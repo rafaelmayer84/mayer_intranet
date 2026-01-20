@@ -1045,22 +1045,4 @@ public function getLucratividadeByMonth(int $ano): array
             'topReducoes' => $maioresReducoes
         ];
     }
-
-    /**
-     * Recupera meta específica da tabela kpi_monthly_targets
-     */
-    private function getMetaValueFromKpiTable(string $kpiKey, int $mes, int $ano): ?float
-    {
-        $meta = DB::table('kpi_monthly_targets')
-            ->where('year', $ano)
-            ->where('month', $mes)
-            ->where('kpi_key', $kpiKey)
-            ->first();
-        
-        if ($meta && $meta->target_value) {
-            return (float) $meta->target_value;
-        }
-        
-        return null;
-    }
 }
