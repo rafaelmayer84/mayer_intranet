@@ -197,7 +197,7 @@
                 
                 <!-- Configurações -->
                         <a href="{{ route('config.metas-kpi-mensais') }}" class="dropdown-item">
-                            <i class="fas fa-bullseye"></i> Metas de KPIs (Mensais)
+                            <i class="fas fa-bullseye"></i> 📊 Metas de KPIs
                         </a>
                 <a href="{{ route('configuracoes.index') }}" 
                    class="nav-link flex items-center px-4 py-3 rounded-lg transition-colors {{ request()->routeIs('configuracoes.*') ? 'nav-link-active' : '' }}">
