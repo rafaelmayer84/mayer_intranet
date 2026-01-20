@@ -724,15 +724,7 @@ public function getLucratividadeByMonth(int $ano): array
         $metaPf = (float) Configuracao::get("meta_pf_{$ano}_{$mes}", 0);
         $metaPj = (float) Configuracao::get("meta_pj_{$ano}_{$mes}", 0);
         $metaReceita = $metaPf + $metaPj;
-        // Meta de despesas
-        $metaDespesasDb = $this->getMetaValueFromKpiTable("despesas", $mes, $ano);
-        if (!$metaDespesasDb) {
-            $metaDespesasAnual = $this->getMetaValueFromKpiTable("despesa_total_ano", 0, $ano);
-            if ($metaDespesasAnual) {
-                $metaDespesasDb = $metaDespesasAnual / 12;
-            }
-        }
-        $metaDespesas = (float) ($metaDespesasDb ?? 0);
+        $metaDespesas = (float) Configuracao::get("meta_despesas_{$ano}_{$mes}", 0);
 
         $metaResultado = (float) Configuracao::get("meta_resultado_{$ano}_{$mes}", max($metaReceita - $metaDespesas, 0));
         $metaMargem = (float) Configuracao::get(
