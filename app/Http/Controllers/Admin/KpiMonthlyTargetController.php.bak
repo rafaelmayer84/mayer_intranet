@@ -10,23 +10,22 @@ class KpiMonthlyTargetController extends Controller
 {
     public function index(Request $request)
     {
-        $ano = (int) $request->get('ano', date('Y'));
+        $ano = $request->get('ano', date('Y'));
         
         // Buscar todas as metas para o ano selecionado
+        // month = 0 significa meta anual
         $metasDb = DB::table('kpi_monthly_targets')
             ->where('year', $ano)
-            ->orderBy('month')
-            ->orderBy('kpi_key')
             ->get();
         
         // Transformar em array associativo para fácil acesso na view
         $metas = collect();
         foreach ($metasDb as $meta) {
             if ($meta->month == 0) {
-                // Meta anual: chave = kpi_key_ano
+                // Meta anual
                 $key = $meta->kpi_key . '_' . $ano;
             } else {
-                // Meta mensal: chave = kpi_key_mes
+                // Meta mensal
                 $key = $meta->kpi_key . '_' . $meta->month;
             }
             $metas->put($key, $meta->target_value);
@@ -40,7 +39,7 @@ class KpiMonthlyTargetController extends Controller
 
     public function store(Request $request)
     {
-        $ano = (int) $request->get('ano', date('Y'));
+        $ano = $request->get('ano', date('Y'));
         $metas = $request->get('metas', []);
 
         // Salvar metas anuais (month = 0)
@@ -54,17 +53,17 @@ class KpiMonthlyTargetController extends Controller
         foreach ($kpisAnuais as $kpiKey) {
             $valor = $metas[$kpiKey][$ano] ?? null;
             if ($valor !== null && $valor !== '') {
-                // Deletar se existe
+                // Primeiro tenta deletar se existe
                 DB::table('kpi_monthly_targets')
                     ->where('year', $ano)
                     ->where('month', 0)
                     ->where('kpi_key', $kpiKey)
                     ->delete();
                 
-                // Inserir novo registro
+                // Depois insere novo registro
                 DB::table('kpi_monthly_targets')->insert([
                     'year' => $ano,
-                    'month' => 0,
+                    'month' => 0,  // 0 = meta anual
                     'kpi_key' => $kpiKey,
                     'target_value' => $valor,
                     'created_at' => now(),
@@ -84,14 +83,14 @@ class KpiMonthlyTargetController extends Controller
             for ($mes = 1; $mes <= 12; $mes++) {
                 $valor = $metas[$kpiKey][$mes] ?? null;
                 if ($valor !== null && $valor !== '') {
-                    // Deletar se existe
+                    // Primeiro tenta deletar se existe
                     DB::table('kpi_monthly_targets')
                         ->where('year', $ano)
                         ->where('month', $mes)
                         ->where('kpi_key', $kpiKey)
                         ->delete();
                     
-                    // Inserir novo registro
+                    // Depois insere novo registro
                     DB::table('kpi_monthly_targets')->insert([
                         'year' => $ano,
                         'month' => $mes,
