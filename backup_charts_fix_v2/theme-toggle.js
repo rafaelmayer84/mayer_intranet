@@ -1,0 +1,225 @@
+/**
+ * Sistema de Tema Escuro/Claro - Intranet Mayer
+ * Gerencia alternância entre temas e persistência em localStorage
+ */
+
+class ThemeManager {
+  constructor() {
+    this.storageKey = 'intranet-theme';
+    this.htmlElement = document.documentElement;
+    this.init();
+  }
+
+  /**
+   * Inicializa o sistema de tema
+   */
+  init() {
+    // Carregar tema salvo ou usar preferência do sistema
+    const savedTheme = this.getSavedTheme();
+    const preferredTheme = savedTheme || this.getSystemPreference();
+    
+    // Aplicar tema
+    this.setTheme(preferredTheme, false);
+    
+    // Criar botão de alternância se não existir
+    this.createThemeToggle();
+    
+    // Escutar mudanças de preferência do sistema
+    this.watchSystemPreference();
+  }
+
+  /**
+   * Obtém o tema salvo no localStorage
+   */
+  getSavedTheme() {
+    return localStorage.getItem(this.storageKey);
+  }
+
+  /**
+   * Obtém a preferência de tema do sistema
+   */
+  getSystemPreference() {
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      return 'dark';
+    }
+    return 'light';
+  }
+
+  /**
+   * Define o tema e salva no localStorage
+   */
+  setTheme(theme, save = true) {
+    // Validar tema
+    if (!['light', 'dark'].includes(theme)) {
+      theme = 'light';
+    }
+
+    // Adicionar classe de transição suave
+    this.htmlElement.classList.add('theme-transition');
+
+    // Aplicar tema
+    if (theme === 'dark') {
+      this.htmlElement.classList.add('dark');
+    } else {
+      this.htmlElement.classList.remove('dark');
+    }
+
+    // Remover classe de transição após animação
+    setTimeout(() => {
+      this.htmlElement.classList.remove('theme-transition');
+    }, 300);
+
+    // Salvar preferência
+    if (save) {
+      localStorage.setItem(this.storageKey, theme);
+    }
+
+    // Atualizar botão de alternância
+    this.updateToggleButton(theme);
+
+    // Disparar evento customizado
+    window.dispatchEvent(new CustomEvent('themechange', { detail: { theme } }));
+
+    // Atualizar gráficos se Chart.js estiver disponível
+    if (window.Chart) {
+      this.updateChartDefaults(theme);
+    }
+  }
+
+  /**
+   * Alterna entre temas
+   */
+  toggleTheme() {
+    const currentTheme = this.htmlElement.classList.contains('dark') ? 'dark' : 'light';
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    this.setTheme(newTheme, true);
+  }
+
+  /**
+   * Cria o botão de alternância de tema
+   */
+  createThemeToggle() {
+    // Procurar por um elemento com id 'theme-toggle-btn'
+    let toggleBtn = document.getElementById('theme-toggle-btn');
+    
+    if (!toggleBtn) {
+      // Se não existir, criar um
+      const headerRight = document.querySelector('.header-right') || 
+                         document.querySelector('header nav') ||
+                         document.querySelector('nav');
+      
+      if (headerRight) {
+        toggleBtn = document.createElement('button');
+        toggleBtn.id = 'theme-toggle-btn';
+        toggleBtn.className = 'theme-toggle';
+        toggleBtn.setAttribute('aria-label', 'Alternar tema');
+        toggleBtn.innerHTML = this.getThemeIcon();
+        headerRight.appendChild(toggleBtn);
+      }
+    }
+
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => this.toggleTheme());
+    }
+  }
+
+  /**
+   * Retorna o ícone do tema (SVG)
+   */
+  getThemeIcon() {
+    const currentTheme = this.htmlElement.classList.contains('dark') ? 'dark' : 'light';
+    
+    if (currentTheme === 'dark') {
+      // Ícone de sol (para mudar para tema claro)
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 18a6 6 0 100-12 6 6 0 000 12zM12 2v4m0 12v4M4.22 4.22l2.83 2.83m4.24 4.24l2.83 2.83M2 12h4m12 0h4m-17.78 7.78l2.83-2.83m4.24-4.24l2.83-2.83"/>
+        </svg>
+      `;
+    } else {
+      // Ícone de lua (para mudar para tema escuro)
+      return `
+        <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      `;
+    }
+  }
+
+  /**
+   * Atualiza o botão de alternância
+   */
+  updateToggleButton(theme) {
+    const toggleBtn = document.getElementById('theme-toggle-btn');
+    if (toggleBtn) {
+      toggleBtn.innerHTML = this.getThemeIcon();
+      toggleBtn.classList.toggle('dark', theme === 'dark');
+    }
+  }
+
+  /**
+   * Escuta mudanças de preferência do sistema
+   */
+  watchSystemPreference() {
+    if (!window.matchMedia) return;
+
+    const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    
+    // Suporte para navegadores antigos
+    if (darkModeQuery.addListener) {
+      darkModeQuery.addListener((e) => {
+        const savedTheme = this.getSavedTheme();
+        if (!savedTheme) {
+          this.setTheme(e.matches ? 'dark' : 'light', false);
+        }
+      });
+    } else if (darkModeQuery.addEventListener) {
+      darkModeQuery.addEventListener('change', (e) => {
+        const savedTheme = this.getSavedTheme();
+        if (!savedTheme) {
+          this.setTheme(e.matches ? 'dark' : 'light', false);
+        }
+      });
+    }
+  }
+
+  /**
+   * Atualiza cores padrão do Chart.js conforme o tema
+   */
+  updateChartDefaults(theme) {
+    const isDark = theme === 'dark';
+    
+    Chart.defaults.color = isDark ? '#d1d5db' : '#6b7280';
+    Chart.defaults.borderColor = isDark ? '#374151' : '#e5e7eb';
+    
+    // Atualizar gráficos existentes
+    Chart.helpers.each(Chart.instances, (instance) => {
+      instance.options.plugins = instance.options.plugins || {};
+      instance.options.plugins.legend = instance.options.plugins.legend || {};
+      instance.options.plugins.legend.labels = instance.options.plugins.legend.labels || {};
+      instance.options.plugins.legend.labels.color = isDark ? '#d1d5db' : '#6b7280';
+      
+      instance.options.scales = instance.options.scales || {};
+      Object.keys(instance.options.scales).forEach(key => {
+        instance.options.scales[key].ticks = instance.options.scales[key].ticks || {};
+        instance.options.scales[key].ticks.color = isDark ? '#d1d5db' : '#6b7280';
+        instance.options.scales[key].grid = instance.options.scales[key].grid || {};
+        instance.options.scales[key].grid.color = isDark ? '#374151' : '#e5e7eb';
+      });
+      
+      instance.update();
+    });
+  }
+}
+
+// Inicializar quando o DOM estiver pronto
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    new ThemeManager();
+  });
+} else {
+  new ThemeManager();
+}
+
+// Exportar para uso em outros scripts
+window.ThemeManager = ThemeManager;

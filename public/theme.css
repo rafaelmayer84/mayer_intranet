@@ -1,0 +1,19 @@
+/*
+ * Hotfix - Form fields não clicáveis (inputs/selects/textarea)
+ * Motivo típico: alguma regra global com pointer-events:none ou overlay.
+ * Correção: garantir interação dentro de forms.
+ */
+
+form, form * {
+  pointer-events: auto !important;
+}
+
+/* Segurança extra para controles padrão */
+input, select, textarea, button {
+  pointer-events: auto !important;
+}
+
+/* Evita pseudo-elementos “por cima” de campos em alguns temas */
+form *::before, form *::after {
+  pointer-events: none !important;
+}

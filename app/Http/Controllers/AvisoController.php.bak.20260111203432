@@ -1,0 +1,216 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Aviso;
+use App\Models\CategoriaAviso;
+use App\Services\AvisoService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
+use Illuminate\View\View;
+
+class AvisoController extends Controller
+{
+    public function __construct(private readonly AvisoService $avisoService)
+    {
+    }
+
+    /**
+     * Quadro de Avisos (usuário) - listagem.
+     */
+    public function index(Request $request): View
+    {
+        $categorias = CategoriaAviso::query()
+            ->where('ativo', true)
+            ->orderBy('ordem')
+            ->orderBy('nome')
+            ->get();
+
+        $filtros = [
+            'categoria_id' => $request->query('categoria_id'),
+            'ordenar' => $request->query('ordenar', 'prioridade'),
+            'busca' => $request->query('busca', ''),
+        ];
+
+        $avisos = $this->avisoService->getAvisosAtivos($filtros);
+        $totalUsuarios = $this->avisoService->getTotalUsuariosAtivos();
+
+        return view('avisos.index', compact('avisos', 'categorias', 'filtros', 'totalUsuarios'));
+    }
+
+    /**
+     * Quadro de Avisos (usuário) - detalhes.
+     *
+     * Importante: retorna 404 apenas quando o aviso não existe ou não está ativo.
+     * Retorna 403 apenas para rotas admin (via Gate).
+     */
+    public function show(Aviso $aviso): View
+    {
+        abort_unless($aviso->isAtivo(), 404);
+
+        $aviso->load(['categoria', 'autor'])->loadCount('usuariosLidos');
+        $totalUsuarios = $this->avisoService->getTotalUsuariosAtivos();
+
+        // Marca como lido (não pode derrubar a página)
+        try {
+            $this->avisoService->marcarComoLido($aviso, auth()->user());
+        } catch (\Throwable $e) {
+            // não silencia erros críticos em fluxo admin; aqui é fluxo usuário -> apenas mantém UX
+            report($e);
+        }
+
+        $htmlDescricao = $this->renderMarkdownSeguro((string) ($aviso->descricao ?? ''));
+
+        return view('avisos.show', compact('aviso', 'htmlDescricao', 'totalUsuarios'));
+    }
+
+    /**
+     * Admin - listagem e filtros.
+     */
+    public function admin(Request $request): View
+    {
+        Gate::authorize('avisos.manage');
+
+        $categorias = CategoriaAviso::query()->orderBy('ordem')->orderBy('nome')->get();
+
+        $query = Aviso::query()->with(['categoria', 'autor']);
+
+        if ($request->filled('categoria_id')) {
+            $query->where('categoria_id', (int) $request->input('categoria_id'));
+        }
+        if ($request->filled('prioridade')) {
+            $query->where('prioridade', (string) $request->input('prioridade'));
+        }
+        if ($request->filled('status')) {
+            $query->where('status', (string) $request->input('status'));
+        }
+        if ($request->filled('busca')) {
+            $busca = trim((string) $request->input('busca'));
+            $query->where(function ($q) use ($busca) {
+                $q->where('titulo', 'like', "%{$busca}%")
+                  ->orWhere('descricao', 'like', "%{$busca}%");
+            });
+        }
+
+        $avisos = $query->orderByDesc('created_at')->paginate(20)->withQueryString();
+
+        return view('avisos.admin.index', compact('avisos', 'categorias'));
+    }
+
+    public function create(): View
+    {
+        Gate::authorize('avisos.manage');
+
+        $aviso = new Aviso([
+            'status' => 'ativo',
+            'prioridade' => 'baixa',
+        ]);
+
+        $categorias = CategoriaAviso::query()->orderBy('ordem')->orderBy('nome')->get();
+
+        return view('avisos.admin.form', [
+            'aviso' => $aviso,
+            'categorias' => $categorias,
+            'mode' => 'create',
+        ]);
+    }
+
+    public function store(Request $request): RedirectResponse
+    {
+        Gate::authorize('avisos.manage');
+
+        $data = $this->validateAviso($request);
+
+        $data['criado_por'] = (int) auth()->id();
+
+        $aviso = Aviso::create($data);
+
+        // Bump para refletir em /avisos imediatamente
+        $this->avisoService->bumpCacheVersion();
+
+        return redirect()
+            ->route('admin.avisos.edit', $aviso)
+            ->with('success', 'Aviso criado com sucesso.');
+    }
+
+    public function edit(Aviso $aviso): View
+    {
+        Gate::authorize('avisos.update', $aviso);
+
+        $categorias = CategoriaAviso::query()->orderBy('ordem')->orderBy('nome')->get();
+
+        return view('avisos.admin.form', [
+            'aviso' => $aviso,
+            'categorias' => $categorias,
+            'mode' => 'edit',
+        ]);
+    }
+
+    public function update(Request $request, Aviso $aviso): RedirectResponse
+    {
+        Gate::authorize('avisos.update', $aviso);
+
+        $data = $this->validateAviso($request, $aviso->id);
+
+        $aviso->update($data);
+
+        $this->avisoService->bumpCacheVersion();
+
+        return redirect()
+            ->route('admin.avisos.edit', $aviso)
+            ->with('success', 'Aviso atualizado com sucesso.');
+    }
+
+    public function destroy(Aviso $aviso): RedirectResponse
+    {
+        Gate::authorize('avisos.delete', $aviso);
+
+        $aviso->delete();
+
+        $this->avisoService->bumpCacheVersion();
+
+        return redirect()
+            ->route('admin.avisos.index')
+            ->with('success', 'Aviso excluído com sucesso.');
+    }
+
+    /**
+     * Validação centralizada do aviso.
+     *
+     * @return array<string,mixed>
+     */
+    private function validateAviso(Request $request, ?int $avisoId = null): array
+    {
+        return $request->validate([
+            'titulo' => ['required', 'string', 'max:255'],
+            'descricao' => ['required', 'string'],
+            'categoria_id' => ['nullable', 'integer', 'exists:categorias_avisos,id'],
+            'prioridade' => ['required', 'in:baixa,media,alta,urgente'],
+            'status' => ['required', 'in:ativo,inativo'],
+            'data_inicio' => ['nullable', 'date'],
+            'data_fim' => ['nullable', 'date', 'after_or_equal:data_inicio'],
+            'destaque' => ['nullable', 'boolean'],
+        ], [
+            'titulo.required' => 'Informe o título.',
+            'descricao.required' => 'Informe a descrição.',
+            'categoria_id.exists' => 'Categoria inválida.',
+            'prioridade.in' => 'Prioridade inválida.',
+            'status.in' => 'Status inválido.',
+        ]);
+    }
+
+    private function renderMarkdownSeguro(string $texto): string
+    {
+        $html = Str::markdown($texto);
+
+        // Permite um conjunto pequeno e útil de tags.
+        $html = strip_tags($html, '<p><br><strong><em><ul><ol><li><a><blockquote><code><pre><h1><h2><h3><h4><h5><h6>');
+
+        // Hardening simples para links.
+        $html = preg_replace('/<a\s+([^>]*href=)/i', '<a rel="noopener noreferrer" target="_blank" $1', $html) ?? $html;
+
+        return $html;
+    }
+}

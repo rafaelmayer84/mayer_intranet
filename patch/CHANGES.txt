@@ -1,0 +1,117 @@
+--- /dev/null	2026-01-16 09:11:34.188523592 -0500
++++ patch/app/Services/DashboardFinanceProdService.php	2026-01-18 07:05:23.042115368 -0500
+@@ -0,0 +1,950 @@
++<?php
++
++namespace App\Services;
++
++use App\Models\Configuracao;
++use App\Models\ContaReceber;
++use App\Models\Movimento;
++use Carbon\Carbon;
++use Illuminate\Support\Facades\Cache;
++use Illuminate\Support\Facades\DB;
++use Illuminate\Support\Facades\Schema;
++
++/**
++ * DashboardFinanceProdService
++ *
++ * Fase 1: Financeiro (Visão Gerencial Executiva)
++ *
++ * Este service consolida as consultas necessárias para a dashboard executiva.
++ * As metas são lidas da tabela "configuracoes" usando o mesmo padrão já
++ * existente em DashboardController (meta_pf_{ano}_{mes}, etc).
++ */
++class DashboardFinanceProdService
++{
++/**
++ * Palavras-chave de rubricas que NÃO devem ser tratadas como despesa operacional
++ * (distribuição de lucros, retirada de sócios, dividendos etc.).
++ *
++ * Observação: usamos "contém" (substring) para funcionar mesmo quando a rubrica vem com código.
++ */
++public const RUBRICAS_EXCLUIDAS = [
++    'distribuição',
++    'distribuicao',
++    'retirada',
++    'dividendo',
++    'dividendos',
++    'lucro',
++    'lucros',
++];
++
++    /**
++     * Cache (curto) de valores distintos do campo "classificacao" em movimentos.
++     *
++     * Importante: este sistema teve ao menos duas versões de schema no histórico:
++     * - classificacao = PF / PJ / DESPESA / OUTRO
++     * - classificacao = RECEITA_PF / RECEITA_PJ / DESPESA / OUTRO
++     *
++     * Para evitar "gráficos em branco" quando o banco estiver na versão antiga,
++     * resolvemos dinamicamente quais valores representam PF/PJ.
++     */
++    private function distinctClassificacoes(): array
++    {
++        return Cache::remember('dash_fin_exec:movimentos:classificacoes', 600, function () {
++            try {
++                return Movimento::query()
++                    ->select('classificacao')
++                    ->distinct()
++                    ->whereNotNull('classificacao')
++                    ->limit(200)
++                    ->pluck('classificacao')
++                    ->filter()
++                    ->values()
++                    ->all();
++            } catch (\Throwable $e) {
++                return [];
++            }
++        });
++    }
++
++    private function normalizeKey(?string $value): string
++    {
++        $v = (string) ($value ?? '');
++        $v = trim($v);
++        if ($v === '') return '';
++
++        // tenta remover acentos (sem depender de extensões externas)
++        $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $v);
++        if (is_string($ascii) && $ascii !== '') {
++            $v = $ascii;
++        }
++
++        $v = mb_strtolower($v, 'UTF-8');
++        // remove separadores comuns para facilitar matching
++        $v = str_replace([' ', '-', '_', '.', '/', '\\'], '', $v);
++        // remove tudo que não for alfanumérico
++        $v = preg_replace('/[^a-z0-9]/', '', $v) ?? '';
++        return $v;
++    }
++
++    /**
++     * Retorna quais valores de "classificacao" devem ser tratados como Receita PF/PJ.
++     *
++     * @return array{pf: array<int,string>, pj: array<int,string>}
++     */
++    private function resolveReceitaClassificacoes(): array
++    {
++        $pf = [];
++        $pj = [];
+=== Mudanças no DashboardFinanceProdService.php ===
+
+1. Linha 470-477: Corrigido getContasEmAtrasoLista()
+   - Antes: 'cliente' => $c->cliente_nome ?? $c->descricao ?? 'Cliente'
+   - Depois: 'numero' => $c->datajuri_id ?? $c->id, 'cliente' => $c->cliente ?? '(Sem cliente)'
+
+2. Linha 235-257: Adicionada detecção de pendentes e pagamentos
+   - Detecta PENDENTE_CLASSIFICACAO
+   - Detecta data_pagamento vazia
+
+3. Linha 584-595: Retorna null para taxaCobranca quando sem pagamentos
+
+=== Mudanças no visao-gerencial.blade.php ===
+
+1. Linha 748-762: Corrigido JavaScript para renderizar tabela
+   - Antes: c.cliente, c.dias, c.status
+   - Depois: c.numero, c.cliente, c.dias_atraso

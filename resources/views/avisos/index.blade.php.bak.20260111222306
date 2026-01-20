@@ -1,0 +1,111 @@
+@extends('layouts.app')
+
+@section('title', 'Quadro de Avisos')
+
+@section('content')
+<div class="space-y-6">
+    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+            <h1 class="text-2xl font-semibold">Quadro de Avisos</h1>
+            <p class="text-sm text-gray-600 dark:text-slate-300">Mensagens importantes e alertas do escritório.</p>
+        </div>
+
+        <div class="flex gap-2">
+            <a href="{{ route('admin.avisos.index') }}"
+               class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white">
+                Gerenciar
+            </a>
+            <a href="{{ route('admin.avisos.create') }}"
+               class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500">
+                Novo aviso
+            </a>
+        </div>
+    </div>
+
+    @if(session('success'))
+        <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-200">
+            {{ session('success') }}
+        </div>
+    @endif
+
+    @if($errors->any())
+        <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-800 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-200">
+            <ul class="list-disc pl-5">
+                @foreach($errors->all() as $e)
+                    <li>{{ $e }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
+    <form method="GET" action="{{ route('avisos.index') }}" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
+            <div>
+                <label class="block text-xs font-medium text-slate-600 dark:text-slate-300">Categoria</label>
+                <select name="categoria_id" class="mt-1 w-full rounded-xl border-slate-200 bg-white text-sm dark:border-slate-800 dark:bg-slate-950">
+                    <option value="">Todas</option>
+                    @foreach($categorias as $cat)
+                        <option value="{{ $cat->id }}" @selected(($filtros['categoria_id'] ?? null) == $cat->id)>{{ $cat->nome }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs font-medium text-slate-600 dark:text-slate-300">Ordenar</label>
+                <select name="ordenar" class="mt-1 w-full rounded-xl border-slate-200 bg-white text-sm dark:border-slate-800 dark:bg-slate-950">
+                    <option value="prioridade" @selected(($filtros['ordenar'] ?? '') === 'prioridade')>Prioridade</option>
+                    <option value="recentes" @selected(($filtros['ordenar'] ?? '') === 'recentes')>Mais recentes</option>
+                </select>
+            </div>
+
+            <div class="md:col-span-2">
+                <label class="block text-xs font-medium text-slate-600 dark:text-slate-300">Busca</label>
+                <input type="text" name="busca" value="{{ $filtros['busca'] ?? '' }}"
+                       class="mt-1 w-full rounded-xl border-slate-200 bg-white text-sm dark:border-slate-800 dark:bg-slate-950"
+                       placeholder="Título ou descrição..." />
+            </div>
+        </div>
+
+        <div class="mt-4 flex items-center justify-between">
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+                Total de usuários ativos: <span class="font-semibold">{{ $totalUsuarios ?? 0 }}</span>
+            </p>
+            <button type="submit" class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white">
+                Filtrar
+            </button>
+        </div>
+    </form>
+
+    <div class="grid grid-cols-1 gap-4">
+        @forelse($avisos as $aviso)
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100 truncate">{{ $aviso->titulo }}</h2>
+                        <p class="mt-1 text-sm text-slate-600 dark:text-slate-300 line-clamp-2">{{ Str::limit(strip_tags($aviso->descricao ?? ''), 180) }}</p>
+                        <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                            @if($aviso->categoria)
+                                <span class="rounded-full border border-slate-200 px-2 py-0.5 dark:border-slate-700">
+                                    {{ $aviso->categoria->nome }}
+                                </span>
+                            @endif
+                            <span class="rounded-full border border-slate-200 px-2 py-0.5 dark:border-slate-700">
+                                Prioridade: {{ $aviso->getPrioridadeLabel() }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <a href="{{ route('avisos.show', $aviso->id) }}"
+                       class="shrink-0 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500">
+                        Ver detalhes
+                    </a>
+                </div>
+            </div>
+        @empty
+            <div class="rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                Nenhum aviso encontrado.
+            </div>
+        @endforelse
+    </div>
+</div>
+@endsection

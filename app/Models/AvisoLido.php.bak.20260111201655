@@ -1,0 +1,35 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class AvisoLido extends Model
+{
+    use HasFactory;
+
+    protected $table = 'avisos_lidos';
+
+    public $timestamps = false;
+
+    protected $fillable = [
+        'aviso_id',
+        'usuario_id',
+        'lido_em',
+    ];
+
+    protected $casts = [
+        'lido_em' => 'datetime',
+    ];
+
+    public function aviso()
+    {
+        return $this->belongsTo(Aviso::class, 'aviso_id');
+    }
+
+    public function usuario()
+    {
+        return $this->belongsTo(User::class, 'usuario_id');
+    }
+}

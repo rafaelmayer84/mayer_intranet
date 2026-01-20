@@ -1,0 +1,127 @@
+/* Small helpers only. Keep Tailwind as the main styling source. */
+html.theme-transition, html.theme-transition * {
+  transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease, fill 200ms ease, stroke 200ms ease;
+}
+
+/* Submenu animation (keeps existing markup) */
+.submenu { max-height: 0; overflow: hidden; transition: max-height 0.25s ease; }
+.submenu.open { max-height: 700px; }
+.menu-arrow { transition: transform 0.25s ease; }
+.menu-arrow.rotated { transform: rotate(180deg); }
+
+/* Optional: keep menu colors stable even with Tailwind resets */
+.menu-item.active { font-weight: 600; }
+
+/*
+ * Tema (dark = padrão atual, light = override)
+ * Estratégia: não mexer na massa de classes Tailwind das views;
+ * aplicamos overrides escopados (sidebar + main) quando html NÃO tem .dark.
+ */
+
+/* Base */
+html.dark body { background-color: #111827; color: #ffffff; }
+html:not(.dark) body { background-color: #f9fafb; color: #111827; }
+
+/* Sidebar + header */
+html.dark .sidebar { background-color: #1f2937; border-right: 1px solid #374151; }
+html:not(.dark) .sidebar { background-color: #ffffff; border-right: 1px solid #e5e7eb; }
+
+html.dark .mobile-header { background-color: #111827; border-bottom: 1px solid #1f2937; color: #ffffff; }
+html:not(.dark) .mobile-header { background-color: #ffffff; border-bottom: 1px solid #e5e7eb; color: #111827; }
+
+/* Tipografia (header/mobile) */
+html:not(.dark) .mobile-header .text-white { color: #111827 !important; }
+
+/* Botão de tema */
+.theme-toggle {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+
+html.dark .theme-toggle { background-color: rgba(55, 65, 81, 0.5); border-color: #374151; color: #e5e7eb; }
+html.dark .theme-toggle:hover { background-color: #374151; }
+html:not(.dark) .theme-toggle { background-color: #f3f4f6; border-color: #e5e7eb; color: #111827; }
+html:not(.dark) .theme-toggle:hover { background-color: #e5e7eb; }
+
+/* Itens de navegação (novos helpers usados no layout) */
+.nav-link,
+.nav-sublink {
+  display: flex;
+  align-items: center;
+}
+
+html.dark .nav-link { color: #d1d5db; }
+html.dark .nav-link:hover { background-color: #374151; color: #ffffff; }
+html.dark .nav-link-active { background-color: #2563eb; color: #ffffff; }
+
+html:not(.dark) .nav-link { color: #374151; }
+html:not(.dark) .nav-link:hover { background-color: #f3f4f6; color: #111827; }
+html:not(.dark) .nav-link-active { background-color: #2563eb; color: #ffffff; }
+
+html.dark .nav-sublink { color: #9ca3af; }
+html.dark .nav-sublink:hover { background-color: #374151; color: #ffffff; }
+html.dark .nav-sublink-active { color: #60a5fa; background-color: rgba(59, 130, 246, 0.10); }
+
+html:not(.dark) .nav-sublink { color: #4b5563; }
+html:not(.dark) .nav-sublink:hover { background-color: #f3f4f6; color: #111827; }
+html:not(.dark) .nav-sublink-active { color: #2563eb; background-color: rgba(37, 99, 235, 0.08); }
+
+.nav-sublink-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.nav-sublink-disabled:hover { background-color: transparent !important; }
+
+/* Divisor do menu */
+html:not(.dark) hr.border-gray-700\/70 { border-color: #e5e7eb !important; }
+
+/* Conteúdo principal: "clarear" as superfícies mais comuns */
+html:not(.dark) main .bg-gray-900 { background-color: #f9fafb !important; }
+html:not(.dark) main .bg-gray-800 { background-color: #ffffff !important; }
+html:not(.dark) main .bg-gray-700 { background-color: #f3f4f6 !important; }
+html:not(.dark) main .border-gray-700 { border-color: #e5e7eb !important; }
+html:not(.dark) main .border-gray-800 { border-color: #e5e7eb !important; }
+
+/* Textos no conteúdo */
+html:not(.dark) main .text-white { color: #111827 !important; }
+html:not(.dark) main .text-gray-100 { color: #111827 !important; }
+html:not(.dark) main .text-gray-200 { color: #1f2937 !important; }
+html:not(.dark) main .text-gray-300 { color: #374151 !important; }
+html:not(.dark) main .text-gray-400 { color: #6b7280 !important; }
+html:not(.dark) main .text-gray-500 { color: #6b7280 !important; }
+
+/* Manter contraste em botões/selos coloridos */
+html:not(.dark) main .bg-blue-600 .text-white,
+html:not(.dark) main .bg-blue-500 .text-white,
+html:not(.dark) main .bg-emerald-600 .text-white,
+html:not(.dark) main .bg-green-600 .text-white,
+html:not(.dark) main .bg-red-600 .text-white,
+html:not(.dark) main .bg-amber-600 .text-white {
+  color: #ffffff !important;
+}
+
+
+/*
+ * Hotfix - Form fields não clicáveis (inputs/selects/textarea)
+ * Motivo típico: alguma regra global com pointer-events:none ou overlay.
+ * Correção: garantir interação dentro de forms.
+ */
+
+form, form * {
+  pointer-events: auto !important;
+}
+
+/* Segurança extra para controles padrão */
+input, select, textarea, button {
+  pointer-events: auto !important;
+}
+
+/* Evita pseudo-elementos “por cima” de campos em alguns temas */
+form *::before, form *::after {
+  pointer-events: none !important;
+}
