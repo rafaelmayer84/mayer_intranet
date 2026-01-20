@@ -213,9 +213,14 @@ public const RUBRICAS_EXCLUIDAS = [
             $metasPJ = $this->getMetasMensais('meta_pj', $ano);
 
             $despesasRubrica = $this->getDespesasByRubrica($ano, $mes);
-            $rubricasMoM = $this->getRubricasMoM($ano, $mes);
             $contasAtrasoLista = $this->getContasEmAtrasoLista($ano, $mes);
-            $topAtrasoClientes = $this->getTopAtrasoClientes($ano, $mes);
+            try {
+                $topAtrasoClientes = $this->getTopAtrasoClientes($ano, $mes);
+            } catch (\Exception $e) {
+                \Log::error('Erro ao calcular top atraso clientes: ' . $e->getMessage());
+                $this->warnings[] = 'Não foi possível calcular concentração de atraso de clientes';
+                $topAtrasoClientes = ['refDate' => date('Y-m-d'), 'totalVencido' => 0, 'top' => [], 'top3SharePct' => 0];
+            }
             $aging = $this->getAgingContas($ano, $mes);
             $comparativo = $this->getComparativoMensal($ano, $mes);
             // Diagnóstico de qualidade de dados (para evitar dashboard "bonita" com base vazia).
@@ -265,59 +270,6 @@ public const RUBRICAS_EXCLUIDAS = [
                 $warnings[] = 'metas não cadastradas: metas ficarão 0 (preencha em /configurar-metas).';
             }
 
-
-            // Calcular mix PF/PJ
-            $totalReceitaMes = $resumo['receitaTotal'] ?? 0;
-            $pfMes = $resumo['receitaPF'] ?? 0;
-            $pjMes = $resumo['receitaPJ'] ?? 0;
-            $mix = [
-                'pfPct' => $totalReceitaMes > 0 ? ($pfMes / $totalReceitaMes) * 100 : 0,
-                'pjPct' => $totalReceitaMes > 0 ? ($pjMes / $totalReceitaMes) * 100 : 0,
-                'pfValor' => $pfMes,
-                'pjValor' => $pjMes,
-            ];
-
-            // Calcular YoY
-            $prevMes = $mes === 1 ? 12 : $mes - 1;
-            $prevAno = $mes === 1 ? $ano - 1 : $ano;
-            $resumoPrev = $this->getResumoExecutivo($prevAno, $prevMes);
-            $receitaPrev = $resumoPrev['receitaTotal'] ?? 0;
-            $yoy = [
-                'yoyPct' => $receitaPrev > 0 ? (($totalReceitaMes - $receitaPrev) / $receitaPrev) * 100 : 0,
-                'atual' => $totalReceitaMes,
-                'anoAnterior' => $receitaPrev,
-            ];
-
-            // Calcular Expense Ratio
-            $despesasMes = $resumo['despesasTotal'] ?? 0;
-            $expense = [
-                'pct' => $totalReceitaMes > 0 ? ($despesasMes / $totalReceitaMes) * 100 : 0,
-                'despesas' => $despesasMes,
-                'receita' => $totalReceitaMes,
-            ];
-
-            // Calcular Inadimplência
-            $aging = $this->getAgingContas($ano, $mes);
-            $totalVencido = array_sum([
-                $aging['dias0_15'] ?? 0,
-                $aging['dias16_30'] ?? 0,
-                $aging['dias31_60'] ?? 0,
-                $aging['dias60plus'] ?? 0,
-            ]);
-            $totalAberto = (float) ContaReceber::query()
-                ->where('status', 'aberto')
-                ->sum('valor') ?? 0;
-            $inad = [
-                'pctVencidoSobreAberto' => $totalAberto > 0 ? ($totalVencido / $totalAberto) * 100 : 0,
-                'totalVencido' => $totalVencido,
-                'totalAberto' => $totalAberto,
-            ];
-
-            // Qualidade do Dado
-            $qual = [
-                'pctConciliadoCount' => $movimentosTotal > 0 ? ($movimentosComClassificacao / $movimentosTotal) * 100 : 0,
-            ];
-
             return [
                 'ano' => $ano,
                 'mes' => $mes,
@@ -338,21 +290,41 @@ public const RUBRICAS_EXCLUIDAS = [
                 'contasAtrasoLista' => $contasAtrasoLista,
                 'topAtrasoClientes' => $topAtrasoClientes,
                 'agingContas' => $aging,
+                'mixReceita' => [
+                    'pfValor' => $resumo['receitaPf'] ?? 0,
+                    'pjValor' => $resumo['receitaPj'] ?? 0,
+                    'pfPct' => $resumo['receitaTotal'] > 0 ? round(($resumo['receitaPf'] / $resumo['receitaTotal']) * 100, 1) : 0,
+                    'pjPct' => $resumo['receitaTotal'] > 0 ? round(($resumo['receitaPj'] / $resumo['receitaTotal']) * 100, 1) : 0,
+                ],
+                'receitaYoY' => [
+                    'yoyPct' => $resumo['receitaTrend'] ?? 0,
+                    'atual' => $resumo['receitaTotal'] ?? 0,
+                    'anoAnterior' => $resumo['receitaPrev'] ?? 0,
+                ],
+                'expenseRatio' => [
+                    'pct' => $resumo['receitaTotal'] > 0 ? round(($resumo['despesasTotal'] / $resumo['receitaTotal']) * 100, 1) : 0,
+                    'despesas' => $resumo['despesasTotal'] ?? 0,
+                    'receita' => $resumo['receitaTotal'] ?? 0,
+                ],
+                'inadimplencia' => [
+                    'pctVencidoSobreAberto' => $saude['inadimplencia'] ?? 0,
+                    'totalVencido' => $saude['totalVencido'] ?? 0,
+                    'totalAberto' => $saude['totalAberto'] ?? 0,
+                ],
+                'qualidadeDados' => [
+                    'pctConciliadoCount' => $movimentosComClassificacao > 0 ? round(($movimentosComClassificacao / $movimentosTotal) * 100, 1) : 0,
+                    'receitaQualificada' => $resumo['receitaTotal'] ?? 0,
+                    'receitaTotal' => $resumo['receitaTotal'] ?? 0,
+                ],
                 'comparativoMensal' => $comparativo,
-                'rubricasMoM' => $rubricasMoM,
-                'mix' => $mix,
-                'yoy' => $yoy,
-                'expense' => $expense,
-                'inad' => $inad,
-                'qual' => $qual,
                 'dataQuality' => [
                     'movimentosTotal' => $movimentosTotal,
                     'movimentosComClassificacao' => $movimentosComClassificacao,
                     'contasReceberTotal' => $contasReceberTotal,
                     'metasConfiguradasCount' => $metasConfiguradasCount,
                 ],
+                'rubricasMoM' => $this->getRubricasVariacaoMoM($ano, $mes),
                 'warnings' => $warnings,
-
             ];
         });
     }
@@ -396,7 +368,7 @@ public const RUBRICAS_EXCLUIDAS = [
  */
 public function getReceitaPFByMonth(int $ano): array
 {
-    $metas = $this->metasMensais('meta_pf', $ano);
+    $metas = $this->getMetasMensais('meta_pf', $ano);
     $real = $this->getReceitaByMonth($ano)['pf'];
 
     return [
@@ -411,7 +383,7 @@ public function getReceitaPFByMonth(int $ano): array
  */
 public function getReceitaPJByMonth(int $ano): array
 {
-    $metas = $this->metasMensais('meta_pj', $ano);
+    $metas = $this->getMetasMensais('meta_pj', $ano);
     $real = $this->getReceitaByMonth($ano)['pj'];
 
     return [
@@ -449,172 +421,66 @@ public function getLucratividadeByMonth(int $ano): array
     ];
 }
 
-
-        /**
-     * Rubricas — Variação MoM (Top 5 ↑/↓).
-     * Base: movimentos (DESPESA) agrupados por (codigo_plano, plano_contas) em competência atual vs anterior.
-     * Compatível com MySQL ONLY_FULL_GROUP_BY.
+    /**
+     * Despesas por rubrica (agrupadas por código do plano) dentro do mês.
+     * Filtra rubricas não-operacionais (distribuição/retirada/dividendos/lucros).
      */
-    public function getRubricasMoM(int $ano, int $mes): array
+    public function getDespesasByRubrica(int $ano, int $mes): array
     {
         $mes = max(1, min(12, $mes));
         [$pAno, $pMes] = $this->prevCompetencia($ano, $mes);
 
-        $baseQuery = function (int $a, int $m) {
-            $q = Movimento::query()
-                ->select(
-                    'codigo_plano',
-                    'plano_contas',
-                    DB::raw('SUM(valor) as total')
-                )
-                ->where('ano', $a)
-                ->where('mes', $m)
-                ->where('classificacao', Movimento::DESPESA);
+        $q = Movimento::select(
+                'codigo_plano',
+                'plano_contas',
+                DB::raw('SUM(valor) as total')
+            )
+            ->where('ano', $ano)
+            ->where('mes', $mes)
+            ->where('classificacao', Movimento::DESPESA);
 
-            $this->applyRubricasExcluidas($q);
+        $this->applyRubricasExcluidas($q);
 
-            // ONLY_FULL_GROUP_BY: todas as colunas não agregadas precisam estar no groupBy.
-            return $q->groupBy('codigo_plano', 'plano_contas')->get();
-        };
+        $rows = $q->groupBy('codigo_plano', 'plano_contas')
+            ->orderByDesc('total')
+            ->limit(30)
+            ->get();
 
-        $curRows = $baseQuery($ano, $mes);
-        $prevRows = $baseQuery($pAno, $pMes);
+        // Totais do mês anterior por rubrica (para tendência)
+        $qPrev = Movimento::select('codigo_plano', DB::raw('SUM(valor) as total'))
+            ->where('ano', $pAno)
+            ->where('mes', $pMes)
+            ->where('classificacao', Movimento::DESPESA);
 
-        $cur = [];
-        foreach ($curRows as $r) {
-            $key = (string) ($r->codigo_plano ?? '');
-            $label = $this->normalizarRubrica((string) ($r->plano_contas ?? $key));
-            $cur[$key] = ['rubrica' => $label, 'total' => (float) $r->total];
-        }
+        $this->applyRubricasExcluidas($qPrev);
 
-        $prev = [];
-        foreach ($prevRows as $r) {
-            $key = (string) ($r->codigo_plano ?? '');
-            $label = $this->normalizarRubrica((string) ($r->plano_contas ?? $key));
-            $prev[$key] = ['rubrica' => $label, 'total' => (float) $r->total];
-        }
+        $prev = $qPrev->groupBy('codigo_plano')
+            ->pluck('total', 'codigo_plano')
+            ->toArray();
 
-        $keys = array_values(array_unique(array_merge(array_keys($cur), array_keys($prev))));
+        $out = [];
+        foreach ($rows as $r) {
+            $codigo = (string) ($r->codigo_plano ?? '');
+            $rubrica = $this->normalizarRubrica((string) ($r->plano_contas ?? $codigo));
 
-        $aumentos = [];
-        $reducoes = [];
-
-        foreach ($keys as $k) {
-            $atual = (float) ($cur[$k]['total'] ?? 0.0);
-            $anterior = (float) ($prev[$k]['total'] ?? 0.0);
-            $delta = $atual - $anterior;
-
-            if (abs($delta) < 0.00001) {
+            if (!$this->isDespesaOperacional($rubrica)) {
                 continue;
             }
 
-            // Regra: se mês anterior = 0 e atual > 0, variação = 100% (evita Infinity/NaN).
-            if ($anterior == 0.0) {
-                $varPct = $atual > 0 ? 100.0 : 0.0;
-            } else {
-                $varPct = ($delta / $anterior) * 100.0;
-            }
+            $valor = (float) $r->total;
+            $meta = (float) Configuracao::get("meta_despesa_rubrica_{$ano}_{$mes}_{$codigo}", 0);
+            $prevVal = isset($prev[$codigo]) ? (float) $prev[$codigo] : 0.0;
 
-            $item = [
-                'codigo_plano' => $k,
-                'rubrica' => (string) (($cur[$k]['rubrica'] ?? $prev[$k]['rubrica'] ?? $k)),
-                'atual' => round($atual, 2),
-                'anterior' => round($anterior, 2),
-                'delta' => round($delta, 2),
-                'varPct' => round($varPct, 2),
+            $out[] = [
+                'rubrica' => $rubrica,
+                'valor' => round($valor, 2),
+                'meta' => round($meta, 2),
+                'trend' => $this->percentChange($valor, $prevVal),
             ];
-
-            if ($delta > 0) {
-                $aumentos[] = $item;
-            } else {
-                $reducoes[] = $item;
-            }
         }
 
-        usort($aumentos, fn($a, $b) => ($b['delta'] <=> $a['delta']));
-        usort($reducoes, fn($a, $b) => ($a['delta'] <=> $b['delta'])); // mais negativo primeiro
-
-        $topAumentos = array_slice($aumentos, 0, 5);
-        $topReducoes = array_slice($reducoes, 0, 5);
-
-        return [
-            // nomes usados na view
-            'topAumentos' => $topAumentos,
-            'topReducoes' => $topReducoes,
-
-            // aliases (retrocompat / API)
-            'aumentos' => $topAumentos,
-            'reducoes' => $topReducoes,
-
-            'competencia' => ['ano' => $ano, 'mes' => $mes],
-            'competenciaAnterior' => ['ano' => $pAno, 'mes' => $pMes],
-        ];
+        return $out;
     }
-
-/**
-     * Despesas por rubrica (agrupadas por código do plano) dentro do mês.
-     */
-    /**
- * Despesas por rubrica (agrupadas por código do plano) dentro do mês.
- * Filtra rubricas não-operacionais (distribuição/retirada/dividendos/lucros).
- */
-public function getDespesasByRubrica(int $ano, int $mes): array
-{
-    $mes = max(1, min(12, $mes));
-    [$pAno, $pMes] = $this->prevCompetencia($ano, $mes);
-
-    $q = Movimento::select(
-            'codigo_plano',
-            'plano_contas',
-            DB::raw('SUM(valor) as total')
-        )
-        ->where('ano', $ano)
-        ->where('mes', $mes)
-        ->where('classificacao', Movimento::DESPESA);
-
-    $this->applyRubricasExcluidas($q);
-
-    $rows = $q->groupBy('codigo_plano', 'plano_contas')
-        ->orderByDesc('total')
-        ->limit(30)
-        ->get();
-
-    // Totais do mês anterior por rubrica (para tendência)
-    $qPrev = Movimento::select('codigo_plano', DB::raw('SUM(valor) as total'))
-        ->where('ano', $pAno)
-        ->where('mes', $pMes)
-        ->where('classificacao', Movimento::DESPESA);
-
-    $this->applyRubricasExcluidas($qPrev);
-
-    $prev = $qPrev->groupBy('codigo_plano')
-        ->pluck('total', 'codigo_plano')
-        ->toArray();
-
-    $out = [];
-    foreach ($rows as $r) {
-        $codigo = (string) ($r->codigo_plano ?? '');
-        $rubrica = $this->normalizarRubrica((string) ($r->plano_contas ?? $codigo));
-
-        if (!$this->isDespesaOperacional($rubrica)) {
-            continue;
-        }
-
-        $valor = (float) $r->total;
-        $meta = (float) Configuracao::get("meta_despesa_rubrica_{$ano}_{$mes}_{$codigo}", 0);
-        $prevVal = isset($prev[$codigo]) ? (float) $prev[$codigo] : 0.0;
-
-        $out[] = [
-            'rubrica' => $rubrica,
-            'valor' => round($valor, 2),
-            'meta' => round($meta, 2),
-            'trend' => $this->percentChange($valor, $prevVal),
-        ];
-    }
-
-    return $out;
-}
-
 
     /**
      * Wrapper conforme nomenclatura do prompt.
@@ -652,18 +518,17 @@ public function getDespesasByRubrica(int $ano, int $mes): array
                 'numero' => (int) ($c->datajuri_id ?? $c->id ?? 0),
                 'cliente' => (string) ($c->cliente ?? '(Sem cliente)'),
                 'valor' => (float) $c->valor,
-                'dias_atraso' => $dias,
+                'diasAtraso' => $dias,
                 'status' => $this->statusAtraso($dias),
             ];
         }
 
         usort($mapped, function ($a, $b) {
-            return ($b['dias_atraso'] <=> $a['dias_atraso']) ?: ($b['valor'] <=> $a['valor']);
+            return ($b['diasAtraso'] <=> $a['diasAtraso']) ?: ($b['valor'] <=> $a['valor']);
         });
 
         return array_slice($mapped, 0, 10);
     }
-
 
     /**
      * KPI: Top clientes em atraso (agrupado por cliente_nome).
@@ -680,11 +545,10 @@ public function getDespesasByRubrica(int $ano, int $mes): array
     {
         $ref = $this->refDateCompetencia($ano, $mes);
 
-        // Coluna confirmada no schema do projeto: contas_receber.cliente_nome.
-        // Mantemos fallback ultra-conservador apenas para instalações antigas.
-        $col = Schema::hasColumn('contas_receber', 'cliente_nome')
-            ? 'cliente_nome'
-            : (Schema::hasColumn('contas_receber', 'cliente') ? 'cliente' : null);
+        // Coluna confirmada no schema do projeto: contas_receber.cliente
+        $col = Schema::hasColumn('contas_receber', 'cliente')
+            ? 'cliente'
+            : null;
 
         $base = $this->overdueQuery($ref);
 
@@ -767,6 +631,9 @@ public function getDespesasByRubrica(int $ano, int $mes): array
 
         return [
             'contasAtraso' => round($totalAtraso, 2),
+            'diasAtraso' => $avgDias,
+            'diasAtrasoMeta' => (int) Configuracao::get("meta_dias_atraso_{$ano}_{$mes}", 30),
+            'diasAtrasoTrend' => $avgDiasPrev > 0 ? (int) round($avgDias - $avgDiasPrev) : (int) $avgDias,
             'contasAtrasoPercent' => $percent,
             'contasAtrasoTrend' => $this->percentChange($totalAtraso, $totalAtrasoPrev),
             'diasMedioAtraso' => $avgDias,
@@ -775,7 +642,26 @@ public function getDespesasByRubrica(int $ano, int $mes): array
             'taxaCobranca' => $taxa,
             'taxaCobrancaMeta' => (float) Configuracao::get("meta_taxa_cobranca_{$ano}_{$mes}", 95),
             'taxaCobrancaTrend' => $this->percentChange($taxa, $taxaPrev),
+            'totalVencido' => $totalAtraso,
+            'totalAberto' => (float) ContaReceber::query()->whereNull('data_pagamento')->sum('valor'),
+            'inadimplencia' => $this->calcularInadimplencia($ano, $mes),
         ];
+    }
+
+    /**
+     * Calcula inadimplência (% de contas vencidas sobre total em aberto).
+     */
+    private function calcularInadimplencia(int $ano, int $mes): float
+    {
+        $ref = $this->refDateCompetencia($ano, $mes);
+        $totalAberto = (float) ContaReceber::query()
+            ->whereNull('data_pagamento')
+            ->sum('valor');
+
+        if ($totalAberto <= 0) return 0.0;
+
+        $totalVencido = (float) $this->overdueQuery($ref)->sum('valor');
+        return round(($totalVencido / $totalAberto) * 100, 1);
     }
 
     /**
@@ -847,9 +733,12 @@ public function getDespesasByRubrica(int $ano, int $mes): array
         );
 
         return [
+            'receitaPf' => round($receitaPf, 2),
+            'receitaPj' => round($receitaPj, 2),
             'receitaTotal' => round($receitaTotal, 2),
             'receitaMeta' => round($metaReceita, 2),
             'receitaTrend' => $this->percentChange($receitaTotal, $receitaPrev),
+            'receitaPrev' => round($receitaPrev, 2),
             'despesasTotal' => round($despesasTotal, 2),
             'despesasMeta' => round($metaDespesas, 2),
             'despesasTrend' => $this->percentChange($despesasTotal, $despesasPrev),
@@ -944,29 +833,27 @@ public function getDespesasByRubrica(int $ano, int $mes): array
     {
         $ref = $this->refDateCompetencia($ano, $mes);
         $contas = $this->overdueQuery($ref)->get();
-
         $buckets = [
             'dias0_15' => 0.0,
             'dias16_30' => 0.0,
             'dias31_60' => 0.0,
-            'dias60plus' => 0.0,
+            'dias61_90' => 0.0,
+            'dias91_120' => 0.0,
+            'dias120_plus' => 0.0,
         ];
-
         foreach ($contas as $c) {
-            if (!$c->data_vencimento) continue;
             $dias = max(0, (int) $c->data_vencimento->diffInDays($ref, false));
             $v = (float) $c->valor;
-
             if ($dias <= 15) $buckets['dias0_15'] += $v;
             elseif ($dias <= 30) $buckets['dias16_30'] += $v;
             elseif ($dias <= 60) $buckets['dias31_60'] += $v;
-            else $buckets['dias60plus'] += $v;
+            elseif ($dias <= 90) $buckets['dias61_90'] += $v;
+            elseif ($dias <= 120) $buckets['dias91_120'] += $v;
+            else $buckets['dias120_plus'] += $v;
         }
-
         foreach ($buckets as $k => $v) {
             $buckets[$k] = round((float) $v, 2);
         }
-
         return $buckets;
     }
 
@@ -1000,73 +887,72 @@ public function getDespesasByRubrica(int $ano, int $mes): array
         return $metas;
     }
 
-    
-/**
- * Aplica filtro de exclusão de rubricas não operacionais a uma query de Movimento.
- */
-private function applyRubricasExcluidas($query)
-{
-    foreach (self::RUBRICAS_EXCLUIDAS as $kw) {
-        $like = '%' . $kw . '%';
-        // Filtra por plano_contas e descricao (quando houver)
-        $query->whereRaw(
-            "LOWER(CONCAT(COALESCE(plano_contas,''), ' ', COALESCE(descricao,''))) NOT LIKE ?",
-            [$like]
-        );
-    }
-    return $query;
-}
-
-private function isDespesaOperacional(string $rubrica): bool
-{
-    $r = mb_strtolower($rubrica);
-    foreach (self::RUBRICAS_EXCLUIDAS as $kw) {
-        if (str_contains($r, $kw)) {
-            return false;
+    /**
+     * Aplica filtro de exclusão de rubricas não operacionais a uma query de Movimento.
+     */
+    private function applyRubricasExcluidas($query)
+    {
+        foreach (self::RUBRICAS_EXCLUIDAS as $kw) {
+            $like = '%' . $kw . '%';
+            // Filtra por plano_contas e descricao (quando houver)
+            $query->whereRaw(
+                "LOWER(CONCAT(COALESCE(plano_contas,''), ' ', COALESCE(descricao,''))) NOT LIKE ?",
+                [$like]
+            );
         }
-    }
-    return true;
-}
-
-/**
- * Soma despesas operacionais do mês (aplicando exclusões).
- */
-private function despesasOperacionaisTotal(int $ano, int $mes): float
-{
-    $q = Movimento::where('ano', $ano)
-        ->where('mes', $mes)
-        ->where('classificacao', Movimento::DESPESA);
-
-    $this->applyRubricasExcluidas($q);
-
-    return (float) $q->sum('valor');
-}
-
-/**
- * Despesas operacionais por mês (12 meses).
- *
- * @return array<int,float>
- */
-private function despesasOperacionaisByMonth(int $ano): array
-{
-    $out = array_fill(0, 12, 0.0);
-
-    $q = Movimento::select(DB::raw('mes'), DB::raw('SUM(valor) as total'))
-        ->where('ano', $ano)
-        ->where('classificacao', Movimento::DESPESA);
-    $this->applyRubricasExcluidas($q);
-
-    $rows = $q->groupBy('mes')->pluck('total', 'mes')->toArray();
-
-    foreach ($rows as $m => $t) {
-        $idx = ((int) $m) - 1;
-        if ($idx >= 0 && $idx < 12) $out[$idx] = (float) $t;
+        return $query;
     }
 
-    return array_map('floatval', $out);
-}
+    private function isDespesaOperacional(string $rubrica): bool
+    {
+        $r = mb_strtolower($rubrica);
+        foreach (self::RUBRICAS_EXCLUIDAS as $kw) {
+            if (str_contains($r, $kw)) {
+                return false;
+            }
+        }
+        return true;
+    }
 
-private function getMesesAbrev(): array
+    /**
+     * Soma despesas operacionais do mês (aplicando exclusões).
+     */
+    private function despesasOperacionaisTotal(int $ano, int $mes): float
+    {
+        $q = Movimento::where('ano', $ano)
+            ->where('mes', $mes)
+            ->where('classificacao', Movimento::DESPESA);
+
+        $this->applyRubricasExcluidas($q);
+
+        return (float) $q->sum('valor');
+    }
+
+    /**
+     * Despesas operacionais por mês (12 meses).
+     *
+     * @return array<int,float>
+     */
+    private function despesasOperacionaisByMonth(int $ano): array
+    {
+        $out = array_fill(0, 12, 0.0);
+
+        $q = Movimento::select(DB::raw('mes'), DB::raw('SUM(valor) as total'))
+            ->where('ano', $ano)
+            ->where('classificacao', Movimento::DESPESA);
+        $this->applyRubricasExcluidas($q);
+
+        $rows = $q->groupBy('mes')->pluck('total', 'mes')->toArray();
+
+        foreach ($rows as $m => $t) {
+            $idx = ((int) $m) - 1;
+            if ($idx >= 0 && $idx < 12) $out[$idx] = (float) $t;
+        }
+
+        return array_map('floatval', $out);
+    }
+
+    private function getMesesAbrev(): array
     {
         return ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
     }
@@ -1105,5 +991,58 @@ private function getMesesAbrev(): array
             return $last !== '' ? $last : $plano;
         }
         return $plano;
+    }
+
+    private function getRubricasVariacaoMoM(int $ano, int $mes): array
+    {
+        [$prevAno, $prevMes] = $this->prevCompetencia($ano, $mes);
+        
+        $atualRaw = $this->getDespesasByRubrica($ano, $mes);
+        $anteriorRaw = $this->getDespesasByRubrica($prevAno, $prevMes);
+        
+        $atual = [];
+        foreach ($atualRaw as $item) {
+            $atual[$item['rubrica']] = (float) $item['valor'];
+        }
+        
+        $anterior = [];
+        foreach ($anteriorRaw as $item) {
+            $anterior[$item['rubrica']] = (float) $item['valor'];
+        }
+        
+        $variacoes = [];
+        $todasRubricas = array_unique(array_merge(array_keys($atual), array_keys($anterior)));
+        
+        foreach ($todasRubricas as $rubrica) {
+            $vAtual = $atual[$rubrica] ?? 0.0;
+            $vAnterior = $anterior[$rubrica] ?? 0.0;
+            
+            $diff = $vAtual - $vAnterior;
+            $pct = 0.0;
+            if ($vAnterior > 0) {
+                $pct = ($diff / $vAnterior) * 100;
+            } elseif ($vAtual > 0) {
+                $pct = 100.0;
+            }
+            
+            $variacoes[] = [
+                'rubrica' => $this->normalizarRubrica($rubrica),
+                'atual' => $vAtual,
+                'anterior' => $vAnterior,
+                'diff' => $diff,
+                'pct' => round($pct, 1)
+            ];
+        }
+        
+        usort($variacoes, fn($a, $b) => $b['diff'] <=> $a['diff']);
+        $maioresAumentos = array_slice(array_filter($variacoes, fn($v) => $v['diff'] > 0), 0, 5);
+        
+        usort($variacoes, fn($a, $b) => $a['diff'] <=> $b['diff']);
+        $maioresReducoes = array_slice(array_filter($variacoes, fn($v) => $v['diff'] < 0), 0, 5);
+        
+        return [
+            'aumentos' => $maioresAumentos,
+            'reducoes' => $maioresReducoes
+        ];
     }
 }

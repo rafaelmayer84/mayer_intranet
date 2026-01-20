@@ -9,11 +9,6 @@
     $d = $dashboardData ?? [];
     $resumo = $d['resumoExecutivo'] ?? [];
     $saude = $d['saudeFinanceira'] ?? [];
-    $mix = $d['mix'] ?? null;
-    $yoy = $d['yoy'] ?? null;
-    $expense = $d['expense'] ?? null;
-    $inad = $d['inad'] ?? null;
-    $qual = $d['qual'] ?? null;
 
     $fmtMoeda = fn($v) => 'R$ ' . number_format((float) $v, 2, ',', '.');
     $fmtPct = fn($v) => number_format((float) $v, 1, ',', '.') . '%';
@@ -105,6 +100,124 @@
         ])
     </div>
 
+@php
+    $mix = $d['mixReceita'] ?? [];
+    $yoy = $d['receitaYoY'] ?? [];
+    $expense = $d['expenseRatio'] ?? [];
+    $inad = $d['inadimplencia'] ?? [];
+    $qual = $d['qualidadeDados'] ?? [];
+    $topAtraso = $d['topAtrasoClientes'] ?? [];
+    $rubMoM = $d['rubricasMoM'] ?? [];
+
+    $statusMeta = function($real, $meta, $direction) {
+        $real = (float) $real;
+        $meta = (float) $meta;
+        if ($meta <= 0) return ['label' => '—', 'class' => 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200'];
+        if ($direction === 'LOWER') {
+            if ($real <= $meta) return ['label' => 'OK', 'class' => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200'];
+            if ($real <= $meta * 1.10) return ['label' => 'Atenção', 'class' => 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200'];
+            return ['label' => 'Crítico', 'class' => 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200'];
+        }
+        // HIGHER
+        if ($real >= $meta) return ['label' => 'OK', 'class' => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200'];
+        if ($real >= $meta * 0.90) return ['label' => 'Atenção', 'class' => 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200'];
+        return ['label' => 'Crítico', 'class' => 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200'];
+    };
+@endphp
+
+<!-- Metas do mês (Gap vs Meta + Semáforo) -->
+<div class="mt-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+    <div class="flex items-center justify-between">
+        <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100">Metas do Mês (Gap vs Meta)</h2>
+    </div>
+    <div class="mt-3 overflow-x-auto">
+        <table class="min-w-full text-sm">
+            <thead>
+                <tr class="bg-gray-50 text-left text-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                    <th class="px-3 py-2">Indicador</th>
+                    <th class="px-3 py-2">Realizado</th>
+                    <th class="px-3 py-2">Meta</th>
+                    <th class="px-3 py-2">% Atingimento</th>
+                    <th class="px-3 py-2">Status</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-800 text-gray-800 dark:text-gray-200">
+                @php
+                    $itemsMetas = [
+                        ['label' => 'Receita', 'real' => $resumo['receitaTotal'] ?? 0, 'meta' => $resumo['receitaMeta'] ?? 0, 'dir' => 'HIGH', 'fmt' => $fmtMoeda],
+                        ['label' => 'Despesas', 'real' => $resumo['despesasTotal'] ?? 0, 'meta' => $resumo['despesasMeta'] ?? 0, 'dir' => 'LOWER', 'fmt' => $fmtMoeda],
+                        ['label' => 'Resultado', 'real' => $resumo['resultadoLiquido'] ?? 0, 'meta' => $resumo['resultadoMeta'] ?? 0, 'dir' => 'HIGH', 'fmt' => $fmtMoeda],
+                        ['label' => 'Margem', 'real' => $resumo['margemLiquida'] ?? 0, 'meta' => $resumo['margemMeta'] ?? 0, 'dir' => 'HIGH', 'fmt' => $fmtPct],
+                    ];
+                @endphp
+                @foreach($itemsMetas as $it)
+                    @php
+                        $real = (float) $it['real'];
+                        $meta = (float) $it['meta'];
+                        $pct = $meta > 0 ? ($real / $meta) * 100 : 0;
+                        $st = $statusMeta($real, $meta, $it['dir']);
+                    @endphp
+                    <tr>
+                        <td class="px-3 py-2 font-medium">{{ $it['label'] }}</td>
+                        <td class="px-3 py-2">{{ ($it['fmt'])($real) }}</td>
+                        <td class="px-3 py-2">{{ ($it['fmt'])($meta) }}</td>
+                        <td class="px-3 py-2">{{ number_format($pct, 1, ',', '.') }}%</td>
+                        <td class="px-3 py-2">
+                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $st['class'] }}">{{ $st['label'] }}</span>
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- KPIs adicionais -->
+<div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
+    <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+        <p class="text-xs text-gray-600 dark:text-gray-400">Mix Receita PF/PJ</p>
+        <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">
+            PF {{ $fmtPct($mix['pfPct'] ?? 0) }} • PJ {{ $fmtPct($mix['pjPct'] ?? 0) }}
+        </p>
+        <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+            PF {{ $fmtMoeda($mix['pfValor'] ?? 0) }} • PJ {{ $fmtMoeda($mix['pjValor'] ?? 0) }}
+        </p>
+    </div>
+
+    <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+        <p class="text-xs text-gray-600 dark:text-gray-400">Receita YoY</p>
+        <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">{{ $fmtPct($yoy['yoyPct'] ?? 0) }}</p>
+        <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+            Atual {{ $fmtMoeda($yoy['atual'] ?? 0) }} • Ano ant. {{ $fmtMoeda($yoy['anoAnterior'] ?? 0) }}
+        </p>
+    </div>
+
+    <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+        <p class="text-xs text-gray-600 dark:text-gray-400">Expense Ratio</p>
+        <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">{{ $fmtPct($expense['pct'] ?? 0) }}</p>
+        <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+            Desp {{ $fmtMoeda($expense['despesas'] ?? 0) }} / Rec {{ $fmtMoeda($expense['receita'] ?? 0) }}
+        </p>
+    </div>
+
+    <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+        <p class="text-xs text-gray-600 dark:text-gray-400">Inadimplência (% aberto)</p>
+        <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">{{ $fmtPct($inad['pctVencidoSobreAberto'] ?? 0) }}</p>
+        <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+            Vencido {{ $fmtMoeda($inad['totalVencido'] ?? 0) }} • Aberto {{ $fmtMoeda($inad['totalAberto'] ?? 0) }}
+        </p>
+    </div>
+
+    <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+        <p class="text-xs text-gray-600 dark:text-gray-400">Qualidade do dado</p>
+        <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">
+            Concil. {{ $fmtPct($qual['pctConciliadoCount'] ?? 0) }}
+        </p>
+        <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
+            Receita qualif. {{ $fmtMoeda($qual['receitaQualificada'] ?? 0) }} / {{ $fmtMoeda($qual['receitaTotal'] ?? 0) }}
+        </p>
+    </div>
+</div>
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
         @include('dashboard.partials._health-card', [
             'id' => 'atraso',
@@ -141,7 +254,7 @@
     </div>
 
 
-<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+<div class="grid grid-cols-1 gap-4">
     <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
         <div class="flex items-center justify-between">
             <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100">Receita PF - Meta x Resultado (12 Meses)</h2>
@@ -197,8 +310,8 @@
 
         <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
             <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100">Gráfico de Despesas por Rubrica</h2>
-            <div class="mt-4">
-                <canvas id="chart-despesas" height="180"></canvas>
+            <div class="mt-4 h-[320px]">
+                <canvas id="chart-despesas" class="h-full w-full"></canvas>
             </div>
             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Clique em uma rubrica para sinalizar detalhamento (fase 2).</p>
         </div>
@@ -255,6 +368,98 @@
 </div>
 
 
+<!-- KPIs adicionais: Concentração do Atraso e Rubricas MoM -->
+<div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+    <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+        <div class="flex items-center justify-between">
+            <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100">Concentração do Atraso (Top Clientes)</h2>
+            <span class="text-xs text-gray-500 dark:text-gray-400">Top3 = {{ number_format((float)($topAtraso['top3SharePct'] ?? 0), 1, ',', '.') }}%</span>
+        </div>
+
+        <div class="mt-4 overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead>
+                    <tr class="bg-gray-50 text-left text-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                        <th class="px-3 py-2">Cliente</th>
+                        <th class="px-3 py-2">Valor (R$)</th>
+                        <th class="px-3 py-2">Share</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-800 text-gray-800 dark:text-gray-200">
+                    @foreach(($topAtraso['top'] ?? []) as $r)
+                        <tr>
+                            <td class="px-3 py-2">{{ $r['cliente_nome'] ?? '' }}</td>
+                            <td class="px-3 py-2">{{ $fmtMoeda($r['valor'] ?? 0) }}</td>
+                            <td class="px-3 py-2">{{ $fmtPct($r['sharePct'] ?? 0) }}</td>
+                        </tr>
+                    @endforeach
+                    @if(empty($topAtraso['top']))
+                        <tr><td class="px-3 py-2 text-gray-500 dark:text-gray-400" colspan="3">Sem contas vencidas em aberto.</td></tr>
+                    @endif
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+        <div class="flex items-center justify-between">
+            <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100">Rubricas — Variação MoM (Top 5 ↑ / ↓)</h2>
+        </div>
+
+        <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div class="overflow-x-auto">
+                <p class="mb-2 text-xs font-semibold text-gray-600 dark:text-gray-300">Maiores aumentos</p>
+                <table class="min-w-full text-sm">
+                    <thead>
+                        <tr class="bg-gray-50 text-left text-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                            <th class="px-3 py-2">Rubrica</th>
+                            <th class="px-3 py-2">Var%</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-800 text-gray-800 dark:text-gray-200">
+                        @foreach(($rubMoM['topAumentos'] ?? []) as $r)
+                            <tr>
+                                <td class="px-3 py-2">{{ $r['rubrica'] ?? '' }}</td>
+                                <td class="px-3 py-2">{{ $fmtPct($r['varPct'] ?? 0) }}</td>
+                            </tr>
+                        @endforeach
+                        @if(empty($rubMoM['topAumentos']))
+                            <tr><td class="px-3 py-2 text-gray-500 dark:text-gray-400" colspan="2">Sem dados.</td></tr>
+                        @endif
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="overflow-x-auto">
+                <p class="mb-2 text-xs font-semibold text-gray-600 dark:text-gray-300">Maiores reduções</p>
+                <table class="min-w-full text-sm">
+                    <thead>
+                        <tr class="bg-gray-50 text-left text-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                            <th class="px-3 py-2">Rubrica</th>
+                            <th class="px-3 py-2">Var%</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-800 text-gray-800 dark:text-gray-200">
+                        @foreach(($rubMoM['topReducoes'] ?? []) as $r)
+                            <tr>
+                                <td class="px-3 py-2">{{ $r['rubrica'] ?? '' }}</td>
+                                <td class="px-3 py-2">{{ $fmtPct($r['varPct'] ?? 0) }}</td>
+                            </tr>
+                        @endforeach
+                        @if(empty($rubMoM['topReducoes']))
+                            <tr><td class="px-3 py-2 text-gray-500 dark:text-gray-400" colspan="2">Sem dados.</td></tr>
+                        @endif
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
+            Regra de variação: se mês anterior = 0 e atual &gt; 0, variação = 100%.
+        </p>
+    </div>
+</div>
+
 <script type="application/json" id="dashboard-exec-data-json">@json($dashboardData ?? [])</script>
 <script>
     // Mantém compatibilidade com versões anteriores (e facilita debug pelo console)
@@ -263,7 +468,8 @@
     window.__DASHBOARD_EXPORT_URL__ = window.__DASHBOARD_EXPORT_URL__ ?? "{{ route('visao-gerencial.export') }}";
 </script>
 
-<script src="{{ asset('js/dashboard-charts.js') }}"></script>
+{{-- Cache-buster: evita o browser manter JS antigo (problema típico: gráfico “pisca” e some) --}}
+<script src="{{ asset('js/dashboard-charts.js') }}?v={{ filemtime(public_path('js/dashboard-charts.js')) }}"></script>
 
 <script>
 (function () {
@@ -310,6 +516,34 @@
         arr = asArray(arr).slice(0, len);
         while (arr.length < len) arr.push(0);
         return arr;
+    }
+
+
+    function ensure12Labels(fallbackLabels) {
+        // Preferimos labels do PJ se existirem; senão, geramos últimos 12 meses (pt-BR).
+        if (Array.isArray(fallbackLabels) && fallbackLabels.length === 12) return fallbackLabels.slice();
+        var now = new Date();
+        var fmt = new Intl.DateTimeFormat('pt-BR', { month: 'short' });
+        var labels = [];
+        for (var i = 11; i >= 0; i--) {
+            var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            var mon = fmt.format(d);
+            // Normaliza "set." => "Set", etc.
+            mon = mon.replace('.', '');
+            labels.push(mon.charAt(0).toUpperCase() + mon.slice(1) + '/' + String(d.getFullYear()).slice(-2));
+        }
+        return labels;
+    }
+
+    function normalize12Series(obj, fallbackLabels) {
+        obj = (obj && typeof obj === 'object') ? obj : {};
+        var labels = Array.isArray(obj.meses) ? obj.meses.slice() : [];
+        if (labels.length !== 12) {
+            labels = ensure12Labels(fallbackLabels);
+        }
+        var meta = padToLen((Array.isArray(obj.meta) ? obj.meta : []).map(asNumber), 12);
+        var realizado = padToLen((Array.isArray(obj.realizado) ? obj.realizado : []).map(asNumber), 12);
+        return { meses: labels, meta: meta, realizado: realizado };
     }
 
     function destroyIfExists(canvasId) {
@@ -441,7 +675,7 @@
     }
 
     function makeSimpleBar(canvasId, labels, values) {
-        var canvas = $(canvasId);
+        var canvas = document.getElementById(canvasId.replace('#', ''));
         if (!canvas) { log('warn', 'Canvas não encontrado: ' + canvasId); return null; }
         destroyIfExists(canvasId);
 
@@ -511,17 +745,17 @@
         }
 
         // Contas em atraso (tabela)
+        // CORRIGIDO: Usar campos corretos (numero, cliente, dias_atraso)
         var tbodyAtr = $('tbl-atrasos');
         if (tbodyAtr) {
             var atrasos = asArray(d.contasAtrasoLista);
             tbodyAtr.innerHTML = atrasos.map(function (c) {
                 return (
                     '<tr>' +
-                        '<td class="px-3 py-2">' + escapeHtml(c.cliente) + '</td>' +
+                        '<td class="px-3 py-2">' + escapeHtml(c.numero || '') + '</td>' +
+                        '<td class="px-3 py-2">' + escapeHtml(c.cliente || '') + '</td>' +
                         '<td class="px-3 py-2">' + fmtBRL(c.valor) + '</td>' +
-                        '<td class="px-3 py-2">' + escapeHtml(c.dias) + '</td>' +
-                        '<td class="px-3 py-2">' + escapeHtml(c.status || '') + '</td>' +
-                        '<td class="px-3 py-2"><button type="button" class="text-xs text-blue-600 hover:underline" disabled>Ver</button></td>' +
+                        '<td class="px-3 py-2">' + escapeHtml((c.dias_atraso || 0) + ' dias') + '</td>' +
                     '</tr>'
                 );
             }).join('');
@@ -565,9 +799,20 @@
     }
 
     function renderCharts(d) {
-        // 1) Receita PF
-        var pf = d.receitaPF12Meses || {};
-        makeBarChart('chart-receita-pf', pf.meses || [], pf.meta || [], pf.realizado || []);
+        // Se existir renderer externo, pode rodar também — mas NÃO retornamos aqui,
+        // para garantir que o PF sempre renderize (mesmo sem dados) em todos os browsers.
+        if (window.__DASHBOARD_CHARTS_BOOTSTRAP__) {
+            try { window.__DASHBOARD_CHARTS_BOOTSTRAP__({ force: true, source: 'inline-guard' }); } catch (e) {}
+        }
+
+        d = d || {};
+
+
+        // 1) Receita PF (NUNCA abortar: se não houver dados, renderiza com zeros)
+        var pjLabels = (d.receitaPJ12Meses && Array.isArray(d.receitaPJ12Meses.meses)) ? d.receitaPJ12Meses.meses : null;
+        var pf = normalize12Series(d.receitaPF12Meses, pjLabels);
+        makeBarChart('chart-receita-pf', pf.meses, pf.meta, pf.realizado);
+
 
         // 2) Receita PJ
         var pj = d.receitaPJ12Meses || {};
