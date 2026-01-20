@@ -13,6 +13,7 @@ class KpiMonthlyTargetController extends Controller
         $ano = $request->get('ano', date('Y'));
         
         // Buscar todas as metas para o ano selecionado
+        // month = 0 significa meta anual
         $metasDb = DB::table('kpi_monthly_targets')
             ->where('year', $ano)
             ->get();
@@ -20,7 +21,13 @@ class KpiMonthlyTargetController extends Controller
         // Transformar em array associativo para fácil acesso na view
         $metas = collect();
         foreach ($metasDb as $meta) {
-            $key = $meta->kpi_key . '_' . ($meta->month ?? $ano);
+            if ($meta->month == 0) {
+                // Meta anual
+                $key = $meta->kpi_key . '_' . $ano;
+            } else {
+                // Meta mensal
+                $key = $meta->kpi_key . '_' . $meta->month;
+            }
             $metas->put($key, $meta->target_value);
         }
         
@@ -35,7 +42,7 @@ class KpiMonthlyTargetController extends Controller
         $ano = $request->get('ano', date('Y'));
         $metas = $request->get('metas', []);
 
-        // Salvar metas anuais
+        // Salvar metas anuais (month = 0)
         $kpisAnuais = [
             'receita_total_ano',
             'despesa_total_ano',
@@ -46,20 +53,26 @@ class KpiMonthlyTargetController extends Controller
         foreach ($kpisAnuais as $kpiKey) {
             $valor = $metas[$kpiKey][$ano] ?? null;
             if ($valor !== null && $valor !== '') {
-                DB::table('kpi_monthly_targets')->updateOrInsert(
-                    [
-                        'year' => $ano,
-                        'month' => null,
-                        'kpi_key' => $kpiKey,
-                    ],
-                    [
-                        'target_value' => $valor,
-                    ]
-                );
+                // Primeiro tenta deletar se existe
+                DB::table('kpi_monthly_targets')
+                    ->where('year', $ano)
+                    ->where('month', 0)
+                    ->where('kpi_key', $kpiKey)
+                    ->delete();
+                
+                // Depois insere novo registro
+                DB::table('kpi_monthly_targets')->insert([
+                    'year' => $ano,
+                    'month' => 0,  // 0 = meta anual
+                    'kpi_key' => $kpiKey,
+                    'target_value' => $valor,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
             }
         }
 
-        // Salvar metas mensais
+        // Salvar metas mensais (month = 1-12)
         $kpisMensais = [
             'receita_pf',
             'receita_pj',
@@ -70,16 +83,22 @@ class KpiMonthlyTargetController extends Controller
             for ($mes = 1; $mes <= 12; $mes++) {
                 $valor = $metas[$kpiKey][$mes] ?? null;
                 if ($valor !== null && $valor !== '') {
-                    DB::table('kpi_monthly_targets')->updateOrInsert(
-                        [
-                            'year' => $ano,
-                            'month' => $mes,
-                            'kpi_key' => $kpiKey,
-                        ],
-                        [
-                            'target_value' => $valor,
-                        ]
-                    );
+                    // Primeiro tenta deletar se existe
+                    DB::table('kpi_monthly_targets')
+                        ->where('year', $ano)
+                        ->where('month', $mes)
+                        ->where('kpi_key', $kpiKey)
+                        ->delete();
+                    
+                    // Depois insere novo registro
+                    DB::table('kpi_monthly_targets')->insert([
+                        'year' => $ano,
+                        'month' => $mes,
+                        'kpi_key' => $kpiKey,
+                        'target_value' => $valor,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
                 }
             }
         }
