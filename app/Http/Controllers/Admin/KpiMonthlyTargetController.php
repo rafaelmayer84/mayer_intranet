@@ -15,23 +15,15 @@ class KpiMonthlyTargetController extends Controller
         // Buscar todas as metas para o ano selecionado
         $metasDb = DB::table('kpi_monthly_targets')
             ->where('year', $ano)
-            ->orderBy('month')
-            ->orderBy('kpi_key')
             ->get();
-        
-        // Transformar em array associativo para fácil acesso na view
+
+        // Transformar em array associativo para a view
         $metas = collect();
         foreach ($metasDb as $meta) {
-            if ($meta->month == 0) {
-                // Meta anual: chave = kpi_key_ano
-                $key = $meta->kpi_key . '_' . $ano;
-            } else {
-                // Meta mensal: chave = kpi_key_mes
-                $key = $meta->kpi_key . '_' . $meta->month;
-            }
-            $metas->put($key, $meta->target_value);
+            $key = $meta->kpi_key . '_' . $meta->month;
+            $metas->put($key, $meta->target_value ?? '');
         }
-        
+
         return view('admin.metas-kpi-mensais', [
             'ano' => $ano,
             'metas' => $metas,
@@ -43,69 +35,109 @@ class KpiMonthlyTargetController extends Controller
         $ano = (int) $request->get('ano', date('Y'));
         $metas = $request->get('metas', []);
 
-        // Salvar metas anuais (month = 0)
-        $kpisAnuais = [
-            'receita_total_ano',
-            'despesa_total_ano',
-            'resultado_liquido_ano',
-            'margem_liquida_ano',
-        ];
+        // Limpar metas antigas do ano
+        DB::table('kpi_monthly_targets')
+            ->where('year', $ano)
+            ->delete();
 
-        foreach ($kpisAnuais as $kpiKey) {
-            $valor = $metas[$kpiKey][$ano] ?? null;
-            if ($valor !== null && $valor !== '') {
-                // Deletar se existe
-                DB::table('kpi_monthly_targets')
-                    ->where('year', $ano)
-                    ->where('month', 0)
-                    ->where('kpi_key', $kpiKey)
-                    ->delete();
-                
-                // Inserir novo registro
-                DB::table('kpi_monthly_targets')->insert([
-                    'year' => $ano,
-                    'month' => 0,
-                    'kpi_key' => $kpiKey,
-                    'target_value' => $valor,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-            }
-        }
+        // Inserir novas metas
+        $inserts = [];
 
-        // Salvar metas mensais (month = 1-12)
-        $kpisMensais = [
-            'receita_pf',
-            'receita_pj',
-            'despesas',
-        ];
-
-        foreach ($kpisMensais as $kpiKey) {
-            for ($mes = 1; $mes <= 12; $mes++) {
-                $valor = $metas[$kpiKey][$mes] ?? null;
-                if ($valor !== null && $valor !== '') {
-                    // Deletar se existe
-                    DB::table('kpi_monthly_targets')
-                        ->where('year', $ano)
-                        ->where('month', $mes)
-                        ->where('kpi_key', $kpiKey)
-                        ->delete();
-                    
-                    // Inserir novo registro
-                    DB::table('kpi_monthly_targets')->insert([
+        // Metas mensais de Receita PF
+        if (isset($metas['receita_pf'])) {
+            foreach ($metas['receita_pf'] as $mes => $valor) {
+                if ($valor !== '' && $valor !== null) {
+                    $inserts[] = [
                         'year' => $ano,
-                        'month' => $mes,
-                        'kpi_key' => $kpiKey,
-                        'target_value' => $valor,
+                        'month' => (int)$mes,
+                        'kpi_key' => 'receita_pf',
+                        'target_value' => (float)$valor,
                         'created_at' => now(),
                         'updated_at' => now(),
-                    ]);
+                    ];
                 }
             }
         }
 
-        return redirect()
-            ->route('config.metas-kpi-mensais', ['ano' => $ano])
+        // Metas mensais de Receita PJ
+        if (isset($metas['receita_pj'])) {
+            foreach ($metas['receita_pj'] as $mes => $valor) {
+                if ($valor !== '' && $valor !== null) {
+                    $inserts[] = [
+                        'year' => $ano,
+                        'month' => (int)$mes,
+                        'kpi_key' => 'receita_pj',
+                        'target_value' => (float)$valor,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                }
+            }
+        }
+
+        // Metas mensais de Despesas
+        if (isset($metas['despesas'])) {
+            foreach ($metas['despesas'] as $mes => $valor) {
+                if ($valor !== '' && $valor !== null) {
+                    $inserts[] = [
+                        'year' => $ano,
+                        'month' => (int)$mes,
+                        'kpi_key' => 'despesas',
+                        'target_value' => (float)$valor,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ];
+                }
+            }
+        }
+
+        // Metas de Saúde Financeira (sem mês, apenas ano)
+        $saude_financeira = [
+            'dias_atraso_meta' => 'dias_atraso_meta',
+            'taxa_cobranca_meta' => 'taxa_cobranca_meta',
+            'inadimplencia_meta' => 'inadimplencia_meta',
+        ];
+
+        foreach ($saude_financeira as $key => $db_key) {
+            if (isset($metas[$key]) && $metas[$key] !== '' && $metas[$key] !== null) {
+                $inserts[] = [
+                    'year' => $ano,
+                    'month' => 0, // 0 = anual
+                    'kpi_key' => $db_key,
+                    'target_value' => (float)$metas[$key],
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+        }
+
+        // Metas de Eficiência (sem mês, apenas ano)
+        $eficiencia = [
+            'expense_ratio_meta' => 'expense_ratio_meta',
+            'yoy_growth_meta' => 'yoy_growth_meta',
+        ];
+
+        foreach ($eficiencia as $key => $db_key) {
+            if (isset($metas[$key]) && $metas[$key] !== '' && $metas[$key] !== null) {
+                $inserts[] = [
+                    'year' => $ano,
+                    'month' => 0, // 0 = anual
+                    'kpi_key' => $db_key,
+                    'target_value' => (float)$metas[$key],
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ];
+            }
+        }
+
+        // Inserir em chunks para evitar limite de query
+        if (!empty($inserts)) {
+            foreach (array_chunk($inserts, 100) as $chunk) {
+                DB::table('kpi_monthly_targets')->insert($chunk);
+            }
+        }
+
+        return redirect()->route('config.metas-kpi-mensais', ['ano' => $ano])
             ->with('success', 'Metas salvas com sucesso!');
     }
 }
