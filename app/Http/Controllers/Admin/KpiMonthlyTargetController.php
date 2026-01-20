@@ -46,7 +46,7 @@ class KpiMonthlyTargetController extends Controller
         foreach ($kpisAnuais as $kpiKey) {
             $valor = $metas[$kpiKey][$ano] ?? null;
             if ($valor !== null && $valor !== '') {
-                DB::table('kpi_monthly_targets')->updateOrCreate(
+                DB::table('kpi_monthly_targets')->updateOrInsert(
                     [
                         'year' => $ano,
                         'month' => null,
@@ -70,7 +70,7 @@ class KpiMonthlyTargetController extends Controller
             for ($mes = 1; $mes <= 12; $mes++) {
                 $valor = $metas[$kpiKey][$mes] ?? null;
                 if ($valor !== null && $valor !== '') {
-                    DB::table('kpi_monthly_targets')->updateOrCreate(
+                    DB::table('kpi_monthly_targets')->updateOrInsert(
                         [
                             'year' => $ano,
                             'month' => $mes,
