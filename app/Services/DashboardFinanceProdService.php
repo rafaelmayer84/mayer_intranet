@@ -1041,8 +1041,8 @@ public function getLucratividadeByMonth(int $ano): array
         $maioresReducoes = array_slice(array_filter($variacoes, fn($v) => $v['diff'] < 0), 0, 5);
         
         return [
-            'aumentos' => $maioresAumentos,
-            'reducoes' => $maioresReducoes
+            'topAumentos' => $maioresAumentos,
+            'topReducoes' => $maioresReducoes
         ];
     }
 }

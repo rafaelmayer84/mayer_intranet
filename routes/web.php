@@ -93,3 +93,15 @@ Route::middleware(['auth'])->group(function () {
 // Quadro de Avisos + Diagnóstico
 require __DIR__ . '/_avisos_routes.php';
 
+
+// Metas KPI Mensais
+Route::middleware(['auth'])->group(function () {
+    Route::get('/administracao/metas-kpi-mensais', [App\Http\Controllers\Admin\KpiMonthlyTargetController::class, 'index'])->name('admin.metas-kpi-mensais');
+    Route::post('/administracao/metas-kpi-mensais', [App\Http\Controllers\Admin\KpiMonthlyTargetController::class, 'store'])->name('admin.metas-kpi-mensais.store');
+});
+
+// Metas KPI Mensais - Configurações
+Route::middleware(['auth'])->prefix('configuracoes')->name('config.')->group(function () {
+    Route::get('metas-kpi-mensais', [App\Http\Controllers\Admin\KpiMonthlyTargetController::class, 'index'])->name('metas-kpi-mensais');
+    Route::post('metas-kpi-mensais', [App\Http\Controllers\Admin\KpiMonthlyTargetController::class, 'store'])->name('metas-kpi-mensais.store');
+});

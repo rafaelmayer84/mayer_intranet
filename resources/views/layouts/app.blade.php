@@ -196,6 +196,9 @@
                 @endif
                 
                 <!-- Configurações -->
+                        <a href="{{ route('config.metas-kpi-mensais') }}" class="dropdown-item">
+                            <i class="fas fa-bullseye"></i> Metas de KPIs (Mensais)
+                        </a>
                 <a href="{{ route('configuracoes.index') }}" 
                    class="nav-link flex items-center px-4 py-3 rounded-lg transition-colors {{ request()->routeIs('configuracoes.*') ? 'nav-link-active' : '' }}">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

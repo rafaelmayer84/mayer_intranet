@@ -1,0 +1,4 @@
+BACKUP MANIFEST
+Hash: 871f376
+Branch: hotfix/restore-dashboard-kpis
+Arquivos: code.tar.gz, db.sql.gz, storage_min.tar.gz
