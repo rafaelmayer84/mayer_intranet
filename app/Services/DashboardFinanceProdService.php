@@ -721,8 +721,8 @@ public function getLucratividadeByMonth(int $ano): array
         $resultadoPrev = $receitaPrev - $despesasPrev;
         $margemPrev = $receitaPrev > 0 ? ($resultadoPrev / $receitaPrev) * 100 : 0.0;
 
-        $metaPf = (float) Configuracao::get("meta_pf_{$ano}_{$mes}", 0);
-        $metaPj = (float) Configuracao::get("meta_pj_{$ano}_{$mes}", 0);
+        $metaPf = (float) ($this->getMetaValueFromKpiTable("receita_pf", $mes, $ano) ?? 0);
+        $metaPj = (float) ($this->getMetaValueFromKpiTable("receita_pj", $mes, $ano) ?? 0);
         $metaReceita = $metaPf + $metaPj;
         // Meta de despesas
         $metaDespesasDb = $this->getMetaValueFromKpiTable("despesas", $mes, $ano);
@@ -734,11 +734,8 @@ public function getLucratividadeByMonth(int $ano): array
         }
         $metaDespesas = (float) ($metaDespesasDb ?? 0);
 
-        $metaResultado = (float) Configuracao::get("meta_resultado_{$ano}_{$mes}", max($metaReceita - $metaDespesas, 0));
-        $metaMargem = (float) Configuracao::get(
-            "meta_margem_{$ano}_{$mes}",
-            $metaReceita > 0 ? round((($metaReceita - $metaDespesas) / $metaReceita) * 100, 1) : 0
-        );
+        $metaResultado = (float) ($this->getMetaValueFromKpiTable("resultado_liquido", $mes, $ano) ?? max($metaReceita - $metaDespesas, 0));
+        $metaMargem = (float) ($this->getMetaValueFromKpiTable("margem_liquida", $mes, $ano) ?? ($metaReceita > 0 ? round((($metaReceita - $metaDespesas) / $metaReceita) * 100, 1) : 0));
 
         return [
             'receitaPf' => round($receitaPf, 2),
