@@ -7,6 +7,14 @@
     ];
     $accentClass = $accentMap[$accent ?? 'blue'] ?? $accentMap['blue'];
 
+    $colorMap = [
+        'green' => 'bg-emerald-500',
+        'blue' => 'bg-blue-500',
+        'orange' => 'bg-orange-500',
+        'purple' => 'bg-purple-500',
+    ];
+    $barColor = $colorMap[$accent ?? 'blue'] ?? $colorMap['blue'];
+
     $p = (float) ($percent ?? 0);
     $p = max(0, min(999, $p));
 @endphp
@@ -29,7 +37,7 @@
 
     <div class="mt-3">
         <div class="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800">
-            <div id="kpi-{{ $id }}-progress" class="h-2 rounded-full" style="width: {{ min(100, $p) }}%"></div>
+            <div id="kpi-{{ $id }}-progress" class="h-2 rounded-full {{ $barColor }}" style="width: {{ min(100, $p) }}%"></div>
         </div>
         <div class="mt-2 text-xs">
             <span id="kpi-{{ $id }}-trend" class="inline-flex items-center gap-1"></span>
