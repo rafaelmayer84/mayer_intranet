@@ -886,8 +886,15 @@ public function getLucratividadeByMonth(int $ano): array
     private function getMetasMensais(string $tipo, int $ano): array
     {
         $metas = [];
+        // Mapear chaves de tipo para chaves da tabela kpi_monthly_targets
+        $kpiKey = $tipo;
+        if ($tipo === 'meta_pf') $kpiKey = 'receita_pf';
+        if ($tipo === 'meta_pj') $kpiKey = 'receita_pj';
+        if ($tipo === 'meta_despesas') $kpiKey = 'despesas';
+
         for ($m = 1; $m <= 12; $m++) {
-            $metas[$m] = (float) Configuracao::get("{$tipo}_{$ano}_{$m}", 0);
+            $val = $this->getMetaValueFromKpiTable($kpiKey, $m, $ano);
+            $metas[$m] = (float) ($val ?? 0);
         }
         return $metas;
     }
