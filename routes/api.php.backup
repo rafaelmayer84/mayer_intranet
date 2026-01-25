@@ -3,7 +3,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SyncController;
 use App\Http\Controllers\ClientesMercadoController;
-use App\Http\Controllers\IntegracaoController;
 
 /*
 |--------------------------------------------------------------------------
@@ -40,16 +39,3 @@ Route::prefix('clientes-mercado')->group(function () {
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
-
-// Rotas do módulo Clientes & Mercado - Lançamentos
-Route::get('/clientes-mercado/lancamentos', [ClientesMercadoController::class, 'lancamentos']);
-Route::get('/clientes-mercado/mix-pf-pj', [ClientesMercadoController::class, 'mixPfPj']);
-Route::get('/clientes-mercado/resumo-executivo', [ClientesMercadoController::class, 'resumoExecutivo']);
-
-// Rotas do módulo Integrações
-Route::prefix('integracao')->group(function () {
-    Route::get('/dados', [IntegracaoController::class, 'dados']);
-    Route::post('/sincronizar-datajuri', [IntegracaoController::class, 'sincronizarDataJuri']);
-    Route::post('/sincronizar-espocrm', [IntegracaoController::class, 'sincronizarEspoCrm']);
-    Route::get('/detalhes/{id}', [IntegracaoController::class, 'detalhes']);
-});

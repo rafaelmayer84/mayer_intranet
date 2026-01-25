@@ -113,8 +113,9 @@ Route::middleware(['auth'])->prefix('configuracoes')->name('config.')->group(fun
 
 // Integrações (Admin only)
 Route::middleware(['auth'])->group(function () {
-    Route::get('/integracao', [App\Http\Controllers\IntegrationController::class, 'index'])->name('integration.index');
-    Route::get('/integracao/{log}', [App\Http\Controllers\IntegrationController::class, 'show'])->name('integration.show');
-    Route::post('/integracao/sync', [App\Http\Controllers\IntegrationController::class, 'sync'])->name('integration.sync');
-    Route::get('/integracao/status', [App\Http\Controllers\IntegrationController::class, 'status'])->name('integration.status');
+    Route::get('/integracao', [App\Http\Controllers\IntegracaoController::class, 'index'])->name('integration.index');
+    Route::get('/integracao/sync', [App\Http\Controllers\IntegracaoController::class, 'sync'])->name('integration.sync');
+    Route::get('/integracao/{log}', [App\Http\Controllers\IntegracaoController::class, 'show'])->name('integration.show');
+    Route::post('/integracao/sincronizar-datajuri', [App\Http\Controllers\IntegracaoController::class, 'sincronizarDataJuri'])->name('integration.sync.datajuri');
+    Route::post('/integracao/sincronizar-espocrm', [App\Http\Controllers\IntegracaoController::class, 'sincronizarEspoCrm'])->name('integration.sync.espocrm');
 });

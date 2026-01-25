@@ -3,10 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class IntegrationLog extends Model
 {
     protected $table = 'integration_logs';
+    public $timestamps = false;
 
     protected $fillable = [
         'sync_id',
@@ -17,71 +19,80 @@ class IntegrationLog extends Model
         'registros_criados',
         'registros_atualizados',
         'registros_ignorados',
-        'registros_erro',
-        'mensagem_erro',
-        'detalhes',
+        'erros',
+        'duracao_segundos',
         'inicio',
         'fim',
-        'duracao_segundos'
+        'created_at',
+        'updated_at',
     ];
 
     protected $casts = [
-        'detalhes' => 'array',
-        'inicio' => 'datetime',
-        'fim' => 'datetime'
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
-    // Scopes
-    public function scopeConcluidos($query)
+    /**
+     * Accessor para converter status "concluido" em "success" para exibição
+     */
+    protected function status(): Attribute
     {
-        return $query->where('status', 'concluido');
+        return Attribute::make(
+            get: function ($value) {
+                // Normalizar o status para exibição
+                $status = strtolower(trim($value ?? ''));
+                
+                // Mapear valores do banco para valores de exibição
+                $statusMap = [
+                    'concluido' => 'success',
+                    'concluída' => 'success',
+                    'completed' => 'success',
+                    'success' => 'success',
+                    'erro' => 'failed',
+                    'error' => 'failed',
+                    'failed' => 'failed',
+                    'pendente' => 'pending',
+                    'pending' => 'pending',
+                ];
+                
+                return $statusMap[$status] ?? $status;
+            },
+        );
     }
 
-    public function scopeComErro($query)
+    /**
+     * Mutator para salvar o status original no banco
+     */
+    protected function setStatusAttribute($value)
     {
-        return $query->where('status', 'erro');
+        // Normalizar antes de salvar
+        $this->attributes['status'] = strtolower(trim($value ?? ''));
     }
 
-    public function scopeRecentes($query, $dias = 7)
+    /**
+     * Método helper para verificar se a sincronização foi bem-sucedida
+     */
+    public function isSuccessful(): bool
     {
-        return $query->where('created_at', '>=', now()->subDays($dias));
+        $status = strtolower(trim($this->attributes['status'] ?? ''));
+        return in_array($status, ['concluido', 'concluída', 'completed', 'success']);
     }
 
-    // Accessors
-    public function getTipoLabelAttribute()
+    /**
+     * Método helper para verificar se a sincronização falhou
+     */
+    public function isFailed(): bool
     {
-        return match($this->tipo) {
-            'sync_clientes' => 'Sincronização de Clientes',
-            'sync_leads' => 'Sincronização de Leads',
-            'sync_oportunidades' => 'Sincronização de Oportunidades',
-            'sync_full' => 'Sincronização Completa',
-            default => $this->tipo
-        };
+        $status = strtolower(trim($this->attributes['status'] ?? ''));
+        return in_array($status, ['erro', 'error', 'failed']);
     }
 
-    public function getStatusCorAttribute()
+    /**
+     * Método helper para verificar se a sincronização está pendente
+     */
+    public function isPending(): bool
     {
-        return match($this->status) {
-            'concluido' => 'success',
-            'erro' => 'danger',
-            'em_progresso' => 'warning',
-            'iniciado' => 'info',
-            default => 'secondary'
-        };
-    }
-
-    public function getDuracaoFormatadaAttribute()
-    {
-        if (!$this->duracao_segundos) {
-            return '-';
-        }
-
-        if ($this->duracao_segundos < 60) {
-            return $this->duracao_segundos . 's';
-        }
-
-        $minutos = floor($this->duracao_segundos / 60);
-        $segundos = $this->duracao_segundos % 60;
-        return $minutos . 'm ' . $segundos . 's';
+        $status = strtolower(trim($this->attributes['status'] ?? ''));
+        return in_array($status, ['pendente', 'pending']);
     }
 }
