@@ -2,6 +2,7 @@
 
 namespace App\Services;
 use App\Models\Movimento;
+use App\Services\Integration\DataJuriService;
 
 use App\Models\ContaReceber;
 use Illuminate\Support\Facades\DB;

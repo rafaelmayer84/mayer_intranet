@@ -1,18 +1,282 @@
 (function () {
   'use strict';
 
-  // Visão Gerencial já renderiza os gráficos via JS inline no Blade.
-  // Este arquivo não pode renderizar/destroir gráficos nessa rota, senão o canvas “pisca e some”.
-  // (Também evita o erro "Recursion detected: _scriptable" quando há dupla inicialização.)
+  // =====================================================================
+  // Dashboard Charts (Visão Gerencial)
+  // - Sem mudanças de layout (HTML/CSS). Tudo é injetado via JS.
+  // - Inicialização com retry (Chart.js / DOM / __DASHBOARD_EXEC_DATA__).
+  // - Debug visual opcional (overlay) para diagnosticar por que não renderiza.
+  // =====================================================================
+
+  var DEBUG_ENABLED = false;
   try {
-    const isVG = typeof window !== 'undefined'
-      && window.location
-      && /\/visao-gerencial/.test(window.location.pathname || '');
-    if (isVG && typeof window.makeBarChart === 'function' && typeof window.renderCharts === 'function') {
-      return;
+    DEBUG_ENABLED = /(?:\?|&)chartsDebug=1(?:&|$)/i.test(location.search) || localStorage.getItem('chartsDebug') === '1';
+  } catch (e) {
+    DEBUG_ENABLED = false;
+  }
+
+  var DEBUG = {
+    fileLoadedAt: new Date().toISOString(),
+    bootstrapped: false,
+    lastCheck: null,
+    charts: [],
+    logs: [],
+    errors: []
+  };
+  window.__DASHBOARD_CHARTS_DEBUG__ = DEBUG;
+
+  function nowHHMMSS() {
+    var d = new Date();
+    var hh = String(d.getHours()).padStart(2, '0');
+    var mm = String(d.getMinutes()).padStart(2, '0');
+    var ss = String(d.getSeconds()).padStart(2, '0');
+    return hh + ':' + mm + ':' + ss;
+  }
+
+  function log(level, msg, extra) {
+    try {
+      var entry = { t: nowHHMMSS(), level: level, msg: msg };
+      if (extra !== undefined) entry.extra = extra;
+      DEBUG.logs.push(entry);
+      if (DEBUG.logs.length > 200) DEBUG.logs.shift();
+    } catch (e) {}
+
+    try {
+      var fn = console && console.log;
+      if (console && level === 'error') fn = console.error;
+      else if (console && level === 'warn') fn = console.warn;
+      else if (console && level === 'info') fn = console.info;
+      if (fn) fn('[dashboard-charts][' + level + ']', msg, extra || '');
+    } catch (e2) {}
+
+    if (DEBUG_ENABLED) updateDebugPanel();
+  }
+
+  function captureWindowError(evt) {
+    try {
+      var msg = (evt && evt.message) ? String(evt.message) : 'window.error';
+      var stack = (evt && evt.error && evt.error.stack) ? String(evt.error.stack) : '';
+      DEBUG.errors.push({ t: nowHHMMSS(), label: 'window.error', message: msg, stack: stack });
+      if (DEBUG.errors.length > 50) DEBUG.errors.shift();
+    } catch (e) {}
+    if (DEBUG_ENABLED) updateDebugPanel();
+  }
+
+  if (DEBUG_ENABLED) {
+    window.addEventListener('error', captureWindowError);
+  }
+
+  function drawCanvasMessage(canvasId, title, lines) {
+    var el = null;
+    try { el = document.getElementById(canvasId); } catch (e) { el = null; }
+    if (!el || !el.getContext) return;
+    var ctx = el.getContext('2d');
+    if (!ctx) return;
+    try {
+      ctx.save();
+      ctx.clearRect(0, 0, el.width, el.height);
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      ctx.fillRect(0, 0, el.width, el.height);
+      ctx.fillStyle = '#e2e8f0';
+      ctx.font = '14px system-ui, -apple-system, Segoe UI, Roboto, Arial';
+      ctx.fillText(title || 'DEBUG', 12, 24);
+      ctx.font = '12px system-ui, -apple-system, Segoe UI, Roboto, Arial';
+      var y = 44;
+      (lines || []).slice(0, 10).forEach(function (ln) {
+        ctx.fillText(String(ln).slice(0, 120), 12, y);
+        y += 16;
+      });
+      ctx.restore();
+    } catch (e2) {
+      // silencioso
     }
-  } catch (_) {
-    // no-op
+  }
+
+  function canvasHasInk(canvasEl) {
+    // Heurística rápida: amostra alguns pixels e vê se há alfa/cor > 0.
+    try {
+      if (!canvasEl) return true;
+      var ctx = canvasEl.getContext('2d');
+      if (!ctx) return true;
+      var w = canvasEl.width || 0;
+      var h = canvasEl.height || 0;
+      if (w < 10 || h < 10) return false;
+      var img = ctx.getImageData(0, 0, w, h).data;
+      var samples = 30;
+      for (var i = 0; i < samples; i++) {
+        var x = ((i * 997) % w) | 0;
+        var y = ((i * 463) % h) | 0;
+        var idx = (y * w + x) * 4;
+        var a = img[idx + 3];
+        if (a > 0) {
+          var r = img[idx], g = img[idx + 1], b = img[idx + 2];
+          if (r + g + b > 5) return true;
+        }
+      }
+      return false;
+    } catch (e) {
+      // Se getImageData falhar por qualquer motivo, não assume falha do gráfico.
+      return true;
+    }
+  }
+
+  function scheduleInkCheck(canvasId, label) {
+    try {
+      setTimeout(function () {
+        var el = byId(canvasId);
+        if (!el) return;
+        if (canvasHasInk(el)) return;
+        log('error', 'Canvas parece vazio (sem pixels desenhados)', {
+          canvasId: canvasId,
+          label: label,
+          w: el.width,
+          h: el.height,
+        });
+        drawCanvasMessage(canvasId, 'Gráfico não renderizou', [
+          label || canvasId,
+          'Chart criado, mas canvas está vazio.',
+          'Use o painel: Forçar render / Copiar diagnóstico.',
+        ]);
+      }, 650);
+    } catch (e) {}
+  }
+
+  var _debugPanelEl = null;
+  function ensureDebugPanel() {
+    if (!DEBUG_ENABLED) return;
+    if (_debugPanelEl) return;
+    try {
+      var el = document.createElement('div');
+      el.id = 'charts-debug-panel';
+      el.style.position = 'fixed';
+      el.style.right = '16px';
+      el.style.bottom = '16px';
+      el.style.zIndex = '99999';
+      el.style.width = '360px';
+      el.style.maxWidth = '92vw';
+      el.style.maxHeight = '70vh';
+      el.style.overflow = 'hidden';
+      el.style.borderRadius = '12px';
+      el.style.border = '1px solid rgba(148, 163, 184, 0.25)';
+      el.style.background = 'rgba(2, 6, 23, 0.88)';
+      el.style.color = '#e2e8f0';
+      el.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
+      el.style.fontSize = '12px';
+      el.style.boxShadow = '0 10px 30px rgba(0,0,0,0.35)';
+
+      el.innerHTML =
+        '<div style="display:flex;align-items:center;gap:8px;padding:10px 10px 6px 10px;border-bottom:1px solid rgba(148,163,184,0.18)">' +
+          '<div style="font-weight:700;flex:1">Charts Debug (PF/PJ/Rentabilidade)</div>' +
+          '<button data-act="force" style="background:rgba(148,163,184,0.18);border:1px solid rgba(148,163,184,0.28);color:#e2e8f0;border-radius:8px;padding:6px 8px;cursor:pointer">Forçar render</button>' +
+          '<button data-act="copy" style="background:rgba(148,163,184,0.18);border:1px solid rgba(148,163,184,0.28);color:#e2e8f0;border-radius:8px;padding:6px 8px;cursor:pointer">Copiar diagnóstico</button>' +
+          '<button data-act="min" style="background:rgba(148,163,184,0.18);border:1px solid rgba(148,163,184,0.28);color:#e2e8f0;border-radius:8px;padding:6px 8px;cursor:pointer">Minimizar</button>' +
+        '</div>' +
+        '<div data-body style="padding:10px;max-height:60vh;overflow:auto"></div>';
+
+      document.body.appendChild(el);
+      _debugPanelEl = el;
+
+      el.addEventListener('click', function (ev) {
+        var t = ev && ev.target;
+        if (!t || !t.getAttribute) return;
+        var act = t.getAttribute('data-act');
+        if (!act) return;
+        if (act === 'force') {
+          try { window.__DASHBOARD_CHARTS_FORCE_RENDER__ && window.__DASHBOARD_CHARTS_FORCE_RENDER__(); } catch (e) {}
+        }
+        if (act === 'copy') {
+          try {
+            var txt = JSON.stringify(getDiagnosticsSnapshot(), null, 2);
+            navigator.clipboard.writeText(txt);
+          } catch (e2) {
+            try {
+              var ta = document.createElement('textarea');
+              ta.value = JSON.stringify(getDiagnosticsSnapshot(), null, 2);
+              document.body.appendChild(ta);
+              ta.select();
+              document.execCommand('copy');
+              ta.remove();
+            } catch (e3) {}
+          }
+        }
+        if (act === 'min') {
+          try {
+            var body = el.querySelector('[data-body]');
+            if (!body) return;
+            if (body.style.display === 'none') {
+              body.style.display = 'block';
+              t.textContent = 'Minimizar';
+            } else {
+              body.style.display = 'none';
+              t.textContent = 'Expandir';
+            }
+          } catch (e4) {}
+        }
+      });
+
+      updateDebugPanel();
+    } catch (e) {
+      _debugPanelEl = null;
+    }
+  }
+
+  function updateDebugPanel() {
+    if (!DEBUG_ENABLED) return;
+    ensureDebugPanel();
+    if (!_debugPanelEl) return;
+
+    var body = _debugPanelEl.querySelector('[data-body]');
+    if (!body) return;
+
+    var snap = getDiagnosticsSnapshot();
+    var okBadge = function (ok, label) {
+      var bg = ok ? 'rgba(34,197,94,0.18)' : 'rgba(239,68,68,0.18)';
+      var bd = ok ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.35)';
+      return '<span style="display:inline-block;padding:4px 8px;border-radius:999px;background:' + bg + ';border:1px solid ' + bd + ';margin-right:6px">' + label + '</span>';
+    };
+
+    var lines = [];
+    lines.push('<div style="margin-bottom:8px">' + okBadge(snap.lastCheck.chartJs, 'Chart.js ' + (snap.lastCheck.chartJs ? 'OK' : 'NOK')) + okBadge(snap.lastCheck.data, '__DASHBOARD_EXEC_DATA__ ' + (snap.lastCheck.data ? 'OK' : 'NOK')) + '</div>');
+    lines.push('<div style="margin-bottom:8px">' + okBadge(snap.lastCheck.keysOk, 'Estrutura dados ' + (snap.lastCheck.keysOk ? 'OK' : 'NOK')) + '</div>');
+    lines.push('<div style="opacity:0.85;margin-bottom:8px">Arquivo carregado em: ' + snap.fileLoadedAt + '</div>');
+
+    if (snap.lastCheck.canvases) {
+      var pf = snap.lastCheck.canvases.pf ? (snap.lastCheck.canvases.pf.width + 'x' + snap.lastCheck.canvases.pf.height) : 'N/A';
+      var pj = snap.lastCheck.canvases.pj ? (snap.lastCheck.canvases.pj.width + 'x' + snap.lastCheck.canvases.pj.height) : 'N/A';
+      var rt = snap.lastCheck.canvases.rent ? (snap.lastCheck.canvases.rent.width + 'x' + snap.lastCheck.canvases.rent.height) : 'N/A';
+      lines.push('<div style="margin-bottom:8px">Canvas</div>');
+      lines.push('<div style="margin-bottom:10px">' + okBadge(!!snap.lastCheck.canvases.pf, 'PF ' + pf) + okBadge(!!snap.lastCheck.canvases.pj, 'PJ ' + pj) + okBadge(!!snap.lastCheck.canvases.rent, 'Rent. ' + rt) + '</div>');
+    }
+
+    lines.push('<div style="margin-bottom:6px">Charts criados</div>');
+    lines.push('<div style="opacity:0.9;margin-bottom:10px">' + (snap.charts && snap.charts.length ? snap.charts.join(', ') : '(nenhum)') + '</div>');
+
+    lines.push('<div style="margin-bottom:6px">Logs (últimos 12)</div>');
+    lines.push('<div style="white-space:pre-wrap;line-height:1.35;background:rgba(148,163,184,0.08);border:1px solid rgba(148,163,184,0.18);border-radius:10px;padding:8px;max-height:180px;overflow:auto">' +
+      (snap.logsTail || []).map(function (l) {
+        return '[' + l.t + '][' + l.level + '] ' + l.msg + (l.extra ? ' ' + JSON.stringify(l.extra) : '');
+      }).join('\n') +
+    '</div>');
+
+    lines.push('<div style="margin-top:10px;margin-bottom:6px">Erros capturados (últimos 6)</div>');
+    lines.push('<div style="white-space:pre-wrap;line-height:1.35;background:rgba(148,163,184,0.08);border:1px solid rgba(148,163,184,0.18);border-radius:10px;padding:8px;max-height:170px;overflow:auto">' +
+      (snap.errorsTail || []).map(function (e) {
+        return '[' + e.t + '][' + e.label + '] ' + e.message;
+      }).join('\n') +
+    '</div>');
+
+    body.innerHTML = lines.join('');
+  }
+
+  function getDiagnosticsSnapshot() {
+    var out = {
+      fileLoadedAt: DEBUG.fileLoadedAt,
+      lastCheck: DEBUG.lastCheck,
+      charts: DEBUG.charts.slice(0),
+      logsTail: DEBUG.logs.slice(-12),
+      errorsTail: DEBUG.errors.slice(-6)
+    };
+    return out;
   }
 
   const fmtCurrency = (v) => {
@@ -54,200 +318,49 @@
     }
     return t >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400';
   };
+
   const byId = (id) => document.getElementById(id);
-  const byAnyId = (ids) => (ids || []).map((id) => byId(id)).find(Boolean) || null;
-
-  const DEBUG_ENABLED =
-    (/[?&]chartsDebug=1/.test(window.location.search)) ||
-    (window.localStorage && window.localStorage.getItem('chartsDebug') === '1');
-
-  const __DBG = {
-    startedAt: new Date().toISOString(),
-    lastBootstrapAt: null,
-    lastApplyAt: null,
-    attempts: 0,
-    initDone: false,
-    logs: [],
-    errors: [],
-  };
-
-  const dbgPush = (level, msg, extra) => {
-    const entry = { t: new Date().toISOString(), level, msg, extra: extra || null };
-    __DBG.logs.push(entry);
-    if (__DBG.logs.length > 200) __DBG.logs.shift();
-
-    if (DEBUG_ENABLED) {
-      const fn = level === 'error' ? console.error : (level === 'warn' ? console.warn : console.log);
-      fn('[charts]', msg, extra || '');
-    }
-  };
-
-  const dbgError = (err, where) => {
-    const e = err instanceof Error ? err : new Error(String(err));
-    __DBG.errors.push({ t: new Date().toISOString(), where: where || null, message: e.message, stack: e.stack || null });
-    if (__DBG.errors.length > 100) __DBG.errors.shift();
-    dbgPush('error', where ? `${where}: ${e.message}` : e.message);
-  };
   const charts = {};
 
-  const destroyAnyChartOnCanvas = (canvasOrId) => {
+  function destroyAnyChartOnCanvas(canvasId) {
+    // 1) Se já temos referência local, destrói primeiro
     try {
-      if (typeof Chart === 'undefined' || !Chart.getChart) return;
-      const canvas = typeof canvasOrId === 'string' ? byId(canvasOrId) : canvasOrId;
-      if (!canvas) return;
-      const existing = Chart.getChart(canvas) || (canvas.id ? Chart.getChart(canvas.id) : null);
-      if (existing && typeof existing.destroy === 'function') existing.destroy();
-    } catch (_) {}
-  };
-
-  const buildDiagnosticPayload = () => {
-    const data = window.__DASHBOARD_EXEC_DATA__ || null;
-    const ids = [
-      'chart-receita-pf','chart-receita-pj','chart-rentabilidade',
-      'chart-despesas','chart-despesas-rubrica','chart-aging','chart-aging-contas'
-    ];
-    const canvases = ids.map((id) => {
-      const el = byId(id);
-      if (!el) return null;
-      return { id, w: el.width || null, h: el.height || null, clientW: el.clientWidth || null, clientH: el.clientHeight || null };
-    }).filter(Boolean);
-
-    const chartInstances = canvases.map((c) => {
-      try {
-        const el = byId(c.id);
-        const inst = (typeof Chart !== 'undefined' && Chart.getChart) ? (Chart.getChart(el) || Chart.getChart(c.id)) : null;
-        return { id: c.id, exists: !!inst };
-      } catch (e) {
-        return { id: c.id, exists: false, err: String(e) };
-      }
-    });
-
-    return {
-      debugEnabled: DEBUG_ENABLED,
-      startedAt: __DBG.startedAt,
-      lastBootstrapAt: __DBG.lastBootstrapAt,
-      lastApplyAt: __DBG.lastApplyAt,
-      attempts: __DBG.attempts,
-      chartJsPresent: (typeof Chart !== 'undefined'),
-      dataPresent: !!data,
-      dataKeys: data ? Object.keys(data) : [],
-      canvases,
-      chartInstances,
-      lastLogs: __DBG.logs.slice(-25),
-      lastErrors: __DBG.errors.slice(-10),
-    };
-  };
-
-  const injectDebugPanelOnce = () => {
-    if (!DEBUG_ENABLED) return;
-    if (byId('charts-debug-panel')) return;
-
-    const style = document.createElement('style');
-    style.id = 'charts-debug-style';
-    style.textContent = `
-      #charts-debug-panel{position:fixed;right:12px;bottom:12px;z-index:99999;width:min(420px,calc(100vw - 24px));
-        font:12px/1.35 system-ui,-apple-system,Segoe UI,Roboto,Arial;background:rgba(15,23,42,.95);color:#e2e8f0;
-        border:1px solid rgba(148,163,184,.25);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
-      #charts-debug-panel header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(148,163,184,.18)}
-      #charts-debug-panel header .title{font-weight:700}
-      #charts-debug-panel header .btns{display:flex;gap:8px}
-      #charts-debug-panel button{border:1px solid rgba(148,163,184,.25);background:rgba(30,41,59,.9);color:#e2e8f0;padding:6px 8px;border-radius:8px;cursor:pointer}
-      #charts-debug-panel button:hover{background:rgba(51,65,85,.95)}
-      #charts-debug-panel .body{padding:10px 12px;max-height:52vh;overflow:auto}
-      #charts-debug-panel .k{color:#94a3b8}
-      #charts-debug-panel .ok{color:#34d399}
-      #charts-debug-panel .bad{color:#fb7185}
-      #charts-debug-panel .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
-      #charts-debug-panel .hr{margin:10px 0;border-top:1px solid rgba(148,163,184,.18)}
-      #charts-debug-panel .small{font-size:11px;color:#cbd5e1}
-    `;
-    document.head.appendChild(style);
-
-    const panel = document.createElement('div');
-    panel.id = 'charts-debug-panel';
-    panel.innerHTML = `
-      <header>
-        <div class="title">Charts Debug</div>
-        <div class="btns">
-          <button type="button" id="charts-debug-force">Forçar render</button>
-          <button type="button" id="charts-debug-copy">Copiar diagnóstico</button>
-        </div>
-      </header>
-      <div class="body" id="charts-debug-body"></div>
-    `;
-    document.body.appendChild(panel);
-
-    const btnForce = byId('charts-debug-force');
-    const btnCopy = byId('charts-debug-copy');
-
-    btnForce && btnForce.addEventListener('click', () => {
-      try {
-        if (window.__DASHBOARD_CHARTS_FORCE_RENDER__) window.__DASHBOARD_CHARTS_FORCE_RENDER__();
-        else if (window.__DASHBOARD_CHARTS_BOOTSTRAP__) window.__DASHBOARD_CHARTS_BOOTSTRAP__({ force: true, source: 'debug-panel' });
-      } catch (e) {
-        dbgError(e, 'debug.force');
-      }
-    });
-
-    btnCopy && btnCopy.addEventListener('click', async () => {
-      try {
-        const payload = buildDiagnosticPayload();
-        await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
-        dbgPush('info', 'Diagnóstico copiado para a área de transferência.');
-      } catch (e) {
-        dbgError(e, 'debug.copy');
-      }
-    });
-
-    window.addEventListener('error', (ev) => {
-      try { dbgError(ev.error || ev.message, 'window.error'); renderDebugPanel(); } catch (_) {}
-    });
-    window.addEventListener('unhandledrejection', (ev) => {
-      try { dbgError(ev.reason, 'window.unhandledrejection'); renderDebugPanel(); } catch (_) {}
-    });
-
-    renderDebugPanel();
-  };
-
-  const renderDebugPanel = () => {
-    if (!DEBUG_ENABLED) return;
-    const body = byId('charts-debug-body');
-    if (!body) return;
-    const p = buildDiagnosticPayload();
-    const ok = (v) => `<span class="${v ? 'ok' : 'bad'}">${v ? 'OK' : 'NÃO'}</span>`;
-    body.innerHTML = `
-      <div class="small"><span class="k">Chart.js:</span> ${ok(p.chartJsPresent)} &nbsp; <span class="k">Data:</span> ${ok(p.dataPresent)} &nbsp; <span class="k">tentativas:</span> <span class="mono">${p.attempts}</span></div>
-      <div class="small"><span class="k">bootstrap:</span> <span class="mono">${p.lastBootstrapAt || '-'}</span> &nbsp; <span class="k">apply:</span> <span class="mono">${p.lastApplyAt || '-'}</span></div>
-      <div class="hr"></div>
-      <div class="small"><span class="k">Canvases:</span></div>
-      <div class="mono small">${(p.chartInstances || []).map(ci => `${ci.exists ? '✓' : '×'} ${ci.id}`).join('<br>')}</div>
-      <div class="hr"></div>
-      <div class="small"><span class="k">Últimos erros:</span></div>
-      <div class="mono small">${(p.lastErrors || []).length ? p.lastErrors.map(e => `${e.t} ${e.where || ''} ${e.message}`).join('<br>') : '(nenhum)'}</div>
-    `;
-  };
-
-  const destroyAllCharts = () => {
-    try {
-      Object.keys(charts).forEach((k) => {
-        if (charts[k] && typeof charts[k].destroy === 'function') {
+      Object.keys(charts).forEach(function (k) {
+        if (charts[k] && charts[k].canvas && charts[k].canvas.id === canvasId) {
           charts[k].destroy();
+          delete charts[k];
         }
-        charts[k] = null;
       });
-      // Também garante limpeza por canvas (caso chart não esteja no map)
-      ['chart-receita-pf','chart-receita-pj','chart-rentabilidade','chart-despesas','chart-despesas-rubrica','chart-aging','chart-aging-contas']
-        .forEach((id) => destroyAnyChartOnCanvas(id));
-    } catch (e) {
-      dbgError(e, 'destroyAllCharts');
-    }
-  };
+    } catch (_) {}
 
+    // 2) Fallback: destrói via Chart.getChart (cobre casos fora do registry local)
+    try {
+      if (typeof Chart === 'function' && typeof Chart.getChart === 'function') {
+        var ch = Chart.getChart(canvasId);
+        if (!ch) {
+          var el = byId(canvasId);
+          if (el) ch = Chart.getChart(el);
+        }
+        if (ch) ch.destroy();
+      }
+    } catch (_) {}
+
+    // 3) Limpa o canvas para evitar “fantasma” visual
+    try {
+      var c = byId(canvasId);
+      if (c && c.getContext) {
+        var g = c.getContext('2d');
+        if (g) {
+          g.clearRect(0, 0, c.width || 0, c.height || 0);
+        }
+      }
+    } catch (_) {}
+  }
 
   const buildReceitaLineChart = (ctxId, title, labels, meta, realizado) => {
     const ctx = byId(ctxId);
     if (!ctx) return null;
-    return new Chart(ctx, {
+    const ch = new Chart(ctx, {
       type: 'line',
       data: {
         labels,
@@ -293,26 +406,39 @@
         },
       },
     });
+
+    // Em algumas renderizações (principalmente mobile), o layout ainda está
+    // assentando quando o gráfico é criado. Forçamos uma rodada de resize/update.
+    try {
+      requestAnimationFrame(function () {
+        try {
+          ch.resize();
+          ch.update();
+        } catch (_) {}
+      });
+    } catch (_) {}
+
+    return ch;
   };
 
   const buildReceitaPFChart = (data) => {
     const d = data.receitaPF12Meses || {};
-    const labels = (d.meses && d.meses.length ? d.meses : ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']);
+    const labels = d.meses || [];
     const meta = (d.meta || []).map((n) => Number(n));
     const real = (d.realizado || []).map((n) => Number(n));
     destroyAnyChartOnCanvas('chart-receita-pf');
-    if (charts.receitaPF) charts.receitaPF.destroy();
     charts.receitaPF = buildReceitaLineChart('chart-receita-pf', 'Receita PF', labels, meta, real);
+    scheduleInkCheck('chart-receita-pf', 'Receita PF');
   };
 
   const buildReceitaPJChart = (data) => {
     const d = data.receitaPJ12Meses || {};
-    const labels = (d.meses && d.meses.length ? d.meses : ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']);
+    const labels = d.meses || [];
     const meta = (d.meta || []).map((n) => Number(n));
     const real = (d.realizado || []).map((n) => Number(n));
     destroyAnyChartOnCanvas('chart-receita-pj');
-    if (charts.receitaPJ) charts.receitaPJ.destroy();
     charts.receitaPJ = buildReceitaLineChart('chart-receita-pj', 'Receita PJ', labels, meta, real);
+    scheduleInkCheck('chart-receita-pj', 'Receita PJ');
   };
 
   const buildLucratividadeChart = (data) => {
@@ -324,8 +450,7 @@
     const despesas = (d.despesas || []).map((n) => Number(n));
     const lucro = (d.lucratividade || []).map((n) => Number(n));
     const colors = lucro.map((v) => (v > 0 ? '#10B981' : v < 0 ? '#EF4444' : '#9CA3AF'));
-    if (ctx) destroyAnyChartOnCanvas(ctx);
-    if (charts.lucratividade) charts.lucratividade.destroy();
+    destroyAnyChartOnCanvas('chart-rentabilidade');
     charts.lucratividade = new Chart(ctx, {
       type: 'bar',
       data: {
@@ -373,15 +498,25 @@
         },
       },
     });
+
+    try {
+      requestAnimationFrame(function () {
+        try {
+          charts.lucratividade.resize();
+          charts.lucratividade.update();
+        } catch (_) {}
+      });
+    } catch (_) {}
+
+    scheduleInkCheck('chart-rentabilidade', 'Rentabilidade/Lucratividade');
   };
 
   const buildDespesasChart = (data) => {
-    const ctx = byAnyId(['chart-despesas', 'chart-despesas-rubrica']);
+    const ctx = byId('chart-despesas-rubrica');
     if (!ctx) return;
     const d = data.despesasRubrica || [];
     const labels = d.map((r) => r.rubrica);
     const values = d.map((r) => Number(r.valor));
-    if (ctx) destroyAnyChartOnCanvas(ctx);
     if (charts.despesas) charts.despesas.destroy();
     charts.despesas = new Chart(ctx, {
       type: 'doughnut',
@@ -419,12 +554,11 @@
   };
 
   const buildAgingChart = (data) => {
-    const ctx = byAnyId(['chart-aging', 'chart-aging-contas']);
+    const ctx = byId('chart-aging-contas');
     if (!ctx) return;
     const d = data.agingContas || {};
     const labels = d.faixas || [];
     const values = d.valores || [];
-    if (ctx) destroyAnyChartOnCanvas(ctx);
     if (charts.aging) charts.aging.destroy();
     charts.aging = new Chart(ctx, {
       type: 'bar',
@@ -477,7 +611,7 @@
       const tc = trendClass(metricId, trend);
       el.innerHTML = `
         <div class="space-y-2">
-          <div class="text-2xl font-bold text-gray-900 dark:text-gray-200">${fmtCurrency(value)}</div>
+          <div class="text-2xl font-bold text-gray-900 dark:text-white">${fmtCurrency(value)}</div>
           <div class="text-xs text-gray-500">Meta: ${fmtCurrency(meta)} (${fmtPct(p)})</div>
           <div class="flex items-center gap-1">
             <span class="inline-block px-2 py-1 rounded text-xs font-semibold ${pc}">
@@ -501,22 +635,12 @@
     const el = byId('tbl-despesas-rubrica');
     if (!el) return;
     const d = data.despesasRubrica || [];
-    el.innerHTML = d.map((r) => {
-      const valor = Number(r.valor || 0);
-      const meta = Number(r.meta || 0);
-      const p = meta > 0 ? (valor / meta) * 100 : 0;
-      const trend = Number(r.trend || 0);
-      const tClass = trendClass('despesas', trend);
-      return `
-        <tr>
-          <td class="px-3 py-2 text-sm text-gray-800 dark:text-gray-200">${r.rubrica ?? ''}</td>
-          <td class="px-3 py-2 text-sm text-right font-semibold text-gray-900 dark:text-gray-200">${fmtCurrency(valor)}</td>
-          <td class="px-3 py-2 text-sm text-right text-gray-700 dark:text-gray-300">${fmtCurrency(meta)}</td>
-          <td class="px-3 py-2 text-sm text-right text-gray-700 dark:text-gray-300">${fmtPct(p)}</td>
-          <td class="px-3 py-2 text-sm text-right ${tClass}">${arrow(trend)} ${fmtPct(trend)}</td>
-        </tr>
-      `;
-    }).join('');
+    el.innerHTML = d.map((r) => `
+      <tr>
+        <td class="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">${r.rubrica}</td>
+        <td class="px-4 py-2 text-sm text-right font-semibold text-gray-900 dark:text-white">${fmtCurrency(r.valor)}</td>
+      </tr>
+    `).join('');
   };
 
   const renderAtrasosTable = (data) => {
@@ -536,64 +660,39 @@
   const renderComparativo = (data) => {
     const el = byId('tbl-comparativo');
     if (!el) return;
-    const rows = Array.isArray(data.comparativoMensal) ? data.comparativoMensal : [];
-
-    const isPercentMetric = (name) => {
-      const n = String(name || '').toLowerCase();
-      return n.includes('margem') || n.includes('taxa');
-    };
-
-    const fmtValue = (name, v) => {
-      const num = Number(v || 0);
-      return isPercentMetric(name) ? fmtPct(num) : fmtCurrency(num);
-    };
-
-    const iconFor = (name) => {
-      const n = String(name || '').toLowerCase();
-      if (n.includes('receita')) return '💰';
-      if (n.includes('despesa')) return '📉';
-      if (n.includes('resultado')) return '📈';
-      if (n.includes('margem')) return '📊';
-      if (n.includes('atraso')) return '⏰';
-      if (n.includes('cobran')) return '✅';
-      return '•';
-    };
-
-    el.innerHTML = rows.map((r) => {
-      const name = r.metrica ?? '';
-      const trend = Number(r.trend || 0);
-      const tClass = trendClass(name.toLowerCase().includes('despesa') ? 'despesas' : '', trend);
+    const s = data.resumoExecutivo || {};
+    const metrics = [
+      { label: 'Receita', atual: s.receitaTotal, meta: s.receitaMeta, trend: s.receitaTrend },
+      { label: 'Despesas', atual: s.despesasTotal, meta: s.despesasMeta, trend: s.despesasTrend },
+      { label: 'Resultado Líquido', atual: s.resultadoLiquido, meta: s.resultadoMeta, trend: s.resultadoTrend },
+      { label: 'Margem Líquida', atual: s.margemLiquida, meta: 100, trend: s.margemTrend },
+    ];
+    el.innerHTML = metrics.map((m) => {
+      const p = pct(m.atual, m.meta);
       return `
         <tr>
-          <td class="px-3 py-2 text-sm font-semibold text-gray-800 dark:text-gray-200"><span class="mr-2" aria-hidden="true">${iconFor(name)}</span>${name}</td>
-          <td class="px-3 py-2 text-sm text-right text-gray-700 dark:text-gray-300">${fmtValue(name, r.mes1)}</td>
-          <td class="px-3 py-2 text-sm text-right text-gray-700 dark:text-gray-300">${fmtValue(name, r.mes2)}</td>
-          <td class="px-3 py-2 text-sm text-right font-semibold text-gray-900 dark:text-gray-200">${fmtValue(name, r.mes3)}</td>
-          <td class="px-3 py-2 text-sm text-right ${tClass}">${arrow(trend)} ${fmtPct(trend)}</td>
+          <td class="px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300">${m.label}</td>
+          <td class="px-4 py-2 text-sm text-right text-gray-900 dark:text-white">${fmtCurrency(m.atual)}</td>
+          <td class="px-4 py-2 text-sm text-right text-gray-600 dark:text-gray-400">${fmtCurrency(m.meta)}</td>
+          <td class="px-4 py-2 text-sm text-right font-semibold">${fmtPct(p)}</td>
+          <td class="px-4 py-2 text-sm text-right ${trendClass('', m.trend)}">${arrow(m.trend)} ${fmtPct(m.trend)}</td>
         </tr>
       `;
     }).join('');
   };
 
-    const applyData = (data) => {
-    __DBG.lastApplyAt = new Date().toISOString();
-    try {
-      console.log('[Dashboard] applyData chamado');
-      renderKpis(data);
-      renderDespesasTable(data);
-      renderAtrasosTable(data);
-      renderComparativo(data);
-      buildReceitaPFChart(data);
-      buildReceitaPJChart(data);
-      buildLucratividadeChart(data);
-      buildDespesasChart(data);
-      buildAgingChart(data);
-      console.log('[Dashboard] Todos os gráficos criados');
-    } catch (e) {
-      dbgError(e, 'applyData');
-    } finally {
-      renderDebugPanel();
-    }
+  const applyData = (data) => {
+    console.log('[Dashboard] applyData chamado');
+    renderKpis(data);
+    renderDespesasTable(data);
+    renderAtrasosTable(data);
+    renderComparativo(data);
+    buildReceitaPFChart(data);
+    buildReceitaPJChart(data);
+    buildLucratividadeChart(data);
+    buildDespesasChart(data);
+    buildAgingChart(data);
+    console.log('[Dashboard] Todos os gráficos criados');
   };
 
   const resolveApiUrl = () => window.__DASHBOARD_API_URL__ || '/api/visao-gerencial';
@@ -611,11 +710,10 @@
       url.searchParams.set('mes', String(mes));
       const res = await fetch(url.toString());
       if (!res.ok) {
-        dbgPush('error', 'Erro ao buscar dados', { status: res.status });
+        console.error('[Dashboard] Erro ao buscar dados:', res.status);
         return;
       }
       const data = await res.json();
-      window.__DASHBOARD_EXEC_DATA__ = data;
       applyData(data);
       const exp = byId('export-csv');
       if (exp) {
@@ -659,65 +757,36 @@
     }
   };
 
-    // ===== INICIALIZAÇÃO SIMPLIFICADA E ROBUSTA =====
-  const bootstrap = (opts) => {
-    const options = opts || {};
-    const force = !!options.force;
-    const source = options.source || 'auto';
-
-    __DBG.lastBootstrapAt = new Date().toISOString();
-    injectDebugPanelOnce();
-
+  // ===== INICIALIZAÇÃO SIMPLIFICADA E ROBUSTA =====
+  const bootstrap = () => {
     console.log('[Dashboard] Bootstrap iniciado');
     const data = window.__DASHBOARD_EXEC_DATA__;
-
+    
     if (!data) {
-      const msg = 'window.__DASHBOARD_EXEC_DATA__ não existe';
-      console.error('[Dashboard] ❌ ' + msg);
-      dbgPush('error', msg, { source });
-      renderDebugPanel();
+      console.error('[Dashboard] ❌ window.__DASHBOARD_EXEC_DATA__ não existe');
       return false;
     }
-
+    
     console.log('[Dashboard] ✅ Dados disponíveis');
-
+    
     try {
-      if (!__DBG.initDone) {
-        setupFilters();
-        setupExportMenu();
-        __DBG.initDone = true;
-      }
-
-      if (force) {
-        destroyAllCharts();
-      }
-
       applyData(data);
+      setupFilters();
+      setupExportMenu();
       console.log('[Dashboard] ✅ Bootstrap completo - todos os gráficos criados');
-      dbgPush('info', 'bootstrap ok', { source, force });
       return true;
     } catch (e) {
       console.error('[Dashboard] ❌ Erro durante bootstrap:', e.message);
-      dbgError(e, 'bootstrap');
       return false;
-    } finally {
-      renderDebugPanel();
     }
   };
-
-  // Hooks globais (úteis para depuração)
-  window.__DASHBOARD_CHARTS_BOOTSTRAP__ = bootstrap;
-  window.__DASHBOARD_CHARTS_FORCE_RENDER__ = () => bootstrap({ force: true, source: 'manual' });
-  window.__DASHBOARD_CHARTS_DIAGNOSTIC__ = buildDiagnosticPayload;
 
   // Inicialização com retry robusto
   const initWithRetry = (attempt = 1) => {
     const MAX = 20;
     const DELAY = 100;
     
-    __DBG.attempts = attempt;
     console.log(`[Dashboard] Tentativa ${attempt}/${MAX}`);
-    if (DEBUG_ENABLED) { try { injectDebugPanelOnce(); renderDebugPanel(); } catch (_) {} }
     
     // Verificar Chart.js
     if (typeof Chart !== 'function') {
@@ -746,7 +815,7 @@
     console.log('[Dashboard] ✅ Dados disponíveis');
     
     // Tudo pronto, executar bootstrap
-    bootstrap({ source: 'retry' });
+    bootstrap();
   };
 
   // Garantir que DOM está pronto antes de iniciar
@@ -759,9 +828,5 @@
   } else {
     console.log('[Dashboard] DOM já pronto, iniciando com delay');
     setTimeout(initWithRetry, 100);
-  }
-
-  if (DEBUG_ENABLED) {
-    setInterval(() => { try { renderDebugPanel(); } catch (_) {} }, 1000);
   }
 })();

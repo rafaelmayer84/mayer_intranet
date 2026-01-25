@@ -724,7 +724,15 @@ public function getLucratividadeByMonth(int $ano): array
         $metaPf = (float) Configuracao::get("meta_pf_{$ano}_{$mes}", 0);
         $metaPj = (float) Configuracao::get("meta_pj_{$ano}_{$mes}", 0);
         $metaReceita = $metaPf + $metaPj;
-        $metaDespesas = (float) Configuracao::get("meta_despesas_{$ano}_{$mes}", 0);
+        // Meta de despesas
+        $metaDespesasDb = $this->getMetaValueFromKpiTable("despesas", $mes, $ano);
+        if (!$metaDespesasDb) {
+            $metaDespesasAnual = $this->getMetaValueFromKpiTable("despesa_total_ano", 0, $ano);
+            if ($metaDespesasAnual) {
+                $metaDespesasDb = $metaDespesasAnual / 12;
+            }
+        }
+        $metaDespesas = (float) ($metaDespesasDb ?? 0);
 
         $metaResultado = (float) Configuracao::get("meta_resultado_{$ano}_{$mes}", max($metaReceita - $metaDespesas, 0));
         $metaMargem = (float) Configuracao::get(
@@ -925,8 +933,7 @@ public function getLucratividadeByMonth(int $ano): array
 
         $this->applyRubricasExcluidas($q);
 
-        // ✅ CORREÇÃO: Despesas retornam como valores POSITIVOS usando abs()
-        return (float) abs($q->sum('valor'));
+        return (float) $q->sum('valor');
     }
 
     /**
@@ -947,8 +954,7 @@ public function getLucratividadeByMonth(int $ano): array
 
         foreach ($rows as $m => $t) {
             $idx = ((int) $m) - 1;
-            // ✅ CORREÇÃO: Despesas retornam como valores POSITIVOS usando abs()
-            if ($idx >= 0 && $idx < 12) $out[$idx] = (float) abs($t);
+            if ($idx >= 0 && $idx < 12) $out[$idx] = (float) $t;
         }
 
         return array_map('floatval', $out);
@@ -1046,5 +1052,23 @@ public function getLucratividadeByMonth(int $ano): array
             'topAumentos' => $maioresAumentos,
             'topReducoes' => $maioresReducoes
         ];
+    }
+
+    /**
+     * Recupera meta específica da tabela kpi_monthly_targets
+     */
+    private function getMetaValueFromKpiTable(string $kpiKey, int $mes, int $ano): ?float
+    {
+        $meta = DB::table('kpi_monthly_targets')
+            ->where('year', $ano)
+            ->where('month', $mes)
+            ->where('kpi_key', $kpiKey)
+            ->first();
+        
+        if ($meta && $meta->target_value) {
+            return (float) $meta->target_value;
+        }
+        
+        return null;
     }
 }

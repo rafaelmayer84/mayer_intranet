@@ -381,6 +381,12 @@
             const form = this.closest('form');
             const formData = new FormData(form);
             
+            // Debug: Log dos dados
+            console.log('FormData entries:');
+            for (let [key, value] of formData.entries()) {
+                console.log(`  ${key}: ${value}`);
+            }
+            
             // Mostrar loading
             const originalText = this.innerHTML;
             this.innerHTML = 'Salvando';
@@ -391,7 +397,7 @@
                 const token = document.querySelector('meta[name="csrf-token"]')?.content || '';
                 
                 const response = await fetch('{{ route("configurar-metas.update") }}', {
-                    method: 'PUT',
+                    method: 'POST',
                     body: formData,
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest',

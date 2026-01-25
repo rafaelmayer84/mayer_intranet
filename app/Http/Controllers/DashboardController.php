@@ -225,24 +225,23 @@ class DashboardController extends Controller
                     $valor = $request->get("meta_despesas[$mes]", 0);
                     Configuracao::set("meta_despesas_{$ano}_{$mes}", $valor);
                 }
-            
-        } elseif ($tipo === 'resultado') {
-            for ($mes = 1; $mes <= 12; $mes++) {
-                Configuracao::set("meta_resultado_{$ano}_{$mes}", $request->get("meta_resultado_{$mes}", 0));
-            }
-        } elseif ($tipo === 'margem') {
-            for ($mes = 1; $mes <= 12; $mes++) {
-                Configuracao::set("meta_margem_{$ano}_{$mes}", $request->get("meta_margem_{$mes}", 0));
-            }
-        } elseif ($tipo === 'dias_atraso') {
-            for ($mes = 1; $mes <= 12; $mes++) {
-                Configuracao::set("meta_dias_atraso_{$ano}_{$mes}", $request->get("meta_dias_atraso_{$mes}", 0));
-            }
-        } elseif ($tipo === 'taxa_cobranca') {
-            for ($mes = 1; $mes <= 12; $mes++) {
-                Configuracao::set("meta_taxa_cobranca_{$ano}_{$mes}", $request->get("meta_taxa_cobranca_{$mes}", 0));
-            }
-} elseif ($tipo === 'anuais') {
+            } elseif ($tipo === 'resultado') {
+                for ($mes = 1; $mes <= 12; $mes++) {
+                    Configuracao::set("meta_resultado_{$ano}_{$mes}", $request->get("meta_resultado_{$mes}", 0));
+                }
+            } elseif ($tipo === 'margem') {
+                for ($mes = 1; $mes <= 12; $mes++) {
+                    Configuracao::set("meta_margem_{$ano}_{$mes}", $request->get("meta_margem_{$mes}", 0));
+                }
+            } elseif ($tipo === 'dias_atraso') {
+                for ($mes = 1; $mes <= 12; $mes++) {
+                    Configuracao::set("meta_dias_atraso_{$ano}_{$mes}", $request->get("meta_dias_atraso_{$mes}", 0));
+                }
+            } elseif ($tipo === 'taxa_cobranca') {
+                for ($mes = 1; $mes <= 12; $mes++) {
+                    Configuracao::set("meta_taxa_cobranca_{$ano}_{$mes}", $request->get("meta_taxa_cobranca_{$mes}", 0));
+                }
+            } elseif ($tipo === 'anuais') {
                 // Salvar metas anuais
                 Configuracao::set('meta_avaliacoes_google', $request->get('meta_avaliacoes', 250));
                 Configuracao::set('meta_contratos', $request->get('meta_contratos', 400000));

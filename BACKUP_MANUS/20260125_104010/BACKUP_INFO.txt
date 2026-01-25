@@ -1,0 +1,32 @@
+BACKUP COMPLETO - INTRANET MAYER ADVOGADOS
+==========================================
+
+Data do Backup: $(date)
+Versão do Projeto: Fase 2 - Sincronização de Dados
+Git Hash: $(cd /home/u492856976/public_html/Intranet && git rev-parse HEAD 2>/dev/null || echo "N/A")
+
+Arquivos Inclusos:
+- code.tar.gz: Código completo da aplicação
+- db.sql.gz: Banco de dados MySQL comprimido
+- storage_min.tar.gz: Diretório de storage
+- .env.backup: Arquivo de configuração
+
+Módulos Operacionais:
+✅ Dashboard Financeiro (Visão Gerencial)
+✅ Clientes & Mercado (com sincronização)
+✅ Integrações (DataJuri + ESPO CRM)
+✅ Sincronização de Dados
+
+Dados Sincronizados:
+- 302 clientes (DataJuri)
+- 186 leads (ESPO CRM)
+- 84 oportunidades (ESPO CRM)
+- 2.933 clientes totais no dashboard
+
+Para restaurar este backup:
+1. Descompactar code.tar.gz
+2. Restaurar db.sql.gz no MySQL
+3. Restaurar storage_min.tar.gz
+4. Copiar .env.backup para .env
+5. Executar: php artisan migrate
+6. Executar: php artisan cache:clear

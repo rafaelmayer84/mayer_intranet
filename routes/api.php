@@ -2,6 +2,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SyncController;
+use App\Http\Controllers\ClientesMercadoController;
 
 /*
 |--------------------------------------------------------------------------
@@ -26,6 +27,13 @@ Route::prefix('sync')->group(function () {
     Route::match(['get', 'post'], '/all', [SyncController::class, 'syncAll']);
     
     Route::get('/dados/{tipo}', [SyncController::class, 'getDados']);
+});
+
+// Rotas do módulo Clientes & Mercado (sem autenticação para facilitar)
+Route::prefix('clientes-mercado')->group(function () {
+    Route::get('/top-clientes', [ClientesMercadoController::class, 'topClientes']);
+    Route::get('/leads-recentes', [ClientesMercadoController::class, 'leadsRecentes']);
+    Route::get('/resumo-executivo', [ClientesMercadoController::class, 'resumoExecutivo']);
 });
 
 Route::get('/user', function (Request $request) {

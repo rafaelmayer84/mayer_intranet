@@ -1,0 +1,155 @@
+--- a/app/Services/DashboardFinanceProdService.php
++++ b/app/Services/DashboardFinanceProdService.php
+@@ -496,39 +496,40 @@
+     /**
+      * Lista de contas vencidas (top 10 por dias de atraso).
+      */
+-    public function getContasEmAtrasoLista(int $ano, int $mes): array
+-    {
+-        $refDate = $this->refDateCompetencia($ano, $mes);
+-
+-        $rows = ContaReceber::query()
+-            ->whereNull('data_pagamento')
+-            ->whereNotNull('data_vencimento')
+-            ->whereDate('data_vencimento', '<=', $refDate->toDateString())
+-            ->orderBy('data_vencimento')
+-            ->limit(50)
+-            ->get();
+-
+-        $mapped = [];
+-        foreach ($rows as $c) {
+-            $dias = $c->data_vencimento ? $c->data_vencimento->diffInDays($refDate, false) : 0;
+-            $dias = max(0, (int) $dias);
+-            // CORRIGIDO: Usar coluna 'cliente' (não 'cliente_nome' que não existe)
+-            // Usar datajuri_id como numero, fallback para id
+-            $mapped[] = [
+-                'numero' => (int) ($c->datajuri_id ?? $c->id ?? 0),
+-                'cliente' => (string) ($c->cliente ?? '(Sem cliente)'),
+-                'valor' => (float) $c->valor,
+-                'diasAtraso' => $dias,
+-                'status' => $this->statusAtraso($dias),
+-            ];
+-        }
+-
+-        usort($mapped, function ($a, $b) {
+-            return ($b['diasAtraso'] <=> $a['diasAtraso']) ?: ($b['valor'] <=> $a['valor']);
+-        });
+-
+-        return array_slice($mapped, 0, 10);
+-    }
++
++public function getContasEmAtrasoLista(int $ano, int $mes): array
++{
++    $refDate = $this->refDateCompetencia($ano, $mes);
++    $refEff = $this->effectiveRef($refDate);
++
++    // Fonte única: mesma base do Aging e do Top Clientes
++    $rows = $this->overdueQuery($refDate)
++        ->orderBy('data_vencimento')
++        ->limit(50)
++        ->get();
++
++    $mapped = [];
++    foreach ($rows as $c) {
++        $dias = $c->data_vencimento ? $c->data_vencimento->diffInDays($refEff, false) : 0;
++        $dias = max(0, (int) $dias);
++
++        // Usar datajuri_id como numero, fallback para id
++        $mapped[] = [
++            'numero' => (int) ($c->datajuri_id ?? $c->id ?? 0),
++            'cliente' => (string) ($c->cliente ?? '(Sem cliente)'),
++            'valor' => (float) $c->valor,
++            'diasAtraso' => $dias,
++            'status' => $this->statusAtraso($dias),
++        ];
++    }
++
++    usort($mapped, function ($a, $b) {
++        return ($b['diasAtraso'] <=> $a['diasAtraso']) ?: ($b['valor'] <=> $a['valor']);
++    });
++
++    return array_slice($mapped, 0, 10);
++}
++
+ 
+     /**
+      * KPI: Top clientes em atraso (agrupado por cliente_nome).
+@@ -777,18 +778,49 @@
+         ];
+     }
+ 
+-    private function overdueQuery(Carbon $ref)
+-    {
+-        $startDate = $ref->copy()->subMonths(24)->startOfDay();
+-
+-        return ContaReceber::query()
+-            ->whereNull('data_pagamento')
+-            ->whereNotNull('data_vencimento')
+-            ->where('data_vencimento', '!=', '0000-00-00')
+-            ->whereDate('data_vencimento', '<', Carbon::now()->toDateString()) // Bloqueia datas futuras e hoje
+-            ->whereDate('data_vencimento', '>=', $startDate->toDateString()) // Filtro de 24 meses
+-            ->where('valor', '>', 0); // Exclui residuais
+-    }
++/**
++ * Referência efetiva para cálculos de atraso.
++ * Evita considerar "atraso" em data futura quando o usuário seleciona mês/ano futuro.
++ */
++private function effectiveRef(Carbon $ref): Carbon
++{
++    $today = Carbon::now()->startOfDay();
++    $refEff = $ref->copy()->startOfDay();
++    return $refEff->gt($today) ? $today : $refEff;
++}
++
++
++
++private function overdueQuery(Carbon $ref)
++{
++    $refEff = $this->effectiveRef($ref);
++    $startDate = $refEff->copy()->subMonths(24)->startOfDay();
++    $residueCutoff = $refEff->copy()->subMonths(12)->startOfDay();
++
++    return ContaReceber::query()
++        ->whereNull('data_pagamento')
++        ->whereNotNull('data_vencimento')
++        ->where('data_vencimento', '!=', '0000-00-00')
++        // Vencidos em relação à referência efetiva (nunca futura)
++        ->whereDate('data_vencimento', '<', $refEff->toDateString())
++        // Janela de 24 meses por VENCIMENTO
++        ->whereDate('data_vencimento', '>=', $startDate->toDateString())
++        // Status "Não lançado" (aceita variações comuns gravadas no DB)
++        ->where(function ($q) {
++            $q->where('status', 'Não lançado')
++              ->orWhere('status', 'Nao lançado')
++              ->orWhere('status', 'nao_lancado')
++              ->orWhere('status', 'não lançado');
++        })
++        // Valor positivo
++        ->where('valor', '>', 0)
++        // Regra de resíduos: excluir quando (valor < 10 AND vencimento < 12 meses)
++        ->where(function ($q) use ($residueCutoff) {
++            $q->where('valor', '>=', 10)
++              ->orWhereDate('data_vencimento', '>=', $residueCutoff->toDateString());
++        });
++}
++
+ 
+     private function avgDiasAtraso($contas, Carbon $ref): int
+     {
+@@ -842,6 +874,7 @@
+     private function getAgingContas(int $ano, int $mes): array
+     {
+         $ref = $this->refDateCompetencia($ano, $mes);
++        $refEff = $this->effectiveRef($ref);
+         $contas = $this->overdueQuery($ref)->get();
+         $buckets = [
+             'dias0_15' => 0.0,
+@@ -852,7 +885,7 @@
+             'dias120_plus' => 0.0,
+         ];
+         foreach ($contas as $c) {
+-            $dias = max(0, (int) $c->data_vencimento->diffInDays($ref, false));
++            $dias = max(0, (int) $c->data_vencimento->diffInDays($refEff, false));
+             $v = (float) $c->valor;
+             if ($dias <= 15) $buckets['dias0_15'] += $v;
+             elseif ($dias <= 30) $buckets['dias16_30'] += $v;

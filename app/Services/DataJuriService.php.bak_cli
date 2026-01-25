@@ -113,7 +113,7 @@ class DataJuriService
     {
         $params = [
             // AQUI ESTAVA O ERRO: Pedimos nominalmente todos os campos vitais + status
-            'campos'   => 'id,dataVencimento,dataCompetencia,valor,valorPago,dataPagamento,descricao,observacao,status,situacao,pessoa.nome,pessoaId,processo,classificacaoFinanceira,conta,formaPagamento,numeroParcela,quantidadeParcelas',
+            'campos'   => 'id,dataVencimento,dataCompetencia,valor,valorPago,dataPagamento,descricao,observacao,status,situacao,pessoa,processo,classificacaoFinanceira,conta,formaPagamento,numeroParcela,quantidadeParcelas',
             'criterio' => 'dataVencimento | menor que | ' . date('d/m/Y') . ' ## prazo | diferente de | Concluído',
         ];
 

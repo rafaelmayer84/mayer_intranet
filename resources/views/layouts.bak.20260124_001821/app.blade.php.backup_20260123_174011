@@ -6,7 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Intranet') - {{ config('app.name', 'Mayer Advogados') }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <!-- CSS auxiliar (transições, tema claro/escuro, pequenos fixes) -->
     <link rel="stylesheet" href="{{ asset('css/intranet-ui.css') }}">
@@ -147,35 +147,32 @@
 
                 <!-- 2) RESULTADOS! (colapsável) -->
                 <div class="menu-group">
-                    <button onclick="toggleSubmenu('resultados')" class="nav-link w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors {{ request()->is('visao-gerencial*') || request()->is('clientes-mercado*') || request()->is('processos-internos*') || request()->is('time-evolucao*') ? 'nav-link-active' : '' }}">
+                    <button onclick="toggleSubmenu('resultados')" class="nav-link w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors {{ request()->is('visao-gerencial*') ? 'nav-link-active' : '' }}">
                         <div class="flex items-center">
                             <span class="w-5 h-5 mr-3" aria-hidden="true">🎯</span>
                             <span class="font-medium">RESULTADOS!</span>
                         </div>
-                        <svg id="arrow-resultados" class="w-4 h-4 menu-arrow {{ request()->is('visao-gerencial*') || request()->is('clientes-mercado*') || request()->is('processos-internos*') || request()->is('time-evolucao*') ? 'rotated' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg id="arrow-resultados" class="w-4 h-4 menu-arrow {{ request()->is('visao-gerencial*') ? 'rotated' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                         </svg>
                     </button>
-                    <div id="submenu-resultados" class="submenu {{ request()->is('visao-gerencial*') || request()->is('clientes-mercado*') || request()->is('processos-internos*') || request()->is('time-evolucao*') ? 'open' : '' }} ml-4 mt-1 space-y-1">
+                    <div id="submenu-resultados" class="submenu {{ request()->is('visao-gerencial*') ? 'open' : '' }} ml-4 mt-1 space-y-1">
                         <a href="{{ route('visao-gerencial') }}"
                            class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('visao-gerencial') ? 'nav-sublink-active' : '' }}">
                             <span class="w-4 h-4 mr-3" aria-hidden="true">💰</span>
                             Financeiro
                         </a>
-                        <a href="{{ route('clientes-mercado') }}"
-                           class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('clientes-mercado') ? 'nav-sublink-active' : '' }}">
+                        <a href="#" class="nav-sublink nav-sublink-disabled flex items-center px-4 py-2 text-sm rounded-lg transition-colors">
                             <span class="w-4 h-4 mr-3" aria-hidden="true">⚖️</span>
                             Clientes &amp; Mercado
                         </a>
-                        <a href="#" class="nav-sublink nav-sublink-disabled flex items-center px-4 py-2 text-sm rounded-lg transition-colors opacity-50 cursor-not-allowed">
+                        <a href="#" class="nav-sublink nav-sublink-disabled flex items-center px-4 py-2 text-sm rounded-lg transition-colors">
                             <span class="w-4 h-4 mr-3" aria-hidden="true">⚙️</span>
                             Processos Internos
-                            <span class="text-xs ml-auto bg-yellow-600 px-2 py-0.5 rounded">Em breve</span>
                         </a>
-                        <a href="#" class="nav-sublink nav-sublink-disabled flex items-center px-4 py-2 text-sm rounded-lg transition-colors opacity-50 cursor-not-allowed">
+                        <a href="#" class="nav-sublink nav-sublink-disabled flex items-center px-4 py-2 text-sm rounded-lg transition-colors">
                             <span class="w-4 h-4 mr-3" aria-hidden="true">👥</span>
                             Time &amp; Evolução
-                            <span class="text-xs ml-auto bg-yellow-600 px-2 py-0.5 rounded">Em breve</span>
                         </a>
                     </div>
                 </div>
@@ -196,24 +193,12 @@
                     </svg>
                     Sincronização
                 </a>
-                
-                <!-- Integração (Novo) -->
-                <a href="{{ route('integration.index') }}" 
-                   class="nav-link flex items-center px-4 py-3 rounded-lg transition-colors {{ request()->routeIs('integration.*') ? 'nav-link-active' : '' }}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.658 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
-                    </svg>
-                    Integrações
-                </a>
                 @endif
                 
                 <!-- Configurações -->
-                <a href="{{ route('config.metas-kpi-mensais') }}" 
-                   class="nav-link flex items-center px-4 py-3 rounded-lg transition-colors {{ request()->routeIs('config.*') ? 'nav-link-active' : '' }}">
-                    <span class="w-5 h-5 mr-3" aria-hidden="true">📊</span>
-                    Metas de KPIs
-                </a>
-                
+                        <a href="{{ route('config.metas-kpi-mensais') }}" class="dropdown-item">
+                            <i class="fas fa-bullseye"></i> 📊 Metas de KPIs
+                        </a>
                 <a href="{{ route('configuracoes.index') }}" 
                    class="nav-link flex items-center px-4 py-3 rounded-lg transition-colors {{ request()->routeIs('configuracoes.*') ? 'nav-link-active' : '' }}">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

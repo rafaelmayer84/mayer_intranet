@@ -360,7 +360,7 @@ class SyncService
             "data_vencimento" => $parseDate($dataVenc),
             "data_pagamento" => $parseDate($dataPag),
             "status" => $trimOrNull($it["status"] ?? null),
-            "cliente" => (function() use ($trimOrNull, $pessoaNome, $it) { $c = $trimOrNull($pessoaNome); if (!$c) { $c = $trimOrNull($it["descricao"] ?? null); } if ($c === null || $c === "" || $c === "0" || $c === 0) { return "Sem dados"; } return $c; })(),
+            "cliente" => $trimOrNull($pessoaNome) ?? "(Sem cliente)",
             "tipo" => $trimOrNull($it["tipo"] ?? "normal"),
         ];
     }

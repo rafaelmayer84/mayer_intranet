@@ -925,8 +925,7 @@ public function getLucratividadeByMonth(int $ano): array
 
         $this->applyRubricasExcluidas($q);
 
-        // ✅ CORREÇÃO: Despesas retornam como valores POSITIVOS usando abs()
-        return (float) abs($q->sum('valor'));
+        return (float) $q->sum('valor');
     }
 
     /**
@@ -947,8 +946,7 @@ public function getLucratividadeByMonth(int $ano): array
 
         foreach ($rows as $m => $t) {
             $idx = ((int) $m) - 1;
-            // ✅ CORREÇÃO: Despesas retornam como valores POSITIVOS usando abs()
-            if ($idx >= 0 && $idx < 12) $out[$idx] = (float) abs($t);
+            if ($idx >= 0 && $idx < 12) $out[$idx] = (float) $t;
         }
 
         return array_map('floatval', $out);

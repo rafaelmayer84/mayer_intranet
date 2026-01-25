@@ -87,11 +87,6 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/api/configuracoes/ano', [ConfiguracaoController::class, 'setAnoFiltro']);
     Route::post('/api/configuracoes/datajuri', [ConfiguracaoController::class, 'saveDataJuriCredentials']);
     Route::get('/api/configuracoes/datajuri/test', [ConfiguracaoController::class, 'testDataJuriConnection']);
-    
-    // Clientes & Mercado
-    Route::get('/clientes-mercado', [App\Http\Controllers\ClientesMercadoController::class, 'index'])->name('clientes-mercado');
-    Route::get('/api/clientes-mercado/top', [App\Http\Controllers\ClientesMercadoController::class, 'topClientes'])->name('api.clientes-mercado.top');
-    Route::get('/api/clientes-mercado/leads', [App\Http\Controllers\ClientesMercadoController::class, 'leadsRecentes'])->name('api.clientes-mercado.leads');
 });
 
 
@@ -111,10 +106,17 @@ Route::middleware(['auth'])->prefix('configuracoes')->name('config.')->group(fun
     Route::post('metas-kpi-mensais', [App\Http\Controllers\Admin\KpiMonthlyTargetController::class, 'store'])->name('metas-kpi-mensais.store');
 });
 
-// Integrações (Admin only)
-Route::middleware(['auth'])->group(function () {
-    Route::get('/integracao', [App\Http\Controllers\IntegrationController::class, 'index'])->name('integration.index');
-    Route::get('/integracao/{log}', [App\Http\Controllers\IntegrationController::class, 'show'])->name('integration.show');
-    Route::post('/integracao/sync', [App\Http\Controllers\IntegrationController::class, 'sync'])->name('integration.sync');
-    Route::get('/integracao/status', [App\Http\Controllers\IntegrationController::class, 'status'])->name('integration.status');
+// Clientes & Mercado
+Route::middleware(['auth'])->prefix('clientes-mercado')->group(function () {
+    Route::get('/', [App\Http\Controllers\ClientesMercadoController::class, 'index'])->name('clientes-mercado.index');
+    Route::get('/data', [App\Http\Controllers\ClientesMercadoController::class, 'getData'])->name('clientes-mercado.data');
+});
+Route::middleware(['auth'])->prefix('clientes')->group(function () {
+    Route::get('/', [App\Http\Controllers\ClientesMercadoController::class, 'clientes'])->name('clientes.lista');
+    Route::get('/{id}', [App\Http\Controllers\ClientesMercadoController::class, 'clienteDetalhes'])->name('clientes.detalhes');
+});
+Route::middleware(['auth'])->prefix('integration')->group(function () {
+    Route::get('/', [App\Http\Controllers\IntegrationController::class, 'index'])->name('integration.index');
+    Route::post('/sync', [App\Http\Controllers\IntegrationController::class, 'syncManual'])->name('integration.sync');
+    Route::get('/status', [App\Http\Controllers\IntegrationController::class, 'status'])->name('integration.status');
 });
