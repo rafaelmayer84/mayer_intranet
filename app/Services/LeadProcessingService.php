@@ -599,11 +599,15 @@ PROMPT;
             }
 
             // Idempotência
-            $existingLead = Lead::where('telefone', $telefone)
-                ->where('contact_id', $contactId)
-                ->first();
+            $existingLead = Lead::where('telefone', $telefone)->first();
 
             if ($existingLead) {
+                // Atualizar contact_id se veio vazio
+                if (empty($existingLead->contact_id) && !empty($contactId)) {
+                    $existingLead->contact_id = $contactId;
+                    $existingLead->timestamps = false;
+                    $existingLead->save();
+                }
                 Log::info('Lead ja existe', ['lead_id' => $existingLead->id]);
                 return $existingLead;
             }
