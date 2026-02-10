@@ -302,7 +302,7 @@ public const RUBRICAS_EXCLUIDAS = [
                     'anoAnterior' => $resumo['receitaPrev'] ?? 0,
                 ],
                 'expenseRatio' => [
-                    'pct' => $resumo['receitaTotal'] > 0 ? round((($resumo['despesasTotal'] + ($resumo['deducoesTotal'] ?? 0)) / $resumo['receitaTotal']) * 100, 1) : 0,
+                    'pct' => $resumo['receitaTotal'] > 0 ? round(($resumo['despesasTotal'] / $resumo['receitaTotal']) * 100, 1) : 0,
                     'despesas' => $resumo['despesasTotal'] ?? 0,
                     'deducoes' => $resumo['deducoesTotal'] ?? 0,
                     'receita' => $resumo['receitaTotal'] ?? 0,
@@ -652,7 +652,7 @@ public function getLucratividadeByMonth(int $ano): array
             'taxaCobrancaMeta' => (float) Configuracao::get("meta_taxa_cobranca_{$ano}_{$mes}", 95),
             'taxaCobrancaTrend' => $this->percentChange($taxa, $taxaPrev),
             'totalVencido' => $totalAtraso,
-            'totalAberto' => (float) ContaReceber::query()->whereNull('data_pagamento')->where('status', 'Não lançado')->sum('valor'),
+            'totalAberto' => (float) ContaReceber::query()->whereNull('data_pagamento')->where('status', 'Não lançado')->where('data_vencimento', '>=', Carbon::create($ano, $mes, 1)->subDays(720))->sum('valor'),
             'inadimplencia' => $this->calcularInadimplencia($ano, $mes),
         ];
     }
@@ -746,6 +746,9 @@ public function getLucratividadeByMonth(int $ano): array
         $despesasPrev = (float) $this->despesasOperacionaisTotal($pAno, $pMes);
         $resultadoPrev = $receitaPrev - $deducoesPrev - $despesasPrev;
         $margemPrev = $receitaPrev > 0 ? ($resultadoPrev / $receitaPrev) * 100 : 0.0;
+        // FIX: YoY compara mesmo mes do ano anterior
+        $yoyAno = $ano - 1;
+        $receitaYoYPrev = $this->sumReceitaTipo($yoyAno, $mes, 'pf') + $this->sumReceitaTipo($yoyAno, $mes, 'pj');
 
         $metaPf = (float) Configuracao::get("meta_pf_{$ano}_{$mes}", 0);
         $metaPj = (float) Configuracao::get("meta_pj_{$ano}_{$mes}", 0);
@@ -763,8 +766,8 @@ public function getLucratividadeByMonth(int $ano): array
             'receitaPj' => round($receitaPj, 2),
             'receitaTotal' => round($receitaTotal, 2),
             'receitaMeta' => round($metaReceita, 2),
-            'receitaTrend' => $this->percentChange($receitaTotal, $receitaPrev),
-            'receitaPrev' => round($receitaPrev, 2),
+            'receitaTrend' => $this->percentChange($receitaTotal, $receitaYoYPrev),
+            'receitaPrev' => round($receitaYoYPrev, 2),
             'deducoesTotal' => round($deducoesTotal, 2),
             'deducoesTrend' => $this->percentChange($deducoesTotal, $deducoesPrev),
             'despesasTotal' => round($despesasTotal, 2),

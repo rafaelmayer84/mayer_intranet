@@ -1,0 +1,166 @@
+<?php
+
+namespace App\Http\Controllers\Dashboard;
+
+use App\Http\Controllers\Controller;
+use App\Services\ProcessosInternosService;
+use Illuminate\Http\Request;
+
+/**
+ * ProcessosInternosController
+ *
+ * Controller para a perspectiva "Processos Internos" do BSC.
+ * Segue exatamente o mesmo padrão do ClientesMercadoController:
+ *   - Filtros via querystring com persistência em session
+ *   - Renderiza view Blade com dados do Service
+ *   - Endpoint drilldown para clique em card (JSON paginado)
+ */
+class ProcessosInternosController extends Controller
+{
+    private ProcessosInternosService $service;
+
+    public function __construct(ProcessosInternosService $service)
+    {
+        $this->middleware('auth');
+        $this->service = $service;
+    }
+
+    /**
+     * GET /resultados/bsc/processos-internos
+     *
+     * Renderiza a página principal do dashboard.
+     * Filtros são lidos da querystring e persistidos em session.
+     */
+    public function index(Request $request)
+    {
+        $filtros = $this->resolverFiltros($request);
+        $data = $this->service->getDashboardData($filtros);
+
+        return view('dashboard.processos-internos.index', $data);
+    }
+
+    /**
+     * GET /resultados/bsc/processos-internos/drilldown/{tipo}
+     *
+     * Retorna JSON paginado para drilldown de um KPI.
+     * Tipos: backlog, wip, sem_andamento, throughput
+     */
+    public function drilldown(Request $request, string $tipo)
+    {
+        $filtros = $this->resolverFiltros($request);
+        $page = (int) $request->get('page', 1);
+
+        $resultado = $this->service->getDrilldown($tipo, $filtros, $page);
+
+        return response()->json($resultado);
+    }
+
+    /**
+     * GET /resultados/bsc/processos-internos/export
+     *
+     * Exporta dados do dashboard em CSV.
+     */
+    public function export(Request $request)
+    {
+        $filtros = $this->resolverFiltros($request);
+        $data = $this->service->getDashboardData($filtros);
+
+        $filename = 'processos-internos_' . now()->format('Y-m-d_His') . '.csv';
+
+        $headers = [
+            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ];
+
+        $callback = function () use ($data) {
+            $fp = fopen('php://output', 'w');
+            // BOM UTF-8
+            fwrite($fp, "\xEF\xBB\xBF");
+
+            // Cards
+            fputcsv($fp, ['KPI', 'Valor', 'Variação (%)']);
+            foreach ($data['cards'] as $card) {
+                fputcsv($fp, [
+                    $card['titulo'],
+                    $card['valor'],
+                    $card['variacao'] ?? '-',
+                ]);
+            }
+
+            fputcsv($fp, []);
+
+            // Equipe
+            fputcsv($fp, ['Responsável', 'SLA (%)', 'Backlog', 'WIP', 'Throughput', 'Horas']);
+            foreach ($data['equipe'] as $membro) {
+                fputcsv($fp, [
+                    $membro['nome'],
+                    $membro['sla'],
+                    $membro['backlog'],
+                    $membro['wip'],
+                    $membro['throughput'],
+                    $membro['horas'],
+                ]);
+            }
+
+            fputcsv($fp, []);
+
+            // Processos por fase
+            fputcsv($fp, ['Fase', 'Total Parados', 'Média Dias']);
+            foreach ($data['processos_por_fase'] as $fase) {
+                fputcsv($fp, [$fase['fase'], $fase['total'], $fase['media_dias']]);
+            }
+
+            fputcsv($fp, []);
+
+            // Top riscos
+            fputcsv($fp, ['Pasta', 'Número', 'Responsável', 'Valor Provisionado', 'Fase', 'Dias Parado', 'Score Risco']);
+            foreach ($data['top_riscos'] as $risco) {
+                fputcsv($fp, [
+                    $risco['pasta'],
+                    $risco['numero'],
+                    $risco['responsavel'],
+                    $risco['valor_provisionado'],
+                    $risco['fase'],
+                    $risco['dias_parado'],
+                    $risco['score_risco'],
+                ]);
+            }
+
+            fclose($fp);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /* ================================================================== */
+    /*  FILTROS                                                           */
+    /* ================================================================== */
+
+    /**
+     * Resolve filtros: querystring tem prioridade, session é fallback.
+     * Persiste resultado em session para manter estado entre navegações.
+     */
+    private function resolverFiltros(Request $request): array
+    {
+        $sessionKey = 'filtros_processos_internos';
+        $sessao = session($sessionKey, []);
+
+        $filtros = [
+            'periodo'                  => $request->get('periodo', $sessao['periodo'] ?? '30'),
+            'data_inicio'              => $request->get('data_inicio', $sessao['data_inicio'] ?? null),
+            'data_fim'                 => $request->get('data_fim', $sessao['data_fim'] ?? null),
+            'responsavel'              => $request->get('responsavel', $sessao['responsavel'] ?? []),
+            'grupo'                    => $request->get('grupo', $sessao['grupo'] ?? []),
+            'area'                     => $request->get('area', $sessao['area'] ?? null),
+            'tipo_atividade'           => $request->get('tipo_atividade', $sessao['tipo_atividade'] ?? null),
+            'status_processo'          => $request->get('status_processo', $sessao['status_processo'] ?? null),
+            'agrupamento_evolucao'     => $request->get('agrupamento_evolucao', $sessao['agrupamento_evolucao'] ?? 'semana'),
+            'comparar_periodo_anterior'=> $request->get('comparar_periodo_anterior', $sessao['comparar_periodo_anterior'] ?? '0'),
+            'dias_sem_andamento'       => $request->get('dias_sem_andamento', $sessao['dias_sem_andamento'] ?? '30'),
+        ];
+
+        session([$sessionKey => $filtros]);
+
+        return $filtros;
+    }
+}

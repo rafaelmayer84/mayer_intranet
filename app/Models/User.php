@@ -259,4 +259,17 @@ class User extends Authenticatable
     {
         return $query->whereNotNull('datajuri_id');
     }
+
+    /**
+     * Grupos de manuais normativos atribuídos ao usuário.
+     */
+    public function manuaisGrupos()
+    {
+        return $this->belongsToMany(
+            \App\Models\ManualGrupo::class,
+            'manuais_grupo_user',
+            'user_id',
+            'grupo_id'
+        )->withTimestamps();
+    }
 }

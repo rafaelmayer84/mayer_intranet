@@ -11,22 +11,22 @@ use Illuminate\Support\Str;
 /**
  * DataJuriSyncOrchestrator v2.2
  *
- * Orquestrador único de sincronização com API DataJuri.
+ * Orquestrador ï¿½nico de sincronizaï¿½ï¿½o com API DataJuri.
  * Usado tanto pelo controller da UI quanto pelo comando artisan.
  *
  * CHANGELOG v2.2 (06/02/2026):
- *   - FIX CRÍTICO: apiGet() agora normaliza UTF-8 antes de json_decode
+ *   - FIX CRï¿½TICO: apiGet() agora normaliza UTF-8 antes de json_decode
  *   - removerHtml removido do fetchPage (quebrava API silenciosamente)
- *   - getNestedValue reescrito com 4 camadas de resolução
+ *   - getNestedValue reescrito com 4 camadas de resoluï¿½ï¿½o
  *   - parseDecimal com strip_tags para HTML
- *   - parseHtmlValue novo método para valorComSinal
- *   - conciliado Sim/Não ? 1/0
+ *   - parseHtmlValue novo mï¿½todo para valorComSinal
+ *   - conciliado Sim/Nï¿½o ? 1/0
  *   - classificacao_manual default 0
  *   - Empty strings ? null em campos nullable
  *   - cleanupStaleRuns para runs travadas >30min
  *   - tipo_classificacao lowercase (enum)
- *   - codigo_plano extraído via regex
- *   - Campo 'tipo' removido do upsert Movimento (coluna não existe)
+ *   - codigo_plano extraï¿½do via regex
+ *   - Campo 'tipo' removido do upsert Movimento (coluna nï¿½o existe)
  */
 class DataJuriSyncOrchestrator
 {
@@ -62,11 +62,11 @@ class DataJuriSyncOrchestrator
     }
 
     // =========================================================================
-    // AUTENTICAÇÃO OAUTH
+    // AUTENTICAï¿½ï¿½O OAUTH
     // =========================================================================
 
     /**
-     * Obter token OAuth com cache e renovação automática
+     * Obter token OAuth com cache e renovaï¿½ï¿½o automï¿½tica
      */
     public function getAccessToken(): ?string
     {
@@ -123,7 +123,7 @@ class DataJuriSyncOrchestrator
                         return $token;
                     }
 
-                    Log::warning('DataJuri OAuth: token inválido retornado');
+                    Log::warning('DataJuri OAuth: token invï¿½lido retornado');
                 }
 
                 Log::warning("DataJuri OAuth attempt {$attempt} failed", [
@@ -146,11 +146,11 @@ class DataJuriSyncOrchestrator
     }
 
     // =========================================================================
-    // REQUISIÇÕES API (COM FIX UTF-8)
+    // REQUISIï¿½ï¿½ES API (COM FIX UTF-8)
     // =========================================================================
 
     /**
-     * Fazer requisição GET à API com retry, backoff e normalização UTF-8.
+     * Fazer requisiï¿½ï¿½o GET ï¿½ API com retry, backoff e normalizaï¿½ï¿½o UTF-8.
      *
      * FIX v2.2: A API DataJuri retorna ISO-8859-1 em alguns campos.
      * Usar $response->json() direto causava "Malformed UTF-8 characters".
@@ -184,7 +184,7 @@ class DataJuriSyncOrchestrator
 
                 if ($response->successful()) {
                     // ============================================================
-                    // FIX CRÍTICO v2.2: Normalizar UTF-8 antes de json_decode
+                    // FIX CRï¿½TICO v2.2: Normalizar UTF-8 antes de json_decode
                     // A API DataJuri retorna ISO-8859-1 em alguns campos de texto.
                     // $response->json() usa json_decode() direto ? "Malformed UTF-8"
                     // ============================================================
@@ -197,7 +197,7 @@ class DataJuriSyncOrchestrator
                         $body = mb_convert_encoding($body, 'UTF-8', $encoding);
                     }
 
-                    // Limpar possíveis bytes inválidos remanescentes
+                    // Limpar possï¿½veis bytes invï¿½lidos remanescentes
                     $body = mb_convert_encoding($body, 'UTF-8', 'UTF-8');
 
                     $decoded = json_decode($body, true);
@@ -241,7 +241,7 @@ class DataJuriSyncOrchestrator
     // =========================================================================
 
     /**
-     * Descobrir módulos disponíveis na API
+     * Descobrir mï¿½dulos disponï¿½veis na API
      */
     public function discoverModules(): array
     {
@@ -255,7 +255,7 @@ class DataJuriSyncOrchestrator
     }
 
     /**
-     * Obter total de registros de um módulo
+     * Obter total de registros de um mï¿½dulo
      */
     public function getModuleTotal(string $modulo): int
     {
@@ -280,11 +280,11 @@ class DataJuriSyncOrchestrator
     // =========================================================================
 
     /**
-     * Buscar página de entidades.
+     * Buscar pï¿½gina de entidades.
      *
      * FIX v2.1: Removido 'removerHtml' => 'true' que quebrava a API silenciosamente.
-     * A API retorna 0 rows quando esse parâmetro está presente.
-     * HTML é tratado no cliente via strip_tags() e parseHtmlValue().
+     * A API retorna 0 rows quando esse parï¿½metro estï¿½ presente.
+     * HTML ï¿½ tratado no cliente via strip_tags() e parseHtmlValue().
      */
     public function fetchPage(string $modulo, int $page): ?array
     {
@@ -298,10 +298,10 @@ class DataJuriSyncOrchestrator
             'page' => $page,
             'pageSize' => $this->pageSize,
             'campos' => $config['campos'],
-            // REMOVIDO: 'removerHtml' => 'true' — PROIBIDO, quebra API silenciosamente
+            // REMOVIDO: 'removerHtml' => 'true' ï¿½ PROIBIDO, quebra API silenciosamente
         ];
 
-        // Só adicionar criterio se estiver definido
+        // Sï¿½ adicionar criterio se estiver definido
         if (!empty($config['criterio'])) {
             $params['criterio'] = $config['criterio'];
         }
@@ -310,11 +310,11 @@ class DataJuriSyncOrchestrator
     }
 
     // =========================================================================
-    // TRACKING DE EXECUÇÃO (sync_runs)
+    // TRACKING DE EXECUï¿½ï¿½O (sync_runs)
     // =========================================================================
 
     /**
-     * Iniciar execução de sincronização
+     * Iniciar execuï¿½ï¿½o de sincronizaï¿½ï¿½o
      */
     public function startRun(string $tipo = 'full'): string
     {
@@ -333,7 +333,7 @@ class DataJuriSyncOrchestrator
     }
 
     /**
-     * Atualizar progresso da execução
+     * Atualizar progresso da execuï¿½ï¿½o
      */
     public function updateProgress(array $data): void
     {
@@ -344,7 +344,7 @@ class DataJuriSyncOrchestrator
     }
 
     /**
-     * Finalizar execução
+     * Finalizar execuï¿½ï¿½o
      */
     public function finishRun(string $status = 'completed', ?string $mensagem = null): void
     {
@@ -380,18 +380,18 @@ class DataJuriSyncOrchestrator
     }
 
     // =========================================================================
-    // SINCRONIZAÇÃO DE MÓDULOS
+    // SINCRONIZAï¿½ï¿½O DE Mï¿½DULOS
     // =========================================================================
 
     /**
-     * Sincronizar um módulo completo (paginação automática)
+     * Sincronizar um mï¿½dulo completo (paginaï¿½ï¿½o automï¿½tica)
      */
     public function syncModule(string $modulo, callable $progressCallback = null): array
     {
         $config = $this->config['modulos'][$modulo] ?? null;
 
         if (!$config) {
-            throw new \Exception("Módulo {$modulo} não configurado");
+            throw new \Exception("Mï¿½dulo {$modulo} nï¿½o configurado");
         }
 
         $result = [
@@ -425,7 +425,7 @@ class DataJuriSyncOrchestrator
                 $progressCallback($modulo, $page, $totalPages, 'processing');
             }
 
-            // Processar página em transação
+            // Processar pï¿½gina em transaï¿½ï¿½o
             DB::beginTransaction();
             try {
                 foreach ($response['rows'] as $row) {
@@ -445,7 +445,7 @@ class DataJuriSyncOrchestrator
             } catch (\Exception $e) {
                 DB::rollBack();
                 $result['erros']++;
-                Log::error("Erro ao processar página {$page} de {$modulo}", [
+                Log::error("Erro ao processar pï¿½gina {$page} de {$modulo}", [
                     'error' => $e->getMessage(),
                 ]);
             }
@@ -453,7 +453,7 @@ class DataJuriSyncOrchestrator
             $result['paginas'] = $page;
             $page++;
 
-            // Verificar se há mais páginas
+            // Verificar se hï¿½ mais pï¿½ginas
             if ($page > $totalPages || count($response['rows']) < $this->pageSize) {
                 $hasMore = false;
             }
@@ -467,19 +467,19 @@ class DataJuriSyncOrchestrator
     }
 
     // =========================================================================
-    // UPSERT COM TRATAMENTO ESPECIAL POR MÓDULO
+    // UPSERT COM TRATAMENTO ESPECIAL POR Mï¿½DULO
     // =========================================================================
 
     /**
-     * Inserir ou atualizar registro com detecção de mudanças.
+     * Inserir ou atualizar registro com detecï¿½ï¿½o de mudanï¿½as.
      *
-     * FIX v2.1: Tratamento especial para módulo Movimento:
-     *   - conciliado Sim/Não ? 1/0
+     * FIX v2.1: Tratamento especial para mï¿½dulo Movimento:
+     *   - conciliado Sim/Nï¿½o ? 1/0
      *   - classificacao_manual default 0
      *   - empty strings ? null em campos nullable
      *   - tipo_classificacao lowercase
-     *   - codigo_plano extraído via regex
-     *   - campo 'tipo' removido (coluna não existe na tabela movimentos)
+     *   - codigo_plano extraï¿½do via regex
+     *   - campo 'tipo' removido (coluna nï¿½o existe na tabela movimentos)
      *   - parseHtmlValue para valorComSinal
      */
     protected function upsertRecord(string $modulo, array $row, array $config): string
@@ -528,7 +528,7 @@ class DataJuriSyncOrchestrator
         }
 
         // =====================================================================
-        // TRATAMENTO ESPECIAL: Módulo Movimento (FIX v2.1)
+        // TRATAMENTO ESPECIAL: Mï¿½dulo Movimento (FIX v2.1)
         // =====================================================================
         if ($modulo === 'Movimento') {
             // 1. Processar valorComSinal (HTML ? valor + tipo receita/despesa)
@@ -553,7 +553,7 @@ class DataJuriSyncOrchestrator
                 return 'skipped';
             }
 
-            // 3. conciliado: Sim/Não ? 1/0
+            // 3. conciliado: Sim/Nï¿½o ? 1/0
             if (isset($data['conciliado'])) {
                 $concVal = strtolower((string)$data['conciliado']);
                 $data['conciliado'] = in_array($concVal, ['sim', 's', '1', 'true']) ? 1 : 0;
@@ -562,7 +562,7 @@ class DataJuriSyncOrchestrator
             // 4. classificacao_manual: default 0
             $data['classificacao_manual'] = $data['classificacao_manual'] ?? 0;
 
-            // 5. Remover campo 'tipo' — coluna não existe na tabela movimentos
+            // 5. Remover campo 'tipo' ï¿½ coluna nï¿½o existe na tabela movimentos
             unset($data['tipo']);
 
             // 6. Calcular mes/ano
@@ -572,11 +572,11 @@ class DataJuriSyncOrchestrator
                     $data['mes'] = (int) $date->format('n');
                     $data['ano'] = (int) $date->format('Y');
                 } catch (\Exception $e) {
-                    // Data inválida, ignorar
+                    // Data invï¿½lida, ignorar
                 }
             }
 
-            // 7. Classificação automática via ClassificacaoService (se disponível)
+            // 7. Classificaï¿½ï¿½o automï¿½tica via ClassificacaoService (se disponï¿½vel)
             try {
                 if (class_exists(\App\Services\ClassificacaoService::class)) {
                     $classificacaoService = app(\App\Services\ClassificacaoService::class);
@@ -586,12 +586,12 @@ class DataJuriSyncOrchestrator
                     }
                 }
             } catch (\Exception $e) {
-                // ClassificacaoService não disponível, continuar sem classificação
+                // ClassificacaoService nï¿½o disponï¿½vel, continuar sem classificaï¿½ï¿½o
             }
         }
 
         // =====================================================================
-        // SANITIZAÇÃO FINAL: Empty strings ? null em campos nullable (FIX v2.1)
+        // SANITIZAï¿½ï¿½O FINAL: Empty strings ? null em campos nullable (FIX v2.1)
         // A API retorna "" (string vazia) para campos sem valor.
         // MySQL strict mode rejeita "" em campos INT/DECIMAL NULL.
         // =====================================================================
@@ -664,7 +664,7 @@ class DataJuriSyncOrchestrator
         }
 
 if ($existing) {
-            // Verificar se houve mudança
+            // Verificar se houve mudanï¿½a
             if ($existing->payload_hash === $payloadHash) {
                 DB::table($table)
                     ->where('id', $existing->id)
@@ -693,21 +693,21 @@ if ($existing) {
     }
 
     // =========================================================================
-    // RESOLUÇÃO DE CAMPOS DA API
+    // RESOLUï¿½ï¿½O DE CAMPOS DA API
     // =========================================================================
 
     /**
-     * Obter valor de array com 4 camadas de resolução (FIX v2.1).
+     * Obter valor de array com 4 camadas de resoluï¿½ï¿½o (FIX v2.1).
      *
      * A API DataJuri retorna chaves FLAT com ponto literal:
-     *   "planoConta.nomeCompleto" é uma chave, NÃO acesso aninhado.
-     *   "pessoaId" é camelCase flat, NÃO "pessoa.id".
+     *   "planoConta.nomeCompleto" ï¿½ uma chave, Nï¿½O acesso aninhado.
+     *   "pessoaId" ï¿½ camelCase flat, Nï¿½O "pessoa.id".
      *
      * Camadas:
      *   1. Chave flat exata (ex: "planoConta.nomeCompleto")
-     *   2. Padrão camelCase para ".id" (ex: "pessoa.id" ? "pessoaId")
-     *   3. Concatenação camelCase (ex: "planoConta.codigo" ? "planoContaCodigo")
-     *   4. Fallback acesso aninhado (último recurso)
+     *   2. Padrï¿½o camelCase para ".id" (ex: "pessoa.id" ? "pessoaId")
+     *   3. Concatenaï¿½ï¿½o camelCase (ex: "planoConta.codigo" ? "planoContaCodigo")
+     *   4. Fallback acesso aninhado (ï¿½ltimo recurso)
      */
     protected function getNestedValue(array $data, string $key)
     {
@@ -716,14 +716,14 @@ if ($existing) {
             return $data[$key];
         }
 
-        // Se não contém ponto, retornar null
+        // Se nï¿½o contï¿½m ponto, retornar null
         if (!str_contains($key, '.')) {
             return null;
         }
 
         $parts = explode('.', $key);
 
-        // Camada 2: Padrão camelCase para ".id" (pessoa.id ? pessoaId)
+        // Camada 2: Padrï¿½o camelCase para ".id" (pessoa.id ? pessoaId)
         if (count($parts) === 2 && $parts[1] === 'id') {
             $camelKey = $parts[0] . 'Id';
             if (array_key_exists($camelKey, $data)) {
@@ -731,7 +731,7 @@ if ($existing) {
             }
         }
 
-        // Camada 3: Concatenação camelCase (planoConta.codigo ? planoContaCodigo)
+        // Camada 3: Concatenaï¿½ï¿½o camelCase (planoConta.codigo ? planoContaCodigo)
         if (count($parts) === 2) {
             $camelKey = $parts[0] . ucfirst($parts[1]);
             if (array_key_exists($camelKey, $data)) {
@@ -788,11 +788,11 @@ if ($existing) {
         // FIX: Remover HTML que pode vir da API
         $value = strip_tags((string)$value);
 
-        // Remover R$, espaços
+        // Remover R$, espaï¿½os
         $value = preg_replace('/[R$\s]/', '', $value);
         // Remover separador de milhar
         $value = str_replace('.', '', $value);
-        // Converter vírgula decimal para ponto
+        // Converter vï¿½rgula decimal para ponto
         $value = str_replace(',', '.', $value);
 
         return is_numeric($value) ? (float) $value : null;
@@ -821,7 +821,7 @@ if ($existing) {
             $result['tipo_classificacao'] = 'despesa';
         }
 
-        // Extrair valor numérico
+        // Extrair valor numï¿½rico
         $cleanValue = strip_tags($html);
         $parsed = $this->parseDecimal($cleanValue);
 
@@ -834,11 +834,11 @@ if ($existing) {
     }
 
     // =========================================================================
-    // HOOKS PÓS-UPSERT
+    // HOOKS Pï¿½S-UPSERT
     // =========================================================================
 
     /**
-     * Processar campos derivados após upsert
+     * Processar campos derivados apï¿½s upsert
      */
     protected function postUpsertHook(string $modulo, string $table, int $recordId, array $data): void
     {
@@ -861,7 +861,7 @@ if ($existing) {
                 $updates['mes'] = (int) $date->format('n');
                 $updates['ano'] = (int) $date->format('Y');
             } catch (\Exception $e) {
-                // Data inválida, ignorar
+                // Data invï¿½lida, ignorar
             }
         }
 
@@ -920,10 +920,31 @@ if ($existing) {
 
             $result['deletados'] = $staleCount;
 
-            $this->finishRun('completed', "Reprocessamento concluído: {$result['processados']} processados, {$staleCount} marcados como removidos");
+            // Limpar cache do dashboard para refletir novos dados
+            \Illuminate\Support\Facades\Cache::flush();
+
+            $this->finishRun('completed', "Reprocessamento concluï¿½do: {$result['processados']} processados, {$staleCount} marcados como removidos");
 
         } catch (\Exception $e) {
-            $this->finishRun('failed', $e->getMessage());
+            // SAFETY NET: Reverter TODOS os stale para nao bloquear dashboard
+            try {
+                $reverted = DB::table('movimentos')
+                    ->where('is_stale', true)
+                    ->update(['is_stale' => false]);
+                Log::warning("Reprocessar FALHOU - revertidos {$reverted} registros stale", [
+                    'error' => $e->getMessage()
+                ]);
+            } catch (\Exception $revertEx) {
+                Log::critical("Reprocessar: falha ao reverter stale!", [
+                    'original_error' => $e->getMessage(),
+                    'revert_error' => $revertEx->getMessage()
+                ]);
+            }
+
+            // Limpar cache mesmo em caso de falha
+            try { \Illuminate\Support\Facades\Cache::flush(); } catch (\Exception $ce) {}
+
+            $this->finishRun('failed', 'Falha: ' . substr($e->getMessage(), 0, 200));
             Log::error('Reprocessamento financeiro falhou', ['error' => $e->getMessage()]);
             throw $e;
         }
@@ -960,7 +981,7 @@ if ($existing) {
                 return $results;
             }
 
-            // Teste 2: Módulos
+            // Teste 2: Mï¿½dulos
             $modulos = $this->apiGet('/v1/modulos');
             $results['modulos'] = is_array($modulos);
 

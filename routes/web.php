@@ -203,3 +203,9 @@ Route::middleware(['auth'])->prefix('nexo')->group(function () {
     Route::get('/automacoes/monitor', [NexoMonitorController::class, 'index'])->name('nexo.monitor');
     Route::get('/automacoes/dados', [NexoMonitorController::class, 'dados'])->name('nexo.monitor.dados');
 });
+
+// Manuais Normativos
+require __DIR__ . '/_manuais_routes.php';
+
+// Processos Internos (BSC)
+require __DIR__ . '/_processos_internos_routes.php';

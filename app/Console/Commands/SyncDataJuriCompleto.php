@@ -4,27 +4,45 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Services\DataJuriSyncService;
+use App\Services\DataJuriSyncOrchestrator;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Comando de sincronização completa do DataJuri
- * 
- * Sincroniza TODOS os módulos:
- * - Pessoas → clientes
- * - Processos → processos
- * - Fases → fases_processo
- * - Movimentos → movimentos
- * - Contratos → contratos
- * - Atividades → atividades_datajuri
- * - Horas Trabalhadas → horas_trabalhadas_datajuri
- * - Ordens de Serviço → ordens_servico
+ *
+ * Usa DataJuriSyncService para Pessoas/Processos/Movimentos (métodos dedicados)
+ * Usa DataJuriSyncOrchestrator para os demais módulos (motor genérico via config)
  */
 class SyncDataJuriCompleto extends Command
 {
-    protected $signature = 'sync:datajuri-completo 
-                            {--modulo= : Sincronizar módulo específico (pessoas, processos, fases, movimentos, contratos, atividades, horas, os)}
+    protected $signature = 'sync:datajuri-completo
+                            {--modulo= : Sincronizar módulo específico (pessoas, processos, fases, movimentos, contratos, atividades, horas, os, contasreceber, andamentos)}
                             {--silent : Modo silencioso}';
-    
+
     protected $description = 'Sincroniza TODOS os módulos do DataJuri com o banco local';
+
+    /**
+     * Mapa de módulos:
+     *   'alias' => [tipo, label, identificador]
+     *
+     *   tipo 'service' = usa DataJuriSyncService->$metodo()
+     *   tipo 'orchestrator' = usa DataJuriSyncOrchestrator->syncModule($modulo)
+     */
+    private function getModulosMap(): array
+    {
+        return [
+            'pessoas'       => ['service',      'syncPessoas',      '👥 Pessoas',              'clientes'],
+            'processos'     => ['service',      'syncProcessos',    '⚖️ Processos',            'processos'],
+            'movimentos'    => ['service',      'syncMovimentos',   '💰 Movimentos',           'movimentos'],
+            'fases'         => ['orchestrator', 'Fase',             '📋 Fases do Processo',    'fases_processo'],
+            'contratos'     => ['orchestrator', 'Contrato',         '📝 Contratos',            'contratos'],
+            'atividades'    => ['orchestrator', 'Atividade',        '📅 Atividades',           'atividades_datajuri'],
+            'horas'         => ['orchestrator', 'HoraTrabalhada',   '⏱️ Horas Trabalhadas',    'horas_trabalhadas_datajuri'],
+            'os'            => ['orchestrator', 'OrdemServico',     '📦 Ordens de Serviço',    'ordens_servico'],
+            'contasreceber' => ['orchestrator', 'ContasReceber',    '💳 Contas a Receber',     'contas_receber'],
+            'andamentos'    => ['orchestrator', 'AndamentoFase',    '📄 Andamentos de Fase',   'andamentos_fase'],
+        ];
+    }
 
     public function handle(DataJuriSyncService $service)
     {
@@ -35,7 +53,7 @@ class SyncDataJuriCompleto extends Command
             $this->info('🔄 Iniciando sincronização DataJuri COMPLETA...');
         }
 
-        // Autenticação
+        // Autenticação via Service
         if (!$service->authenticate()) {
             $this->error('❌ Falha na autenticação com DataJuri');
             return 1;
@@ -45,11 +63,21 @@ class SyncDataJuriCompleto extends Command
             $this->info('✅ Autenticado com sucesso');
         }
 
-        // Sincronização por módulo ou completa
+        $map = $this->getModulosMap();
+
         if ($modulo) {
-            $this->syncModuloEspecifico($service, $modulo, $silent);
+            // Módulo específico
+            if (!isset($map[$modulo])) {
+                $this->error("❌ Módulo inválido: {$modulo}");
+                $this->info("Módulos válidos: " . implode(', ', array_keys($map)));
+                return 1;
+            }
+            $this->executarModulo($service, $map[$modulo], $silent);
         } else {
-            $this->syncTodosModulos($service, $silent);
+            // Todos os módulos
+            foreach ($map as $alias => $config) {
+                $this->executarModulo($service, $config, $silent);
+            }
         }
 
         if (!$silent) {
@@ -60,64 +88,52 @@ class SyncDataJuriCompleto extends Command
         return 0;
     }
 
-    private function syncModuloEspecifico(DataJuriSyncService $service, string $modulo, bool $silent)
+    /**
+     * Executa sync de um módulo usando Service ou Orchestrator conforme tipo
+     */
+    private function executarModulo(DataJuriSyncService $service, array $config, bool $silent): void
     {
-        $map = [
-            'pessoas' => ['syncPessoas', '👥 Pessoas', 'clientes'],
-            'processos' => ['syncProcessos', '⚖️ Processos', 'processos'],
-            'fases' => ['syncFasesProcesso', '📋 Fases', 'fases_processo'],
-            'movimentos' => ['syncMovimentos', '💰 Movimentos', 'movimentos'],
-            'contratos' => ['syncContratos', '📝 Contratos', 'contratos'],
-            'atividades' => ['syncAtividades', '📅 Atividades', 'atividades_datajuri'],
-            'horas' => ['syncHorasTrabalhadas', '⏱️ Horas Trabalhadas', 'horas_trabalhadas_datajuri'],
-            'os' => ['syncOrdensServico', '📦 Ordens de Serviço', 'ordens_servico'],
-        ];
-
-        if (!isset($map[$modulo])) {
-            $this->error("❌ Módulo inválido: {$modulo}");
-            $this->info("Módulos válidos: " . implode(', ', array_keys($map)));
-            return;
-        }
-
-        [$method, $label, $table] = $map[$modulo];
+        [$tipo, $identificador, $label, $tabela] = $config;
 
         if (!$silent) {
             $this->info("{$label}...");
         }
 
-        $count = $service->$method();
+        try {
+            if ($tipo === 'service') {
+                // Usa método dedicado do DataJuriSyncService
+                $result = $service->$identificador();
+                $count = $result['count'] ?? 0;
+                $errors = $result['errors'] ?? 0;
 
-        if (!$silent) {
-            $this->info("   ✅ Processados: {$count} registros → {$table}");
-        }
-    }
-
-    private function syncTodosModulos(DataJuriSyncService $service, bool $silent)
-    {
-        $modulos = [
-            ['syncPessoas', '👥 Pessoas', 'clientes'],
-            ['syncProcessos', '⚖️ Processos', 'processos'],
-            ['syncFasesProcesso', '📋 Fases do Processo', 'fases_processo'],
-            ['syncMovimentos', '💰 Movimentos Financeiros', 'movimentos'],
-            ['syncContratos', '📝 Contratos', 'contratos'],
-            ['syncAtividades', '📅 Atividades', 'atividades_datajuri'],
-            ['syncHorasTrabalhadas', '⏱️ Horas Trabalhadas', 'horas_trabalhadas_datajuri'],
-            ['syncOrdensServico', '📦 Ordens de Serviço', 'ordens_servico'],
-        ];
-
-        foreach ($modulos as [$method, $label, $table]) {
-            if (!$silent) {
-                $this->info("{$label}...");
-            }
-
-            try {
-                $count = $service->$method();
                 if (!$silent) {
-                    $this->info("   ✅ Processados: {$count} registros → {$table}");
+                    $msg = "   ✅ {$count} registros → {$tabela}";
+                    if ($errors > 0) {
+                        $msg .= " ({$errors} erros)";
+                    }
+                    $this->info($msg);
                 }
-            } catch (\Exception $e) {
-                $this->error("   ❌ Erro: " . $e->getMessage());
+            } else {
+                // Usa Orchestrator genérico (config/datajuri.php)
+                $orchestrator = app(DataJuriSyncOrchestrator::class);
+                $result = $orchestrator->syncModule($identificador);
+                $count = $result['processados'] ?? $result['count'] ?? 0;
+                $created = $result['criados'] ?? 0;
+                $updated = $result['atualizados'] ?? 0;
+                $errors = $result['erros'] ?? 0;
+
+                if (!$silent) {
+                    $msg = "   ✅ {$count} processados";
+                    if ($created > 0) $msg .= ", {$created} novos";
+                    if ($updated > 0) $msg .= ", {$updated} atualizados";
+                    if ($errors > 0) $msg .= ", {$errors} erros";
+                    $msg .= " → {$tabela}";
+                    $this->info($msg);
+                }
             }
+        } catch (\Exception $e) {
+            $this->error("   ❌ Erro: " . $e->getMessage());
+            Log::error("sync:datajuri-completo [{$label}]: " . $e->getMessage());
         }
     }
 }

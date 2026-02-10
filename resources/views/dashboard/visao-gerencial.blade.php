@@ -201,10 +201,10 @@
     </div>
 
     <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-        <p class="text-xs text-gray-600 dark:text-gray-400">Inadimplência (% aberto)</p>
-        <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">{{ $fmtPct($inad['pctVencidoSobreAberto'] ?? 0) }}</p>
+        <p class="text-xs text-gray-600 dark:text-gray-400">Inadimplência (% receita)</p>
+        <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">{{ $fmtPct($inad['inadimplencia'] ?? 0) }}</p>
         <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
-            Vencido {{ $fmtMoeda($inad['totalVencido'] ?? 0) }} • Aberto {{ $fmtMoeda($inad['totalAberto'] ?? 0) }}
+            Vencido {{ $fmtMoeda($inad['totalVencido'] ?? 0) }} • Receita {{ $fmtMoeda($d['resumo']['receitaTotal'] ?? 0) }}
         </p>
     </div>
 
