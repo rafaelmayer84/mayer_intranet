@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Log;
  */
 class TestDataJuriConnection extends Command
 {
-    protected $signature = 'datajuri:test {--verbose : Mostrar detalhes completos}';
+    protected $signature = 'datajuri:test {--details : Mostrar detalhes completos}';
     protected $description = 'Testa a conexão com a API DataJuri e valida os módulos';
 
     private DataJuriService $dataJuri;
@@ -64,7 +64,7 @@ class TestDataJuriConnection extends Command
                 $this->resultados['autenticacao'] = true;
                 $this->line('   ✅ Autenticação bem sucedida');
                 
-                if ($this->option('verbose')) {
+                if ($this->option('details')) {
                     $this->line('   Token: ' . substr($token, 0, 50) . '...');
                 }
             } else {

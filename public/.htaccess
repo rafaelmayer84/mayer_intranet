@@ -13,13 +13,22 @@
     RewriteCond %{HTTP:x-xsrf-token} .
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
-    # Redirect Trailing Slashes If Not A Folder...
+    # Redirect Trailing Slashes If Not A Folder
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_URI} (.+)/$
     RewriteRule ^ %1 [L,R=301]
 
-    # Send Requests To Front Controller...
+    # Send Requests To Front Controller
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+# Desabilitar listagem de diretórios
+Options -Indexes
+
+# Bloquear arquivos sensíveis
+<FilesMatch "\.(env|git|htaccess|htpasswd)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>

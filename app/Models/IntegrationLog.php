@@ -1,15 +1,11 @@
 <?php
-
 namespace App\Models;
-
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Casts\Attribute;
-
 class IntegrationLog extends Model
 {
     protected $table = 'integration_logs';
     public $timestamps = false;
-
     protected $fillable = [
         'sync_id',
         'tipo',
@@ -26,12 +22,12 @@ class IntegrationLog extends Model
         'created_at',
         'updated_at',
     ];
-
     protected $casts = [
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'inicio' => 'datetime',
+        'fim' => 'datetime',
     ];
-
     /**
      * Accessor para converter status "concluido" em "success" para exibição
      */
@@ -59,7 +55,6 @@ class IntegrationLog extends Model
             },
         );
     }
-
     /**
      * Mutator para salvar o status original no banco
      */
@@ -68,7 +63,6 @@ class IntegrationLog extends Model
         // Normalizar antes de salvar
         $this->attributes['status'] = strtolower(trim($value ?? ''));
     }
-
     /**
      * Método helper para verificar se a sincronização foi bem-sucedida
      */
@@ -77,7 +71,6 @@ class IntegrationLog extends Model
         $status = strtolower(trim($this->attributes['status'] ?? ''));
         return in_array($status, ['concluido', 'concluída', 'completed', 'success']);
     }
-
     /**
      * Método helper para verificar se a sincronização falhou
      */
@@ -86,7 +79,6 @@ class IntegrationLog extends Model
         $status = strtolower(trim($this->attributes['status'] ?? ''));
         return in_array($status, ['erro', 'error', 'failed']);
     }
-
     /**
      * Método helper para verificar se a sincronização está pendente
      */

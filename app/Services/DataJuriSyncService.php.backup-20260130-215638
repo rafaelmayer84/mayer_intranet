@@ -1,0 +1,337 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Cliente;
+use App\Models\Processo;
+use App\Models\Movimento;
+use App\Models\IntegrationLog;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Exception;
+
+class DataJuriSyncService
+{
+    private $baseUrl = 'https://api.datajuri.com.br';
+    private $token;
+    private $clientId;
+    private $secretId;
+    private $username;
+    private $password;
+    private $perPage = 100;  // Paginação
+
+    public function __construct()
+    {
+        $this->clientId = env('DATAJURI_CLIENT_ID');
+        $this->secretId = env('DATAJURI_SECRET_ID');
+        $this->username = env('DATAJURI_EMAIL');
+        $this->password = env('DATAJURI_PASSWORD');
+    }
+
+    /**
+     * Autenticar na API DataJuri
+     */
+    public function authenticate()
+    {
+        try {
+            $credentials = base64_encode("{$this->clientId}:{$this->secretId}");
+            
+            $response = Http::withHeaders([
+                'Authorization' => "Basic {$credentials}",
+                'Content-Type' => 'application/x-www-form-urlencoded'
+            ])->asForm()->post("{$this->baseUrl}/oauth/token", [
+                'grant_type' => 'password',
+                'username' => $this->username,
+                'password' => $this->password
+            ]);
+
+            if ($response->successful()) {
+                $this->token = $response->json()['access_token'];
+                return true;
+            }
+
+            $this->logError('DataJuri', 'Autenticação', 'Falha na autenticação: ' . $response->body());
+            return false;
+
+        } catch (Exception $e) {
+            $this->logError('DataJuri', 'Autenticação', $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Sincronizar todas as entidades com paginação
+     */
+    public function syncAll()
+    {
+        if (!$this->authenticate()) {
+            return [
+                'success' => false,
+                'message' => 'Falha na autenticação com DataJuri'
+            ];
+        }
+
+        $results = [
+            'pessoas' => $this->syncPessoasComPaginacao(),
+            'processos' => $this->syncProcessosComPaginacao(),
+            'movimentos' => $this->syncMovimentosComPaginacao(),
+        ];
+
+        return [
+            'success' => true,
+            'results' => $results
+        ];
+    }
+
+    /**
+     * Sincronizar Pessoas com paginação
+     */
+    public function syncPessoasComPaginacao()
+    {
+        try {
+            $page = 1;
+            $totalSincronizadas = 0;
+            $totalErros = 0;
+
+            do {
+                try {
+                    $response = Http::withHeaders([
+                        'Authorization' => "Bearer {$this->token}",
+                        'Content-Type' => 'application/json'
+                    ])->get("{$this->baseUrl}/v1/entidades/Pessoa", [
+                        'page' => $page,
+                        'limit' => $this->perPage
+                    ]);
+
+                    if (!$response->successful()) {
+                        throw new Exception('Falha ao buscar pessoas: ' . $response->body());
+                    }
+
+                    $data = $response->json();
+                    $pessoas = $data['rows'] ?? [];
+
+                    if (empty($pessoas)) {
+                        break;
+                    }
+
+                    foreach ($pessoas as $pessoa) {
+                        try {
+                            $cliente = Cliente::updateOrCreate(
+                                ['datajuri_id' => $pessoa['id'] ?? null],
+                                [
+                                    'nome' => substr($pessoa['nome'] ?? '', 0, 255),
+                                    'email' => substr($pessoa['email'] ?? '', 0, 255),
+                                    'telefone' => substr($pessoa['telefone'] ?? '', 0, 20),
+                                    'tipo' => substr($pessoa['tipo'] ?? 'PF', 0, 50),
+                                    'ativo' => true,
+                                ]
+                            );
+                            $totalSincronizadas++;
+                        } catch (Exception $e) {
+                            Log::warning("Erro ao sincronizar pessoa {$pessoa['id']}: " . $e->getMessage());
+                            $totalErros++;
+                        }
+                    }
+
+                    $page++;
+                } catch (Exception $e) {
+                    Log::error("Erro na página {$page} de pessoas: " . $e->getMessage());
+                    break;
+                }
+            } while (count($pessoas) === $this->perPage);
+
+            $this->logSuccess('DataJuri', 'Pessoas', "Sincronizadas {$totalSincronizadas} pessoas ({$totalErros} erros)");
+            return ['success' => true, 'count' => $totalSincronizadas, 'errors' => $totalErros];
+
+        } catch (Exception $e) {
+            $this->logError('DataJuri', 'Pessoas', $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Sincronizar Processos com paginação
+     */
+    public function syncProcessosComPaginacao()
+    {
+        try {
+            $page = 1;
+            $totalSincronizadas = 0;
+            $totalErros = 0;
+
+            do {
+                try {
+                    $response = Http::withHeaders([
+                        'Authorization' => "Bearer {$this->token}",
+                        'Content-Type' => 'application/json'
+                    ])->get("{$this->baseUrl}/v1/entidades/Processo", [
+                        'page' => $page,
+                        'limit' => $this->perPage
+                    ]);
+
+                    if (!$response->successful()) {
+                        throw new Exception('Falha ao buscar processos: ' . $response->body());
+                    }
+
+                    $data = $response->json();
+                    $processos = $data['rows'] ?? [];
+
+                    if (empty($processos)) {
+                        break;
+                    }
+
+                    foreach ($processos as $processo) {
+                        try {
+                            $proc = Processo::updateOrCreate(
+                                ['datajuri_id' => $processo['id'] ?? null],
+                                [
+                                    'numero' => substr($processo['numero'] ?? '', 0, 100),
+                                    'descricao' => substr($processo['descricao'] ?? '', 0, 500),
+                                    'status' => substr($processo['status'] ?? 'Ativo', 0, 50),
+                                    'ativo' => true,
+                                ]
+                            );
+                            $totalSincronizadas++;
+                        } catch (Exception $e) {
+                            Log::warning("Erro ao sincronizar processo {$processo['id']}: " . $e->getMessage());
+                            $totalErros++;
+                        }
+                    }
+
+                    $page++;
+                } catch (Exception $e) {
+                    Log::error("Erro na página {$page} de processos: " . $e->getMessage());
+                    break;
+                }
+            } while (count($processos) === $this->perPage);
+
+            $this->logSuccess('DataJuri', 'Processos', "Sincronizados {$totalSincronizadas} processos ({$totalErros} erros)");
+            return ['success' => true, 'count' => $totalSincronizadas, 'errors' => $totalErros];
+
+        } catch (Exception $e) {
+            $this->logError('DataJuri', 'Processos', $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Sincronizar Movimentos com paginação
+     */
+    public function syncMovimentosComPaginacao()
+    {
+        try {
+            $page = 1;
+            $totalSincronizadas = 0;
+            $totalErros = 0;
+
+            do {
+                try {
+                    $response = Http::withHeaders([
+                        'Authorization' => "Bearer {$this->token}",
+                        'Content-Type' => 'application/json'
+                    ])->get("{$this->baseUrl}/v1/entidades/Movimento", [
+                        'page' => $page,
+                        'limit' => $this->perPage
+                    ]);
+
+                    if (!$response->successful()) {
+                        throw new Exception('Falha ao buscar movimentos: ' . $response->body());
+                    }
+
+                    $data = $response->json();
+                    $movimentos = $data['rows'] ?? [];
+
+                    if (empty($movimentos)) {
+                        break;
+                    }
+
+                    foreach ($movimentos as $movimento) {
+                        try {
+                            $mov = Movimento::updateOrCreate(
+                                ['datajuri_id' => $movimento['id'] ?? null],
+                                [
+                                    'descricao' => substr($movimento['descricao'] ?? '', 0, 500),
+                                    'data' => $movimento['data'] ?? null,
+                                    'valor' => $movimento['valor'] ?? 0,
+                                ]
+                            );
+                            $totalSincronizadas++;
+                        } catch (Exception $e) {
+                            Log::warning("Erro ao sincronizar movimento {$movimento['id']}: " . $e->getMessage());
+                            $totalErros++;
+                        }
+                    }
+
+                    $page++;
+                } catch (Exception $e) {
+                    Log::error("Erro na página {$page} de movimentos: " . $e->getMessage());
+                    break;
+                }
+            } while (count($movimentos) === $this->perPage);
+
+            $this->logSuccess('DataJuri', 'Movimentos', "Sincronizados {$totalSincronizadas} movimentos ({$totalErros} erros)");
+            return ['success' => true, 'count' => $totalSincronizadas, 'errors' => $totalErros];
+
+        } catch (Exception $e) {
+            $this->logError('DataJuri', 'Movimentos', $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    // Métodos antigos mantidos para compatibilidade
+    public function syncPessoas()
+    {
+        return $this->syncPessoasComPaginacao();
+    }
+
+    public function syncProcessos()
+    {
+        return $this->syncProcessosComPaginacao();
+    }
+
+    public function syncMovimentos()
+    {
+        return $this->syncMovimentosComPaginacao();
+    }
+
+    /**
+     * Registrar log de sucesso
+     */
+    private function logSuccess($sistema, $tipo, $mensagem)
+    {
+        try {
+            IntegrationLog::create([
+                'sync_id' => Str::uuid(),
+                'tipo' => $tipo,
+                'fonte' => 'datajuri',
+                'status' => 'concluido',
+                'registros_processados' => 0
+            ]);
+        } catch (Exception $e) {
+            Log::error("Erro ao registrar log de sucesso: " . $e->getMessage());
+        }
+
+        Log::info("[{$sistema}] {$tipo}: {$mensagem}");
+    }
+
+    /**
+     * Registrar log de erro
+     */
+    private function logError($sistema, $tipo, $mensagem)
+    {
+        try {
+            IntegrationLog::create([
+                'sync_id' => Str::uuid(),
+                'tipo' => $tipo,
+                'fonte' => 'datajuri',
+                'status' => 'erro',
+                'mensagem_erro' => $mensagem
+            ]);
+        } catch (Exception $e) {
+            Log::error("Erro ao registrar log de erro: " . $e->getMessage());
+        }
+
+        Log::error("[{$sistema}] {$tipo}: {$mensagem}");
+    }
+}

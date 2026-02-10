@@ -93,4 +93,5 @@ class ConfiguracaoController extends Controller
         return redirect()->route('configuracoes.index')
             ->with('success', 'Pesos BSC salvos com sucesso!');
     }
+
 }

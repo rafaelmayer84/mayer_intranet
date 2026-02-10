@@ -1,0 +1,408 @@
+<?php
+
+namespace App\Services;
+
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+
+class SendPulseWhatsAppService
+{
+    private string $baseUrl = 'https://api.sendpulse.com';
+    private string $apiId;
+    private string $apiSecret;
+    private string $botId;
+
+    public function __construct()
+    {
+        $this->apiId     = config('services.sendpulse.api_id', env('SENDPULSE_API_ID', ''));
+        $this->apiSecret = config('services.sendpulse.api_secret', env('SENDPULSE_API_SECRET', ''));
+        $this->botId     = config('services.sendpulse.bot_id', env('SENDPULSE_BOT_ID', ''));
+    }
+
+    public function getBotId(): string
+    {
+        return $this->botId;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // AUTENTICAÇÃO
+    // ═══════════════════════════════════════════════════════
+
+    public function getToken(): ?string
+    {
+        return Cache::remember('sendpulse_wa_token', 3000, function () {
+            try {
+                $response = Http::timeout(15)
+                    ->post("{$this->baseUrl}/oauth/access_token", [
+                        'grant_type'    => 'client_credentials',
+                        'client_id'     => $this->apiId,
+                        'client_secret' => $this->apiSecret,
+                    ]);
+
+                if ($response->successful()) {
+                    $token = $response->json('access_token');
+                    if ($token) {
+                        return $token;
+                    }
+                }
+
+                Log::error('SendPulse WA: falha ao obter token', [
+                    'status' => $response->status(),
+                    'body'   => mb_substr($response->body(), 0, 500),
+                ]);
+                return null;
+            } catch (\Throwable $e) {
+                Log::error('SendPulse WA: exceção ao obter token', ['error' => $e->getMessage()]);
+                return null;
+            }
+        });
+    }
+
+    public function clearTokenCache(): void
+    {
+        Cache::forget('sendpulse_wa_token');
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // LEITURA DE CHATS E MENSAGENS
+    // ═══════════════════════════════════════════════════════
+
+    public function getChats(): ?array
+    {
+        return $this->apiGet("/whatsapp/chats", ['bot_id' => $this->botId]);
+    }
+
+    public function getChatMessages(string $chatId, int $limit = 100, ?string $since = null): ?array
+    {
+        $params = ['bot_id' => $this->botId, 'chat_id' => $chatId, 'limit' => $limit];
+        if ($since) $params['since'] = $since;
+        return $this->apiGet("/whatsapp/chats/messages", $params);
+    }
+
+    public function getContactByPhone(string $phone): ?array
+    {
+        $result = $this->apiGet("/whatsapp/contacts/getByPhone", ['bot_id' => $this->botId, 'phone' => $phone]);
+        if ($result && isset($result['id'])) return $result;
+        if ($result && isset($result['data']['id'])) return $result['data'];
+        return $result;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // FLOWS
+    // ═══════════════════════════════════════════════════════
+
+    public function getFlows(): ?array
+    {
+        return $this->apiGet("/whatsapp/flows", ['bot_id' => $this->botId]);
+    }
+
+    public function runFlow(string $contactId, string $flowId, array $externalData = []): array
+    {
+        return $this->apiPost("/whatsapp/flows/run", [
+            'contact_id'    => $contactId,
+            'flow_id'       => $flowId,
+            'external_data' => $externalData ?: (object) [],
+        ]);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // ENVIO DE MENSAGENS
+    // ═══════════════════════════════════════════════════════
+
+    public function sendMessage(string $contactId, string $text): array
+    {
+        return $this->apiPost("/whatsapp/contacts/send", [
+            'contact_id' => $contactId,
+            'bot_id'     => $this->botId,
+            'message'    => ['type' => 'text', 'text' => ['body' => $text]],
+        ]);
+    }
+
+    public function sendMessageByPhone(string $phone, string $text): array
+    {
+        return $this->apiPost("/whatsapp/contacts/sendByPhone", [
+            'bot_id' => $this->botId,
+            'phone'  => $phone,
+            'message' => ['type' => 'text', 'text' => ['body' => $text]],
+        ]);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // PARSING DE MENSAGENS (ESTÁTICO)
+    // ═══════════════════════════════════════════════════════
+
+    public static function extractText(array $msg): string
+    {
+        $text = data_get($msg, 'data.text.body');
+        if (!empty($text) && is_string($text)) return $text;
+
+        $dt = data_get($msg, 'data.text');
+        if (!empty($dt) && is_string($dt)) return $dt;
+
+        $db = data_get($msg, 'data.body');
+        if (!empty($db) && is_string($db)) return $db;
+
+        $tb = data_get($msg, 'text.body');
+        if (!empty($tb) && is_string($tb)) return $tb;
+
+        $b = data_get($msg, 'body');
+        if (!empty($b) && is_string($b)) return $b;
+
+        $m = data_get($msg, 'message');
+        if (!empty($m) && is_string($m)) return $m;
+
+        // Button reply (ex: "Sim" de botao rapido)
+        $btn = data_get($msg, 'info.message.channel_data.message.button.text');
+        if (!empty($btn) && is_string($btn)) return $btn;
+
+        // Interactive button_reply (ex: "Meus processos")
+        $ibr = data_get($msg, 'info.message.channel_data.message.interactive.button_reply.title');
+        if (!empty($ibr) && is_string($ibr)) return $ibr;
+
+        // Interactive list_reply
+        $ilr = data_get($msg, 'info.message.channel_data.message.interactive.list_reply.title');
+        if (!empty($ilr) && is_string($ilr)) return $ilr;
+
+        return '';
+    }
+
+    public static function extractMessageType(array $msg): string
+    {
+        return data_get($msg, 'data.type') ?? data_get($msg, 'type') ?? 'text';
+    }
+
+    public static function extractDirection(array $msg): int
+    {
+        $dir = data_get($msg, 'direction');
+        // Aceitar int ou string numérica
+        if (is_int($dir) || is_string($dir)) {
+            $intDir = (int) $dir;
+            if (in_array($intDir, [1, 2], true)) {
+                return $intDir;
+            }
+        }
+        return 1;
+    }
+
+    /**
+     * Extrai dados de mídia (imagem, áudio, documento, vídeo) do payload SendPulse.
+     *
+     * @return array{url: string|null, mime_type: string|null, filename: string|null, caption: string|null}
+     */
+    public static function extractMedia(array $msg): array
+    {
+        $result = ['url' => null, 'mime_type' => null, 'filename' => null, 'caption' => null];
+
+        $type = self::extractMessageType($msg);
+        if ($type === 'text') return $result;
+
+        $mediaTypes = ['image', 'document', 'audio', 'video', 'voice', 'sticker'];
+        $mediaKey = in_array($type, $mediaTypes) ? $type : null;
+
+        // Buscar URL em múltiplos caminhos
+        $url = null;
+        if ($mediaKey) {
+            foreach (["data.{$mediaKey}.link", "data.{$mediaKey}.url"] as $path) {
+                $val = data_get($msg, $path);
+                if (!empty($val) && is_string($val) && filter_var($val, FILTER_VALIDATE_URL)) {
+                    $url = $val;
+                    break;
+                }
+            }
+        }
+
+        // Fallback: qualquer chave de mídia
+        if (!$url) {
+            foreach ($mediaTypes as $mt) {
+                $val = data_get($msg, "data.{$mt}.link") ?? data_get($msg, "data.{$mt}.url");
+                if (!empty($val) && is_string($val) && filter_var($val, FILTER_VALIDATE_URL)) {
+                    $url = $val;
+                    $mediaKey = $mt;
+                    break;
+                }
+            }
+        }
+
+        $result['url'] = $url;
+
+        if ($mediaKey) {
+            $caption = data_get($msg, "data.{$mediaKey}.caption");
+            if (!empty($caption) && is_string($caption)) $result['caption'] = $caption;
+
+            $filename = data_get($msg, "data.{$mediaKey}.filename") ?? data_get($msg, "data.{$mediaKey}.file_name");
+            if (!empty($filename) && is_string($filename)) $result['filename'] = $filename;
+
+            $mime = data_get($msg, "data.{$mediaKey}.mime_type") ?? data_get($msg, "data.{$mediaKey}.mimeType");
+            if (!empty($mime) && is_string($mime)) $result['mime_type'] = $mime;
+        }
+
+        // Inferir mime_type
+        if (!$result['mime_type'] && $url) {
+            $mimeMap = ['image' => 'image/jpeg', 'audio' => 'audio/ogg', 'voice' => 'audio/ogg', 'video' => 'video/mp4', 'document' => 'application/octet-stream', 'sticker' => 'image/webp'];
+            $result['mime_type'] = $mimeMap[$mediaKey ?? $type] ?? null;
+        }
+
+        return $result;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // PARSING DE WEBHOOK
+    // ═══════════════════════════════════════════════════════
+
+    public static function parseWebhookIncomingMessage(array $payload): ?array
+    {
+        $event = is_array($payload) && isset($payload[0]) ? $payload[0] : $payload;
+
+        $title = data_get($event, 'title', '');
+        if ($title !== 'incoming_message') return null;
+
+        $contactId   = data_get($event, 'contact.id', '');
+        $contactName = data_get($event, 'contact.name', '');
+        $phone       = data_get($event, 'info.message.channel_data.message.from', '');
+        $textBody    = data_get($event, 'info.message.channel_data.message.text.body', '');
+        $msgType     = data_get($event, 'info.message.channel_data.message.type', 'text');
+        $msgId       = data_get($event, 'info.message.channel_data.message.id', '');
+        $timestamp   = data_get($event, 'date', time());
+        $botId       = data_get($event, 'bot.id', '');
+
+        if (empty($textBody)) {
+            $textBody = data_get($event, 'contact.last_message', '');
+        }
+
+        // Extrair mídia do webhook
+        $mediaData = ['media_url' => null, 'media_mime' => null, 'media_filename' => null, 'media_caption' => null];
+        $channelMsg = data_get($event, 'info.message.channel_data.message', []);
+        if (is_array($channelMsg) && $msgType !== 'text') {
+            foreach (['image', 'document', 'audio', 'video', 'voice', 'sticker'] as $mt) {
+                $block = data_get($channelMsg, $mt);
+                if (is_array($block)) {
+                    $mediaData['media_url']      = data_get($block, 'link') ?? data_get($block, 'url') ?? data_get($block, 'id');
+                    $mediaData['media_mime']     = data_get($block, 'mime_type');
+                    $mediaData['media_filename'] = data_get($block, 'filename');
+                    $mediaData['media_caption']  = data_get($block, 'caption');
+                    break;
+                }
+            }
+        }
+
+        return array_merge([
+            'contact_id'   => $contactId,
+            'contact_name' => $contactName,
+            'phone'        => $phone,
+            'text'         => $textBody,
+            'message_type' => $msgType,
+            'message_id'   => $msgId,
+            'timestamp'    => $timestamp,
+            'bot_id'       => $botId,
+        ], $mediaData);
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // MÉTODOS HTTP INTERNOS
+    // ═══════════════════════════════════════════════════════
+
+    private function apiGet(string $endpoint, array $params = []): ?array
+    {
+        $token = $this->getToken();
+        if (!$token) { Log::error("SendPulse WA: sem token para GET {$endpoint}"); return null; }
+
+        try {
+            $response = Http::timeout(20)
+                ->withHeaders(['Authorization' => "Bearer {$token}", 'Content-Type' => 'application/json'])
+                ->get("{$this->baseUrl}{$endpoint}", $params);
+
+            if ($response->status() === 401) {
+                $this->clearTokenCache();
+                $token = $this->getToken();
+                if ($token) {
+                    $response = Http::timeout(20)
+                        ->withHeaders(['Authorization' => "Bearer {$token}", 'Content-Type' => 'application/json'])
+                        ->get("{$this->baseUrl}{$endpoint}", $params);
+                }
+            }
+
+            if ($response->successful()) return $response->json() ?? [];
+
+            Log::warning("SendPulse WA: GET {$endpoint} falhou", ['status' => $response->status(), 'body' => mb_substr($response->body(), 0, 500)]);
+            return null;
+        } catch (\Throwable $e) {
+            Log::error("SendPulse WA: exceção em GET {$endpoint}", ['error' => $e->getMessage()]);
+            return null;
+        }
+    }
+
+    private function apiPost(string $endpoint, array $data): array
+    {
+        $token = $this->getToken();
+        if (!$token) return ['success' => false, 'data' => null, 'error' => 'Sem token de autenticação'];
+
+        try {
+            $response = Http::timeout(20)
+                ->withHeaders(['Authorization' => "Bearer {$token}", 'Content-Type' => 'application/json'])
+                ->post("{$this->baseUrl}{$endpoint}", $data);
+
+            if ($response->status() === 401) {
+                $this->clearTokenCache();
+                $token = $this->getToken();
+                if ($token) {
+                    $response = Http::timeout(20)
+                        ->withHeaders(['Authorization' => "Bearer {$token}", 'Content-Type' => 'application/json'])
+                        ->post("{$this->baseUrl}{$endpoint}", $data);
+                }
+            }
+
+            if ($response->successful()) return ['success' => true, 'data' => $response->json(), 'error' => null];
+
+            $errorMsg = "HTTP {$response->status()}: " . mb_substr($response->body(), 0, 300);
+            Log::warning("SendPulse WA: POST {$endpoint} falhou", ['status' => $response->status(), 'body' => mb_substr($response->body(), 0, 500)]);
+            return ['success' => false, 'data' => null, 'error' => $errorMsg];
+        } catch (\Throwable $e) {
+            Log::error("SendPulse WA: exceção em POST {$endpoint}", ['error' => $e->getMessage()]);
+            return ['success' => false, 'data' => null, 'error' => $e->getMessage()];
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // CONTATO: INFO + TAGS
+    // ═══════════════════════════════════════════════════════
+    public function getContactInfo(string $contactId): ?array
+    {
+        return $this->apiGet("/whatsapp/contacts/get", [
+            'bot_id' => $this->botId,
+            'id'     => $contactId,
+        ]);
+    }
+
+    public function setContactTags(string $contactId, array $tagNames): bool
+    {
+        $result = $this->apiPost("/chatbots/contacts/tags/set", [
+            'contact_id' => $contactId,
+            'tags'        => $tagNames,
+            'channel'     => 'whatsapp',
+        ]);
+        return ($result['success'] ?? false) || isset($result['result']) || ($result === true);
+    }
+
+    public function getBotTags(): array
+    {
+        $result = $this->apiGet("/chatbots/bots/" . $this->botId . "/tags", ['channel' => 'whatsapp']);
+        if (is_array($result) && isset($result[0]['id'])) return $result;
+        if (is_array($result) && isset($result['data'])) return $result['data'];
+        return is_array($result) ? $result : [];
+    }
+
+    public function getContactTags(string $phone): array
+    {
+        $contact = $this->getContactByPhone($phone);
+        if (!$contact || !isset($contact['tags'])) return [];
+        return is_array($contact['tags']) ? $contact['tags'] : [];
+    }
+
+    public function setContactTagsByPhone(string $phone, array $tagNames): bool
+    {
+        $contact = $this->getContactByPhone($phone);
+        if (!$contact || !isset($contact['id'])) return false;
+        return $this->setContactTags($contact['id'], $tagNames);
+    }
+}

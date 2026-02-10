@@ -302,8 +302,9 @@ public const RUBRICAS_EXCLUIDAS = [
                     'anoAnterior' => $resumo['receitaPrev'] ?? 0,
                 ],
                 'expenseRatio' => [
-                    'pct' => $resumo['receitaTotal'] > 0 ? round(($resumo['despesasTotal'] / $resumo['receitaTotal']) * 100, 1) : 0,
+                    'pct' => $resumo['receitaTotal'] > 0 ? round((($resumo['despesasTotal'] + ($resumo['deducoesTotal'] ?? 0)) / $resumo['receitaTotal']) * 100, 1) : 0,
                     'despesas' => $resumo['despesasTotal'] ?? 0,
+                    'deducoes' => $resumo['deducoesTotal'] ?? 0,
                     'receita' => $resumo['receitaTotal'] ?? 0,
                 ],
                 'inadimplencia' => [
@@ -394,13 +395,16 @@ public function getReceitaPJByMonth(int $ano): array
 }
 
 /**
- * Lucratividade mensal (12 meses): Receita Total - Despesas Operacionais.
+ * Lucratividade mensal (12 meses): Receita Total - Deducoes - Despesas Operacionais.
+ *
+ * FIX v3.0: Inclui deducoes (DEDUCAO) no calculo.
  *
  * @return array{meses: array<int,string>, receita: array<int,float>, despesas: array<int,float>, lucratividade: array<int,float>}
  */
 public function getLucratividadeByMonth(int $ano): array
 {
     $receitas = $this->getReceitaByMonth($ano);
+    $deducoes = $this->deducoesByMonth($ano);
     $despesas = $this->despesasOperacionaisByMonth($ano);
 
     $receitaTotal = [];
@@ -408,9 +412,10 @@ public function getLucratividadeByMonth(int $ano): array
 
     for ($i = 0; $i < 12; $i++) {
         $rt = (float) ($receitas['pf'][$i] ?? 0) + (float) ($receitas['pj'][$i] ?? 0);
+        $dd = (float) ($deducoes[$i] ?? 0);
         $dt = (float) ($despesas[$i] ?? 0);
         $receitaTotal[$i] = round($rt, 2);
-        $lucro[$i] = round($rt - $dt, 2);
+        $lucro[$i] = round($rt - $dd - $dt, 2);
     }
 
     return [
@@ -461,7 +466,9 @@ public function getLucratividadeByMonth(int $ano): array
         $out = [];
         foreach ($rows as $r) {
             $codigo = (string) ($r->codigo_plano ?? '');
-            $rubrica = $this->normalizarRubrica((string) ($r->plano_contas ?? $codigo));
+            // FIX v3.0: Usar codigo_plano como fallback quando plano_contas vazio
+            $planoContas = (string) ($r->plano_contas ?? '');
+            $rubrica = $this->normalizarRubrica($planoContas !== '' ? $planoContas : $codigo);
 
             if (!$this->isDespesaOperacional($rubrica)) {
                 continue;
@@ -502,8 +509,10 @@ public function getLucratividadeByMonth(int $ano): array
 
         $rows = ContaReceber::query()
             ->whereNull('data_pagamento')
+            ->where('status', 'Não lançado')
             ->whereNotNull('data_vencimento')
             ->whereDate('data_vencimento', '<=', $refDate->toDateString())
+            ->whereDate('data_vencimento', '>=', $refDate->copy()->subDays(90)->toDateString())
             ->orderBy('data_vencimento')
             ->limit(50)
             ->get();
@@ -643,7 +652,7 @@ public function getLucratividadeByMonth(int $ano): array
             'taxaCobrancaMeta' => (float) Configuracao::get("meta_taxa_cobranca_{$ano}_{$mes}", 95),
             'taxaCobrancaTrend' => $this->percentChange($taxa, $taxaPrev),
             'totalVencido' => $totalAtraso,
-            'totalAberto' => (float) ContaReceber::query()->whereNull('data_pagamento')->sum('valor'),
+            'totalAberto' => (float) ContaReceber::query()->whereNull('data_pagamento')->where('status', 'Não lançado')->sum('valor'),
             'inadimplencia' => $this->calcularInadimplencia($ano, $mes),
         ];
     }
@@ -656,6 +665,7 @@ public function getLucratividadeByMonth(int $ano): array
         $ref = $this->refDateCompetencia($ano, $mes);
         $totalAberto = (float) ContaReceber::query()
             ->whereNull('data_pagamento')
+            ->where('status', 'Não lançado')
             ->sum('valor');
 
         if ($totalAberto <= 0) return 0.0;
@@ -667,6 +677,10 @@ public function getLucratividadeByMonth(int $ano): array
     /**
      * Comparativo dos últimos 3 meses.
      */
+    /**
+     * Comparativo dos ultimos 3 meses.
+     * FIX v3.0: Adicionada linha de Deducoes; Resultado inclui deducoes.
+     */
     public function getComparativoMensal(int $ano, int $mes): array
     {
         [$ano2, $mes2] = $this->prevCompetencia($ano, $mes);
@@ -676,7 +690,7 @@ public function getLucratividadeByMonth(int $ano): array
         $m2 = $this->resumoBasico($ano2, $mes2);
         $m3 = $this->resumoBasico($ano, $mes);
 
-        // Contas em atraso e taxa de cobrança (por competência)
+        // Contas em atraso e taxa de cobranca (por competencia)
         $ref1 = $this->refDateCompetencia($ano1, $mes1);
         $ref2 = $this->refDateCompetencia($ano2, $mes2);
         $ref3 = $this->refDateCompetencia($ano, $mes);
@@ -689,10 +703,11 @@ public function getLucratividadeByMonth(int $ano): array
         [$taxa3] = $this->taxaCobrancaMes($ano, $mes);
 
         return [
-            ['metrica' => 'Receita Total', 'mes1' => $m1['receita'], 'mes2' => $m2['receita'], 'mes3' => $m3['receita'], 'trend' => $this->percentChange($m3['receita'], $m2['receita'])],
-            ['metrica' => 'Despesas Total', 'mes1' => $m1['despesas'], 'mes2' => $m2['despesas'], 'mes3' => $m3['despesas'], 'trend' => $this->percentChange($m3['despesas'], $m2['despesas'])],
-            ['metrica' => 'Resultado', 'mes1' => $m1['resultado'], 'mes2' => $m2['resultado'], 'mes3' => $m3['resultado'], 'trend' => $this->percentChange($m3['resultado'], $m2['resultado'])],
-            ['metrica' => 'Margem', 'mes1' => $m1['margem'], 'mes2' => $m2['margem'], 'mes3' => $m3['margem'], 'trend' => $this->percentChange($m3['margem'], $m2['margem'])],
+            ['metrica' => 'Receita', 'mes1' => $m1['receita'], 'mes2' => $m2['receita'], 'mes3' => $m3['receita'], 'trend' => $this->percentChange($m3['receita'], $m2['receita'])],
+            ['metrica' => 'Deduções', 'mes1' => $m1['deducoes'], 'mes2' => $m2['deducoes'], 'mes3' => $m3['deducoes'], 'trend' => $this->percentChange($m3['deducoes'], $m2['deducoes'])],
+            ['metrica' => 'Despesas', 'mes1' => $m1['despesas'], 'mes2' => $m2['despesas'], 'mes3' => $m3['despesas'], 'trend' => $this->percentChange($m3['despesas'], $m2['despesas'])],
+            ['metrica' => 'Resultado Líquido', 'mes1' => $m1['resultado'], 'mes2' => $m2['resultado'], 'mes3' => $m3['resultado'], 'trend' => $this->percentChange($m3['resultado'], $m2['resultado'])],
+            ['metrica' => 'Margem Líquida', 'mes1' => $m1['margem'], 'mes2' => $m2['margem'], 'mes3' => $m3['margem'], 'trend' => $this->percentChange($m3['margem'], $m2['margem'])],
             ['metrica' => 'Contas Atraso', 'mes1' => $at1, 'mes2' => $at2, 'mes3' => $at3, 'trend' => $this->percentChange($at3, $at2)],
             ['metrica' => 'Taxa Cobrança', 'mes1' => $taxa1, 'mes2' => $taxa2, 'mes3' => $taxa3, 'trend' => $this->percentChange($taxa3, $taxa2)],
         ];
@@ -700,6 +715,13 @@ public function getLucratividadeByMonth(int $ano): array
 
     /**
      * Resumo executivo (cards principais).
+     */
+    /**
+     * Resumo executivo (cards principais).
+     *
+     * FIX v3.0: Resultado agora inclui DEDUCAO (3.01.03.*).
+     * Formula: Resultado = ReceitaTotal - Deducoes - Despesas
+     * Validado contra Arvore do Plano de Contas (DataJuri).
      */
     private function getResumoExecutivo(int $ano, int $mes): array
     {
@@ -709,16 +731,20 @@ public function getLucratividadeByMonth(int $ano): array
         $receitaPj = $this->sumReceitaTipo($ano, $mes, 'pj');
         $receitaTotal = $receitaPf + $receitaPj;
 
+        // FIX v3.0: Incluir deducoes (Simples Nacional, INSS, etc.)
+        $deducoesTotal = $this->deducoesTotal($ano, $mes);
         $despesasTotal = (float) $this->despesasOperacionaisTotal($ano, $mes);
 
-        $resultado = $receitaTotal - $despesasTotal;
+        // FIX v3.0: Resultado = Receita - Deducoes - Despesas
+        $resultado = $receitaTotal - $deducoesTotal - $despesasTotal;
         $margem = $receitaTotal > 0 ? ($resultado / $receitaTotal) * 100 : 0.0;
 
         $receitaPfPrev = $this->sumReceitaTipo($pAno, $pMes, 'pf');
         $receitaPjPrev = $this->sumReceitaTipo($pAno, $pMes, 'pj');
         $receitaPrev = $receitaPfPrev + $receitaPjPrev;
+        $deducoesPrev = $this->deducoesTotal($pAno, $pMes);
         $despesasPrev = (float) $this->despesasOperacionaisTotal($pAno, $pMes);
-        $resultadoPrev = $receitaPrev - $despesasPrev;
+        $resultadoPrev = $receitaPrev - $deducoesPrev - $despesasPrev;
         $margemPrev = $receitaPrev > 0 ? ($resultadoPrev / $receitaPrev) * 100 : 0.0;
 
         $metaPf = (float) Configuracao::get("meta_pf_{$ano}_{$mes}", 0);
@@ -739,6 +765,8 @@ public function getLucratividadeByMonth(int $ano): array
             'receitaMeta' => round($metaReceita, 2),
             'receitaTrend' => $this->percentChange($receitaTotal, $receitaPrev),
             'receitaPrev' => round($receitaPrev, 2),
+            'deducoesTotal' => round($deducoesTotal, 2),
+            'deducoesTrend' => $this->percentChange($deducoesTotal, $deducoesPrev),
             'despesasTotal' => round($despesasTotal, 2),
             'despesasMeta' => round($metaDespesas, 2),
             'despesasTrend' => $this->percentChange($despesasTotal, $despesasPrev),
@@ -754,18 +782,24 @@ public function getLucratividadeByMonth(int $ano): array
     /**
      * Totais básicos do mês.
      */
+    /**
+     * Totais basicos do mes.
+     * FIX v3.0: Inclui deducoes no calculo do resultado.
+     */
     private function resumoBasico(int $ano, int $mes): array
     {
         $receitaPf = $this->sumReceitaTipo($ano, $mes, 'pf');
         $receitaPj = $this->sumReceitaTipo($ano, $mes, 'pj');
         $receita = $receitaPf + $receitaPj;
 
+        $deducoes = $this->deducoesTotal($ano, $mes);
         $despesas = (float) $this->despesasOperacionaisTotal($ano, $mes);
-        $resultado = $receita - $despesas;
+        $resultado = $receita - $deducoes - $despesas;
         $margem = $receita > 0 ? ($resultado / $receita) * 100 : 0.0;
 
         return [
             'receita' => round($receita, 2),
+            'deducoes' => round($deducoes, 2),
             'despesas' => round($despesas, 2),
             'resultado' => round($resultado, 2),
             'margem' => round($margem, 1),
@@ -775,9 +809,11 @@ public function getLucratividadeByMonth(int $ano): array
     private function overdueQuery(Carbon $ref)
     {
         return ContaReceber::query()
+            ->where('status', 'Não lançado')
             ->whereNull('data_pagamento')
             ->whereNotNull('data_vencimento')
-            ->whereDate('data_vencimento', '<=', $ref->toDateString());
+            ->whereDate('data_vencimento', '<=', $ref->toDateString())
+            ->whereDate('data_vencimento', '>=', $ref->copy()->subDays(90)->toDateString());
     }
 
     private function avgDiasAtraso($contas, Carbon $ref): int
@@ -808,6 +844,7 @@ public function getLucratividadeByMonth(int $ano): array
         $end = Carbon::create($ano, $mes, 1)->endOfMonth();
 
         $totalDue = (float) ContaReceber::query()
+            ->where('status', 'Não lançado')
             ->whereNotNull('data_vencimento')
             ->whereBetween('data_vencimento', [$start->toDateString(), $end->toDateString()])
             ->sum('valor');
@@ -912,6 +949,47 @@ public function getLucratividadeByMonth(int $ano): array
             }
         }
         return true;
+    }
+
+    /**
+     * Soma deducoes da receita do mes (classificacao = DEDUCAO).
+     *
+     * FIX v3.0: Metodo novo. Deducoes sao 3.01.03.* (Simples Nacional,
+     * INSS, Salarios, Distribuicao de lucros, etc.).
+     * Valores estao armazenados como POSITIVOS no DB (abs no sync).
+     * Retorna valor positivo (para subtrair da receita no caller).
+     */
+    private function deducoesTotal(int $ano, int $mes): float
+    {
+        return (float) abs(Movimento::where('ano', $ano)
+            ->where('mes', $mes)
+            ->where('classificacao', Movimento::DEDUCAO)
+            ->sum('valor'));
+    }
+
+    /**
+     * Deducoes por mes (12 meses).
+     * FIX v3.0: Metodo novo para getLucratividadeByMonth.
+     */
+    private function deducoesByMonth(int $ano): array
+    {
+        $out = array_fill(0, 12, 0.0);
+
+        $rows = Movimento::select(DB::raw('mes'), DB::raw('SUM(valor) as total'))
+            ->where('ano', $ano)
+            ->where('classificacao', Movimento::DEDUCAO)
+            ->groupBy('mes')
+            ->pluck('total', 'mes')
+            ->toArray();
+
+        foreach ($rows as $m => $t) {
+            $idx = ((int) $m) - 1;
+            if ($idx >= 0 && $idx < 12) {
+                $out[$idx] = (float) abs($t);
+            }
+        }
+
+        return array_map('floatval', $out);
     }
 
     /**

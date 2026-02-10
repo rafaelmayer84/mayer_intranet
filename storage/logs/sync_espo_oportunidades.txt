@@ -1,0 +1,5 @@
+Sincronizando oportunidades...
+✓ Sincronização de oportunidades concluída!
+  Criados: 0
+  Atualizados: 0
+  Ignorados: 0

@@ -1,0 +1,505 @@
+{{-- 
+    Partial: _contexto_datajuri.blade.php
+    Aba DataJuri no painel direito do Nexo Atendimento.
+    Carregado via JS fetch quando a aba é ativada.
+    NÃO altera nada do Contexto 360 existente.
+--}}
+
+<div id="datajuri-panel" class="hidden h-full overflow-y-auto">
+    {{-- Estado: Loading --}}
+    <div id="dj-loading" class="flex items-center justify-center py-12">
+        <svg class="animate-spin h-6 w-6 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+        </svg>
+        <span class="ml-2 text-sm text-gray-500">Carregando DataJuri...</span>
+    </div>
+
+    {{-- Estado: Sem cliente vinculado --}}
+    <div id="dj-sem-cliente" class="hidden p-4">
+        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
+            <svg class="mx-auto h-8 w-8 text-yellow-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            <p class="text-sm font-medium text-yellow-800 mb-3">Sem cliente vinculado</p>
+            <button onclick="NexoDataJuri.autoVincular()" class="w-full mb-2 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition">
+                Auto-vincular por telefone
+            </button>
+            <div class="relative mt-3">
+                <input type="text" id="dj-busca-cliente" placeholder="Buscar por nome, CPF/CNPJ ou telefone..."
+                    class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    onkeyup="NexoDataJuri.debounceBusca(this.value)">
+            </div>
+            <div id="dj-busca-resultados" class="hidden mt-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg"></div>
+        </div>
+    </div>
+
+    {{-- Estado: Conteúdo DataJuri --}}
+    <div id="dj-conteudo" class="hidden">
+        {{-- Card Cliente --}}
+        <div class="p-3 border-b border-gray-200">
+            <div class="flex items-center justify-between mb-2">
+                <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Cliente</h4>
+                <a id="dj-link-datajuri" href="#" target="_blank" class="text-xs text-blue-600 hover:text-blue-800 font-medium">
+                    Abrir no DataJuri &rarr;
+                </a>
+            </div>
+            <p id="dj-cliente-nome" class="text-sm font-semibold text-gray-900"></p>
+            <div class="flex items-center gap-2 mt-1">
+                <span id="dj-cliente-tipo" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700"></span>
+                <span id="dj-cliente-doc" class="text-xs text-gray-500"></span>
+            </div>
+            <p id="dj-cliente-tel" class="text-xs text-gray-500 mt-1"></p>
+        </div>
+
+        {{-- Processo vinculado à conversa --}}
+        <div id="dj-processo-vinculado" class="hidden p-3 border-b border-gray-200 bg-blue-50">
+            <div class="flex items-center justify-between mb-2">
+                <h4 class="text-xs font-semibold text-blue-700 uppercase tracking-wider">Processo desta conversa</h4>
+                <button onclick="NexoDataJuri.unlinkProcesso()" class="text-xs text-red-500 hover:text-red-700" title="Desvincular">
+                    &#10005;
+                </button>
+            </div>
+            <p id="dj-pv-numero" class="text-sm font-semibold text-blue-900"></p>
+            <p id="dj-pv-descricao" class="text-xs text-blue-700 mt-1"></p>
+        </div>
+
+        {{-- Seletor de processo + toggle prazos --}}
+        <div class="p-3 border-b border-gray-200">
+            <label class="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-1">Vincular processo</label>
+            <select id="dj-select-processo" onchange="NexoDataJuri.selecionarProcesso(this.value)"
+                class="w-full text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                <option value="">Selecione um processo...</option>
+            </select>
+        </div>
+
+        {{-- Toggle prazos --}}
+        <div class="px-3 pt-2 flex items-center justify-between">
+            <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Próximos Prazos</h4>
+            <label class="flex items-center gap-1 cursor-pointer" id="dj-toggle-prazos-wrapper" style="display:none;">
+                <input type="checkbox" id="dj-toggle-prazos" onchange="NexoDataJuri.togglePrazos()" class="rounded text-blue-600 h-3 w-3">
+                <span class="text-xs text-gray-500">Ver todos do cliente</span>
+            </label>
+        </div>
+
+        {{-- Lista de prazos --}}
+        <div id="dj-prazos-lista" class="p-3 space-y-2"></div>
+
+        {{-- Processos ativos --}}
+        <div class="p-3 border-t border-gray-200">
+            <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Processos Ativos</h4>
+            <div id="dj-processos-lista" class="space-y-2"></div>
+        </div>
+    </div>
+
+    {{-- Estado: Erro --}}
+    <div id="dj-erro" class="hidden p-4">
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
+            <p class="text-sm text-red-700">Erro ao carregar dados do DataJuri.</p>
+            <button onclick="NexoDataJuri.carregar()" class="mt-2 px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700">
+                Tentar novamente
+            </button>
+        </div>
+    </div>
+</div>
+
+{{-- ═══════════════════════════════════════════════════════════════════
+     JAVASCRIPT — NexoDataJuri module
+     ═══════════════════════════════════════════════════════════════════ --}}
+<script>
+window.NexoDataJuri = (function() {
+    let _conversationId = null;
+    let _data = null;
+    let _buscaTimer = null;
+    let _filtrandoPorProcesso = false;
+
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+    function baseUrl(path) {
+        return `/nexo/atendimento/conversas/${_conversationId}/${path}`;
+    }
+
+    function show(id) { document.getElementById(id)?.classList.remove('hidden'); }
+    function hide(id) { document.getElementById(id)?.classList.add('hidden'); }
+
+    function setConversation(id) {
+        _conversationId = id;
+        _data = null;
+        _filtrandoPorProcesso = false;
+    }
+
+    async function carregar() {
+        if (!_conversationId) return;
+
+        show('dj-loading');
+        hide('dj-sem-cliente');
+        hide('dj-conteudo');
+        hide('dj-erro');
+
+        try {
+            const resp = await fetch(baseUrl('contexto-datajuri'), {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+            });
+
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+            _data = await resp.json();
+            hide('dj-loading');
+
+            if (!_data.has_cliente) {
+                show('dj-sem-cliente');
+                return;
+            }
+
+            renderConteudo();
+            show('dj-conteudo');
+        } catch (e) {
+            console.error('NexoDataJuri erro:', e);
+            hide('dj-loading');
+            show('dj-erro');
+        }
+    }
+
+    function renderConteudo() {
+        if (!_data || !_data.cliente) return;
+
+        const c = _data.cliente;
+
+        // Cliente — CORRIGIDO: tipo (não tipo_pessoa), cpf_cnpj (não documento)
+        setText('dj-cliente-nome', c.nome || '—');
+        setText('dj-cliente-tipo', c.tipo || '—');
+        setText('dj-cliente-doc', c.cpf_cnpj || '');
+        setText('dj-cliente-tel', c.telefone ? `Tel: ${c.telefone}` : '');
+
+        // Link DataJuri
+        const linkEl = document.getElementById('dj-link-datajuri');
+        if (linkEl && _data.datajuri_web_url && c.datajuri_id) {
+            linkEl.href = `${_data.datajuri_web_url}/pessoas/${c.datajuri_id}`;
+            linkEl.style.display = '';
+        } else if (linkEl) {
+            linkEl.style.display = 'none';
+        }
+
+        // Processo vinculado
+        if (_data.processo_vinculado) {
+            const pv = _data.processo_vinculado;
+            setText('dj-pv-numero', pv.numero || `Pasta ${pv.pasta}`);
+            setText('dj-pv-descricao', pv.descricao || '');
+            show('dj-processo-vinculado');
+            _filtrandoPorProcesso = true;
+            document.getElementById('dj-toggle-prazos-wrapper').style.display = '';
+            document.getElementById('dj-toggle-prazos').checked = false;
+        } else {
+            hide('dj-processo-vinculado');
+            _filtrandoPorProcesso = false;
+            document.getElementById('dj-toggle-prazos-wrapper').style.display = 'none';
+        }
+
+        renderSelectProcessos();
+        renderPrazos(_data.prazos);
+        renderProcessos(_data.processos);
+    }
+
+    function renderSelectProcessos() {
+        const sel = document.getElementById('dj-select-processo');
+        if (!sel || !_data) return;
+
+        sel.innerHTML = '<option value="">Selecione um processo...</option>';
+        (_data.processos || []).forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = `${p.numero || 'Pasta ' + p.pasta} — ${p.descricao || p.status}`;
+            if (_data.linked_processo_id && p.id == _data.linked_processo_id) {
+                opt.selected = true;
+            }
+            sel.appendChild(opt);
+        });
+    }
+
+    function renderPrazos(prazos) {
+        const container = document.getElementById('dj-prazos-lista');
+        if (!container) return;
+
+        if (!prazos || prazos.length === 0) {
+            container.innerHTML = '<p class="text-xs text-gray-400 italic">Nenhum prazo futuro encontrado.</p>';
+            return;
+        }
+
+        container.innerHTML = prazos.map(p => {
+            const urgClass = urgenciaClass(p.urgencia);
+            const dias = p.dias_restantes;
+            const diasLabel = dias === 0 ? 'HOJE' : dias === 1 ? 'D-1' : `D-${dias}`;
+
+            return `<div class="flex items-start gap-2 p-2 rounded-lg ${urgClass.bg}">
+                <span class="inline-flex items-center justify-center min-w-[40px] px-1.5 py-0.5 rounded text-xs font-bold ${urgClass.badge}">
+                    ${diasLabel}
+                </span>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs font-medium text-gray-900 truncate">${escHtml(p.atividade || '—')}</p>
+                    <p class="text-xs text-gray-500">${formatDate(p.data)} · ${escHtml(p.processo_numero || '')}</p>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function renderProcessos(processos) {
+        const container = document.getElementById('dj-processos-lista');
+        if (!container) return;
+
+        if (!processos || processos.length === 0) {
+            container.innerHTML = '<p class="text-xs text-gray-400 italic">Nenhum processo ativo.</p>';
+            return;
+        }
+
+        container.innerHTML = processos.map(p => {
+            const prazoHtml = p.proximo_prazo
+                ? `<span class="text-xs ${urgenciaClass(urgenciaFromDias(p.proximo_prazo.dias_restantes)).text}">Prazo: ${formatDate(p.proximo_prazo.data)} (D-${p.proximo_prazo.dias_restantes})</span>`
+                : '<span class="text-xs text-gray-400">Sem prazo</span>';
+
+            const andamentoHtml = p.ultimo_andamento
+                ? `<span class="text-xs text-gray-500">Últ: ${formatDate(p.ultimo_andamento.data)} — ${escHtml(p.ultimo_andamento.resumo)}</span>`
+                : '';
+
+            const faseHtml = p.fase_atual
+                ? `<span class="text-xs text-indigo-600">${escHtml(p.fase_atual.tipo_fase || '')} ${p.fase_atual.instancia ? '(' + escHtml(p.fase_atual.instancia) + ')' : ''}</span>`
+                : '';
+
+            const isVinculado = _data.linked_processo_id && p.id == _data.linked_processo_id;
+
+            return `<div class="border ${isVinculado ? 'border-blue-400 bg-blue-50' : 'border-gray-200'} rounded-lg p-2.5">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-gray-900 truncate">${escHtml(p.numero || 'Pasta ' + p.pasta)}</p>
+                        <p class="text-xs text-gray-600 truncate">${escHtml(p.descricao || '')}</p>
+                    </div>
+                    <button onclick="NexoDataJuri.selecionarProcesso(${p.id})" title="Definir como processo desta conversa"
+                        class="ml-2 flex-shrink-0 p-1 rounded ${isVinculado ? 'text-blue-600' : 'text-gray-400 hover:text-blue-600'} transition">
+                        <svg class="h-4 w-4" fill="${isVinculado ? 'currentColor' : 'none'}" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="mt-1.5 flex flex-col gap-0.5">
+                    ${faseHtml}
+                    ${prazoHtml}
+                    ${andamentoHtml}
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    // —— Ações ——————————————————————————————————
+
+    async function autoVincular() {
+        if (!_conversationId) return;
+
+        try {
+            const resp = await fetch(baseUrl('auto-vincular-cliente'), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+
+            const result = await resp.json();
+
+            if (result.success) {
+                if (typeof window.refreshContexto360 === 'function') {
+                    window.refreshContexto360(_conversationId);
+                }
+                carregar();
+            } else {
+                alert(result.message || 'Não foi possível vincular automaticamente.');
+            }
+        } catch (e) {
+            console.error('AutoVincular erro:', e);
+            alert('Erro ao tentar vincular. Tente novamente.');
+        }
+    }
+
+    function debounceBusca(q) {
+        clearTimeout(_buscaTimer);
+        _buscaTimer = setTimeout(() => buscarClientes(q), 400);
+    }
+
+    async function buscarClientes(q) {
+        if (!_conversationId || q.length < 2) {
+            hide('dj-busca-resultados');
+            return;
+        }
+
+        try {
+            const resp = await fetch(baseUrl('buscar-clientes') + `?q=${encodeURIComponent(q)}`, {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+            });
+
+            const data = await resp.json();
+            const container = document.getElementById('dj-busca-resultados');
+            if (!container) return;
+
+            if (!data.clientes || data.clientes.length === 0) {
+                container.innerHTML = '<p class="p-3 text-xs text-gray-400">Nenhum resultado.</p>';
+                show('dj-busca-resultados');
+                return;
+            }
+
+            // CORRIGIDO: tipo (não tipo_pessoa), cpf_cnpj (não documento)
+            container.innerHTML = data.clientes.map(c =>
+                `<button onclick="NexoDataJuri.vincularCliente(${c.id})" class="w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-100 last:border-0 transition">
+                    <p class="text-sm font-medium text-gray-900">${escHtml(c.nome)}</p>
+                    <p class="text-xs text-gray-500">${escHtml(c.tipo || '')} ${c.cpf_cnpj ? '· ' + escHtml(c.cpf_cnpj) : ''} ${c.telefone ? '· ' + escHtml(c.telefone) : ''}</p>
+                </button>`
+            ).join('');
+            show('dj-busca-resultados');
+        } catch (e) {
+            console.error('Busca clientes erro:', e);
+        }
+    }
+
+    async function vincularCliente(clienteId) {
+        if (!_conversationId) return;
+
+        try {
+            const resp = await fetch(`/nexo/atendimento/conversas/${_conversationId}/link-cliente`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({ cliente_id: clienteId }),
+            });
+
+            if (resp.ok) {
+                if (typeof window.refreshContexto360 === 'function') {
+                    window.refreshContexto360(_conversationId);
+                }
+                carregar();
+            }
+        } catch (e) {
+            console.error('Vincular cliente erro:', e);
+        }
+    }
+
+    async function selecionarProcesso(processoId) {
+        if (!_conversationId || !processoId) return;
+
+        try {
+            const resp = await fetch(baseUrl('link-processo'), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({ processo_id: parseInt(processoId) }),
+            });
+
+            if (resp.ok) {
+                carregar();
+            }
+        } catch (e) {
+            console.error('Link processo erro:', e);
+        }
+    }
+
+    async function unlinkProcesso() {
+        if (!_conversationId) return;
+
+        try {
+            await fetch(baseUrl('unlink-processo'), {
+                method: 'DELETE',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            });
+            carregar();
+        } catch (e) {
+            console.error('Unlink processo erro:', e);
+        }
+    }
+
+    async function togglePrazos() {
+        if (!_conversationId || !_data) return;
+
+        const verTodos = document.getElementById('dj-toggle-prazos')?.checked;
+
+        if (verTodos || !_data.linked_processo_id) {
+            renderPrazos(_data.prazos);
+            return;
+        }
+
+        try {
+            const resp = await fetch(baseUrl('prazos-filtrados') + `?processo_id=${_data.linked_processo_id}`, {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const result = await resp.json();
+            renderPrazos(result.prazos || []);
+        } catch (e) {
+            console.error('Toggle prazos erro:', e);
+        }
+    }
+
+    // —— Helpers ——————————————————————————————————
+
+    function setText(id, text) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+    }
+
+    function escHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function formatDate(dateStr) {
+        if (!dateStr) return '—';
+        try {
+            const d = new Date(dateStr);
+            if (isNaN(d.getTime())) return dateStr;
+            return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        } catch { return dateStr; }
+    }
+
+    function urgenciaFromDias(dias) {
+        if (dias <= 0) return 'vencido';
+        if (dias <= 2) return 'critico';
+        if (dias <= 5) return 'urgente';
+        if (dias <= 15) return 'atencao';
+        return 'normal';
+    }
+
+    function urgenciaClass(urgencia) {
+        const map = {
+            vencido: { bg: 'bg-red-100', badge: 'bg-red-600 text-white', text: 'text-red-600' },
+            critico: { bg: 'bg-red-50', badge: 'bg-red-500 text-white', text: 'text-red-500' },
+            urgente: { bg: 'bg-orange-50', badge: 'bg-orange-500 text-white', text: 'text-orange-500' },
+            atencao: { bg: 'bg-yellow-50', badge: 'bg-yellow-500 text-white', text: 'text-yellow-600' },
+            normal:  { bg: 'bg-gray-50', badge: 'bg-gray-400 text-white', text: 'text-gray-500' },
+        };
+        return map[urgencia] || map.normal;
+    }
+
+    // —— API pública ——————————————————————————————
+
+    return {
+        setConversation,
+        carregar,
+        autoVincular,
+        debounceBusca,
+        vincularCliente,
+        selecionarProcesso,
+        unlinkProcesso,
+        togglePrazos,
+    };
+})();
+</script>

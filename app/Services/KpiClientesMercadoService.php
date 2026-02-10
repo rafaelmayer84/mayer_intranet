@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\Cliente;
-use App\Models\Lancamento;
+use App\Models\Movimento;
 use App\Models\Lead;
 use App\Models\Oportunidade;
 use Illuminate\Support\Facades\DB;
@@ -25,7 +25,7 @@ class KpiClientesMercadoService
             'clientes_ativos' => $this->getClientesAtivos($mes, $ano),
             'clientes_inativos' => $this->getClientesInativos($mes, $ano),
             
-            // KPIs Financeiros (baseado em LANÇAMENTOS)
+            // KPIs Financeiros (baseado em MOVIMENTOS)
             'valor_carteira' => $this->getValorCarteira(),
             'receita_total' => $this->getReceitaTotal($mes, $ano),
             'receita_mes_atual' => $this->getReceitaMesAtual(),
@@ -67,10 +67,10 @@ class KpiClientesMercadoService
         $mes = $mes ?? now()->month;
         $ano = $ano ?? now()->year;
 
-        return Cliente::whereHas('lancamentos', function ($query) use ($mes, $ano) {
-            $query->where('tipo', 'Receita')
-                  ->whereYear('data_lancamento', $ano)
-                  ->whereMonth('data_lancamento', $mes);
+        return Cliente::whereHas('movimentos', function ($query) use ($mes, $ano) {
+            $query->where('classificacao', 'like', '%RECEITA%')
+                  ->whereYear('data_movimento', $ano)
+                  ->whereMonth('data_movimento', $mes);
         })->count();
     }
 
@@ -83,11 +83,13 @@ class KpiClientesMercadoService
     }
 
     /**
-     * Valor total da carteira (soma de todos os lançamentos de receita)
+     * Valor total da carteira (soma de todos os movimentos de receita)
      */
     public function getValorCarteira(): float
     {
-        return Lancamento::where('tipo', 'Receita')->sum('valor');
+        return Movimento::where('classificacao', 'like', '%RECEITA%')
+            ->where('valor', '>', 0)
+            ->sum('valor');
     }
 
     /**
@@ -95,13 +97,14 @@ class KpiClientesMercadoService
      */
     public function getReceitaTotal(int $mes = null, int $ano = null): float
     {
-        $query = Lancamento::where('tipo', 'Receita');
+        $query = Movimento::where('classificacao', 'like', '%RECEITA%')
+            ->where('valor', '>', 0);
 
         if ($mes && $ano) {
-            $query->whereYear('data_lancamento', $ano)
-                  ->whereMonth('data_lancamento', $mes);
+            $query->whereYear('data_movimento', $ano)
+                  ->whereMonth('data_movimento', $mes);
         } elseif ($ano) {
-            $query->whereYear('data_lancamento', $ano);
+            $query->whereYear('data_movimento', $ano);
         }
 
         return $query->sum('valor');
@@ -112,8 +115,10 @@ class KpiClientesMercadoService
      */
     public function getReceitaMesAtual(): float
     {
-        return Lancamento::where('tipo', 'Receita')
-            ->mesAtual()
+        return Movimento::where('classificacao', 'like', '%RECEITA%')
+            ->where('valor', '>', 0)
+            ->whereYear('data_movimento', now()->year)
+            ->whereMonth('data_movimento', now()->month)
             ->sum('valor');
     }
 
@@ -122,8 +127,11 @@ class KpiClientesMercadoService
      */
     public function getReceitaMesAnterior(): float
     {
-        return Lancamento::where('tipo', 'Receita')
-            ->mesAnterior()
+        $mesAnterior = now()->subMonth();
+        return Movimento::where('classificacao', 'like', '%RECEITA%')
+            ->where('valor', '>', 0)
+            ->whereYear('data_movimento', $mesAnterior->year)
+            ->whereMonth('data_movimento', $mesAnterior->month)
             ->sum('valor');
     }
 
@@ -149,9 +157,14 @@ class KpiClientesMercadoService
             return 0;
         }
 
-        $top10Receita = Cliente::orderBy('valor_carteira', 'desc')
+        $top10Receita = DB::table('movimentos')
+            ->select('cliente_id', DB::raw('SUM(valor) as total'))
+            ->where('classificacao', 'like', '%RECEITA%')
+            ->where('valor', '>', 0)
+            ->groupBy('cliente_id')
+            ->orderBy('total', 'desc')
             ->limit(10)
-            ->sum('valor_carteira');
+            ->sum('valor');
 
         return ($top10Receita / $receitaTotal) * 100;
     }
@@ -173,13 +186,14 @@ class KpiClientesMercadoService
         }
 
         // Buscar receita por tipo de cliente
-        $query = Lancamento::select('clientes.tipo', DB::raw('SUM(lancamentos.valor) as total'))
-            ->join('clientes', 'lancamentos.cliente_id', '=', 'clientes.id')
-            ->where('lancamentos.tipo', 'Receita');
+        $query = Movimento::select('clientes.tipo', DB::raw('SUM(movimentos.valor) as total'))
+            ->join('clientes', 'movimentos.cliente_id', '=', 'clientes.id')
+            ->where('movimentos.classificacao', 'like', '%RECEITA%')
+            ->where('movimentos.valor', '>', 0);
 
         if ($mes && $ano) {
-            $query->whereYear('lancamentos.data_lancamento', $ano)
-                  ->whereMonth('lancamentos.data_lancamento', $mes);
+            $query->whereYear('movimentos.data_movimento', $ano)
+                  ->whereMonth('movimentos.data_movimento', $mes);
         }
 
         $resultados = $query->groupBy('clientes.tipo')->get();
@@ -188,9 +202,9 @@ class KpiClientesMercadoService
         $receitaPj = 0;
 
         foreach ($resultados as $resultado) {
-            if ($resultado->tipo == 'PF') {
+            if ($resultado->tipo == 'PF' || $resultado->tipo == 'Pessoa Física') {
                 $receitaPf = $resultado->total;
-            } elseif ($resultado->tipo == 'PJ') {
+            } elseif ($resultado->tipo == 'PJ' || $resultado->tipo == 'Pessoa Jurídica') {
                 $receitaPj = $resultado->total;
             }
         }

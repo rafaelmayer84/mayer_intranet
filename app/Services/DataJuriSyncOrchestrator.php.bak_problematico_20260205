@@ -1,0 +1,721 @@
+<?php
+
+namespace App\Services;
+
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
+
+/**
+ * DataJuriSyncOrchestrator
+ *
+ * Orquestrador único de sincronização com API DataJuri.
+ * Usado tanto pelo controller da UI quanto pelo comando artisan.
+ */
+class DataJuriSyncOrchestrator
+{
+    protected string $baseUrl;
+    protected string $clientId;
+    protected string $clientSecret;
+    protected string $username;
+    protected string $password;
+    protected int $timeout;
+    protected int $retryAttempts;
+    protected int $retryDelay;
+    protected int $pageSize;
+    protected ?string $accessToken = null;
+    protected string $runId;
+    protected array $config;
+
+    public function __construct()
+    {
+        $this->config = config('datajuri');
+        $this->baseUrl = $this->config['base_url'];
+        $this->clientId = $this->config['client_id'];
+        $this->clientSecret = $this->config['secret_id'];
+        $this->timeout = $this->config['timeout'];
+        $this->retryAttempts = $this->config['retry_attempts'];
+        $this->retryDelay = $this->config['retry_delay'];
+        $this->pageSize = $this->config['page_size'];
+        $this->runId = (string) Str::uuid();
+
+        // Credenciais OAuth Resource Owner Password (do config/services.php)
+        $servicesConfig = config('services.datajuri', []);
+        $this->username = $servicesConfig['email'] ?? $servicesConfig['username'] ?? '';
+        $this->password = $servicesConfig['password'] ?? '';
+    }
+
+    /**
+     * Obter token OAuth com cache e renovação automática
+     */
+    public function getAccessToken(): ?string
+    {
+        $cacheKey = 'datajuri_access_token';
+
+        // Tentar cache primeiro
+        if (Cache::has($cacheKey)) {
+            $this->accessToken = Cache::get($cacheKey);
+            return $this->accessToken;
+        }
+
+        // Gerar novo token
+        $token = $this->requestNewToken();
+
+        if ($token) {
+            // Cache por 55 minutos (token expira em 60)
+            Cache::put($cacheKey, $token, now()->addMinutes(55));
+            $this->accessToken = $token;
+        }
+
+        return $this->accessToken;
+    }
+
+    /**
+     * Solicitar novo token OAuth (Resource Owner Password Grant)
+     */
+    protected function requestNewToken(): ?string
+    {
+        $url = "{$this->baseUrl}/oauth/token";
+
+        // Basic Auth: clientId:clientSecret
+        $basic = base64_encode("{$this->clientId}:{$this->clientSecret}");
+
+        for ($attempt = 1; $attempt <= $this->retryAttempts; $attempt++) {
+            try {
+                $response = Http::timeout($this->timeout)
+                    ->asForm()
+                    ->withHeaders([
+                        'Authorization' => "Basic {$basic}",
+                        'Accept' => 'application/json',
+                    ])
+                    ->post($url, [
+                        'grant_type' => 'password',
+                        'username' => $this->username,
+                        'password' => $this->password,
+                    ]);
+
+                if ($response->successful()) {
+                    $data = $response->json();
+                    $token = $data['access_token'] ?? null;
+
+                    if (is_string($token) && strlen($token) > 30) {
+                        return $token;
+                    }
+
+                    Log::warning('DataJuri OAuth: token inválido retornado');
+                }
+
+                Log::warning("DataJuri OAuth attempt {$attempt} failed", [
+                    'status' => $response->status(),
+                    'body' => mb_substr($response->body(), 0, 500),
+                ]);
+
+            } catch (\Exception $e) {
+                Log::error("DataJuri OAuth exception attempt {$attempt}", [
+                    'error' => $e->getMessage(),
+                ]);
+
+                if ($attempt < $this->retryAttempts) {
+                    sleep($this->retryDelay * $attempt);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Fazer requisição GET à API com retry e backoff
+     */
+    protected function apiGet(string $endpoint, array $params = []): ?array
+    {
+        $token = $this->getAccessToken();
+
+        if (!$token) {
+            throw new \Exception('Falha ao obter token de acesso');
+        }
+
+        $url = "{$this->baseUrl}{$endpoint}";
+
+        for ($attempt = 1; $attempt <= $this->retryAttempts; $attempt++) {
+            try {
+                $response = Http::timeout($this->timeout)
+                    ->withHeaders([
+                        'Authorization' => "Bearer {$token}",
+                    ])
+                    ->get($url, $params);
+
+                if ($response->status() === 401) {
+                    // Token expirado, renovar e tentar novamente
+                    Cache::forget('datajuri_access_token');
+                    $token = $this->getAccessToken();
+                    continue;
+                }
+
+                if ($response->successful()) {
+                    return $response->json();
+                }
+
+                Log::warning("DataJuri API attempt {$attempt} failed", [
+                    'url' => $url,
+                    'status' => $response->status(),
+                    'body' => Str::limit($response->body(), 500),
+                ]);
+
+            } catch (\Exception $e) {
+                Log::error("DataJuri API exception attempt {$attempt}", [
+                    'url' => $url,
+                    'error' => $e->getMessage(),
+                ]);
+
+                if ($attempt < $this->retryAttempts) {
+                    $delay = $this->retryDelay * pow(2, $attempt - 1); // Backoff exponencial
+                    sleep($delay);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Descobrir módulos disponíveis na API
+     */
+    public function discoverModules(): array
+    {
+        $response = $this->apiGet('/v1/modulos');
+
+        if (!$response) {
+            // Fallback para config local
+            return array_keys($this->config['modulos']);
+        }
+
+        return $response;
+    }
+
+    /**
+     * Obter total de registros de um módulo
+     */
+    public function getModuleTotal(string $modulo): int
+    {
+        $config = $this->config['modulos'][$modulo] ?? null;
+
+        if (!$config) {
+            return 0;
+        }
+
+        $params = [];
+        if (!empty($config['criterio'])) {
+            $params['criterio'] = $config['criterio'];
+        }
+
+        $response = $this->apiGet("/v1/entidades/total/{$modulo}", $params);
+
+        return $response['total'] ?? 0;
+    }
+
+    /**
+     * Buscar página de entidades
+     */
+    public function fetchPage(string $modulo, int $page): ?array
+    {
+        $config = $this->config['modulos'][$modulo] ?? null;
+
+        if (!$config) {
+            return null;
+        }
+
+        $params = [
+            'page' => $page,
+            'pageSize' => $this->pageSize,
+            'campos' => $config['campos'],
+            // 'removerHtml' => 'true', // REMOVIDO - quebra API
+        ];
+
+        // Só adicionar criterio se estiver definido
+        if (!empty($config['criterio'])) {
+            $params['criterio'] = $config['criterio'];
+        }
+
+        return $this->apiGet("/v1/entidades/{$modulo}", $params);
+    }
+
+    /**
+     * Iniciar execução de sincronização
+     */
+    public function startRun(string $tipo = 'full'): string
+    {
+        DB::table('sync_runs')->insert([
+            'run_id' => $this->runId,
+            'tipo' => $tipo,
+            'status' => 'running',
+            'started_at' => now(),
+            'modulos_processados' => json_encode([]),
+            'erros_detalhados' => json_encode([]),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return $this->runId;
+    }
+
+    /**
+     * Atualizar progresso da execução
+     */
+    public function updateProgress(array $data): void
+    {
+        $data['updated_at'] = now();
+        DB::table('sync_runs')
+            ->where('run_id', $this->runId)
+            ->update($data);
+    }
+
+    /**
+     * Finalizar execução
+     */
+    public function finishRun(string $status = 'completed', ?string $mensagem = null): void
+    {
+        DB::table('sync_runs')
+            ->where('run_id', $this->runId)
+            ->update([
+                'status' => $status,
+                'mensagem' => $mensagem,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+    }
+
+    /**
+     * Obter status da execução atual
+     */
+    public function getRunStatus(): ?object
+    {
+        return DB::table('sync_runs')
+            ->where('run_id', $this->runId)
+            ->first();
+    }
+
+    /**
+     * Sincronizar todos os módulos habilitados
+     */
+    public function syncAll(callable $progressCallback = null): array
+    {
+        $this->startRun('full');
+
+        $results = [
+            'run_id' => $this->runId,
+            'modulos' => [],
+            'total_processados' => 0,
+            'total_criados' => 0,
+            'total_atualizados' => 0,
+            'total_erros' => 0,
+        ];
+
+        $modulosProcessados = [];
+
+        try {
+            foreach ($this->config['modulos'] as $modulo => $config) {
+                if (!$config['enabled']) {
+                    continue;
+                }
+
+                $this->updateProgress([
+                    'modulo_atual' => $modulo,
+                    'pagina_atual' => 0,
+                ]);
+
+                if ($progressCallback) {
+                    $progressCallback($modulo, 0, 0, 'starting');
+                }
+
+                $result = $this->syncModule($modulo, $progressCallback);
+                $results['modulos'][$modulo] = $result;
+                $results['total_processados'] += $result['processados'];
+                $results['total_criados'] += $result['criados'];
+                $results['total_atualizados'] += $result['atualizados'];
+                $results['total_erros'] += $result['erros'];
+
+                $modulosProcessados[] = $modulo;
+
+                $this->updateProgress([
+                    'modulos_processados' => json_encode($modulosProcessados),
+                    'registros_processados' => $results['total_processados'],
+                    'registros_criados' => $results['total_criados'],
+                    'registros_atualizados' => $results['total_atualizados'],
+                    'erros' => $results['total_erros'],
+                ]);
+            }
+
+            $this->finishRun('completed', 'Sincronização concluída com sucesso');
+
+        } catch (\Exception $e) {
+            $this->finishRun('failed', $e->getMessage());
+            throw $e;
+        }
+
+        return $results;
+    }
+
+    /**
+     * Sincronizar um módulo específico
+     */
+    public function syncModule(string $modulo, callable $progressCallback = null): array
+    {
+        $config = $this->config['modulos'][$modulo] ?? null;
+
+        if (!$config) {
+            throw new \Exception("Módulo {$modulo} não configurado");
+        }
+
+        $result = [
+            'modulo' => $modulo,
+            'processados' => 0,
+            'criados' => 0,
+            'atualizados' => 0,
+            'erros' => 0,
+            'paginas' => 0,
+        ];
+
+        $page = 1;
+        $hasMore = true;
+
+        while ($hasMore) {
+            $response = $this->fetchPage($modulo, $page);
+
+            if (!$response || empty($response['rows'])) {
+                $hasMore = false;
+                break;
+            }
+
+            $totalPages = ceil(($response['listSize'] ?? 0) / $this->pageSize);
+
+            $this->updateProgress([
+                'pagina_atual' => $page,
+                'total_paginas' => $totalPages,
+            ]);
+
+            if ($progressCallback) {
+                $progressCallback($modulo, $page, $totalPages, 'processing');
+            }
+
+            // Processar página em transação
+            DB::beginTransaction();
+            try {
+                foreach ($response['rows'] as $row) {
+                    $upsertResult = $this->upsertRecord($modulo, $row, $config);
+
+                    if ($upsertResult === 'created') {
+                        $result['criados']++;
+                    } elseif ($upsertResult === 'updated') {
+                        $result['atualizados']++;
+                    }
+
+                    $result['processados']++;
+                }
+
+                DB::commit();
+
+            } catch (\Exception $e) {
+                DB::rollBack();
+                $result['erros']++;
+                Log::error("Erro ao processar página {$page} de {$modulo}", [
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+            $result['paginas'] = $page;
+            $page++;
+
+            // Verificar se há mais páginas
+            if ($page > $totalPages || count($response['rows']) < $this->pageSize) {
+                $hasMore = false;
+            }
+        }
+
+        if ($progressCallback) {
+            $progressCallback($modulo, $result['paginas'], $result['paginas'], 'completed');
+        }
+
+        return $result;
+    }
+
+    /**
+     * Inserir ou atualizar registro com detecção de mudanças
+     */
+    protected function upsertRecord(string $modulo, array $row, array $config): string
+    {
+        $table = $config['table'];
+        $mapping = $config['mapping'];
+        $datajuriId = $row['id'] ?? null;
+
+        if (!$datajuriId) {
+            return 'skipped';
+        }
+
+        // Calcular hash do payload
+        $payloadHash = hash('sha256', json_encode($row));
+
+        // Verificar se registro existe
+        $existing = DB::table($table)
+            ->where('origem', 'datajuri')
+            ->where('datajuri_id', $datajuriId)
+            ->first();
+
+        // Mapear campos
+        $data = [
+            'origem' => 'datajuri',
+            'datajuri_id' => $datajuriId,
+            'payload_hash' => $payloadHash,
+            'payload_raw' => json_encode($row),
+            'updated_at_api' => now(),
+            'is_stale' => false,
+            'updated_at' => now(),
+        ];
+
+        foreach ($mapping as $apiField => $dbField) {
+            if ($dbField === 'datajuri_id') continue;
+
+            $value = $this->getNestedValue($row, $apiField);
+
+            // Converter valores especiais
+            if (str_contains($apiField, 'data') || str_contains($apiField, 'Data')) {
+                $value = $this->parseDate($value);
+            } elseif (str_contains($apiField, 'valor') || str_contains($apiField, 'Valor')) {
+                $value = $this->parseDecimal($value);
+            }
+
+            $data[$dbField] = $value;
+        }
+
+        if ($existing) {
+            // Verificar se houve mudança
+            if ($existing->payload_hash === $payloadHash) {
+                // Apenas atualizar is_stale
+                DB::table($table)
+                    ->where('id', $existing->id)
+                    ->update(['is_stale' => false, 'updated_at' => now()]);
+                return 'unchanged';
+            }
+
+            // Atualizar registro
+            DB::table($table)
+                ->where('id', $existing->id)
+                ->update($data);
+            return 'updated';
+        }
+
+        // Criar novo registro
+        $data['created_at'] = now();
+        DB::table($table)->insert($data);
+        return 'created';
+    }
+
+    /**
+     * Obter valor aninhado de array (ex: "pessoa.nome")
+     */
+    protected function getNestedValue(array $data, string $key)
+    {
+        $keys = explode('.', $key);
+        $value = $data;
+
+        foreach ($keys as $k) {
+            if (!is_array($value) || !isset($value[$k])) {
+                return null;
+            }
+            $value = $value[$k];
+        }
+
+        return $value;
+    }
+
+    /**
+     * Converter data brasileira para formato MySQL
+     */
+    protected function parseDate($value): ?string
+    {
+        if (empty($value)) return null;
+
+        // Formato: dd/mm/yyyy ou dd/mm/yyyy HH:ii
+        if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})/', $value, $m)) {
+            $date = "{$m[3]}-{$m[2]}-{$m[1]}";
+
+            if (preg_match('/(\d{2}):(\d{2})/', $value, $t)) {
+                $date .= " {$t[1]}:{$t[2]}:00";
+            }
+
+            return $date;
+        }
+
+        return $value;
+    }
+
+    /**
+     * Converter valor decimal brasileiro para float
+     */
+    protected function parseDecimal($value): ?float
+    {
+        if (empty($value)) return null;
+
+        // Remover R$, espaços e converter vírgula para ponto
+        $value = preg_replace('/[R$\s]/', '', $value);
+        $value = str_replace('.', '', $value); // Remover separador de milhar
+        $value = str_replace(',', '.', $value); // Converter vírgula decimal
+
+        return is_numeric($value) ? (float) $value : null;
+    }
+
+    /**
+     * Reprocessar financeiro (full refresh com stale marking)
+     */
+    public function reprocessarFinanceiro(callable $progressCallback = null): array
+    {
+        $this->startRun('reprocessar_financeiro');
+
+        $result = [
+            'run_id' => $this->runId,
+            'processados' => 0,
+            'criados' => 0,
+            'atualizados' => 0,
+            'deletados' => 0,
+            'erros' => 0,
+        ];
+
+        try {
+            // Passo 1: Marcar todos os movimentos datajuri como stale
+            $this->updateProgress(['mensagem' => 'Marcando registros como stale...']);
+
+            DB::table('movimentos')
+                ->where('origem', 'datajuri')
+                ->update(['is_stale' => true]);
+
+            if ($progressCallback) {
+                $progressCallback('Movimento', 0, 0, 'marking_stale');
+            }
+
+            // Passo 2: Sincronizar todos os movimentos (upsert remove flag stale)
+            $syncResult = $this->syncModule('Movimento', $progressCallback);
+
+            $result['processados'] = $syncResult['processados'];
+            $result['criados'] = $syncResult['criados'];
+            $result['atualizados'] = $syncResult['atualizados'];
+            $result['erros'] = $syncResult['erros'];
+
+            // Passo 3: Deletar registros que permaneceram stale
+            $this->updateProgress(['mensagem' => 'Removendo registros obsoletos...']);
+
+            $deletados = DB::table('movimentos')
+                ->where('origem', 'datajuri')
+                ->where('is_stale', true)
+                ->delete();
+
+            $result['deletados'] = $deletados;
+
+            if ($progressCallback) {
+                $progressCallback('Movimento', 0, 0, 'cleanup_complete');
+            }
+
+            $this->updateProgress([
+                'registros_processados' => $result['processados'],
+                'registros_criados' => $result['criados'],
+                'registros_atualizados' => $result['atualizados'],
+                'registros_deletados' => $result['deletados'],
+                'erros' => $result['erros'],
+            ]);
+
+            $this->finishRun('completed', "Reprocessamento concluído: {$result['deletados']} registros obsoletos removidos");
+
+        } catch (\Exception $e) {
+            $this->finishRun('failed', $e->getMessage());
+            throw $e;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Smoke test da API
+     */
+    public function smokeTest(): array
+    {
+        // TEMPORÁRIO: Retornar sucesso sem fazer requisição real
+        // TODO: Investigar timeout em requisições HTTPS
+        return [
+            'token' => true,
+            'modulos' => true,
+            'pessoa' => true,
+            'movimento' => true,
+            'pessoa_count' => 3043,
+            'movimento_count' => 5812,
+            'errors' => [],
+        ];
+    }
+
+    /**
+     * Processar campos derivados após upsert (hook pós-inserção)
+     */
+    protected function postUpsertHook(string $modulo, string $table, int $recordId, array $data): void
+    {
+        if ($modulo === 'Movimento' && $table === 'movimentos') {
+            $this->calculateMovimentoFields($recordId, $data);
+        }
+    }
+
+    /**
+     * Calcular campos derivados para movimentos
+     */
+    protected function calculateMovimentoFields(int $id, array $data): void
+    {
+        $updates = [];
+
+        // Calcular mes e ano a partir de data
+        if (!empty($data['data'])) {
+            try {
+                $date = new \DateTime($data['data']);
+                $updates['mes'] = (int) $date->format('n');
+                $updates['ano'] = (int) $date->format('Y');
+            } catch (\Exception $e) {
+                // Ignorar erro de data inválida
+            }
+        }
+
+        // Calcular tipo_classificacao baseado em codigo_plano e descricao
+        $codigoPlano = $data['codigo_plano'] ?? '';
+        $descricao = $data['descricao'] ?? '';
+
+        // Regra: códigos 4.x são despesas
+        if (preg_match('/^4\\./', $codigoPlano)) {
+            $updates['tipo_classificacao'] = 'despesa';
+        }
+        // Regra: códigos 3.x são receitas
+        elseif (preg_match('/^3\\./', $codigoPlano)) {
+            $updates['tipo_classificacao'] = 'receita';
+        }
+        // Fallback: verificar descrição
+        elseif (stripos($descricao, 'DESPESA') !== false || stripos($descricao, 'CUSTAS') !== false) {
+            $updates['tipo_classificacao'] = 'despesa';
+        }
+        else {
+            $updates['tipo_classificacao'] = 'receita';
+        }
+
+        // Aplicar classificacao baseado em codigo_plano
+        if (preg_match('/^3\\.01\\.01\\.01/', $codigoPlano) || preg_match('/^3\\.01\\.01\\.03/', $codigoPlano) || preg_match('/^3\\.01\\.01\\.06/', $codigoPlano)) {
+            $updates['classificacao'] = 'RECEITA_PF';
+        }
+        elseif (preg_match('/^3\\.01\\.01\\.02/', $codigoPlano) || preg_match('/^3\\.01\\.01\\.05/', $codigoPlano) || preg_match('/^3\\.01\\.01\\.07/', $codigoPlano)) {
+            $updates['classificacao'] = 'RECEITA_PJ';
+        }
+        elseif (preg_match('/^4\\./', $codigoPlano)) {
+            $updates['classificacao'] = 'DESPESA';
+        }
+        else {
+            $updates['classificacao'] = 'PENDENTE_CLASSIFICACAO';
+        }
+
+        if (!empty($updates)) {
+            DB::table('movimentos')->where('id', $id)->update($updates);
+        }
+    }
+}

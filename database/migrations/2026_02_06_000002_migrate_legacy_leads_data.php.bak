@@ -1,0 +1,260 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Support\Facades\DB;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     * 
+     * OBJETIVO: Migrar os 198 registros da tabela 'leads_legacy' para a nova 
+     * estrutura da tabela 'leads' do módulo Central de Leads (WhatsApp Bot).
+     * 
+     * ESTRATÉGIA DE MAPEAMENTO:
+     * - Campos compatíveis (nome, telefone): Migração direta 1:1
+     * - Campos não existentes na origem: Preenchimento com valores padrão sensatos
+     * - Metadados de origem: Marcação clara de que são registros migrados
+     * 
+     * IMPORTANTE: Esta migration só executa se ambas as tabelas existirem.
+     */
+    public function up(): void
+    {
+        // Verificar se ambas as tabelas existem
+        if (!DB::getSchemaBuilder()->hasTable('leads_legacy') || !DB::getSchemaBuilder()->hasTable('leads')) {
+            DB::statement("
+                INSERT INTO integration_logs (sistema, tipo, fonte, status, mensagem, detalhes, created_at, updated_at) 
+                VALUES (
+                    'Central de Leads', 
+                    'migracao', 
+                    'sistema', 
+                    'pulado', 
+                    'Transferência de dados não executada', 
+                    'Tabelas leads_legacy ou leads não existem. Migration de dados não executada.',
+                    NOW(),
+                    NOW()
+                )
+            ");
+            return;
+        }
+
+        // Contar registros a migrar
+        $totalLegacy = DB::table('leads_legacy')->count();
+        
+        DB::statement("
+            INSERT INTO integration_logs (sistema, tipo, fonte, status, mensagem, detalhes, registros_processados, inicio, created_at, updated_at) 
+            VALUES (
+                'Central de Leads', 
+                'migracao', 
+                'leads_legacy', 
+                'em_andamento', 
+                'Transferência de dados iniciada', 
+                'Iniciando migração de $totalLegacy registros de leads_legacy para leads',
+                $totalLegacy,
+                NOW(),
+                NOW(),
+                NOW()
+            )
+        ");
+
+        try {
+            // Buscar todos os leads legacy
+            $legacyLeads = DB::table('leads_legacy')->get();
+            
+            $migrated = 0;
+            $skipped = 0;
+            $errors = 0;
+
+            foreach ($legacyLeads as $legacy) {
+                try {
+                    // Verificar se telefone já existe na nova tabela (evitar duplicação)
+                    $exists = DB::table('leads')
+                        ->where('telefone', $legacy->telefone)
+                        ->exists();
+
+                    if ($exists) {
+                        $skipped++;
+                        continue;
+                    }
+
+                    // Preparar metadata com informações de origem
+                    $metadata = [
+                        'origem' => 'leads_legacy',
+                        'legacy_id' => $legacy->id,
+                        'legacy_email' => $legacy->email ?? null,
+                        'legacy_origem' => $legacy->origem ?? null,
+                        'legacy_responsavel_id' => $legacy->responsavel_id ?? null,
+                        'legacy_motivo_perda' => $legacy->motivo_perda ?? null,
+                        'legacy_data_conversao' => $legacy->data_conversao ?? null,
+                        'migrated_at' => now()->toDateTimeString()
+                    ];
+
+                    // Determinar status baseado em data_conversao
+                    $status = 'novo'; // Padrão
+                    if (!empty($legacy->data_conversao)) {
+                        $status = 'convertido';
+                    } elseif (!empty($legacy->motivo_perda)) {
+                        $status = 'descartado';
+                    }
+
+                    // Inserir na nova tabela
+                    DB::table('leads')->insert([
+                        'nome' => $legacy->nome ?? 'Nome não informado',
+                        'telefone' => $legacy->telefone ?? 'Não informado',
+                        'contact_id' => null, // Não existe na origem legacy
+                        'area_interesse' => 'Migrado do sistema anterior',
+                        'cidade' => null, // Não existe na origem legacy
+                        'resumo_demanda' => 'Lead migrado do sistema anterior. Consultar tabela leads_legacy (ID: ' . $legacy->id . ') para informações completas.',
+                        'palavras_chave' => 'lead, migrado, legacy',
+                        'intencao_contratar' => 'não', // Valor padrão para leads migrados
+                        'gclid' => null, // Não existe na origem legacy
+                        'status' => $status,
+                        'espocrm_id' => null, // Será preenchido se integração rodar
+                        'erro_processamento' => null,
+                        'metadata' => json_encode($metadata),
+                        'data_entrada' => $legacy->created_at ?? now(),
+                        'created_at' => $legacy->created_at ?? now(),
+                        'updated_at' => $legacy->updated_at ?? now()
+                    ]);
+
+                    $migrated++;
+
+                } catch (\Exception $e) {
+                    $errors++;
+                    
+                    // Log de erro individual
+                    DB::statement("
+                        INSERT INTO integration_logs (sistema, tipo, fonte, status, mensagem, mensagem_erro, detalhes, registros_erro, created_at, updated_at) 
+                        VALUES (
+                            'Central de Leads', 
+                            'migracao', 
+                            'leads_legacy', 
+                            'erro', 
+                            'Erro ao migrar registro individual', 
+                            " . DB::getPdo()->quote($e->getMessage()) . ",
+                            " . DB::getPdo()->quote('Erro ao migrar lead ID ' . $legacy->id . ': ' . $e->getMessage()) . ",
+                            1,
+                            NOW(),
+                            NOW()
+                        )
+                    ");
+                }
+            }
+
+            // Log de sucesso com estatísticas
+            DB::statement("
+                INSERT INTO integration_logs (sistema, tipo, fonte, status, mensagem, detalhes, registros_processados, registros_criados, registros_ignorados, registros_erro, fim, created_at, updated_at) 
+                VALUES (
+                    'Central de Leads', 
+                    'migracao', 
+                    'leads_legacy', 
+                    'sucesso', 
+                    'Transferência de dados concluída', 
+                    'Migração concluída. Total legacy: $totalLegacy | Migrados: $migrated | Duplicados (pulados): $skipped | Erros: $errors',
+                    $totalLegacy,
+                    $migrated,
+                    $skipped,
+                    $errors,
+                    NOW(),
+                    NOW(),
+                    NOW()
+                )
+            ");
+
+        } catch (\Exception $e) {
+            // Log de erro geral
+            DB::statement("
+                INSERT INTO integration_logs (sistema, tipo, fonte, status, mensagem, mensagem_erro, detalhes, fim, created_at, updated_at) 
+                VALUES (
+                    'Central de Leads', 
+                    'migracao', 
+                    'leads_legacy', 
+                    'erro', 
+                    'Erro na transferência de dados', 
+                    " . DB::getPdo()->quote($e->getMessage()) . ",
+                    " . DB::getPdo()->quote('Erro na migração de dados: ' . $e->getMessage()) . ",
+                    NOW(),
+                    NOW(),
+                    NOW()
+                )
+            ");
+            
+            throw $e;
+        }
+    }
+
+    /**
+     * Reverse the migrations.
+     * 
+     * ATENÇÃO: Este rollback remove APENAS os registros migrados da tabela 'leads',
+     * identificados pelo campo metadata.origem = 'leads_legacy'.
+     * Os registros criados via webhook do WhatsApp são preservados.
+     */
+    public function down(): void
+    {
+        if (!DB::getSchemaBuilder()->hasTable('leads')) {
+            return;
+        }
+
+        try {
+            // Contar registros migrados antes de remover
+            $migratedCount = DB::table('leads')
+                ->where('area_interesse', 'Migrado do sistema anterior')
+                ->count();
+
+            DB::statement("
+                INSERT INTO integration_logs (sistema, tipo, fonte, status, mensagem, detalhes, registros_processados, inicio, created_at, updated_at) 
+                VALUES (
+                    'Central de Leads', 
+                    'rollback', 
+                    'sistema', 
+                    'em_andamento', 
+                    'Remoção de registros migrados', 
+                    'Removendo $migratedCount registros migrados da tabela leads',
+                    $migratedCount,
+                    NOW(),
+                    NOW(),
+                    NOW()
+                )
+            ");
+
+            // Remover apenas registros migrados (identificados pelo area_interesse)
+            DB::table('leads')
+                ->where('area_interesse', 'Migrado do sistema anterior')
+                ->delete();
+
+            DB::statement("
+                INSERT INTO integration_logs (sistema, tipo, fonte, status, mensagem, detalhes, registros_processados, fim, created_at, updated_at) 
+                VALUES (
+                    'Central de Leads', 
+                    'rollback', 
+                    'sistema', 
+                    'sucesso', 
+                    'Remoção de registros migrados concluída', 
+                    'Registros migrados removidos com sucesso. Total removido: $migratedCount',
+                    $migratedCount,
+                    NOW(),
+                    NOW(),
+                    NOW()
+                )
+            ");
+
+        } catch (\Exception $e) {
+            DB::statement("
+                INSERT INTO integration_logs (sistema, tipo, fonte, status, mensagem, mensagem_erro, detalhes, fim, created_at, updated_at) 
+                VALUES (
+                    'Central de Leads', 
+                    'rollback', 
+                    'sistema', 
+                    'erro', 
+                    'Erro na remoção de registros migrados', 
+                    " . DB::getPdo()->quote($e->getMessage()) . ",
+                    " . DB::getPdo()->quote('Erro no rollback: ' . $e->getMessage()) . ",
+                    NOW(),
+                    NOW(),
+                    NOW()
+                )
+            ");
+        }
+    }
+};

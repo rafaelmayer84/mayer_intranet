@@ -397,4 +397,21 @@ class SyncService
         }
         return $resumo;
     }
+
+    public function syncAll(bool $dryRun = false): array
+    {
+        $results = [];
+        
+        // Sincronizar movimentos
+        $results['movimentos'] = $this->syncMovimentosBatch(ano: 0, page: 1, pageSize: 200);
+        
+        // Sincronizar contas a receber
+        $results['contas_receber'] = $this->sincronizarContasReceber(dryRun: $dryRun);
+        
+        return [
+            'success' => true,
+            'message' => 'Sincronização completa realizada',
+            'results' => $results,
+        ];
+    }
 }

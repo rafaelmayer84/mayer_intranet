@@ -1,0 +1,695 @@
+<?php
+
+namespace App\Services;
+
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
+
+/**
+ * DataJuriSyncService - Versão Expandida
+ * 
+ * Sincroniza TODOS os módulos do DataJuri conforme mapeamento -GRAVAR:
+ * - Pessoa → clientes
+ * - Processo → processos
+ * - FaseProcesso → fases_processo
+ * - Movimento → movimentos
+ * - Contrato → contratos
+ * - Atividade → atividades_datajuri
+ * - HoraTrabalhada → horas_trabalhadas_datajuri
+ * - OrdemServico → ordens_servico
+ * 
+ * @version 2.0 - Expansão completa
+ * @date 2026-02-04
+ */
+class DataJuriSyncService
+{
+    private ?string $token = null;
+    private string $baseUrl = 'https://api.datajuri.com.br';
+    
+    // Credenciais OAuth2
+    private string $clientId;
+    private string $secretId;
+    private string $username;
+    private string $password;
+
+    public function __construct()
+    {
+        $this->clientId = config('services.datajuri.client_id', env('DATAJURI_CLIENT_ID'));
+        $this->secretId = config('services.datajuri.secret_id', env('DATAJURI_SECRET_ID'));
+        $this->username = config('services.datajuri.username', env('DATAJURI_USERNAME'));
+        $this->password = config('services.datajuri.password', env('DATAJURI_PASSWORD'));
+    }
+
+    // =========================================================================
+    // AUTENTICAÇÃO
+    // =========================================================================
+
+    public function authenticate(): bool
+    {
+        try {
+            $credentials = base64_encode("{$this->clientId}:{$this->secretId}");
+            
+            $response = Http::asForm()->withHeaders([
+                'Authorization' => "Basic {$credentials}"
+            ])->post("{$this->baseUrl}/oauth/token", [
+                'grant_type' => 'password',
+                'username' => $this->username,
+                'password' => $this->password
+            ]);
+
+            if ($response->successful()) {
+                $this->token = $response->json()['access_token'];
+                return true;
+            }
+
+            Log::error('DataJuri Auth Failed', ['response' => $response->json()]);
+            return false;
+        } catch (\Exception $e) {
+            Log::error('DataJuri Auth Exception', ['error' => $e->getMessage()]);
+            return false;
+        }
+    }
+
+    private function getHeaders(): array
+    {
+        return [
+            'Authorization' => "Bearer {$this->token}",
+            'Content-Type' => 'application/json'
+        ];
+    }
+
+    // =========================================================================
+    // BUSCA GENÉRICA PAGINADA
+    // =========================================================================
+
+    private function fetchAllPages(string $modulo, string $campos, int $pageSize = 100): array
+    {
+        $allRows = [];
+        $page = 1;
+        $hasMore = true;
+
+        while ($hasMore) {
+            $response = Http::withHeaders($this->getHeaders())
+                ->timeout(120)
+                ->get("{$this->baseUrl}/v1/entidades/{$modulo}", [
+                    'page' => $page,
+                    'pageSize' => $pageSize,
+                    'campos' => $campos
+                ]);
+
+            if (!$response->successful()) {
+                Log::error("DataJuri Fetch Failed: {$modulo}", ['page' => $page, 'error' => $response->body()]);
+                break;
+            }
+
+            $data = $response->json();
+            $rows = $data['rows'] ?? [];
+            $allRows = array_merge($allRows, $rows);
+
+            $listSize = $data['listSize'] ?? 0;
+            $hasMore = ($page * $pageSize) < $listSize;
+            $page++;
+
+            // Safety limit
+            if ($page > 500) {
+                Log::warning("DataJuri Safety Limit: {$modulo}", ['pages' => $page]);
+                break;
+            }
+        }
+
+        return $allRows;
+    }
+
+    // =========================================================================
+    // SYNC: PESSOA → CLIENTES
+    // =========================================================================
+
+    public function syncPessoas(): int
+    {
+        $campos = implode(',', [
+            'id', 'nome', 'numeroDocumento', 'tipoPessoa', 'dataCadastro',
+            'cliente', 'statusPessoa', 'codigoPessoa', 'valorHora',
+            'totalContasReceber', 'totalContasReceberVencidas', 'valorTotalContasAbertas',
+            'cpf', 'cnpj', 'dataNascimento', 'email', 'telefone', 'celular'
+        ]);
+
+        $rows = $this->fetchAllPages('Pessoa', $campos);
+        $count = 0;
+
+        foreach ($rows as $pessoa) {
+            try {
+                $datajuriId = $pessoa['id'] ?? null;
+                if (!$datajuriId) continue;
+
+                $data = [
+                    'datajuri_id' => $datajuriId,
+                    'nome' => $pessoa['nome'] ?? null,
+                    'documento' => $pessoa['numeroDocumento'] ?? null,
+                    'cpf_cnpj' => $pessoa['numeroDocumento'] ?? null,
+                    'cpf' => $pessoa['cpf'] ?? null,
+                    'cnpj' => $pessoa['cnpj'] ?? null,
+                    'tipo_pessoa' => $this->inferirTipoPessoa($pessoa['tipoPessoa'] ?? ''),
+                    'is_cliente' => ($pessoa['cliente'] ?? '') === 'Sim',
+                    'status_pessoa' => $pessoa['statusPessoa'] ?? null,
+                    'codigo_pessoa' => $pessoa['codigoPessoa'] ?? null,
+                    'valor_hora' => $this->parseValorBrasileiro($pessoa['valorHora'] ?? 0),
+                    'total_contas_receber' => $this->parseValorBrasileiro($pessoa['totalContasReceber'] ?? 0),
+                    'total_contas_vencidas' => $this->parseValorBrasileiro($pessoa['totalContasReceberVencidas'] ?? 0),
+                    'valor_contas_abertas' => $this->parseValorBrasileiro($pessoa['valorTotalContasAbertas'] ?? 0),
+                    'valor_carteira' => $this->parseValorBrasileiro($pessoa['totalContasReceber'] ?? 0),
+                    'data_nascimento' => $this->parseDataBrasileira($pessoa['dataNascimento'] ?? null),
+                    'data_primeiro_contato' => $this->parseDataBrasileira($pessoa['dataCadastro'] ?? null),
+                    'email' => $pessoa['email'] ?? null,
+                    'telefone' => $pessoa['telefone'] ?? $pessoa['celular'] ?? null,
+                    'updated_at' => now(),
+                ];
+
+                DB::table('clientes')->updateOrInsert(
+                    ['datajuri_id' => $datajuriId],
+                    array_merge($data, ['created_at' => now()])
+                );
+                $count++;
+            } catch (\Exception $e) {
+                Log::error('Sync Pessoa Error', ['id' => $pessoa['id'] ?? 'N/A', 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $count;
+    }
+
+    // =========================================================================
+    // SYNC: PROCESSO → PROCESSOS
+    // =========================================================================
+
+    public function syncProcessos(): int
+    {
+        $campos = implode(',', [
+            'id', 'pasta', 'status', 'assunto', 'natureza',
+            'valorCausa', 'valorProvisionado', 'valorSentenca',
+            'possibilidade', 'ganhoCausa', 'tipoEncerramento', 'dataCadastro',
+            'proprietario.nome', 'proprietarioId',
+            'cliente.nome', 'clienteId', 'cliente.numeroDocumento'
+        ]);
+
+        $rows = $this->fetchAllPages('Processo', $campos);
+        $count = 0;
+
+        foreach ($rows as $processo) {
+            try {
+                $datajuriId = $processo['id'] ?? null;
+                if (!$datajuriId) continue;
+
+                $data = [
+                    'datajuri_id' => $datajuriId,
+                    'numero' => $processo['pasta'] ?? null,
+                    'pasta' => $processo['pasta'] ?? null,
+                    'status' => $processo['status'] ?? 'Ativo',
+                    'assunto' => $processo['assunto'] ?? null,
+                    'natureza' => $processo['natureza'] ?? null,
+                    'valor_causa' => $this->parseValorBrasileiro($processo['valorCausa'] ?? 0),
+                    'valor_provisionado' => $this->parseValorBrasileiro($processo['valorProvisionado'] ?? 0),
+                    'valor_sentenca' => $this->parseValorBrasileiro($processo['valorSentenca'] ?? 0),
+                    'possibilidade' => $processo['possibilidade'] ?? null,
+                    'ganho_causa' => ($processo['ganhoCausa'] ?? 'Não') === 'Sim',
+                    'tipo_encerramento' => $processo['tipoEncerramento'] ?? null,
+                    'cliente_nome' => $processo['cliente.nome'] ?? null,
+                    'cliente_id_datajuri' => $processo['clienteId'] ?? null,
+                    'cliente_documento' => $processo['cliente.numeroDocumento'] ?? null,
+                    'proprietario_nome' => $processo['proprietario.nome'] ?? null,
+                    'proprietario_id' => $processo['proprietarioId'] ?? null,
+                    'data_cadastro_dj' => $this->parseDataBrasileira($processo['dataCadastro'] ?? null),
+                    'updated_at' => now(),
+                ];
+
+                DB::table('processos')->updateOrInsert(
+                    ['datajuri_id' => $datajuriId],
+                    array_merge($data, ['created_at' => now()])
+                );
+                $count++;
+            } catch (\Exception $e) {
+                Log::error('Sync Processo Error', ['id' => $processo['id'] ?? 'N/A', 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $count;
+    }
+
+    // =========================================================================
+    // SYNC: FASE DO PROCESSO → FASES_PROCESSO
+    // =========================================================================
+
+    public function syncFasesProcesso(): int
+    {
+        $campos = implode(',', [
+            'id', 'processo.pasta', 'processoId', 'tipoFase', 'localidade', 'instancia',
+            'data', 'faseAtual', 'diasFaseAtiva', 'dataUltimoAndamento',
+            'proprietario.nome', 'proprietarioId'
+        ]);
+
+        $rows = $this->fetchAllPages('FaseProcesso', $campos);
+        $count = 0;
+
+        foreach ($rows as $fase) {
+            try {
+                $datajuriId = $fase['id'] ?? null;
+                if (!$datajuriId) continue;
+
+                $data = [
+                    'datajuri_id' => $datajuriId,
+                    'processo_pasta' => $fase['processo.pasta'] ?? null,
+                    'processo_id_datajuri' => $fase['processoId'] ?? null,
+                    'tipo_fase' => $fase['tipoFase'] ?? null,
+                    'localidade' => $fase['localidade'] ?? null,
+                    'instancia' => $fase['instancia'] ?? null,
+                    'data' => $this->parseDataBrasileira($fase['data'] ?? null),
+                    'fase_atual' => ($fase['faseAtual'] ?? 'Não') === 'Sim',
+                    'dias_fase_ativa' => (int) ($fase['diasFaseAtiva'] ?? 0),
+                    'data_ultimo_andamento' => $this->parseDataBrasileira($fase['dataUltimoAndamento'] ?? null),
+                    'proprietario_nome' => $fase['proprietario.nome'] ?? null,
+                    'proprietario_id' => $fase['proprietarioId'] ?? null,
+                    'updated_at' => now(),
+                ];
+
+                DB::table('fases_processo')->updateOrInsert(
+                    ['datajuri_id' => $datajuriId],
+                    array_merge($data, ['created_at' => now()])
+                );
+                $count++;
+            } catch (\Exception $e) {
+                Log::error('Sync FaseProcesso Error', ['id' => $fase['id'] ?? 'N/A', 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $count;
+    }
+
+    // =========================================================================
+    // SYNC: MOVIMENTO → MOVIMENTOS (Expandido)
+    // =========================================================================
+
+    public function syncMovimentos(): int
+    {
+        $campos = implode(',', [
+            'id', 'data', 'valorComSinal', 'descricao',
+            'planoConta.nomeCompleto', 'planoContaId',
+            'pessoaId', 'contratoId', 'processo.pasta',
+            'proprietario.nome', 'proprietarioId', 'conciliado'
+        ]);
+
+        $rows = $this->fetchAllPages('Movimento', $campos);
+        $count = 0;
+
+        foreach ($rows as $mov) {
+            try {
+                $datajuriId = $mov['id'] ?? null;
+                if (!$datajuriId) continue;
+
+                $valor = $this->parseValorBrasileiro($mov['valorComSinal'] ?? 0);
+                $planoContas = $mov['planoConta.nomeCompleto'] ?? '';
+                $codigoPlano = $this->extrairCodigoPlano($planoContas);
+                $dataMovimento = $this->parseDataBrasileira($mov['data'] ?? null);
+
+                $data = [
+                    'datajuri_id' => $datajuriId,
+                    'data' => $dataMovimento,
+                    'valor' => $valor,
+                    'descricao' => $mov['descricao'] ?? null,
+                    'plano_contas' => $planoContas,
+                    'codigo_plano' => $codigoPlano,
+                    'plano_conta_id' => $mov['planoContaId'] ?? null,
+                    'pessoa_id_datajuri' => $mov['pessoaId'] ?? null,
+                    'contrato_id_datajuri' => $mov['contratoId'] ?? null,
+                    'processo_pasta' => $mov['processo.pasta'] ?? null,
+                    'proprietario_nome' => $mov['proprietario.nome'] ?? null,
+                    'proprietario_id' => $mov['proprietarioId'] ?? null,
+                    'conciliado' => ($mov['conciliado'] ?? 'Não') === 'Sim',
+                    'ano' => $dataMovimento ? (int) date('Y', strtotime($dataMovimento)) : null,
+                    'mes' => $dataMovimento ? (int) date('n', strtotime($dataMovimento)) : null,
+                    'classificacao' => $this->inferirClassificacao($codigoPlano, $valor),
+                    'updated_at' => now(),
+                ];
+
+                DB::table('movimentos')->updateOrInsert(
+                    ['datajuri_id' => $datajuriId],
+                    array_merge($data, ['created_at' => now()])
+                );
+                $count++;
+            } catch (\Exception $e) {
+                Log::error('Sync Movimento Error', ['id' => $mov['id'] ?? 'N/A', 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $count;
+    }
+
+    // =========================================================================
+    // SYNC: CONTRATO → CONTRATOS
+    // =========================================================================
+
+    public function syncContratos(): int
+    {
+        $campos = implode(',', [
+            'id', 'numero', 'valor', 'dataAssinatura',
+            'contratante.nome', 'contratanteId',
+            'proprietario.nome', 'proprietarioId'
+        ]);
+
+        $rows = $this->fetchAllPages('Contrato', $campos);
+        $count = 0;
+
+        foreach ($rows as $contrato) {
+            try {
+                $datajuriId = $contrato['id'] ?? null;
+                if (!$datajuriId) continue;
+
+                $data = [
+                    'datajuri_id' => $datajuriId,
+                    'numero' => $contrato['numero'] ?? null,
+                    'valor' => $this->parseValorBrasileiro($contrato['valor'] ?? 0),
+                    'data_assinatura' => $this->parseDataBrasileira($contrato['dataAssinatura'] ?? null),
+                    'contratante_nome' => $contrato['contratante.nome'] ?? null,
+                    'contratante_id_datajuri' => $contrato['contratanteId'] ?? null,
+                    'proprietario_nome' => $contrato['proprietario.nome'] ?? null,
+                    'proprietario_id' => $contrato['proprietarioId'] ?? null,
+                    'updated_at' => now(),
+                ];
+
+                DB::table('contratos')->updateOrInsert(
+                    ['datajuri_id' => $datajuriId],
+                    array_merge($data, ['created_at' => now()])
+                );
+                $count++;
+            } catch (\Exception $e) {
+                Log::error('Sync Contrato Error', ['id' => $contrato['id'] ?? 'N/A', 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $count;
+    }
+
+    // =========================================================================
+    // SYNC: ATIVIDADE → ATIVIDADES_DATAJURI
+    // =========================================================================
+
+    public function syncAtividades(): int
+    {
+        $campos = implode(',', [
+            'id', 'status', 'dataHora', 'dataConclusao', 'dataPrazoFatal',
+            'processo.pasta', 'proprietarioId', 'particular'
+        ]);
+
+        $rows = $this->fetchAllPages('Atividade', $campos);
+        $count = 0;
+
+        foreach ($rows as $atividade) {
+            try {
+                $datajuriId = $atividade['id'] ?? null;
+                if (!$datajuriId) continue;
+
+                $data = [
+                    'datajuri_id' => $datajuriId,
+                    'status' => $atividade['status'] ?? null,
+                    'data_hora' => $this->parseDataHoraBrasileira($atividade['dataHora'] ?? null),
+                    'data_conclusao' => $this->parseDataHoraBrasileira($atividade['dataConclusao'] ?? null),
+                    'data_prazo_fatal' => $this->parseDataBrasileira($atividade['dataPrazoFatal'] ?? null),
+                    'processo_pasta' => $atividade['processo.pasta'] ?? null,
+                    'proprietario_id' => $atividade['proprietarioId'] ?? null,
+                    'particular' => ($atividade['particular'] ?? 'Não') === 'Sim',
+                    'updated_at' => now(),
+                ];
+
+                DB::table('atividades_datajuri')->updateOrInsert(
+                    ['datajuri_id' => $datajuriId],
+                    array_merge($data, ['created_at' => now()])
+                );
+                $count++;
+            } catch (\Exception $e) {
+                Log::error('Sync Atividade Error', ['id' => $atividade['id'] ?? 'N/A', 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $count;
+    }
+
+    // =========================================================================
+    // SYNC: HORA TRABALHADA → HORAS_TRABALHADAS_DATAJURI
+    // =========================================================================
+
+    public function syncHorasTrabalhadas(): int
+    {
+        $campos = implode(',', [
+            'id', 'data', 'duracaoOriginal', 'totalHoraTrabalhada',
+            'horaInicial', 'horaFinal', 'valorHora', 'valorTotalOriginal',
+            'assunto', 'tipo', 'status', 'proprietarioId', 'particular', 'dataFaturado'
+        ]);
+
+        $rows = $this->fetchAllPages('HoraTrabalhada', $campos);
+        $count = 0;
+
+        foreach ($rows as $hora) {
+            try {
+                $datajuriId = $hora['id'] ?? null;
+                if (!$datajuriId) continue;
+
+                $data = [
+                    'datajuri_id' => $datajuriId,
+                    'data' => $this->parseDataBrasileira($hora['data'] ?? null),
+                    'duracao_original' => $hora['duracaoOriginal'] ?? null,
+                    'total_hora_trabalhada' => $hora['totalHoraTrabalhada'] ?? null,
+                    'hora_inicial' => $this->parseHora($hora['horaInicial'] ?? null),
+                    'hora_final' => $this->parseHora($hora['horaFinal'] ?? null),
+                    'valor_hora' => $this->parseValorBrasileiro($hora['valorHora'] ?? 0),
+                    'valor_total_original' => $this->parseValorBrasileiro($hora['valorTotalOriginal'] ?? 0),
+                    'assunto' => $hora['assunto'] ?? null,
+                    'tipo' => $hora['tipo'] ?? null,
+                    'status' => $hora['status'] ?? null,
+                    'proprietario_id' => $hora['proprietarioId'] ?? null,
+                    'particular' => ($hora['particular'] ?? 'Não') === 'Sim',
+                    'data_faturado' => $this->parseDataBrasileira($hora['dataFaturado'] ?? null),
+                    'updated_at' => now(),
+                ];
+
+                DB::table('horas_trabalhadas_datajuri')->updateOrInsert(
+                    ['datajuri_id' => $datajuriId],
+                    array_merge($data, ['created_at' => now()])
+                );
+                $count++;
+            } catch (\Exception $e) {
+                Log::error('Sync HoraTrabalhada Error', ['id' => $hora['id'] ?? 'N/A', 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $count;
+    }
+
+    // =========================================================================
+    // SYNC: ORDEM SERVIÇO → ORDENS_SERVICO
+    // =========================================================================
+
+    public function syncOrdensServico(): int
+    {
+        $campos = implode(',', [
+            'id', 'numero', 'situacao', 'dataConclusao', 'dataUltimoAndamento',
+            'advogado.nome', 'advogadoId'
+        ]);
+
+        $rows = $this->fetchAllPages('OrdemServico', $campos);
+        $count = 0;
+
+        foreach ($rows as $os) {
+            try {
+                $datajuriId = $os['id'] ?? null;
+                if (!$datajuriId) continue;
+
+                $data = [
+                    'datajuri_id' => $datajuriId,
+                    'numero' => $os['numero'] ?? null,
+                    'situacao' => $os['situacao'] ?? null,
+                    'data_conclusao' => $this->parseDataBrasileira($os['dataConclusao'] ?? null),
+                    'data_ultimo_andamento' => $this->parseDataBrasileira($os['dataUltimoAndamento'] ?? null),
+                    'advogado_nome' => $os['advogado.nome'] ?? null,
+                    'advogado_id' => $os['advogadoId'] ?? null,
+                    'updated_at' => now(),
+                ];
+
+                DB::table('ordens_servico')->updateOrInsert(
+                    ['datajuri_id' => $datajuriId],
+                    array_merge($data, ['created_at' => now()])
+                );
+                $count++;
+            } catch (\Exception $e) {
+                Log::error('Sync OrdemServico Error', ['id' => $os['id'] ?? 'N/A', 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $count;
+    }
+
+    // =========================================================================
+    // MÉTODOS AUXILIARES DE PARSING
+    // =========================================================================
+
+    private function parseValorBrasileiro($valor): float
+    {
+        if (is_numeric($valor)) return (float) $valor;
+        if (!is_string($valor)) return 0.0;
+
+        // Detectar negativo por classe CSS ou sinal
+        $negativo = (stripos($valor, 'valor-negativo') !== false) || 
+                    (strpos($valor, '-') !== false && strpos($valor, '<') === false);
+
+        // Remover HTML
+        $valor = strip_tags($valor);
+        
+        // Remover pontos de milhar, trocar vírgula por ponto
+        $valor = str_replace('.', '', $valor);
+        $valor = str_replace(',', '.', $valor);
+        
+        $float = (float) preg_replace('/[^0-9.\-]/', '', $valor);
+        
+        return $negativo && $float > 0 ? -$float : $float;
+    }
+
+    private function parseDataBrasileira(?string $data): ?string
+    {
+        if (empty($data)) return null;
+        
+        // Formato: DD/MM/YYYY ou DD/MM/YYYY HH:MM
+        if (preg_match('/(\d{2})\/(\d{2})\/(\d{4})/', $data, $m)) {
+            return "{$m[3]}-{$m[2]}-{$m[1]}";
+        }
+        return null;
+    }
+
+    private function parseDataHoraBrasileira(?string $data): ?string
+    {
+        if (empty($data)) return null;
+        
+        // Formato: DD/MM/YYYY HH:MM
+        if (preg_match('/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/', $data, $m)) {
+            return "{$m[3]}-{$m[2]}-{$m[1]} {$m[4]}:{$m[5]}:00";
+        }
+        // Formato: DD/MM/YYYY
+        if (preg_match('/(\d{2})\/(\d{2})\/(\d{4})/', $data, $m)) {
+            return "{$m[3]}-{$m[2]}-{$m[1]} 00:00:00";
+        }
+        return null;
+    }
+
+    private function parseHora(?string $hora): ?string
+    {
+        if (empty($hora)) return null;
+        
+        // Formato: HH:MM ou HH:MM:SS
+        if (preg_match('/^(\d{1,2}):(\d{2})(:(\d{2}))?$/', $hora, $m)) {
+            $h = str_pad($m[1], 2, '0', STR_PAD_LEFT);
+            $min = $m[2];
+            $sec = $m[4] ?? '00';
+            return "{$h}:{$min}:{$sec}";
+        }
+        return null;
+    }
+
+    private function extrairCodigoPlano(?string $nomeCompleto): ?string
+    {
+        if (empty($nomeCompleto)) return null;
+
+        // Padrão: "3.01.01.01 - " (4 níveis)
+        if (preg_match('/(\d+\.\d+\.\d+\.\d+)\s*-/', $nomeCompleto, $m)) {
+            return $m[1];
+        }
+        // Fallback: 3 níveis
+        if (preg_match('/(\d+\.\d+\.\d+)\s*-/', $nomeCompleto, $m)) {
+            return $m[1];
+        }
+        // Fallback: 2 níveis
+        if (preg_match('/(\d+\.\d+)\s*-/', $nomeCompleto, $m)) {
+            return $m[1];
+        }
+        return null;
+    }
+
+    private function inferirTipoPessoa(string $tipoPessoa): string
+    {
+        $tipoPessoa = strtolower($tipoPessoa);
+        if (strpos($tipoPessoa, 'jurídica') !== false || strpos($tipoPessoa, 'juridica') !== false) {
+            return 'PJ';
+        }
+        return 'PF';
+    }
+
+    private function inferirClassificacao(?string $codigoPlano, float $valor): ?string
+    {
+        if (empty($codigoPlano)) return null;
+
+        // Receitas PF
+        if (in_array($codigoPlano, ['3.01.01.01', '3.01.01.03'])) {
+            return 'RECEITA_PF';
+        }
+        // Receitas PJ
+        if (in_array($codigoPlano, ['3.01.01.02', '3.01.01.05'])) {
+            return 'RECEITA_PJ';
+        }
+        // Deduções
+        if (str_starts_with($codigoPlano, '3.01.02') || str_starts_with($codigoPlano, '3.01.03')) {
+            return 'DEDUCAO';
+        }
+        // Despesas operacionais
+        if (str_starts_with($codigoPlano, '3.02')) {
+            return 'DESPESA';
+        }
+        // Receitas financeiras
+        if (str_starts_with($codigoPlano, '3.03')) {
+            return 'RECEITA_FINANCEIRA';
+        }
+        // Despesas financeiras
+        if (str_starts_with($codigoPlano, '3.04')) {
+            return 'DESPESA_FINANCEIRA';
+        }
+
+        return null;
+    }
+
+    // =========================================================================
+    // MÉTODO PRINCIPAL: SYNC ALL
+    // =========================================================================
+
+    public function syncAll(): array
+    {
+        $results = [
+            'success' => false,
+            'pessoas' => 0,
+            'processos' => 0,
+            'fases' => 0,
+            'movimentos' => 0,
+            'contratos' => 0,
+            'atividades' => 0,
+            'horas' => 0,
+            'ordens_servico' => 0,
+            'errors' => []
+        ];
+
+        if (!$this->authenticate()) {
+            $results['errors'][] = 'Falha na autenticação';
+            return $results;
+        }
+
+        try {
+            $results['pessoas'] = $this->syncPessoas();
+            $results['processos'] = $this->syncProcessos();
+            $results['fases'] = $this->syncFasesProcesso();
+            $results['movimentos'] = $this->syncMovimentos();
+            $results['contratos'] = $this->syncContratos();
+            $results['atividades'] = $this->syncAtividades();
+            $results['horas'] = $this->syncHorasTrabalhadas();
+            $results['ordens_servico'] = $this->syncOrdensServico();
+            $results['success'] = true;
+        } catch (\Exception $e) {
+            $results['errors'][] = $e->getMessage();
+            Log::error('DataJuri SyncAll Error', ['error' => $e->getMessage()]);
+        }
+
+        return $results;
+    }
+}

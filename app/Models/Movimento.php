@@ -35,14 +35,23 @@ class Movimento extends Model
         'conciliado' => 'boolean',
     ];
 
-    // Constantes de classificação
+    // Constantes de classificacao
     const RECEITA_PF = 'RECEITA_PF';
     const RECEITA_PJ = 'RECEITA_PJ';
     const RECEITA_FINANCEIRA = 'RECEITA_FINANCEIRA';
     const PENDENTE_CLASSIFICACAO = 'PENDENTE_CLASSIFICACAO';
     const DESPESA = 'DESPESA';
+    const DESPESA_FINANCEIRA = 'DESPESA_FINANCEIRA';
 
-    // Planos de conta para classificação automática
+    /**
+     * FIX v3.0: Constante DEDUCAO para deducoes da receita (3.01.03.*)
+     * Ex: Simples Nacional, INSS, Salarios, Distribuicao de lucros.
+     * Valores na Arvore do Plano de Contas sao NEGATIVOS.
+     * No DB sao armazenados como POSITIVOS (abs) com classificacao=DEDUCAO.
+     */
+    const DEDUCAO = 'DEDUCAO';
+
+    // Planos de conta para classificacao automatica
     const PLANOS_PF = ['3.01.01.01', '3.01.01.03'];
     const PLANOS_PJ = ['3.01.01.02', '3.01.01.05'];
     const PLANOS_FINANCEIRO = ['3.01.02.05'];
@@ -74,23 +83,21 @@ class Movimento extends Model
             }
         }
 
-        // Classificação Manual
+        // Classificacao Manual
         foreach (self::PLANOS_MANUAL as $codigo) {
             if (strpos($planoContas, $codigo) !== false) {
                 return self::PENDENTE_CLASSIFICACAO;
             }
         }
 
-        // Se não encontrou nenhum padrão conhecido, retorna pendente
         return self::PENDENTE_CLASSIFICACAO;
     }
 
     /**
-     * Extrair código do plano de contas (ex: 3.01.01.01)
+     * Extrair codigo do plano de contas (ex: 3.01.01.01)
      */
     public static function extrairCodigoPlano(string $planoContas): ?string
     {
-        // Buscar padrão de código no plano de contas
         if (preg_match('/(\d+\.\d+\.\d+\.\d+)/', $planoContas, $matches)) {
             return $matches[1];
         }
@@ -100,38 +107,25 @@ class Movimento extends Model
         return null;
     }
 
-    /**
-     * Scope para filtrar por mês/ano
-     */
     public function scopePorPeriodo($query, int $mes, int $ano)
     {
         return $query->where('mes', $mes)->where('ano', $ano);
     }
 
-    /**
-     * Scope para filtrar por classificação
-     */
     public function scopePorClassificacao($query, string $classificacao)
     {
         return $query->where('classificacao', $classificacao);
     }
 
-    /**
-     * Scope para receitas (valores positivos)
-     */
     public function scopeReceitas($query)
     {
         return $query->where('valor', '>', 0);
     }
 
-    /**
-     * Scope para pendentes de classificação manual
-     */
     public function scopePendentes($query)
     {
         return $query->where('classificacao', self::PENDENTE_CLASSIFICACAO)
             ->where(function($q) {
-                // Aceitar NULL, 0, '0', false como "não manual"
                 $q->whereNull('classificacao_manual')
                   ->orWhere('classificacao_manual', 0)
                   ->orWhere('classificacao_manual', '0')
@@ -139,9 +133,6 @@ class Movimento extends Model
             });
     }
 
-    /**
-     * Obter total por classificação em um período
-     */
     public static function totalPorClassificacao(int $mes, int $ano, string $classificacao): float
     {
         return self::porPeriodo($mes, $ano)
@@ -150,9 +141,6 @@ class Movimento extends Model
                    ->sum('valor');
     }
 
-    /**
-     * Obter resumo do mês
-     */
     public static function resumoMes(int $mes, int $ano): array
     {
         return [

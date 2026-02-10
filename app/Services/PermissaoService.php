@@ -1,0 +1,223 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\User;
+use App\Models\Modulo;
+use App\Models\UserPermission;
+use Illuminate\Support\Facades\DB;
+
+class PermissaoService
+{
+    /**
+     * Definição de permissões padrão por papel
+     * 
+     * Estrutura:
+     * 'role' => [
+     *     'modulo.slug' => [
+     *         'permissoes' => ['visualizar', 'editar', ...],
+     *         'escopo' => 'proprio|equipe|todos'
+     *     ]
+     * ]
+     */
+    private const PERMISSOES_PADRAO = [
+        'admin' => [
+            // Admin tem todas as permissões - tratado no código, não precisa definir aqui
+        ],
+        'coordenador' => [
+            // RESULTADOS - visualiza tudo
+            'resultados.visao-gerencial' => ['permissoes' => ['visualizar'], 'escopo' => 'todos'],
+            'resultados.clientes-mercado' => ['permissoes' => ['visualizar'], 'escopo' => 'todos'],
+            'resultados.metas-kpi' => ['permissoes' => ['visualizar'], 'escopo' => 'todos'],
+            
+            // GDP - visualiza equipe
+            'gdp.minha-performance' => ['permissoes' => ['visualizar'], 'escopo' => 'equipe'],
+            'gdp.equipe' => ['permissoes' => ['visualizar'], 'escopo' => 'equipe'],
+            'gdp.metas' => ['permissoes' => ['visualizar'], 'escopo' => 'equipe'],
+            
+            // Quadro de Avisos
+            'avisos.listar' => ['permissoes' => ['visualizar'], 'escopo' => 'todos'],
+        ],
+        'socio' => [
+            // RESULTADOS - visualiza tudo
+            'resultados.visao-gerencial' => ['permissoes' => ['visualizar'], 'escopo' => 'todos'],
+            'resultados.clientes-mercado' => ['permissoes' => ['visualizar'], 'escopo' => 'todos'],
+            'resultados.metas-kpi' => ['permissoes' => ['visualizar'], 'escopo' => 'todos'],
+            
+            // GDP - apenas própria performance
+            'gdp.minha-performance' => ['permissoes' => ['visualizar'], 'escopo' => 'proprio'],
+            
+            // Quadro de Avisos
+            'avisos.listar' => ['permissoes' => ['visualizar'], 'escopo' => 'todos'],
+        ],
+    ];
+
+    /**
+     * Aplica permissões padrão baseadas no papel do usuário
+     */
+    public function aplicarPermissoesPadrao(User $user): void
+    {
+        // Admin não precisa de permissões específicas - tem acesso total
+        if ($user->isAdmin()) {
+            // Limpa permissões existentes (não são necessárias)
+            $user->permissions()->delete();
+            return;
+        }
+
+        $permissoesPadrao = self::PERMISSOES_PADRAO[$user->role] ?? [];
+
+        DB::transaction(function () use ($user, $permissoesPadrao) {
+            // Remove permissões existentes
+            $user->permissions()->delete();
+
+            // Aplica novas permissões
+            foreach ($permissoesPadrao as $moduloSlug => $config) {
+                $modulo = Modulo::porSlug($moduloSlug);
+                
+                if (!$modulo) {
+                    continue;
+                }
+
+                $permissoes = $config['permissoes'] ?? [];
+                $escopo = $config['escopo'] ?? 'proprio';
+
+                UserPermission::create([
+                    'user_id' => $user->id,
+                    'modulo_id' => $modulo->id,
+                    'pode_visualizar' => in_array('visualizar', $permissoes),
+                    'pode_editar' => in_array('editar', $permissoes),
+                    'pode_criar' => in_array('criar', $permissoes),
+                    'pode_excluir' => in_array('excluir', $permissoes),
+                    'pode_executar' => in_array('executar', $permissoes),
+                    'escopo' => $escopo,
+                ]);
+            }
+        });
+    }
+
+    /**
+     * Atualiza permissões específicas de um usuário para um módulo
+     */
+    public function atualizarPermissao(
+        User $user, 
+        string $moduloSlug, 
+        array $permissoes, 
+        string $escopo = 'proprio'
+    ): bool {
+        $modulo = Modulo::porSlug($moduloSlug);
+        
+        if (!$modulo) {
+            return false;
+        }
+
+        $userPermission = UserPermission::updateOrCreate(
+            ['user_id' => $user->id, 'modulo_id' => $modulo->id],
+            [
+                'pode_visualizar' => in_array('visualizar', $permissoes),
+                'pode_editar' => in_array('editar', $permissoes),
+                'pode_criar' => in_array('criar', $permissoes),
+                'pode_excluir' => in_array('excluir', $permissoes),
+                'pode_executar' => in_array('executar', $permissoes),
+                'escopo' => $escopo,
+            ]
+        );
+
+        return $userPermission->exists;
+    }
+
+    /**
+     * Remove todas as permissões de um usuário
+     */
+    public function removerTodasPermissoes(User $user): void
+    {
+        $user->permissions()->delete();
+    }
+
+    /**
+     * Copia permissões de um usuário para outro
+     */
+    public function copiarPermissoes(User $origem, User $destino): void
+    {
+        DB::transaction(function () use ($origem, $destino) {
+            // Remove permissões existentes do destino
+            $destino->permissions()->delete();
+
+            // Copia permissões da origem
+            foreach ($origem->permissions as $permission) {
+                UserPermission::create([
+                    'user_id' => $destino->id,
+                    'modulo_id' => $permission->modulo_id,
+                    'pode_visualizar' => $permission->pode_visualizar,
+                    'pode_editar' => $permission->pode_editar,
+                    'pode_criar' => $permission->pode_criar,
+                    'pode_excluir' => $permission->pode_excluir,
+                    'pode_executar' => $permission->pode_executar,
+                    'escopo' => $permission->escopo,
+                ]);
+            }
+        });
+    }
+
+    /**
+     * Retorna matriz de permissões para exibição na UI
+     */
+    public function getMatrizPermissoes(User $user): array
+    {
+        $matriz = [];
+        $modulos = Modulo::agrupadosPorGrupo();
+        $userPermissions = $user->permissions()->pluck('modulo_id')->toArray();
+
+        foreach ($modulos as $grupo => $modulosGrupo) {
+            $matriz[$grupo] = [];
+            
+            foreach ($modulosGrupo as $modulo) {
+                $permission = $user->permissions()
+                    ->where('modulo_id', $modulo->id)
+                    ->first();
+
+                $matriz[$grupo][] = [
+                    'modulo' => $modulo,
+                    'tem_permissao' => in_array($modulo->id, $userPermissions),
+                    'pode_visualizar' => $permission?->pode_visualizar ?? false,
+                    'pode_editar' => $permission?->pode_editar ?? false,
+                    'pode_criar' => $permission?->pode_criar ?? false,
+                    'pode_excluir' => $permission?->pode_excluir ?? false,
+                    'pode_executar' => $permission?->pode_executar ?? false,
+                    'escopo' => $permission?->escopo ?? 'proprio',
+                ];
+            }
+        }
+
+        return $matriz;
+    }
+
+    /**
+     * Salva permissões em lote a partir de um array de formulário
+     */
+    public function salvarPermissoesEmLote(User $user, array $permissoesForm): void
+    {
+        DB::transaction(function () use ($user, $permissoesForm) {
+            // Remove permissões existentes
+            $user->permissions()->delete();
+
+            // Processa cada módulo
+            foreach ($permissoesForm as $moduloId => $config) {
+                // Verifica se o módulo está marcado como ativo
+                if (empty($config['ativo'])) {
+                    continue;
+                }
+
+                UserPermission::create([
+                    'user_id' => $user->id,
+                    'modulo_id' => $moduloId,
+                    'pode_visualizar' => !empty($config['visualizar']),
+                    'pode_editar' => !empty($config['editar']),
+                    'pode_criar' => !empty($config['criar']),
+                    'pode_excluir' => !empty($config['excluir']),
+                    'pode_executar' => !empty($config['executar']),
+                    'escopo' => $config['escopo'] ?? 'proprio',
+                ]);
+            }
+        });
+    }
+}

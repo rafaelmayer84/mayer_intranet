@@ -1,10 +1,5 @@
 <?php
 return [
-    /*
-    |--------------------------------------------------------------------------
-    | Third Party Services
-    |--------------------------------------------------------------------------
-    */
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
     ],
@@ -23,15 +18,27 @@ return [
         ],
     ],
     'datajuri' => [
-        'base_url' => env('DATAJURI_BASE_URL', 'https://app.datajuri.com.br'),
+        'base_url' => env('DATAJURI_BASE_URL', 'https://api.datajuri.com.br'),
         'api_key' => env('DATAJURI_API_KEY', 'sua_api_key_aqui'),
         'client_id' => env('DATAJURI_CLIENT_ID', 'a79mtxvdhsq0pgob733z'),
-        'secret_id' => env('DATAJURI_SECRET_ID', 'f21e0745-0b4f-4bd3-b0a6-959a4d47baa5'),
+        'secret_id' => env('DATAJURI_SECRET_ID', '829c2e85-8b6e-45e0-98d6-749033f62c1a'),
         'email' => env('DATAJURI_EMAIL', 'rafaelmayer@mayeradvogados.adv.br'),
         'password' => env('DATAJURI_PASSWORD', 'Mayer01.'),
     ],
     'espocrm' => [
         'base_url' => env('ESPO_CRM_BASE_URL', 'https://www.mayeradvogados.adv.br/CRM'),
         'api_key' => env('ESPO_CRM_API_KEY', 'c2d399133dc730549073361f39dd4a11'),
+        'url' => env('ESPOCRM_URL', 'https://mayeradvogados.adv.br/CRM/api/v1'),
+    ],
+    'sendpulse' => [
+        'api_id' => env('SENDPULSE_API_ID'),
+        'api_secret' => env('SENDPULSE_API_SECRET'),
+        'bot_id' => env('SENDPULSE_BOT_ID'),
+        'webhook_secret' => env('SENDPULSE_WEBHOOK_SECRET'),
+        'webhook_token' => env('SENDPULSE_WEBHOOK_TOKEN'),
+    ],
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+        'model' => env('OPENAI_MODEL', 'gpt-4o-mini'),
     ],
 ];

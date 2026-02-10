@@ -1,0 +1,275 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Services\DataJuriSyncOrchestrator;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+
+class SincronizacaoUnificadaController extends Controller
+{
+    /**
+     * Exibir página de sincronização unificada
+     */
+    public function index()
+    {
+        // Buscar últimas execuções
+        $runs = DB::table('sync_runs')
+            ->orderBy('created_at', 'desc')
+            ->limit(20)
+            ->get();
+        
+        // Buscar execução em andamento
+        $runningSync = DB::table('sync_runs')
+            ->where('status', 'running')
+            ->first();
+        
+        // Estatísticas DataJuri
+        $movimentos = DB::table('movimentos')->where('origem', 'datajuri')->count();
+        $processos = DB::table('processos')->count();
+        $clientes = DB::table('clientes')->count();
+        $atividades = DB::table('atividades')->count();
+        
+        // Estatísticas ESPOCRM
+        $leads = DB::table('leads')->count();
+        $oportunidades = DB::table('oportunidades')->count();
+        $contas = 0; // Será implementado após reintegração
+        
+        // Última sincronização (usar finished_at da última execução completed)
+        $lastSync = DB::table('sync_runs')
+            ->where('status', 'completed')
+            ->orderBy('finished_at', 'desc')
+            ->first();
+            
+        $lastSyncDataJuri = $lastSync?->finished_at ? \Carbon\Carbon::parse($lastSync->finished_at)->format('d/m/Y H:i') : 'Nunca';
+        $lastSyncEspocrm = 'N/A'; // Será implementado após reintegração ESPOCRM
+        $lastRunTime = $lastSyncDataJuri;
+        
+        // Histórico (usar nomes de colunas corretos da tabela sync_runs)
+        $historico = DB::table('sync_runs')
+            ->select('id', 'run_id', 'tipo', 'status', 'registros_processados', 'registros_criados', 'registros_atualizados', 'erros', 'started_at', 'finished_at', 'created_at')
+            ->orderBy('created_at', 'desc')
+            ->limit(20)
+            ->get()
+            ->map(function ($run) {
+                $run->created_at = \Carbon\Carbon::parse($run->created_at);
+                $run->duracao = null;
+                if ($run->started_at && $run->finished_at) {
+                    $start = \Carbon\Carbon::parse($run->started_at);
+                    $end = \Carbon\Carbon::parse($run->finished_at);
+                    $run->duracao = $start->diffInSeconds($end);
+                }
+                return $run;
+            });
+        
+        return view('admin.sincronizacao-unificada.index', compact(
+            'movimentos', 'processos', 'clientes', 'atividades',
+            'leads', 'oportunidades', 'contas',
+            'lastSyncDataJuri', 'lastSyncEspocrm', 'lastRunTime',
+            'historico'
+        ));
+    }
+    
+    /**
+     * Executar smoke test
+     */
+    public function smokeTest()
+    {
+        try {
+            $orchestrator = new DataJuriSyncOrchestrator();
+            $results = $orchestrator->smokeTest();
+            
+            return response()->json([
+                'success' => $results['token'] && $results['modulos'],
+                'results' => $results,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+    
+    /**
+     * Iniciar sincronização completa
+     * 
+     * CORREÇÃO v2.0: Auto-cleanup de runs stuck antes de verificar
+     */
+    public function syncAll(Request $request)
+    {
+        // CORREÇÃO v2.0: Limpar runs travadas (>30min) antes de verificar
+        $orchestrator = new DataJuriSyncOrchestrator();
+        $staleCleared = $orchestrator->cleanupStaleRuns();
+        
+        // Verificar se já há sincronização em andamento
+        $running = DB::table('sync_runs')
+            ->where('status', 'running')
+            ->first();
+        
+        if ($running) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Já existe uma sincronização em andamento',
+                'run_id' => $running->run_id,
+            ], 409);
+        }
+        
+        try {
+            $results = $orchestrator->syncAll();
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Sincronização concluída',
+                'stale_cleared' => $staleCleared,
+                'results' => $results,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+    
+    /**
+     * Sincronizar módulo específico
+     * 
+     * CORREÇÃO v2.0: Auto-cleanup + reutiliza orchestrator
+     */
+    public function syncModule(Request $request, string $modulo)
+    {
+        try {
+            $orchestrator = new DataJuriSyncOrchestrator();
+            $orchestrator->cleanupStaleRuns();
+            $orchestrator->startRun('incremental');
+            $results = $orchestrator->syncModule($modulo);
+            $orchestrator->finishRun('completed');
+            
+            return response()->json([
+                'success' => true,
+                'message' => "Módulo {$modulo} sincronizado",
+                'results' => $results,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+    
+    /**
+     * Reprocessar financeiro (full refresh)
+     * 
+     * CORREÇÃO v2.0: Auto-cleanup
+     */
+    public function reprocessarFinanceiro()
+    {
+        $orchestrator = new DataJuriSyncOrchestrator();
+        $orchestrator->cleanupStaleRuns();
+        
+        // Verificar se já há sincronização em andamento
+        $running = DB::table('sync_runs')
+            ->where('status', 'running')
+            ->first();
+        
+        if ($running) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Já existe uma sincronização em andamento',
+                'run_id' => $running->run_id,
+            ], 409);
+        }
+        
+        try {
+            $results = $orchestrator->reprocessarFinanceiro();
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Reprocessamento financeiro concluído',
+                'results' => $results,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+    
+    /**
+     * Obter status da sincronização em andamento
+     */
+    public function status(string $runId = null)
+    {
+        if ($runId) {
+            $run = DB::table('sync_runs')
+                ->where('run_id', $runId)
+                ->first();
+        } else {
+            $run = DB::table('sync_runs')
+                ->orderBy('created_at', 'desc')
+                ->first();
+        }
+        
+        if (!$run) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Nenhuma execução encontrada',
+            ], 404);
+        }
+        
+        return response()->json([
+            'success' => true,
+            'run' => $run,
+        ]);
+    }
+    
+    /**
+     * Cancelar sincronização em andamento
+     */
+    public function cancel(string $runId)
+    {
+        $updated = DB::table('sync_runs')
+            ->where('run_id', $runId)
+            ->where('status', 'running')
+            ->update([
+                'status' => 'cancelled',
+                'mensagem' => 'Cancelado pelo usuário',
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+        
+        if ($updated) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Sincronização cancelada',
+            ]);
+        }
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Não foi possível cancelar a sincronização',
+        ], 400);
+    }
+    
+    /**
+     * Limpar histórico de execuções antigas
+     */
+    public function clearHistory(Request $request)
+    {
+        $days = $request->input('days', 30);
+        
+        $deleted = DB::table('sync_runs')
+            ->where('created_at', '<', now()->subDays($days))
+            ->where('status', '!=', 'running')
+            ->delete();
+        
+        return response()->json([
+            'success' => true,
+            'message' => "{$deleted} registros removidos",
+        ]);
+    }
+}

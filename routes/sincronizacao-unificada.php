@@ -1,0 +1,25 @@
+<?php
+
+use App\Http\Controllers\Admin\SincronizacaoUnificadaController;
+use Illuminate\Support\Facades\Route;
+
+Route::middleware(['auth'])->prefix('admin/sincronizacao-unificada')->name('admin.sincronizacao-unificada.')->group(function () {
+    Route::get('/', [SincronizacaoUnificadaController::class, 'index'])->name('index');
+    Route::get('/counts', [SincronizacaoUnificadaController::class, 'getCounts'])->name('counts');
+    Route::post('/smoke-test', [SincronizacaoUnificadaController::class, 'smokeTest'])->name('smoke-test');
+    Route::post('/sync-all', [SincronizacaoUnificadaController::class, 'syncAll'])->name('sync-all');
+    Route::post('/sync/{modulo}', [SincronizacaoUnificadaController::class, 'syncModule'])->name('sync-module');
+    Route::post('/reprocessar-financeiro', [SincronizacaoUnificadaController::class, 'reprocessarFinanceiro'])->name('reprocessar-financeiro');
+    Route::get('/status/{runId?}', [SincronizacaoUnificadaController::class, 'status'])->name('status');
+    Route::post('/cancel/{runId}', [SincronizacaoUnificadaController::class, 'cancel'])->name('cancel');
+    Route::post('/clear-history', [SincronizacaoUnificadaController::class, 'clearHistory'])->name('clear-history');
+    Route::get('/classificacao', [SincronizacaoUnificadaController::class, 'classificacaoIndex'])->name('classificacao.index');
+    Route::get('/classificacao/stats', [SincronizacaoUnificadaController::class, 'classificacaoStats'])->name('classificacao.stats');
+    Route::post('/classificacao', [SincronizacaoUnificadaController::class, 'classificacaoStore'])->name('classificacao.store');
+    Route::put('/classificacao/{id}', [SincronizacaoUnificadaController::class, 'classificacaoUpdate'])->name('classificacao.update');
+    Route::delete('/classificacao/{id}', [SincronizacaoUnificadaController::class, 'classificacaoDestroy'])->name('classificacao.destroy');
+    Route::post('/classificacao/importar', [SincronizacaoUnificadaController::class, 'classificacaoImportar'])->name('classificacao.importar');
+    Route::post('/classificacao/reclassificar', [SincronizacaoUnificadaController::class, 'classificacaoReclassificar'])->name('classificacao.reclassificar');
+    Route::post('/espocrm/test', [SincronizacaoUnificadaController::class, 'espocrmTest'])->name('espocrm-test');
+    Route::post('/espocrm/sync', [SincronizacaoUnificadaController::class, 'espocrmSync'])->name('espocrm-sync');
+});

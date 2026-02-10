@@ -4,20 +4,12 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SyncController;
 use App\Http\Controllers\ClientesMercadoController;
 use App\Http\Controllers\IntegracaoController;
+use App\Http\Controllers\Api\NexoWebhookController;
 
-/*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-*/
-
-// Rotas de API para sincronização (sem autenticação para facilitar)
 Route::prefix('sync')->group(function () {
     Route::get('/test-connection', [SyncController::class, 'testConnection']);
     Route::get('/status', [SyncController::class, 'status']);
     Route::get('/auth', [SyncController::class, 'auth']);
-    
-    // Rotas GET e POST para sincronização
     Route::match(['get', 'post'], '/advogados', [SyncController::class, 'syncAdvogados']);
     Route::match(['get', 'post'], '/processos', [SyncController::class, 'syncProcessos']);
     Route::match(['get', 'post'], '/atividades', [SyncController::class, 'syncAtividades']);
@@ -26,30 +18,81 @@ Route::prefix('sync')->group(function () {
     Route::match(['get', 'post'], '/horas', [SyncController::class, 'syncHoras']);
     Route::match(['get', 'post'], '/movimentos', [SyncController::class, 'syncMovimentos']);
     Route::match(['get', 'post'], '/all', [SyncController::class, 'syncAll']);
-    
     Route::get('/dados/{tipo}', [SyncController::class, 'getDados']);
 });
 
-// Rotas do módulo Clientes & Mercado (sem autenticação para facilitar)
 Route::prefix('clientes-mercado')->group(function () {
     Route::get('/top-clientes', [ClientesMercadoController::class, 'topClientes']);
     Route::get('/leads-recentes', [ClientesMercadoController::class, 'leadsRecentes']);
     Route::get('/resumo-executivo', [ClientesMercadoController::class, 'resumoExecutivo']);
+    Route::get('/lancamentos', [ClientesMercadoController::class, 'lancamentos']);
+    Route::get('/mix-pf-pj', [ClientesMercadoController::class, 'mixPfPj']);
 });
 
-Route::get('/user', function (Request $request) {
-    return $request->user();
-})->middleware('auth:sanctum');
-
-// Rotas do módulo Clientes & Mercado - Lançamentos
-Route::get('/clientes-mercado/lancamentos', [ClientesMercadoController::class, 'lancamentos']);
-Route::get('/clientes-mercado/mix-pf-pj', [ClientesMercadoController::class, 'mixPfPj']);
-Route::get('/clientes-mercado/resumo-executivo', [ClientesMercadoController::class, 'resumoExecutivo']);
-
-// Rotas do módulo Integrações
 Route::prefix('integracao')->group(function () {
     Route::get('/dados', [IntegracaoController::class, 'dados']);
     Route::post('/sincronizar-datajuri', [IntegracaoController::class, 'sincronizarDataJuri']);
     Route::post('/sincronizar-espocrm', [IntegracaoController::class, 'sincronizarEspoCrm']);
     Route::get('/detalhes/{id}', [IntegracaoController::class, 'detalhes']);
 });
+
+Route::prefix('nexo')->group(function () {
+    Route::post('/identificar-cliente', [NexoWebhookController::class, 'identificarCliente']);
+    Route::post('/perguntas-auth', [NexoWebhookController::class, 'perguntasAuth']);
+    Route::post('/validar-auth', [NexoWebhookController::class, 'validarAuth']);
+    Route::post('/consulta-status', [NexoWebhookController::class, 'consultaStatus']);
+});
+
+Route::get('/user', function (Request $request) {
+    return $request->user();
+})->middleware('auth:sanctum');// NEXO Consulta — Automação SendPulse
+require __DIR__ . '/_nexo_consulta_routes.php';
+
+// NEXO Consulta — Automação SendPulse
+require __DIR__ . '/_nexo_consulta_routes.php';
+
+
+/**
+ * ═══════════════════════════════════════════════════════════════
+ * ROTAS PARA TRACKING DE WHATSAPP
+ * ═══════════════════════════════════════════════════════════════
+ * 
+ * ADICIONAR em: routes/api.php
+ * 
+ * LOCALIZAÇÃO: Dentro do grupo 'nexo/api' ou criar novo grupo
+ */
+
+use App\Http\Controllers\Nexo\NexoTrackingController;
+
+// ────────────────────────────────────────────────────────────────
+// Endpoint público (sem autenticação) para receber tracking
+// ────────────────────────────────────────────────────────────────
+
+Route::post('nexo/api/pre-track-whatsapp-lead', [
+    NexoTrackingController::class, 
+    'preTrackWhatsAppLead'
+])->name('nexo.pre-track-whatsapp');
+
+// ────────────────────────────────────────────────────────────────
+// NOTA DE SEGURANÇA:
+// ────────────────────────────────────────────────────────────────
+// 
+// Este endpoint é público porque precisa ser chamado do JavaScript
+// no site. Para evitar spam:
+// 
+// 1. Adicione rate limiting:
+//    ->middleware('throttle:60,1')
+// 
+// 2. Adicione validação de origem (CORS):
+//    ->middleware('cors:mayeradvogados.adv.br')
+// 
+// 3. Adicione verificação de CSRF se necessário
+// 
+// Exemplo com rate limit:
+
+Route::post('nexo/api/pre-track-whatsapp-lead', [
+    NexoTrackingController::class, 
+    'preTrackWhatsAppLead'
+])
+->middleware('throttle:60,1') // Máximo 60 requests por minuto
+->name('nexo.pre-track-whatsapp');

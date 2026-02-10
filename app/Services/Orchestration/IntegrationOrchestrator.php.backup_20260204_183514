@@ -1,0 +1,559 @@
+<?php
+
+namespace App\Services\Orchestration;
+
+use App\Services\Integration\{DataJuriService, EspoCrmService};
+use App\Services\ETL\DataTransformerService;
+use App\Models\{Cliente, Lead, Oportunidade, IntegrationLog};
+use Illuminate\Support\Facades\{DB, Log};
+
+/**
+ * IntegrationOrchestrator - Orquestrador de Sincronização
+ * 
+ * CORREÇÃO 04/02/2026:
+ * - Leads: Adicionado mapeamento completo de campos (status, origem, cidade, data_conversao, motivo_perda)
+ * - Oportunidades: Adicionado mapeamento completo de campos (estagio, lead_id, data_criacao, data_fechamento)
+ * - Usando DataTransformerService para normalização consistente
+ */
+class IntegrationOrchestrator
+{
+    public function __construct(
+        protected DataJuriService $dataJuri,
+        protected EspoCrmService $espo,
+        protected DataTransformerService $transformer
+    ) {}
+
+    /**
+     * Sincronização completa de todas as entidades
+     */
+    public function syncAll(): array
+    {
+        $syncId = 'SYNC_' . now()->format('YmdHis');
+        
+        $log = IntegrationLog::create([
+            'sync_id' => $syncId,
+            'tipo' => 'sync_full',
+            'fonte' => 'manual',
+            'status' => 'iniciado',
+            'inicio' => now()
+        ]);
+        
+        try {
+            $rC = $this->syncClientes($syncId);
+            $rL = $this->syncLeads($syncId);
+            $rO = $this->syncOportunidades($syncId);
+            
+            $log->update([
+                'status' => 'concluido',
+                'fim' => now(),
+                'duracao_segundos' => now()->diffInSeconds($log->inicio),
+                'registros_processados' => $rC['processados'] + $rL['processados'] + $rO['processados'],
+                'registros_criados' => $rC['criados'] + $rL['criados'] + $rO['criados']
+            ]);
+            
+            return [
+                'success' => true,
+                'sync_id' => $syncId,
+                'clientes' => $rC,
+                'leads' => $rL,
+                'oportunidades' => $rO
+            ];
+        } catch (\Exception $e) {
+            $log->update([
+                'status' => 'erro',
+                'fim' => now(),
+                'mensagem_erro' => $e->getMessage()
+            ]);
+            Log::error("Erro sync full: " . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Sincronização de Clientes (DataJuri + ESPO CRM)
+     */
+    public function syncClientes(?string $parentSyncId = null): array
+    {
+        $syncId = $parentSyncId ?? 'SYNC_CLI_' . now()->format('YmdHis');
+        $criados = 0;
+        $atualizados = 0;
+        $ignorados = 0;
+        
+        DB::beginTransaction();
+        try {
+            // Sincronizar Pessoas do DataJuri
+            $pessoas = $this->dataJuri->buscarModulo('Pessoa');
+            foreach ($pessoas as $p) {
+                $data = $this->transformer->normalizeCliente($p, 'datajuri');
+                if (empty($data['datajuri_id'])) {
+                    $ignorados++;
+                    continue;
+                }
+                
+                $cliente = Cliente::where('datajuri_id', $data['datajuri_id'])->first();
+                if ($cliente) {
+                    $cliente->update($data);
+                    $atualizados++;
+                } else {
+                    Cliente::create($data);
+                    $criados++;
+                }
+            }
+            
+            // Sincronizar Accounts do ESPO CRM
+            $contas = $this->espo->getAllEntities('Account');
+            foreach ($contas['data'] as $c) {
+                $data = $this->transformer->normalizeCliente($c, 'espocrm');
+                if (empty($data['espocrm_id'])) {
+                    $ignorados++;
+                    continue;
+                }
+                
+                $cliente = Cliente::where('espocrm_id', $data['espocrm_id'])->first();
+                if (!$cliente) {
+                    // Tentar encontrar por nome para vincular
+                    $clienteExistente = Cliente::where('nome', $data['nome'])->first();
+                    if ($clienteExistente) {
+                        $clienteExistente->update(['espocrm_id' => $data['espocrm_id']]);
+                        $atualizados++;
+                    } else {
+                        Cliente::create($data);
+                        $criados++;
+                    }
+                } else {
+                    $cliente->update($data);
+                    $atualizados++;
+                }
+            }
+            
+            DB::commit();
+            
+            return [
+                'success' => true,
+                'sync_id' => $syncId,
+                'processados' => count($pessoas) + count($contas['data']),
+                'criados' => $criados,
+                'atualizados' => $atualizados,
+                'ignorados' => $ignorados,
+                'erros' => []
+            ];
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Erro sync clientes: " . $e->getMessage());
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+                'processados' => 0,
+                'criados' => 0,
+                'atualizados' => 0
+            ];
+        }
+    }
+
+    /**
+     * Sincronização de Leads do ESPO CRM
+     * CORRIGIDO: Mapeamento completo de todos os campos
+     */
+    public function syncLeads(?string $parentSyncId = null): array
+    {
+        $syncId = $parentSyncId ?? 'SYNC_LEADS_' . now()->format('YmdHis');
+        $criados = 0;
+        $atualizados = 0;
+        $ignorados = 0;
+        $erros = [];
+        
+        DB::beginTransaction();
+        try {
+            $leads = $this->espo->getAllEntities('Lead');
+            
+            Log::info("Sync Leads: Recebidos " . count($leads['data']) . " leads da API");
+            
+            foreach ($leads['data'] as $l) {
+                try {
+                    // Mapeamento COMPLETO dos campos do ESPO CRM
+                    $data = $this->mapearLeadEspoCrm($l);
+                    
+                    if (empty($data['espocrm_id'])) {
+                        $ignorados++;
+                        continue;
+                    }
+                    
+                    $lead = Lead::where('espocrm_id', $data['espocrm_id'])->first();
+                    
+                    if ($lead) {
+                        $lead->update($data);
+                        $atualizados++;
+                    } else {
+                        Lead::create($data);
+                        $criados++;
+                    }
+                } catch (\Exception $e) {
+                    $erros[] = "Lead {$l['id']}: " . $e->getMessage();
+                    Log::warning("Erro ao processar lead", ['id' => $l['id'] ?? 'unknown', 'error' => $e->getMessage()]);
+                }
+            }
+            
+            DB::commit();
+            
+            Log::info("Sync Leads concluído", [
+                'criados' => $criados,
+                'atualizados' => $atualizados,
+                'ignorados' => $ignorados,
+                'erros' => count($erros)
+            ]);
+            
+            return [
+                'success' => true,
+                'sync_id' => $syncId,
+                'processados' => count($leads['data']),
+                'criados' => $criados,
+                'atualizados' => $atualizados,
+                'ignorados' => $ignorados,
+                'erros' => $erros
+            ];
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Erro sync leads: " . $e->getMessage());
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+                'processados' => 0,
+                'criados' => 0,
+                'atualizados' => 0
+            ];
+        }
+    }
+
+    /**
+     * Mapear Lead do ESPO CRM para formato do banco local
+     * 
+     * Campos da API ESPO CRM:
+     * - id, name, firstName, lastName
+     * - status: New, Assigned, In Process, Converted, Recycled, Dead
+     * - source: WhatsApp Bot, Partner, Website, etc.
+     * - addressCity, addressState
+     * - emailAddress, phoneNumber
+     * - convertedAt: data de conversão (quando status = Converted)
+     * - cMotivoDePerdaLead: campo customizado de motivo de perda
+     * - createdAt, modifiedAt
+     * - assignedUserId
+     * - description
+     */
+    private function mapearLeadEspoCrm(array $l): array
+    {
+        // Mapear status do ESPO para status local
+        $statusMap = [
+            'New' => 'novo',
+            'Assigned' => 'atribuido',
+            'In Process' => 'em_andamento',
+            'Converted' => 'convertido',
+            'Recycled' => 'reciclado',
+            'Dead' => 'perdido'
+        ];
+        
+        // Mapear origem
+        $origemMap = [
+            'WhatsApp Bot' => 'WhatsApp Bot',
+            'Partner' => 'Parceiros',
+            'Web Site' => 'Website',
+            'Website' => 'Website',
+            'Email Campaign' => 'Email',
+            'Existing Customer' => 'Cliente Existente',
+            'Public Relations' => 'Relações Públicas',
+            'Direct Mail' => 'Mala Direta',
+            'Conference' => 'Conferência',
+            'Trade Show' => 'Feira',
+            'Other' => 'Outro'
+        ];
+        
+        // Mapear motivo de perda (campo customizado cMotivoDePerdaLead)
+        $motivoPerda = $l['cMotivoDePerdaLead'] ?? null;
+        if ($motivoPerda === 'Selecione' || empty($motivoPerda)) {
+            $motivoPerda = null;
+        }
+        
+        // Status original da API
+        $statusApi = $l['status'] ?? 'New';
+        $statusLocal = $statusMap[$statusApi] ?? 'novo';
+        
+        // Origem
+        $origemApi = $l['source'] ?? 'Other';
+        $origemLocal = $origemMap[$origemApi] ?? 'Outro';
+        
+        // Data de conversão
+        $dataConversao = null;
+        if (!empty($l['convertedAt'])) {
+            $dataConversao = $this->parseDateTime($l['convertedAt']);
+        } elseif ($statusApi === 'Converted' && !empty($l['modifiedAt'])) {
+            // Se status é Converted mas não tem convertedAt, usar modifiedAt
+            $dataConversao = $this->parseDateTime($l['modifiedAt']);
+        }
+        
+        // Data de criação do lead
+        $dataCriacaoLead = null;
+        if (!empty($l['createdAt'])) {
+            $dataCriacaoLead = $this->parseDateTime($l['createdAt']);
+        }
+        
+        // Montar array de dados
+        return [
+            'espocrm_id' => $l['id'] ?? null,
+            'nome' => $l['name'] ?? trim(($l['firstName'] ?? '') . ' ' . ($l['lastName'] ?? '')) ?: 'Sem nome',
+            'email' => $l['emailAddress'] ?? null,
+            'telefone' => $this->limparTelefone($l['phoneNumber'] ?? ''),
+            'origem' => $origemLocal,
+            'cidade' => $l['addressCity'] ?? null,
+            'status' => $statusLocal,
+            'motivo_perda' => $motivoPerda,
+            'responsavel_id' => $this->buscarResponsavelId($l['assignedUserId'] ?? null),
+            'data_criacao_lead' => $dataCriacaoLead,
+            'data_conversao' => $dataConversao,
+            'metadata' => json_encode([
+                'espo_status_original' => $statusApi,
+                'espo_source_original' => $origemApi,
+                'description' => $l['description'] ?? null,
+                'addressState' => $l['addressState'] ?? null,
+                'addressCountry' => $l['addressCountry'] ?? null,
+                'createdById' => $l['createdById'] ?? null,
+                'createdByName' => $l['createdByName'] ?? null,
+                'modifiedAt' => $l['modifiedAt'] ?? null,
+                'cTipoDeDemanda' => $l['cTipoDeDemanda'] ?? null,
+                'createdOpportunityId' => $l['createdOpportunityId'] ?? null,
+                'createdAccountId' => $l['createdAccountId'] ?? null
+            ])
+        ];
+    }
+
+    /**
+     * Sincronização de Oportunidades do ESPO CRM
+     * CORRIGIDO: Mapeamento completo de todos os campos
+     */
+    public function syncOportunidades(?string $parentSyncId = null): array
+    {
+        $syncId = $parentSyncId ?? 'SYNC_OP_' . now()->format('YmdHis');
+        $criados = 0;
+        $atualizados = 0;
+        $ignorados = 0;
+        $erros = [];
+        
+        DB::beginTransaction();
+        try {
+            $ops = $this->espo->getAllEntities('Opportunity');
+            
+            Log::info("Sync Oportunidades: Recebidas " . count($ops['data']) . " oportunidades da API");
+            
+            foreach ($ops['data'] as $o) {
+                try {
+                    // Mapeamento COMPLETO dos campos do ESPO CRM
+                    $data = $this->mapearOportunidadeEspoCrm($o);
+                    
+                    if (empty($data['espocrm_id'])) {
+                        $ignorados++;
+                        continue;
+                    }
+                    
+                    $op = Oportunidade::where('espocrm_id', $data['espocrm_id'])->first();
+                    
+                    if ($op) {
+                        $op->update($data);
+                        $atualizados++;
+                    } else {
+                        Oportunidade::create($data);
+                        $criados++;
+                    }
+                } catch (\Exception $e) {
+                    $erros[] = "Oportunidade {$o['id']}: " . $e->getMessage();
+                    Log::warning("Erro ao processar oportunidade", ['id' => $o['id'] ?? 'unknown', 'error' => $e->getMessage()]);
+                }
+            }
+            
+            DB::commit();
+            
+            Log::info("Sync Oportunidades concluído", [
+                'criados' => $criados,
+                'atualizados' => $atualizados,
+                'ignorados' => $ignorados,
+                'erros' => count($erros)
+            ]);
+            
+            return [
+                'success' => true,
+                'sync_id' => $syncId,
+                'processados' => count($ops['data']),
+                'criados' => $criados,
+                'atualizados' => $atualizados,
+                'ignorados' => $ignorados,
+                'erros' => $erros
+            ];
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error("Erro sync oportunidades: " . $e->getMessage());
+            return [
+                'success' => false,
+                'error' => $e->getMessage(),
+                'processados' => 0,
+                'criados' => 0,
+                'atualizados' => 0
+            ];
+        }
+    }
+
+    /**
+     * Mapear Oportunidade do ESPO CRM para formato do banco local
+     * 
+     * Campos da API ESPO CRM:
+     * - id, name
+     * - stage: Prospecting, Qualification, Proposal, Negotiation, Closed Won, Closed Lost
+     * - amount: valor
+     * - probability: probabilidade
+     * - leadId: vínculo com lead
+     * - accountId: vínculo com conta/cliente
+     * - assignedUserId: responsável
+     * - closeDate: data prevista de fechamento
+     * - createdAt, modifiedAt
+     * - leadSource: origem do lead
+     */
+    private function mapearOportunidadeEspoCrm(array $o): array
+    {
+        // Mapear estágio do ESPO para estágio local
+        $estagioMap = [
+            'Prospecting' => 'prospectando',
+            'Qualification' => 'qualificacao',
+            'Proposal' => 'proposta',
+            'Negotiation' => 'negociacao',
+            'Closed Won' => 'ganha',
+            'Closed Lost' => 'perdida',
+            // Variações em português (caso existam)
+            'Prospecção' => 'prospectando',
+            'Qualificação' => 'qualificacao',
+            'Proposta' => 'proposta',
+            'Negociação' => 'negociacao',
+            'Ganha' => 'ganha',
+            'Perdida' => 'perdida'
+        ];
+        
+        // Estágio
+        $estagioApi = $o['stage'] ?? 'Prospecting';
+        $estagioLocal = $estagioMap[$estagioApi] ?? 'prospectando';
+        
+        // Determinar tipo (PF/PJ) baseado na conta vinculada
+        $tipo = 'PF'; // Default
+        if (!empty($o['accountId'])) {
+            $cliente = Cliente::where('espocrm_id', $o['accountId'])->first();
+            if ($cliente && $cliente->tipo) {
+                $tipo = $cliente->tipo;
+            }
+        }
+        
+        // Buscar lead_id local pelo espocrm_id do lead
+        $leadId = null;
+        if (!empty($o['leadId'])) {
+            $lead = Lead::where('espocrm_id', $o['leadId'])->first();
+            if ($lead) {
+                $leadId = $lead->id;
+            }
+        }
+        
+        // Buscar cliente_id local pelo espocrm_id da conta
+        $clienteId = null;
+        if (!empty($o['accountId'])) {
+            $cliente = Cliente::where('espocrm_id', $o['accountId'])->first();
+            if ($cliente) {
+                $clienteId = $cliente->id;
+            }
+        }
+        
+        // Data de criação
+        $dataCriacao = null;
+        if (!empty($o['createdAt'])) {
+            $dataCriacao = $this->parseDateTime($o['createdAt']);
+        }
+        
+        // Data de fechamento
+        $dataFechamento = null;
+        if (!empty($o['closeDate'])) {
+            $dataFechamento = $this->parseDate($o['closeDate']);
+        }
+        
+        // Montar array de dados
+        return [
+            'espocrm_id' => $o['id'] ?? null,
+            'nome' => $o['name'] ?? 'Sem nome',
+            'estagio' => $estagioLocal,
+            'valor' => (float)($o['amount'] ?? 0),
+            'tipo' => $tipo,
+            'lead_id' => $leadId,
+            'cliente_id' => $clienteId,
+            'responsavel_id' => $this->buscarResponsavelId($o['assignedUserId'] ?? null),
+            'data_criacao' => $dataCriacao,
+            'data_fechamento' => $dataFechamento,
+            'observacoes' => $o['description'] ?? null,
+            'metadata' => json_encode([
+                'espo_stage_original' => $estagioApi,
+                'probability' => $o['probability'] ?? null,
+                'leadSource' => $o['leadSource'] ?? null,
+                'accountId' => $o['accountId'] ?? null,
+                'leadId' => $o['leadId'] ?? null,
+                'modifiedAt' => $o['modifiedAt'] ?? null,
+                'assignedUserName' => $o['assignedUserName'] ?? null,
+                'accountName' => $o['accountName'] ?? null
+            ])
+        ];
+    }
+
+    /**
+     * Limpar telefone - manter apenas números
+     */
+    private function limparTelefone(?string $telefone): ?string
+    {
+        if (empty($telefone)) {
+            return null;
+        }
+        return preg_replace('/[^0-9]/', '', $telefone);
+    }
+
+    /**
+     * Parse de data/hora do formato ESPO CRM
+     * Formato: "2026-02-04 14:51:42"
+     */
+    private function parseDateTime(?string $datetime): ?string
+    {
+        if (empty($datetime)) {
+            return null;
+        }
+        
+        try {
+            return \Carbon\Carbon::parse($datetime)->format('Y-m-d H:i:s');
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Parse de data do formato ESPO CRM
+     * Formato: "2026-02-04"
+     */
+    private function parseDate(?string $date): ?string
+    {
+        if (empty($date)) {
+            return null;
+        }
+        
+        try {
+            return \Carbon\Carbon::parse($date)->format('Y-m-d');
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * Buscar ID do responsável local pelo ID do ESPO CRM
+     * Por enquanto retorna null, pode ser implementado futuramente
+     */
+    private function buscarResponsavelId(?string $espoUserId): ?int
+    {
+        // TODO: Implementar mapeamento de usuários ESPO -> usuários locais
+        // Por enquanto, retorna null
+        return null;
+    }
+}

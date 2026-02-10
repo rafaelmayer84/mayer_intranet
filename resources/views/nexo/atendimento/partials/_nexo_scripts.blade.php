@@ -1,0 +1,317 @@
+<script>
+// ═══ Tab Switcher ═══
+function switchTab(tab) {
+    const panels = {contexto:'contexto360-panel',datajuri:'datajuri-panel',notes:'notes-panel',flows:'flows-panel'};
+    const tabs = {contexto:'tab-contexto',datajuri:'tab-datajuri',notes:'tab-notes',flows:'tab-flows'};
+    Object.values(panels).forEach(id=>{const el=document.getElementById(id);if(el){el.classList.add('hidden');el.classList.remove('flex')}});
+    Object.values(tabs).forEach(id=>{const el=document.getElementById(id);if(el){el.classList.remove('text-[#1e3a5f]','border-[#1e3a5f]');el.classList.add('text-gray-500','border-transparent')}});
+    const p=document.getElementById(panels[tab]),t=document.getElementById(tabs[tab]);
+    if(p){p.classList.remove('hidden');if(['notes','flows'].includes(tab))p.classList.add('flex')}
+    if(t){t.classList.remove('text-gray-500','border-transparent');t.classList.add('text-[#1e3a5f]','border-[#1e3a5f]')}
+    if(tab==='datajuri'&&typeof NexoDataJuri!=='undefined')NexoDataJuri.carregar();
+    if(tab==='notes')NexoApp.loadNotes();
+    if(tab==='flows')NexoApp.loadFlows();
+}
+window.refreshContexto360=function(convId){
+    const dj=document.getElementById('datajuri-panel');
+    if(dj&&!dj.classList.contains('hidden')&&typeof NexoDataJuri!=='undefined')NexoDataJuri.carregar();
+};
+
+// ═══ NexoApp Core ═══
+const NexoApp = {
+    conversas:[],conversaAtual:null,lastMsgId:null,lastMsgCount:0,
+    filters:{status:'',unread:''},searchTerm:'',pollTimer:null,inboxTimer:null,flowsCache:null,
+    priorityLevels:['normal','alta','urgente','critica'],
+    csrf:document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')||'',
+
+    init(){this.loadConversas();this.inboxTimer=setInterval(()=>this.loadConversas(true),8000)},
+
+    async api(url,opts={}){
+        const o={headers:{'Accept':'application/json',...(opts.headers||{})},...opts};
+        if(o.body&&typeof o.body==='object'&&!(o.body instanceof FormData)){o.body=JSON.stringify(o.body);o.headers['Content-Type']='application/json'}
+        if(o.method&&o.method!=='GET')o.headers['X-CSRF-TOKEN']=this.csrf;
+        const r=await fetch(url,o);if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json();
+    },
+
+    // ═══ INBOX ═══
+    async loadConversas(silent=false){
+        if(!silent){document.getElementById('inbox-loading').classList.remove('hidden');document.getElementById('inbox-items').innerHTML='';document.getElementById('inbox-empty').classList.add('hidden')}
+        const p=new URLSearchParams();
+        if(this.filters.status)p.set('status',this.filters.status);
+        if(this.filters.unread)p.set('unread',this.filters.unread);
+        try{
+            const j=await this.api(`/nexo/atendimento/conversas?${p}`);
+            this.conversas=j.data||[];this.renderInbox();
+            document.getElementById('inbox-total').textContent=`${j.total||this.conversas.length} conversas`;
+        }catch(e){console.error('Inbox error:',e);if(!silent)document.getElementById('inbox-items').innerHTML='<p class="text-center text-red-500 text-sm py-6">Erro ao carregar</p>'}
+        finally{document.getElementById('inbox-loading').classList.add('hidden')}
+    },
+
+    renderInbox(){
+        const c=document.getElementById('inbox-items'),em=document.getElementById('inbox-empty');
+        const s=this.searchTerm.toLowerCase();
+        let list=this.conversas;
+        if(s)list=list.filter(x=>(x.name||'').toLowerCase().includes(s)||(x.phone||'').includes(s));
+        if(!list.length){c.innerHTML='';em.classList.remove('hidden');return}
+        em.classList.add('hidden');
+        c.innerHTML=list.map(x=>this.inboxItem(x)).join('');
+    },
+
+    inboxItem(c){
+        const active=this.conversaAtual?.id===c.id;
+        const ini=(c.name||'??').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+        const time=c.last_message_at?this.timeAgo(c.last_message_at):'';
+        const unread=c.unread_count||0;
+        let lb='';
+        if(c.linked_cliente_id)lb='<span class="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium">CLI</span>';
+        else if(c.linked_lead_id)lb='<span class="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium">LEAD</span>';
+        else lb='<span class="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded">?</span>';
+        const pr=c.priority||'normal';
+        const pb=pr!=='normal'?`<span class="w-2 h-2 rounded-full inline-block priority-${pr}"></span>`:'';
+        return `<div class="inbox-item ${active?'active':''} flex items-center gap-3 px-4 py-3 cursor-pointer border-b border-gray-100" onclick="NexoApp.selectConversa(${c.id})">
+            <div class="relative flex-shrink-0"><div class="w-11 h-11 rounded-full bg-[#dfe5e7] text-[#54656f] flex items-center justify-center text-sm font-semibold">${ini}</div>${unread>0?`<span class="absolute -top-1 -right-1 w-5 h-5 bg-[#1e3a5f] text-white text-[10px] font-bold rounded-full flex items-center justify-center">${unread}</span>`:''}</div>
+            <div class="flex-1 min-w-0"><div class="flex items-center justify-between"><span class="text-sm font-medium text-[#111b21] truncate">${this.esc(c.name||'Sem nome')}</span><span class="text-[10px] text-[#667781] flex-shrink-0 ml-2">${time}</span></div><div class="flex items-center justify-between mt-0.5"><span class="text-xs text-[#667781] truncate">${this.fmtPhone(c.phone||'')}</span><div class="flex items-center gap-1 flex-shrink-0 ml-2">${pb} ${lb}</div></div></div></div>`;
+    },
+
+    setFilter(k,v){
+        this.filters={status:'',unread:''};if(k&&v)this.filters[k]=v;
+        document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+        if(!v)document.querySelector('[data-filter="all"]').classList.add('active');
+        else{const t=document.querySelector(`[data-filter="${v==='1'?'unread':v}"]`);if(t)t.classList.add('active')}
+        this.loadConversas();
+    },
+    filterLocal(t){this.searchTerm=t;this.renderInbox()},
+
+    // ═══ SELECT CONVERSA ═══
+    async selectConversa(id){
+        if(this.pollTimer)clearInterval(this.pollTimer);
+        this.lastMsgId=null;this.lastMsgCount=0;
+        try{
+            const j=await this.api(`/nexo/atendimento/conversas/${id}`);
+            this.conversaAtual=j.conversation;
+            const cv=j.conversation;
+            document.getElementById('chat-empty').classList.add('hidden');
+            ['chat-header','chat-messages','chat-input-bar'].forEach(x=>{const el=document.getElementById(x);el.classList.remove('hidden');if(x==='chat-header')el.classList.add('flex')});
+            if(window.innerWidth<1024){document.getElementById('inbox-panel').classList.add('hidden');const cp=document.getElementById('chat-panel');cp.classList.remove('hidden');cp.classList.add('flex')}
+            const ini=(cv.name||'??').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
+            document.getElementById('chat-avatar').textContent=ini;
+            document.getElementById('chat-contact-name').textContent=cv.name||'Sem nome';
+            document.getElementById('chat-contact-phone').textContent=cv.phone?this.fmtPhone(cv.phone):'';
+            const bd=document.getElementById('chat-status-badge');
+            if(cv.status==='open'){bd.textContent='Aberta';bd.className='text-xs px-2 py-0.5 rounded-full bg-[#e7fce3] text-[#1e3a5f]'}
+            else{bd.textContent='Fechada';bd.className='text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-600'}
+            document.getElementById('chat-toggle-status').textContent=cv.status==='open'?'Fechar':'Reabrir';
+            document.getElementById('chat-assign-select').value=cv.assigned_user_id||'';
+            this.updatePrioBadge(cv.priority||'normal');
+            this.renderMessages(j.messages||[]);
+            document.querySelectorAll('.inbox-item').forEach(el=>el.classList.remove('active'));
+            const ai=document.querySelector(`.inbox-item[onclick*="selectConversa(${id})"]`);if(ai)ai.classList.add('active');
+            this.loadContexto(id);
+            if(typeof NexoDataJuri!=='undefined')NexoDataJuri.setConversation(id);
+            switchTab('contexto');
+            this.pollTimer=setInterval(()=>this.poll(id),5000);
+        }catch(e){console.error('Select error:',e)}
+    },
+
+    // ═══ RENDER MENSAGENS COM MÍDIA ═══
+    renderMessages(msgs){
+        const c=document.getElementById('chat-messages');
+        if(!msgs.length){c.innerHTML='<p class="text-center text-[#667781] text-sm py-8">Nenhuma mensagem</p>';this.lastMsgId=null;this.lastMsgCount=0;return}
+        let lastDate='',html='';
+        msgs.forEach(m=>{
+            const md=m.sent_at?m.sent_at.split('T')[0]:'';
+            if(md&&md!==lastDate){lastDate=md;html+=`<div class="flex justify-center my-3"><span class="text-[11px] bg-white text-[#54656f] px-3 py-1.5 rounded-lg shadow-sm font-medium">${this.fmtDate(md)}</span></div>`}
+            const isIn=parseInt(m.direction)===1;
+            const time=m.sent_at?new Date(m.sent_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'';
+            const hb=(!isIn&&m.is_human)?'<span class="text-[9px] text-[#53bdeb] ml-1">✓✓</span>':'';
+            const bc=isIn?'msg-bubble-in':'msg-bubble-out';
+            const al=isIn?'justify-start':'justify-end';
+            const content=this.renderMsgContent(m);
+            html+=`<div class="flex ${al} mb-0.5"><div class="${bc} px-2.5 py-1.5 max-w-[75%] lg:max-w-[55%]">${content}<p class="text-[10px] text-[#667781] text-right mt-0.5 leading-none">${time}${hb}</p></div></div>`;
+        });
+        c.innerHTML=html;
+        this.lastMsgId=msgs[msgs.length-1].id;
+        this.lastMsgCount=msgs.length;
+        c.scrollTop=c.scrollHeight;
+    },
+
+    renderMsgContent(m){
+        const type=m.message_type||'text';
+        const body=this.esc(m.body||'');
+        const url=m.media_url||'';
+        const cap=m.media_caption?this.esc(m.media_caption):'';
+        const fn=m.media_filename?this.esc(m.media_filename):'';
+        const eu=this.esc(url);
+        const txtP=(t)=>`<p class="text-[13px] text-[#111b21] whitespace-pre-wrap break-words leading-[19px]">${t}</p>`;
+
+        switch(type){
+            case 'image':case 'sticker':
+                if(url){let h=`<img src="${eu}" class="msg-media-img" onclick="window.open('${eu}','_blank')" loading="lazy">`;if(cap)h+=txtP(cap);else if(body)h+=txtP(body);return h}
+                return `<div class="flex items-center gap-2 text-xs text-[#667781]">📷 Imagem</div>`+(body?txtP(body):'');
+
+            case 'audio':case 'voice':
+                if(url)return `<audio controls class="msg-media-audio" preload="none"><source src="${eu}"></audio>`+(body&&body!==cap?txtP(body):'');
+                return `<div class="text-xs text-[#667781]">🎵 Áudio</div>`+(body?txtP(body):'');
+
+            case 'video':
+                if(url){let h=`<video controls class="msg-media-img" preload="none"><source src="${eu}"></video>`;if(cap)h+=txtP(cap);return h}
+                return `<div class="text-xs text-[#667781]">🎬 Vídeo</div>`;
+
+            case 'document':
+                const dn=fn||'Documento';
+                if(url)return `<a href="${eu}" target="_blank" class="msg-media-doc"><svg class="w-8 h-8 text-[#667781] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg><div class="min-w-0"><p class="text-xs font-medium text-[#111b21] truncate">${dn}</p><p class="text-[10px] text-[#667781]">Abrir</p></div></a>`+(cap?txtP(cap):'');
+                return `<div class="msg-media-doc"><span class="text-xs text-[#667781]">📄 ${dn}</span></div>`;
+
+            default:
+                return body?txtP(body):'<p class="text-[13px] text-[#8696a0] italic">Mensagem sem conteúdo</p>';
+        }
+    },
+
+    // ═══ POLL ═══
+    async poll(cid){
+        if(!this.conversaAtual||this.conversaAtual.id!==cid)return;
+        try{
+            const j=await this.api(`/nexo/atendimento/conversas/${cid}/poll`);
+            const msgs=j.messages||[];if(!msgs.length)return;
+            const lid=msgs[msgs.length-1].id;
+            if(lid!==this.lastMsgId||msgs.length!==this.lastMsgCount){this.renderMessages(msgs);this.loadConversas(true)}
+        }catch(e){console.warn('Poll error:',e)}
+    },
+
+    // ═══ ENVIAR MENSAGEM ═══
+    async sendMessage(){
+        if(!this.conversaAtual)return;
+        const inp=document.getElementById('chat-input'),text=inp.value.trim();if(!text)return;
+        inp.value='';inp.style.height='auto';
+        const c=document.getElementById('chat-messages');
+        const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+        c.insertAdjacentHTML('beforeend',`<div class="flex justify-end mb-0.5"><div class="msg-bubble-out px-2.5 py-1.5 max-w-[75%] lg:max-w-[55%] opacity-70"><p class="text-[13px] text-[#111b21] whitespace-pre-wrap break-words">${this.esc(text)}</p><p class="text-[10px] text-[#667781] text-right mt-0.5">⏳ ${now}</p></div></div>`);
+        c.scrollTop=c.scrollHeight;
+        try{
+            await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/mensagens`,{method:'POST',body:{text}});
+            const j=await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}`);
+            this.renderMessages(j.messages||[]);
+        }catch(e){console.error('Send error:',e);c.insertAdjacentHTML('beforeend','<p class="text-center text-red-500 text-xs py-1">Erro ao enviar</p>');c.scrollTop=c.scrollHeight}
+    },
+
+    // ═══ PRIORIDADE ═══
+    updatePrioBadge(p){
+        const b=document.getElementById('chat-priority-badge');
+        const l={normal:'⚪ Normal',alta:'🟡 Alta',urgente:'🟠 Urgente',critica:'🔴 Crítica'};
+        b.textContent=l[p]||l.normal;b.className=`text-[10px] px-2 py-0.5 rounded-full font-medium cursor-pointer priority-${p}`;
+    },
+    async cyclePriority(){
+        if(!this.conversaAtual)return;
+        const cur=this.conversaAtual.priority||'normal';
+        const nxt=this.priorityLevels[(this.priorityLevels.indexOf(cur)+1)%this.priorityLevels.length];
+        try{await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/priority`,{method:'PATCH',body:{priority:nxt}});this.conversaAtual.priority=nxt;this.updatePrioBadge(nxt);this.loadConversas(true)}catch(e){console.error('Priority error:',e)}
+    },
+
+    // ═══ NOTAS ═══
+    async loadNotes(){
+        if(!this.conversaAtual)return;
+        const list=document.getElementById('notes-list');
+        list.innerHTML='<div class="flex justify-center py-4"><div class="w-4 h-4 border-2 border-[#1e3a5f] border-t-transparent rounded-full animate-spin"></div></div>';
+        try{
+            const j=await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/notes`);
+            const notes=j.notes||[];
+            if(!notes.length){list.innerHTML='<p class="text-xs text-gray-400 text-center py-4">Nenhuma nota ainda</p>';return}
+            list.innerHTML=notes.map(n=>{
+                const d=new Date(n.created_at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+                return `<div class="bg-amber-50 border border-amber-200 rounded-lg p-2.5 text-xs"><div class="flex justify-between items-start mb-1"><span class="font-medium text-amber-800">${this.esc(n.user?.name||'Sistema')}</span><div class="flex items-center gap-1.5"><span class="text-[10px] text-amber-600">${d}</span><button onclick="NexoApp.deleteNote(${n.id})" class="text-red-400 hover:text-red-600" title="Excluir">✕</button></div></div><p class="text-gray-700 whitespace-pre-wrap">${this.esc(n.content)}</p></div>`;
+            }).join('');
+        }catch(e){list.innerHTML='<p class="text-xs text-red-500 text-center py-4">Erro ao carregar notas</p>'}
+    },
+    async saveNote(){
+        if(!this.conversaAtual)return;const inp=document.getElementById('note-input'),ct=inp.value.trim();if(!ct)return;
+        try{const r=await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/notes`,{method:'POST',body:{content:ct}});if(r.success){inp.value='';this.loadNotes()}}catch(e){console.error('Note save error:',e)}
+    },
+    async deleteNote(nid){
+        if(!this.conversaAtual||!confirm('Excluir esta nota?'))return;
+        try{await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/notes/${nid}`,{method:'DELETE'});this.loadNotes()}catch(e){console.error('Note delete error:',e)}
+    },
+
+    // ═══ FLOWS ═══
+    async loadFlows(){
+        if(!this.conversaAtual)return;
+        const ld=document.getElementById('flows-loading'),ls=document.getElementById('flows-list'),em=document.getElementById('flows-empty');
+        ld.classList.remove('hidden');ls.classList.add('hidden');em.classList.add('hidden');
+        try{
+            if(!this.flowsCache){const j=await this.api('/nexo/atendimento/flows');this.flowsCache=j.flows||[]}
+            ld.classList.add('hidden');
+            if(!this.flowsCache.length){em.classList.remove('hidden');return}
+            ls.classList.remove('hidden');
+            ls.innerHTML=this.flowsCache.map(f=>{
+                const nm=this.esc(f.name||f.title||'Flow');const st=f.status==='active'?'🟢':'⚪';const fid=f.id||f.flow_id||'';
+                return `<div class="border border-gray-200 rounded-lg p-3"><div class="flex items-center justify-between"><div class="flex items-center gap-2"><span>${st}</span><span class="text-xs font-medium text-gray-800">${nm}</span></div><button onclick="NexoApp.triggerFlow('${fid}','${nm}')" class="text-[10px] px-2.5 py-1 bg-[#1e3a5f] text-white rounded hover:bg-[#162d4a] font-medium">Executar</button></div></div>`;
+            }).join('');
+        }catch(e){ld.classList.add('hidden');ls.classList.remove('hidden');ls.innerHTML='<p class="text-xs text-red-500 text-center py-4">Erro ao carregar flows</p>'}
+    },
+    async triggerFlow(fid,fname){
+        if(!this.conversaAtual||!fid)return;if(!confirm(`Executar flow "${fname}"?`))return;
+        try{const r=await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/run-flow`,{method:'POST',body:{flow_id:fid}});alert(r.success?'Flow executado!':'Erro: '+(r.error||'Falha'))}catch(e){alert('Erro ao executar flow')}
+    },
+
+    // ═══ CONTEXTO 360 ═══
+    async loadContexto(cid){
+        const em=document.getElementById('contexto-empty'),ld=document.getElementById('contexto-loading'),dt=document.getElementById('contexto-data'),lk=document.getElementById('contexto-link-actions');
+        em.classList.add('hidden');ld.classList.remove('hidden');dt.classList.add('hidden');lk.classList.add('hidden');
+        document.getElementById('contexto-panel').classList.remove('hidden');document.getElementById('contexto-panel').classList.add('xl:flex');
+        try{
+            const j=await this.api(`/nexo/atendimento/conversas/${cid}/contexto`);
+            let html='';
+            const tc={lead:{bg:'bg-blue-100',tx:'text-blue-700',lb:'Lead'},cliente:{bg:'bg-purple-100',tx:'text-purple-700',lb:'Cliente'},indefinido:{bg:'bg-gray-100',tx:'text-gray-600',lb:'Não vinculado'}};
+            const t=tc[j.link_type]||tc.indefinido;
+            html+=`<div><span class="text-xs px-2.5 py-1 rounded-full ${t.bg} ${t.tx} font-medium">${t.lb}</span></div>`;
+
+            if(j.lead){const l=j.lead;
+                html+=`<div class="ctx-section"><div class="ctx-section-header" onclick="this.nextElementSibling.classList.toggle('hidden')"><span class="text-xs font-semibold text-gray-700">📋 Lead — ${this.esc(l.nome||'N/A')}</span><span class="text-gray-400 text-xs">▼</span></div><div class="ctx-section-body">`;
+                const rows=[['Área',l.area_interesse],['Sub-área',l.sub_area],['Intenção',l.intencao_contratar],['Urgência',l.urgencia],['Complexidade',l.complexidade],['Potencial',l.potencial_honorarios],['Gatilho',l.gatilho_emocional],['Objeções',l.objecoes]];
+                rows.forEach(([k,v])=>{html+=`<div class="ctx-row"><span class="ctx-label">${k}</span><span class="ctx-value">${this.esc(v||'N/A')}</span></div>`});
+                if(l.resumo_demanda)html+=`<div class="mt-2 pt-2 border-t border-gray-100"><p class="text-[10px] text-gray-500 font-medium mb-1">Resumo</p><p class="text-xs text-gray-700 leading-relaxed">${this.esc(l.resumo_demanda)}</p></div>`;
+                if(l.palavras_chave)html+=`<div class="mt-2 pt-2 border-t border-gray-100"><p class="text-[10px] text-gray-500 font-medium mb-1">Tags</p><div class="flex flex-wrap gap-1">${l.palavras_chave.split(',').map(k=>`<span class="text-[10px] px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded">${this.esc(k.trim())}</span>`).join('')}</div></div>`;
+                if(l.intencao_justificativa)html+=`<div class="mt-2 pt-2 border-t border-gray-100"><p class="text-[10px] text-gray-500 font-medium mb-1">IA</p><p class="text-xs text-gray-600 italic">${this.esc(l.intencao_justificativa)}</p></div>`;
+                html+=`</div></div>`;
+            }
+
+            if(j.cliente){const cl=j.cliente;
+                html+=`<div class="ctx-section"><div class="ctx-section-header" onclick="this.nextElementSibling.classList.toggle('hidden')"><span class="text-xs font-semibold text-gray-700">👤 Cliente — ${this.esc(cl.nome||'N/A')}</span><span class="text-gray-400 text-xs">▼</span></div><div class="ctx-section-body">`;
+                html+=`<div class="ctx-row"><span class="ctx-label">Tipo</span><span class="ctx-value">${cl.tipo||cl.tipo_pessoa||'N/A'}</span></div>`;
+                html+=`<div class="ctx-row"><span class="ctx-label">Doc</span><span class="ctx-value">${this.esc(cl.cpf_cnpj||cl.documento||'N/A')}</span></div>`;
+                if(cl.processos_ativos?.length){html+=`<div class="mt-2 pt-2 border-t border-gray-100"><p class="text-[10px] text-gray-500 font-medium mb-1">Processos (${cl.processos_ativos.length})</p>`;cl.processos_ativos.forEach(p=>{html+=`<div class="text-xs text-gray-600 py-0.5 truncate">• ${this.esc(p.numero||p.titulo||'Processo')}</div>`});html+=`</div>`}
+                if(cl.contas_abertas?.length){html+=`<div class="mt-2 pt-2 border-t border-gray-100"><p class="text-[10px] text-gray-500 font-medium mb-1">Contas (${cl.contas_abertas.length})</p>`;cl.contas_abertas.forEach(ct=>{html+=`<div class="text-xs text-gray-600 py-0.5">• R$ ${this.esc(ct.valor||'0')} — ${this.esc(ct.descricao||'')}</div>`});html+=`</div>`}
+                html+=`</div></div>`;
+            }
+
+            if(j.link_type==='indefinido')lk.classList.remove('hidden');else{lk.classList.remove('hidden')}
+            this.updateUnlinkButtons(j);
+            dt.innerHTML=html;dt.classList.remove('hidden');
+        }catch(e){console.error('Ctx error:',e);dt.innerHTML='<p class="text-sm text-red-500 text-center py-4">Erro ao carregar</p>';dt.classList.remove('hidden')}
+        finally{ld.classList.add('hidden')}
+    },
+
+    // ═══ AÇÕES ═══
+    async assignResponsavel(uid){if(!this.conversaAtual)return;try{await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/assign`,{method:'PATCH',body:{user_id:uid||null}});this.loadConversas(true)}catch(e){console.error(e)}},
+    async toggleStatus(){if(!this.conversaAtual)return;const ns=this.conversaAtual.status==='open'?'closed':'open';try{await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/status`,{method:'PATCH',body:{status:ns}});this.selectConversa(this.conversaAtual.id)}catch(e){console.error(e)}},
+    linkLead(id){if(!id||!this.conversaAtual)return;this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/link-lead`,{method:'POST',body:{lead_id:parseInt(id)}}).then(()=>{this.loadContexto(this.conversaAtual.id);this.loadConversas(true)}).catch(e=>console.error(e))},
+    linkCliente(id){if(!id||!this.conversaAtual)return;this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/link-cliente`,{method:'POST',body:{cliente_id:parseInt(id)}}).then(()=>{this.loadContexto(this.conversaAtual.id);this.loadConversas(true)}).catch(e=>console.error(e))},
+    unlinkLead(){if(!this.conversaAtual)return;if(!confirm('Remover vinculação com este Lead?'))return;this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/unlink-lead`,{method:'DELETE'}).then(()=>{this.loadContexto(this.conversaAtual.id);this.loadConversas(true)}).catch(e=>console.error(e))},
+    unlinkCliente(){if(!this.conversaAtual)return;if(!confirm('Remover vinculação com este Cliente? O processo vinculado também será removido.'))return;this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/unlink-cliente`,{method:'DELETE'}).then(()=>{this.loadContexto(this.conversaAtual.id);this.loadConversas(true);if(typeof NexoDJ!=='undefined')NexoDJ.init(this.conversaAtual.id,null,null)}).catch(e=>console.error(e))},
+    updateUnlinkButtons(ctx){const ua=document.getElementById('unlink-actions');const bl=document.getElementById('btn-unlink-lead');const bc=document.getElementById('btn-unlink-cliente');if(!ua)return;let show=false;if(bl){if(ctx&&ctx.lead){bl.classList.remove('hidden');show=true}else{bl.classList.add('hidden')}}if(bc){if(ctx&&ctx.cliente){bc.classList.remove('hidden');show=true}else{bc.classList.add('hidden')}}if(show){ua.classList.remove('hidden')}else{ua.classList.add('hidden')}},
+
+    voltarInbox(){document.getElementById('inbox-panel').classList.remove('hidden');document.getElementById('chat-panel').classList.add('hidden');document.getElementById('chat-panel').classList.remove('flex')},
+    toggleContexto(){
+        const p=document.getElementById('contexto-panel');
+        if(p.classList.contains('hidden')){p.classList.remove('hidden');p.classList.add('flex');if(window.innerWidth<1280){p.style.cssText='position:fixed;right:0;top:64px;bottom:0;z-index:50;width:320px;box-shadow:-4px 0 12px rgba(0,0,0,.1)'}}
+        else{p.classList.add('hidden');p.classList.remove('flex');p.removeAttribute('style')}
+    },
+
+    // ═══ UTILS ═══
+    esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML},
+    fmtPhone(p){if(!p)return'';const c=p.replace(/\D/g,'');if(c.length===13)return`+${c.slice(0,2)} (${c.slice(2,4)}) ${c.slice(4,9)}-${c.slice(9)}`;if(c.length===12)return`+${c.slice(0,2)} (${c.slice(2,4)}) ${c.slice(4,8)}-${c.slice(8)}`;return p},
+    fmtDate(ds){const d=new Date(ds+'T00:00:00'),t=new Date(),y=new Date(t);y.setDate(y.getDate()-1);if(d.toDateString()===t.toDateString())return'Hoje';if(d.toDateString()===y.toDateString())return'Ontem';return d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'})},
+    timeAgo(ds){const d=new Date(ds),dm=Math.floor((new Date()-d)/60000);if(dm<1)return'agora';if(dm<60)return dm+'m';if(dm<1440)return Math.floor(dm/60)+'h';return Math.floor(dm/1440)+'d'}
+};
+
+document.addEventListener('DOMContentLoaded',()=>NexoApp.init());
+</script>

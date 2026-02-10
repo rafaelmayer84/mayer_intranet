@@ -1,0 +1,707 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Services\DataJuriSyncOrchestrator;
+use App\Services\EspoCrmService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+class SincronizacaoUnificadaController extends Controller
+{
+
+    private function normalizeUtf8($data)
+    {
+        if (is_string($data)) {
+            $enc = mb_detect_encoding($data, ['UTF-8','ISO-8859-1','Windows-1252'], true);
+            if ($enc && $enc !== 'UTF-8') $data = mb_convert_encoding($data, 'UTF-8', $enc);
+            return mb_convert_encoding($data, 'UTF-8', 'UTF-8');
+        }
+        if (is_array($data)) return array_map([$this, 'normalizeUtf8'], $data);
+        return $data;
+    }
+
+    /**
+     * Exibir pagina de sincronizacao unificada
+     */
+    public function index()
+    {
+        // Modulos disponiveis (cards dinamicos na view)
+        $datajuriConfig = config('datajuri.modulos', []);
+        $modulosDisponiveis = [];
+        $modulesMeta = [
+            'Pessoa'          => ['table' => 'clientes',                  'label' => 'Clientes',        'icon' => '👥'],
+            'Processo'        => ['table' => 'processos',                 'label' => 'Processos',       'icon' => '⚖️'],
+            'Fase'            => ['table' => 'fases_processo',            'label' => 'Fases',           'icon' => '📋'],
+            'Movimento'       => ['table' => 'movimentos',                'label' => 'Movimentos',      'icon' => '💰'],
+            'Contrato'        => ['table' => 'contratos',                 'label' => 'Contratos',       'icon' => '📝'],
+            'Atividade'       => ['table' => 'atividades_datajuri',       'label' => 'Atividades',      'icon' => '📅'],
+            'HoraTrabalhada'  => ['table' => 'horas_trabalhadas_datajuri','label' => 'Horas',           'icon' => '⏱️'],
+            'OrdemServico'    => ['table' => 'ordens_servico',            'label' => 'Ordens Servico',  'icon' => '📦'],
+            'ContasReceber'   => ['table' => 'contas_receber',            'label' => 'Contas a Receber','icon' => '💳'],
+        ];
+
+        foreach ($datajuriConfig as $key => $mod) {
+            if (empty($mod['enabled'])) continue;
+
+            $meta  = $modulesMeta[$key] ?? ['table' => $mod['table'] ?? strtolower($key), 'label' => $key, 'icon' => '📦'];
+            $table = $mod['table'] ?? $meta['table'];
+            $count = 0;
+            try { $count = DB::table($table)->count(); } catch (\Exception $e) {}
+
+            $modulosDisponiveis[$key] = [
+                'label'   => $mod['label'] ?? $meta['label'],
+                'icon'    => $mod['icon']  ?? $meta['icon'],
+                'table'   => $table,
+                'count'   => $count,
+                'enabled' => true,
+            ];
+        }
+
+        // Estatisticas DataJuri
+        $movimentos = DB::table('movimentos')->where('origem', 'datajuri')->count();
+        $processos  = DB::table('processos')->count();
+        $clientes   = DB::table('clientes')->count();
+        $atividades = 0;
+        try { $atividades = DB::table('atividades_datajuri')->count(); } catch (\Exception $e) {
+            try { $atividades = DB::table('atividades')->count(); } catch (\Exception $e2) {}
+        }
+
+        // Estatisticas ESPOCRM
+        $leads         = DB::table('leads')->count();
+        $oportunidades = DB::table('oportunidades')->count();
+        $contacts      = 0;
+        try { $contacts = DB::table('contacts')->count(); } catch (\Exception $e) {}
+        $contas = 0;
+        try { $contas = DB::table('accounts')->count(); } catch (\Exception $e) {}
+
+        // Ultima sincronizacao
+        $lastSync = DB::table('sync_runs')
+            ->where('status', 'completed')
+            ->orderBy('finished_at', 'desc')
+            ->first();
+
+        $lastSyncDataJuri = $lastSync?->finished_at
+            ? \Carbon\Carbon::parse($lastSync->finished_at)->format('d/m/Y H:i')
+            : 'Nunca';
+        $lastSyncEspocrm = 'N/A';
+        $lastRunTime      = $lastSyncDataJuri;
+
+        // Historico (inclui mensagem que a view usa)
+        $historico = DB::table('sync_runs')
+            ->select('id', 'run_id', 'tipo', 'status', 'registros_processados',
+                     'registros_criados', 'registros_atualizados', 'erros',
+                     'started_at', 'finished_at', 'mensagem', 'created_at')
+            ->orderBy('created_at', 'desc')
+            ->limit(20)
+            ->get()
+            ->map(function ($run) {
+                $run->created_at = \Carbon\Carbon::parse($run->created_at);
+                $run->duracao = null;
+                if ($run->started_at && $run->finished_at) {
+                    $start = \Carbon\Carbon::parse($run->started_at);
+                    $end   = \Carbon\Carbon::parse($run->finished_at);
+                    $run->duracao = $start->diffInSeconds($end);
+                }
+                $run->mensagem = $run->mensagem ?? '';
+                // BUG-004 FIX: Garante que tipo nunca fica vazio na view
+                if (empty($run->tipo)) {
+                    $run->tipo = 'full';
+                }
+                return $run;
+            });
+
+        return view('admin.sincronizacao-unificada.index', compact(
+            'modulosDisponiveis',
+            'movimentos', 'processos', 'clientes', 'atividades',
+            'leads', 'oportunidades', 'contacts', 'contas',
+            'lastSyncDataJuri', 'lastSyncEspocrm', 'lastRunTime',
+            'historico'
+        ));
+    }
+
+    /**
+     * Retornar contagens atualizadas (AJAX)
+     */
+    public function counts()
+    {
+        $datajuriConfig = config('datajuri.modulos', []);
+        $modulesMeta = [
+            'Pessoa'          => 'clientes',
+            'Processo'        => 'processos',
+            'Fase'            => 'fases_processo',
+            'Movimento'       => 'movimentos',
+            'Contrato'        => 'contratos',
+            'Atividade'       => 'atividades_datajuri',
+            'HoraTrabalhada'  => 'horas_trabalhadas_datajuri',
+            'OrdemServico'    => 'ordens_servico',
+            'ContasReceber'   => 'contas_receber',
+        ];
+
+        $counts = [];
+        foreach ($datajuriConfig as $key => $mod) {
+            if (empty($mod['enabled'])) continue;
+            $table = $mod['table'] ?? ($modulesMeta[$key] ?? strtolower($key));
+            try { $counts[$table] = DB::table($table)->count(); } catch (\Exception $e) { $counts[$table] = 0; }
+        }
+
+        return response()->json(['success' => true, 'counts' => $counts]);
+    }
+
+    /**
+     * Executar smoke test
+     */
+    public function smokeTest()
+    {
+        try {
+            $orchestrator = new DataJuriSyncOrchestrator();
+            $results = $orchestrator->smokeTest();
+
+            $results = $this->normalizeUtf8($results);
+            return response()->json([
+                'success' => $results['token'] && $results['modulos'],
+                'message' => $results['token'] ? 'Conexao OK - Token valido, modulos acessiveis' : 'Falha na autenticacao',
+                'results' => $results,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Iniciar sincronizacao completa
+     * FIX 07/02/2026: Orchestrator nao possui metodo syncAll().
+     * Solucao: iterar modulos habilitados usando syncModule() que funciona.
+     */
+    public function syncAll(Request $request)
+    {
+        $orchestrator = new DataJuriSyncOrchestrator();
+        $orchestrator->cleanupStaleRuns();
+
+        $running = DB::table('sync_runs')->where('status', 'running')->first();
+        if ($running) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ja existe uma sincronizacao em andamento',
+                'run_id'  => $running->run_id,
+            ], 409);
+        }
+
+        try {
+            // Registrar inicio da execucao (startRun retorna o run_id)
+            $runId = $orchestrator->startRun('full');
+
+            // Buscar modulos habilitados do config
+            $datajuriConfig = config('datajuri.modulos', []);
+            $modulosHabilitados = [];
+            foreach ($datajuriConfig as $key => $mod) {
+                if (!empty($mod['enabled'])) {
+                    $modulosHabilitados[] = $key;
+                }
+            }
+
+            if (empty($modulosHabilitados)) {
+                $orchestrator->finishRun('completed', 'Nenhum modulo habilitado');
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Nenhum modulo habilitado para sincronizacao',
+                ]);
+            }
+
+            // Agregar resultados de todos os modulos
+            $totalProcessados  = 0;
+            $totalCriados      = 0;
+            $totalAtualizados  = 0;
+            $totalErros        = 0;
+            $detalhesModulos   = [];
+
+            foreach ($modulosHabilitados as $modulo) {
+                try {
+                    $result = $orchestrator->syncModule($modulo);
+
+                    $totalProcessados += $result['processados'] ?? 0;
+                    $totalCriados     += $result['criados'] ?? 0;
+                    $totalAtualizados += $result['atualizados'] ?? 0;
+                    $totalErros       += $result['erros'] ?? 0;
+
+                    $detalhesModulos[$modulo] = $result;
+
+                } catch (\Exception $e) {
+                    $totalErros++;
+                    $detalhesModulos[$modulo] = [
+                        'modulo'      => $modulo,
+                        'processados' => 0,
+                        'criados'     => 0,
+                        'atualizados' => 0,
+                        'erros'       => 1,
+                        'erro_msg'    => $e->getMessage(),
+                    ];
+
+                    Log::error("Erro ao sincronizar modulo {$modulo}: " . $e->getMessage());
+                }
+            }
+
+            // Atualizar sync_run com totais
+            $mensagem = "{$totalProcessados} processados, {$totalCriados} criados, {$totalAtualizados} atualizados";
+            if ($totalErros > 0) {
+                $mensagem .= ", {$totalErros} erros";
+            }
+
+            $orchestrator->finishRun('completed', $mensagem);
+
+            // Atualizar contadores na tabela sync_runs
+            if ($runId) {
+                DB::table('sync_runs')
+                    ->where('run_id', $runId)
+                    ->update([
+                        'registros_processados' => $totalProcessados,
+                        'registros_criados'     => $totalCriados,
+                        'registros_atualizados' => $totalAtualizados,
+                        'erros'                 => $totalErros,
+                    ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "Sincronizacao concluida: {$mensagem}",
+                'results' => [
+                    'total_processados'  => $totalProcessados,
+                    'total_criados'      => $totalCriados,
+                    'total_atualizados'  => $totalAtualizados,
+                    'total_erros'        => $totalErros,
+                    'modulos'            => $detalhesModulos,
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            // Garantir que o run seja finalizado mesmo com erro
+            try {
+                $orchestrator->finishRun('failed', 'Erro: ' . $e->getMessage());
+            } catch (\Exception $finishEx) {
+                Log::error('Erro ao finalizar run: ' . $finishEx->getMessage());
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Sincronizar modulo especifico
+     */
+    public function syncModule(Request $request, string $modulo)
+    {
+        try {
+            $orchestrator = new DataJuriSyncOrchestrator();
+            $orchestrator->cleanupStaleRuns();
+            $orchestrator->startRun('modulo_' . $modulo);
+            $results = $orchestrator->syncModule($modulo);
+            $orchestrator->finishRun('completed', "{$modulo}: {$results['processados']} processados");
+
+            return response()->json([
+                'success' => true,
+                'message' => "{$modulo}: {$results['processados']} processados, {$results['criados']} criados, {$results['atualizados']} atualizados",
+                'results' => $results,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Reprocessar financeiro (full refresh)
+     */
+    public function reprocessarFinanceiro()
+    {
+        $orchestrator = new DataJuriSyncOrchestrator();
+        $orchestrator->cleanupStaleRuns();
+
+        $running = DB::table('sync_runs')->where('status', 'running')->first();
+        if ($running) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ja existe uma sincronizacao em andamento',
+            ], 409);
+        }
+
+        try {
+            $results = $orchestrator->reprocessarFinanceiro();
+
+            return response()->json([
+                'success' => true,
+                'message' => "Reprocessamento concluido: {$results['processados']} processados, {$results['deletados']} obsoletos removidos",
+                'results' => $results,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Obter status da sincronizacao
+     */
+    public function status(string $runId = null)
+    {
+        $run = $runId
+            ? DB::table('sync_runs')->where('run_id', $runId)->first()
+            : DB::table('sync_runs')->orderBy('created_at', 'desc')->first();
+
+        if (!$run) {
+            return response()->json(['success' => false, 'message' => 'Nenhuma execucao encontrada'], 404);
+        }
+
+        return response()->json(['success' => true, 'run' => $run]);
+    }
+
+    /**
+     * Cancelar sincronizacao em andamento
+     */
+    public function cancel(string $runId)
+    {
+        $updated = DB::table('sync_runs')
+            ->where('run_id', $runId)
+            ->where('status', 'running')
+            ->update([
+                'status'      => 'cancelled',
+                'mensagem'    => 'Cancelado pelo usuario',
+                'finished_at' => now(),
+                'updated_at'  => now(),
+            ]);
+
+        return response()->json([
+            'success' => (bool) $updated,
+            'message' => $updated ? 'Sincronizacao cancelada' : 'Nao foi possivel cancelar',
+        ]);
+    }
+
+    /**
+     * Limpar historico de execucoes antigas
+     */
+    public function clearHistory(Request $request)
+    {
+        $days = $request->input('days', 30);
+
+        $deleted = DB::table('sync_runs')
+            ->where('created_at', '<', now()->subDays($days))
+            ->where('status', '!=', 'running')
+            ->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$deleted} registros removidos",
+        ]);
+    }
+
+    /**
+     * Testar conexao ESPO CRM
+     */
+    public function espocrmTest()
+    {
+        try {
+            $service = app(EspoCrmService::class);
+            $result = $service->testConnection();
+            $result = $this->normalizeUtf8($result);
+
+            return response()->json([
+                'success' => $result['success'] ?? false,
+                'message' => $result['message'] ?? 'Sem resposta',
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Sincronizar ESPO CRM (Leads, Contacts, Accounts)
+     */
+    public function espocrmSync()
+    {
+        try {
+            $service = app(EspoCrmService::class);
+            $results = $service->syncAll();
+            $results = $this->normalizeUtf8($results);
+
+            $success = $results['success'] ?? false;
+            $msg = $success
+                ? 'ESPO CRM sincronizado com sucesso'
+                : ($results['message'] ?? 'Falha na sincronizacao');
+
+            return response()->json([
+                'success' => $success,
+                'message' => $msg,
+                'results' => $results,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    // ================================================================
+    // METODOS DE CLASSIFICACAO DE PLANOS DE CONTA
+    // BUG-005/BUG-006 FIX: Metodos ausentes restaurados
+    // ================================================================
+
+    /**
+     * Listar regras de classificacao (API JSON paginada)
+     */
+    public function classificacaoIndex(Request $request)
+    {
+        try {
+            $query = DB::table('classificacao_regras');
+
+            if ($busca = $request->input('busca')) {
+                $query->where(function ($q) use ($busca) {
+                    $q->where('codigo_plano', 'like', "%{$busca}%")
+                      ->orWhere('nome_plano', 'like', "%{$busca}%");
+                });
+            }
+
+            if ($classificacao = $request->input('classificacao')) {
+                $query->where('classificacao', $classificacao);
+            }
+
+            $regras = $query->orderBy('codigo_plano')->paginate(20);
+
+            return response()->json($regras);
+        } catch (\Exception $e) {
+            Log::error('Erro ao listar regras de classificacao: ' . $e->getMessage());
+            return response()->json([
+                'data'         => [],
+                'current_page' => 1,
+                'last_page'    => 1,
+                'total'        => 0,
+            ]);
+        }
+    }
+
+    /**
+     * Estatisticas de classificacao (contagem por tipo)
+     */
+    public function classificacaoStats()
+    {
+        try {
+            $stats = DB::table('classificacao_regras')
+                ->select('classificacao', DB::raw('count(*) as total'))
+                ->where('ativo', true)
+                ->groupBy('classificacao')
+                ->pluck('total', 'classificacao')
+                ->toArray();
+
+            return response()->json($stats);
+        } catch (\Exception $e) {
+            Log::error('Erro ao carregar stats de classificacao: ' . $e->getMessage());
+            return response()->json([
+                'RECEITA_PF'             => 0,
+                'RECEITA_PJ'             => 0,
+                'DESPESA'                => 0,
+                'PENDENTE_CLASSIFICACAO'  => 0,
+            ]);
+        }
+    }
+
+    /**
+     * Criar regra de classificacao
+     */
+    public function classificacaoStore(Request $request)
+    {
+        $validated = $request->validate([
+            'codigo_plano'  => 'required|string|max:50',
+            'nome_plano'    => 'nullable|string|max:255',
+            'classificacao' => 'required|string|in:RECEITA_PF,RECEITA_PJ,RECEITA_FINANCEIRA,DEDUCAO,DESPESA,OUTRAS_RECEITAS,PENDENTE_CLASSIFICACAO',
+            'grupo_dre'     => 'nullable|string|max:20',
+            'ativo'         => 'boolean',
+        ]);
+
+        try {
+            $exists = DB::table('classificacao_regras')
+                ->where('codigo_plano', $validated['codigo_plano'])
+                ->exists();
+
+            if ($exists) {
+                DB::table('classificacao_regras')
+                    ->where('codigo_plano', $validated['codigo_plano'])
+                    ->update([
+                        'nome_plano'    => $validated['nome_plano'] ?? null,
+                        'classificacao' => $validated['classificacao'],
+                        'grupo_dre'     => $validated['grupo_dre'] ?? null,
+                        'ativo'         => $validated['ativo'] ?? true,
+                        'updated_at'    => now(),
+                    ]);
+                return response()->json(['success' => true, 'message' => 'Regra atualizada']);
+            }
+
+            DB::table('classificacao_regras')->insert([
+                'codigo_plano'  => $validated['codigo_plano'],
+                'nome_plano'    => $validated['nome_plano'] ?? null,
+                'classificacao' => $validated['classificacao'],
+                'grupo_dre'     => $validated['grupo_dre'] ?? null,
+                'ativo'         => $validated['ativo'] ?? true,
+                'created_at'    => now(),
+                'updated_at'    => now(),
+            ]);
+
+            return response()->json(['success' => true, 'message' => 'Regra criada']);
+        } catch (\Exception $e) {
+            Log::error('Erro ao salvar regra: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Erro ao salvar: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Atualizar regra de classificacao existente
+     */
+    public function classificacaoUpdate(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'codigo_plano'  => 'required|string|max:50',
+            'nome_plano'    => 'nullable|string|max:255',
+            'classificacao' => 'required|string|in:RECEITA_PF,RECEITA_PJ,RECEITA_FINANCEIRA,DEDUCAO,DESPESA,OUTRAS_RECEITAS,PENDENTE_CLASSIFICACAO',
+            'grupo_dre'     => 'nullable|string|max:20',
+            'ativo'         => 'boolean',
+        ]);
+
+        try {
+            $updated = DB::table('classificacao_regras')
+                ->where('id', $id)
+                ->update([
+                    'nome_plano'    => $validated['nome_plano'] ?? null,
+                    'classificacao' => $validated['classificacao'],
+                    'grupo_dre'     => $validated['grupo_dre'] ?? null,
+                    'ativo'         => $validated['ativo'] ?? true,
+                    'updated_at'    => now(),
+                ]);
+
+            return response()->json([
+                'success' => (bool) $updated,
+                'message' => $updated ? 'Regra atualizada' : 'Regra nao encontrada',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Erro ao atualizar regra: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Erro ao atualizar: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Excluir regra de classificacao
+     */
+    public function classificacaoDestroy($id)
+    {
+        try {
+            $deleted = DB::table('classificacao_regras')->where('id', $id)->delete();
+
+            return response()->json([
+                'success' => (bool) $deleted,
+                'message' => $deleted ? 'Regra excluida' : 'Regra nao encontrada',
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Erro ao excluir regra: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Erro ao excluir: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Importar planos de conta do DataJuri (cria regras para codigos sem regra)
+     */
+    public function classificacaoImportar()
+    {
+        try {
+            $codigosMovimentos = DB::table('movimentos')
+                ->whereNotNull('codigo_plano')
+                ->where('codigo_plano', '!=', '')
+                ->select('codigo_plano', 'plano_contas')
+                ->distinct()
+                ->get();
+
+            $codigosExistentes = DB::table('classificacao_regras')
+                ->pluck('codigo_plano')
+                ->toArray();
+
+            $novos = 0;
+            foreach ($codigosMovimentos as $mov) {
+                if (in_array($mov->codigo_plano, $codigosExistentes)) {
+                    continue;
+                }
+
+                DB::table('classificacao_regras')->insert([
+                    'codigo_plano'  => $mov->codigo_plano,
+                    'nome_plano'    => $mov->plano_contas,
+                    'classificacao' => 'PENDENTE_CLASSIFICACAO',
+                    'ativo'         => true,
+                    'created_at'    => now(),
+                    'updated_at'    => now(),
+                ]);
+                $novos++;
+                $codigosExistentes[] = $mov->codigo_plano;
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "{$novos} novos planos importados do DataJuri",
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Erro ao importar regras: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Erro ao importar: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Reclassificar todos os movimentos com base nas regras atuais
+     */
+    public function classificacaoReclassificar()
+    {
+        try {
+            $regras = DB::table('classificacao_regras')
+                ->where('ativo', true)
+                ->get();
+
+            $totalAtualizado = 0;
+
+            foreach ($regras as $regra) {
+                $atualizado = DB::table('movimentos')
+                    ->where('codigo_plano', $regra->codigo_plano)
+                    ->where(function ($q) use ($regra) {
+                        $q->where('classificacao', '!=', $regra->classificacao)
+                          ->orWhereNull('classificacao');
+                    })
+                    ->update([
+                        'classificacao' => $regra->classificacao,
+                        'updated_at'    => now(),
+                    ]);
+
+                $totalAtualizado += $atualizado;
+            }
+
+            $pendentes = DB::table('movimentos')
+                ->where('classificacao', 'PENDENTE_CLASSIFICACAO')
+                ->orWhereNull('classificacao')
+                ->count();
+
+            return response()->json([
+                'success' => true,
+                'message' => "{$totalAtualizado} movimentos reclassificados. {$pendentes} ainda pendentes.",
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Erro ao reclassificar: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Erro ao reclassificar: ' . $e->getMessage()], 500);
+        }
+    }
+}

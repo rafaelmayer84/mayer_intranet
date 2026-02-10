@@ -1,0 +1,595 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Services\DataJuriSyncOrchestrator;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+
+class SincronizacaoUnificadaController extends Controller
+{
+    /**
+     * Página principal - Dashboard de Sincronização
+     */
+    public function index()
+    {
+        // Contagens das 8 tabelas principais DataJuri
+        $counts = [
+            'clientes' => DB::table('clientes')->count(),
+            'processos' => DB::table('processos')->count(),
+            'fases_processo' => DB::table('fases_processo')->count(),
+            'movimentos' => DB::table('movimentos')->count(),
+            'contratos' => DB::table('contratos')->count(),
+            'atividades_datajuri' => DB::table('atividades_datajuri')->count(),
+            'horas_trabalhadas_datajuri' => DB::table('horas_trabalhadas_datajuri')->count(),
+            'ordens_servico' => DB::table('ordens_servico')->count(),
+            'contas_receber' => DB::table('contas_receber')->count(),
+        ];
+
+        // Atalhos para variáveis antigas (compatibilidade)
+        $movimentos = $counts['movimentos'];
+        $processos = $counts['processos'];
+        $clientes = $counts['clientes'];
+        $atividades = DB::table('atividades')->count(); // tabela antiga
+
+        // ESPOCRM
+        $leads = 0;
+        $contacts = 0;
+        $contas = 0;
+        if (DB::getSchemaBuilder()->hasTable('espocrm_leads')) {
+            $leads = DB::table('espocrm_leads')->count();
+        }
+        if (DB::getSchemaBuilder()->hasTable('espocrm_contacts')) {
+            $contacts = DB::table('espocrm_contacts')->count();
+        }
+        if (DB::getSchemaBuilder()->hasTable('espocrm_accounts')) {
+            $contas = DB::table('espocrm_accounts')->count();
+        }
+
+        // Última sincronização
+        $lastSync = DB::table('sync_runs')->where('status', 'completed')->orderBy('finished_at', 'desc')->first();
+        $lastSyncDataJuri = $lastSync?->finished_at ? \Carbon\Carbon::parse($lastSync->finished_at)->format('d/m/Y H:i') : 'Nunca';
+        $lastSyncEspocrm = 'Nunca';
+        $lastRunTime = $lastSyncDataJuri;
+
+        // Histórico de sincronizações
+        $historico = DB::table('sync_runs')
+            ->select('id', 'run_id', 'tipo', 'status', 'modulo_atual', 'registros_processados', 'registros_criados', 'registros_atualizados', 'erros', 'started_at', 'finished_at', 'mensagem', 'created_at')
+            ->orderBy('created_at', 'desc')
+            ->limit(30)
+            ->get()
+            ->map(function ($run) {
+                $run->created_at = \Carbon\Carbon::parse($run->created_at);
+                $run->duracao = null;
+                if ($run->started_at && $run->finished_at) {
+                    $run->duracao = \Carbon\Carbon::parse($run->started_at)->diffInSeconds(\Carbon\Carbon::parse($run->finished_at));
+                }
+                return $run;
+            });
+
+        // Módulos disponíveis do config
+        $modulosConfig = config('datajuri.modulos', []);
+        $modulosDisponiveis = [];
+        foreach ($modulosConfig as $key => $mod) {
+            if ($mod['enabled'] ?? false) {
+                $modulosDisponiveis[$key] = [
+                    'key' => $key,
+                    'label' => $mod['label'] ?? $key,
+                    'icon' => $mod['icon'] ?? '📦',
+                    'table' => $mod['table'] ?? '',
+                    'count' => $counts[$mod['table']] ?? 0,
+                ];
+            }
+        }
+
+        return view('admin.sincronizacao-unificada.index', compact(
+            'counts',
+            'movimentos', 'processos', 'clientes', 'atividades',
+            'leads', 'contacts', 'contas',
+            'lastSyncDataJuri', 'lastSyncEspocrm', 'lastRunTime',
+            'historico', 'modulosDisponiveis'
+        ));
+    }
+
+    /**
+     * Smoke test da API DataJuri
+     */
+    public function smokeTest()
+    {
+        try {
+            $orchestrator = new DataJuriSyncOrchestrator();
+            
+            // Tentar obter token
+            $token = $orchestrator->getAccessToken();
+            
+            if (!$token) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Falha ao obter token de acesso',
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Conexão OK! Token obtido com sucesso.',
+                'results' => [
+                    'token' => true,
+                    'token_length' => strlen($token),
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Sincronizar TODOS os módulos
+     */
+    public function syncAll(Request $request)
+    {
+        $running = DB::table('sync_runs')->where('status', 'running')->first();
+        if ($running) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Já existe sincronização em andamento (ID: ' . $running->run_id . ')',
+            ], 409);
+        }
+
+        try {
+            $orchestrator = new DataJuriSyncOrchestrator();
+            $results = $orchestrator->syncAll();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Sincronização concluída! ' . 
+                    $results['total_processados'] . ' registros processados, ' .
+                    $results['total_criados'] . ' criados, ' .
+                    $results['total_atualizados'] . ' atualizados.',
+                'results' => $results,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Erro na sincronização completa', ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Sincronizar um módulo específico
+     */
+    public function syncModule(Request $request, string $modulo)
+    {
+        $running = DB::table('sync_runs')->where('status', 'running')->first();
+        if ($running) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Já existe sincronização em andamento',
+            ], 409);
+        }
+
+        $modulosConfig = config('datajuri.modulos', []);
+        if (!isset($modulosConfig[$modulo])) {
+            return response()->json([
+                'success' => false,
+                'message' => "Módulo '{$modulo}' não encontrado na configuração",
+            ], 404);
+        }
+
+        if (!($modulosConfig[$modulo]['enabled'] ?? false)) {
+            return response()->json([
+                'success' => false,
+                'message' => "Módulo '{$modulo}' está desabilitado",
+            ], 400);
+        }
+
+        try {
+            $orchestrator = new DataJuriSyncOrchestrator();
+            
+            // Iniciar run para módulo individual
+            $runId = $orchestrator->startRun("modulo_{$modulo}");
+            
+            $result = $orchestrator->syncModule($modulo);
+            
+            $orchestrator->finishRun('completed', "Módulo {$modulo} sincronizado com sucesso");
+
+            $label = $modulosConfig[$modulo]['label'] ?? $modulo;
+
+            return response()->json([
+                'success' => true,
+                'message' => "{$label}: {$result['processados']} processados, {$result['criados']} criados, {$result['atualizados']} atualizados",
+                'results' => $result,
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Erro na sincronização do módulo {$modulo}", ['error' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Reprocessar financeiro (full refresh)
+     */
+    public function reprocessarFinanceiro()
+    {
+        $running = DB::table('sync_runs')->where('status', 'running')->first();
+        if ($running) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Já existe sincronização em andamento',
+            ], 409);
+        }
+
+        try {
+            $orchestrator = new DataJuriSyncOrchestrator();
+            $results = $orchestrator->reprocessarFinanceiro();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Reprocessamento concluído! ' .
+                    $results['processados'] . ' processados, ' .
+                    $results['deletados'] . ' obsoletos removidos.',
+                'results' => $results,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Obter status de uma execução
+     */
+    public function status(Request $request, ?string $runId = null)
+    {
+        if ($runId) {
+            $run = DB::table('sync_runs')->where('run_id', $runId)->first();
+        } else {
+            $run = DB::table('sync_runs')->orderBy('created_at', 'desc')->first();
+        }
+
+        if (!$run) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Nenhuma execução encontrada',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'run' => $run,
+        ]);
+    }
+
+    /**
+     * Cancelar execução (marcar como cancelado)
+     */
+    public function cancel(Request $request, string $runId)
+    {
+        $affected = DB::table('sync_runs')
+            ->where('run_id', $runId)
+            ->where('status', 'running')
+            ->update([
+                'status' => 'cancelled',
+                'mensagem' => 'Cancelado pelo usuário',
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+        if ($affected === 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Execução não encontrada ou já finalizada',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Execução cancelada',
+        ]);
+    }
+
+    /**
+     * Limpar histórico antigo
+     */
+    public function clearHistory(Request $request)
+    {
+        $deleted = DB::table('sync_runs')
+            ->where('created_at', '<', now()->subDays(30))
+            ->where('status', '!=', 'running')
+            ->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$deleted} registros removidos",
+        ]);
+    }
+
+    /**
+     * Obter contagens atualizadas (para refresh via AJAX)
+     */
+    public function getCounts()
+    {
+        $counts = [
+            'clientes' => DB::table('clientes')->count(),
+            'processos' => DB::table('processos')->count(),
+            'fases_processo' => DB::table('fases_processo')->count(),
+            'movimentos' => DB::table('movimentos')->count(),
+            'contratos' => DB::table('contratos')->count(),
+            'atividades_datajuri' => DB::table('atividades_datajuri')->count(),
+            'horas_trabalhadas_datajuri' => DB::table('horas_trabalhadas_datajuri')->count(),
+            'ordens_servico' => DB::table('ordens_servico')->count(),
+            'contas_receber' => DB::table('contas_receber')->count(),
+        ];
+
+        return response()->json([
+            'success' => true,
+            'counts' => $counts,
+        ]);
+    }
+
+    // ========== ESPOCRM ==========
+
+    public function espocrmTest()
+    {
+        try {
+            if (!class_exists(\App\Services\EspoCrmService::class)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Serviço ESPOCRM não configurado',
+                ]);
+            }
+            $service = new \App\Services\EspoCrmService();
+            return response()->json($service->testConnection());
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function espocrmSync()
+    {
+        try {
+            if (!class_exists(\App\Services\EspoCrmService::class)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Serviço ESPOCRM não configurado',
+                ]);
+            }
+            $service = new \App\Services\EspoCrmService();
+            return response()->json($service->syncAll());
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    // ========== CLASSIFICAÇÃO ==========
+
+    public function classificacaoIndex(Request $request)
+    {
+        $query = DB::table('classificacao_regras');
+        if ($busca = $request->input('busca')) {
+            $query->where(function($q) use ($busca) {
+                $q->where('codigo_plano', 'like', "%{$busca}%")
+                  ->orWhere('nome_plano', 'like', "%{$busca}%");
+            });
+        }
+        if ($classificacao = $request->input('classificacao')) {
+            $query->where('classificacao', $classificacao);
+        }
+        return response()->json($query->orderBy('codigo_plano')->paginate(20));
+    }
+
+    public function classificacaoStats()
+    {
+        $stats = DB::table('classificacao_regras')
+            ->select('classificacao', DB::raw('count(*) as total'))
+            ->where('ativo', true)
+            ->groupBy('classificacao')
+            ->pluck('total', 'classificacao')
+            ->toArray();
+        return response()->json($stats);
+    }
+
+    public function classificacaoStore(Request $request)
+    {
+        $validated = $request->validate([
+            'codigo_plano' => 'required|string|max:50',
+            'nome_plano' => 'nullable|string|max:255',
+            'classificacao' => 'required|string',
+            'grupo_dre' => 'nullable|string|max:20',
+            'ativo' => 'boolean',
+        ]);
+
+        try {
+            $exists = DB::table('classificacao_regras')
+                ->where('codigo_plano', $validated['codigo_plano'])
+                ->exists();
+
+            if ($exists) {
+                DB::table('classificacao_regras')
+                    ->where('codigo_plano', $validated['codigo_plano'])
+                    ->update([
+                        'nome_plano' => $validated['nome_plano'] ?? null,
+                        'classificacao' => $validated['classificacao'],
+                        'grupo_dre' => $validated['grupo_dre'] ?? null,
+                        'ativo' => $validated['ativo'] ?? true,
+                        'updated_at' => now(),
+                    ]);
+            } else {
+                DB::table('classificacao_regras')->insert([
+                    'codigo_plano' => $validated['codigo_plano'],
+                    'nome_plano' => $validated['nome_plano'] ?? null,
+                    'classificacao' => $validated['classificacao'],
+                    'grupo_dre' => $validated['grupo_dre'] ?? null,
+                    'origem' => 'MANUAL',
+                    'ativo' => $validated['ativo'] ?? true,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            return response()->json(['success' => true, 'message' => 'Regra salva']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Erro: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function classificacaoUpdate(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'nome_plano' => 'nullable|string|max:255',
+            'classificacao' => 'required|string',
+            'grupo_dre' => 'nullable|string|max:20',
+            'ativo' => 'boolean',
+        ]);
+
+        try {
+            DB::table('classificacao_regras')->where('id', $id)->update([
+                'nome_plano' => $validated['nome_plano'] ?? null,
+                'classificacao' => $validated['classificacao'],
+                'grupo_dre' => $validated['grupo_dre'] ?? null,
+                'ativo' => $validated['ativo'] ?? true,
+                'updated_at' => now(),
+            ]);
+
+            return response()->json(['success' => true, 'message' => 'Regra atualizada']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Erro: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function classificacaoDestroy($id)
+    {
+        try {
+            DB::table('classificacao_regras')->where('id', $id)->delete();
+            return response()->json(['success' => true, 'message' => 'Regra excluída']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Erro: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function classificacaoImportar()
+    {
+        try {
+            $planos = DB::table('movimentos')
+                ->select('codigo_plano', 'plano_contas')
+                ->whereNotNull('codigo_plano')
+                ->where('codigo_plano', '!=', '')
+                ->groupBy('codigo_plano', 'plano_contas')
+                ->get();
+
+            $importados = 0;
+            $ignorados = 0;
+
+            foreach ($planos as $plano) {
+                if (!DB::table('classificacao_regras')->where('codigo_plano', $plano->codigo_plano)->exists()) {
+                    DB::table('classificacao_regras')->insert([
+                        'codigo_plano' => $plano->codigo_plano,
+                        'nome_plano' => $this->extrairNomePlano($plano->plano_contas),
+                        'classificacao' => $this->determinarClassificacao($plano->codigo_plano),
+                        'grupo_dre' => $this->determinarGrupoDre($plano->codigo_plano),
+                        'origem' => 'API_DATAJURI',
+                        'ativo' => true,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                    $importados++;
+                } else {
+                    $ignorados++;
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "{$importados} importados, {$ignorados} já existiam",
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Erro: ' . $e->getMessage()], 500);
+        }
+    }
+
+    public function classificacaoReclassificar()
+    {
+        try {
+            $regras = DB::table('classificacao_regras')
+                ->where('ativo', true)
+                ->pluck('classificacao', 'codigo_plano')
+                ->toArray();
+
+            if (empty($regras)) {
+                return response()->json(['success' => false, 'message' => 'Nenhuma regra encontrada']);
+            }
+
+            $total = 0;
+            $atualizados = 0;
+
+            DB::table('movimentos')
+                ->whereNotNull('codigo_plano')
+                ->orderBy('id')
+                ->chunk(500, function($movimentos) use ($regras, &$total, &$atualizados) {
+                    foreach ($movimentos as $mov) {
+                        $total++;
+                        $nova = $regras[$mov->codigo_plano] ?? 'PENDENTE_CLASSIFICACAO';
+                        if ($mov->classificacao !== $nova) {
+                            DB::table('movimentos')->where('id', $mov->id)->update(['classificacao' => $nova]);
+                            $atualizados++;
+                        }
+                    }
+                });
+
+            Cache::flush();
+
+            return response()->json([
+                'success' => true,
+                'message' => "{$atualizados} de {$total} atualizados",
+            ]);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => 'Erro: ' . $e->getMessage()], 500);
+        }
+    }
+
+    // ========== HELPERS ==========
+
+    private function determinarClassificacao(string $codigo): string
+    {
+        if (in_array($codigo, ['3.01.01.01', '3.01.01.03'])) return 'RECEITA_PF';
+        if (in_array($codigo, ['3.01.01.02', '3.01.01.05'])) return 'RECEITA_PJ';
+        if (str_starts_with($codigo, '3.01.02')) return 'RECEITA_FINANCEIRA';
+        if (str_starts_with($codigo, '3.01.03')) return 'DEDUCAO';
+        if (str_starts_with($codigo, '3.02')) return 'DESPESA';
+        return 'PENDENTE_CLASSIFICACAO';
+    }
+
+    private function determinarGrupoDre(string $codigo): ?string
+    {
+        if (str_starts_with($codigo, '3.01.01')) return '3.01.01';
+        if (str_starts_with($codigo, '3.01.02')) return '3.01.02';
+        if (str_starts_with($codigo, '3.01.03')) return '3.01.03';
+        if (str_starts_with($codigo, '3.02')) return '3.02.01';
+        return null;
+    }
+
+    private function extrairNomePlano(?string $plano): ?string
+    {
+        if (!$plano) return null;
+        if (preg_match('/ - ([^:]+)$/', $plano, $m)) return trim($m[1]);
+        return substr($plano, 0, 255);
+    }
+}

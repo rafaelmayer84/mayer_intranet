@@ -1,0 +1,148 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\WaConversation;
+use App\Services\NexoDataJuriService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+class NexoDataJuriController extends Controller
+{
+    private NexoDataJuriService $service;
+
+    public function __construct(NexoDataJuriService $service)
+    {
+        $this->service = $service;
+    }
+
+    /**
+     * GET /nexo/atendimento/conversas/{id}/contexto-datajuri
+     * Retorna JSON com contexto DataJuri completo.
+     */
+    public function contextoDataJuri(int $id): JsonResponse
+    {
+        try {
+            $conversation = WaConversation::findOrFail($id);
+            $contexto = $this->service->getContextoDataJuri($conversation);
+
+            return response()->json($contexto);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['error' => 'Conversa não encontrada.'], 404);
+        } catch (\Throwable $e) {
+            \Log::error('NexoDataJuri::contexto erro', [
+                'conversation_id' => $id,
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json(['error' => 'Erro ao carregar contexto DataJuri.'], 500);
+        }
+    }
+
+    /**
+     * GET /nexo/atendimento/conversas/{id}/buscar-clientes?q=
+     * Busca manual de clientes para vinculação.
+     */
+    public function buscarClientes(int $id, Request $request): JsonResponse
+    {
+        try {
+            $q = $request->input('q', '');
+            $clientes = $this->service->buscarClientes($q);
+
+            return response()->json(['clientes' => $clientes]);
+        } catch (\Throwable $e) {
+            \Log::error('NexoDataJuri::buscarClientes erro', ['error' => $e->getMessage()]);
+            return response()->json(['error' => 'Erro na busca.'], 500);
+        }
+    }
+
+    /**
+     * POST /nexo/atendimento/conversas/{id}/auto-vincular-cliente
+     * Auto-vincula cliente pelo telefone da conversa.
+     */
+    public function autoVincularCliente(int $id): JsonResponse
+    {
+        try {
+            $conversation = WaConversation::findOrFail($id);
+            $result = $this->service->autoVincularCliente($conversation);
+
+            return response()->json($result, $result['success'] ? 200 : 422);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['error' => 'Conversa não encontrada.'], 404);
+        } catch (\Throwable $e) {
+            \Log::error('NexoDataJuri::autoVincular erro', ['error' => $e->getMessage()]);
+            return response()->json(['error' => 'Erro ao vincular.'], 500);
+        }
+    }
+
+    /**
+     * POST /nexo/atendimento/conversas/{id}/link-processo
+     * Define linked_processo_id na conversa.
+     */
+    public function linkProcesso(int $id, Request $request): JsonResponse
+    {
+        try {
+            $request->validate(['processo_id' => 'required|integer|exists:processos,id']);
+
+            $conversation = WaConversation::findOrFail($id);
+            $conversation->linked_processo_id = $request->input('processo_id');
+            $conversation->save();
+
+            return response()->json([
+                'success' => true,
+                'linked_processo_id' => $conversation->linked_processo_id,
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['error' => 'Processo inválido.', 'details' => $e->errors()], 422);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['error' => 'Conversa não encontrada.'], 404);
+        } catch (\Throwable $e) {
+            \Log::error('NexoDataJuri::linkProcesso erro', ['error' => $e->getMessage()]);
+            return response()->json(['error' => 'Erro ao vincular processo.'], 500);
+        }
+    }
+
+    /**
+     * DELETE /nexo/atendimento/conversas/{id}/unlink-processo
+     * Remove vínculo de processo da conversa.
+     */
+    public function unlinkProcesso(int $id): JsonResponse
+    {
+        try {
+            $conversation = WaConversation::findOrFail($id);
+            $conversation->linked_processo_id = null;
+            $conversation->save();
+
+            return response()->json(['success' => true]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json(['error' => 'Conversa não encontrada.'], 404);
+        } catch (\Throwable $e) {
+            \Log::error('NexoDataJuri::unlinkProcesso erro', ['error' => $e->getMessage()]);
+            return response()->json(['error' => 'Erro ao desvincular.'], 500);
+        }
+    }
+
+    /**
+     * GET /nexo/atendimento/conversas/{id}/prazos-filtrados?processo_id=
+     * Prazos filtrados por processo específico ou todos do cliente.
+     */
+    public function prazosFiltrados(int $id, Request $request): JsonResponse
+    {
+        try {
+            $conversation = WaConversation::findOrFail($id);
+
+            if (!$conversation->linked_cliente_id) {
+                return response()->json(['prazos' => []]);
+            }
+
+            $processoId = $request->input('processo_id') ? (int) $request->input('processo_id') : null;
+            $prazos = $this->service->getProximosPrazos(
+                $conversation->linked_cliente_id, 10, $processoId
+            );
+
+            return response()->json(['prazos' => $prazos]);
+        } catch (\Throwable $e) {
+            \Log::error('NexoDataJuri::prazosFiltrados erro', ['error' => $e->getMessage()]);
+            return response()->json(['error' => 'Erro ao carregar prazos.'], 500);
+        }
+    }
+}

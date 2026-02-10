@@ -1,0 +1,796 @@
+@extends('layouts.app')
+
+@section('content')
+<div id="nexo-app" class="flex h-[calc(100vh-64px)] bg-gray-100 overflow-hidden">
+
+    {{-- ═══════════════════════════════════════════════════════ --}}
+    {{-- COLUNA 1 — INBOX --}}
+    {{-- ═══════════════════════════════════════════════════════ --}}
+    <div id="inbox-panel" class="w-full lg:w-[340px] flex-shrink-0 bg-white border-r border-gray-200 flex flex-col">
+
+        {{-- Header Inbox --}}
+        <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                    <span class="text-lg">💬</span>
+                    <h2 class="text-base font-semibold text-gray-800">Nexo</h2>
+                </div>
+                <span id="inbox-total" class="text-xs text-gray-500">0 conversas</span>
+            </div>
+
+            {{-- Filtros --}}
+            <div class="flex gap-1.5 mb-2">
+                <button onclick="NexoApp.setFilter('status', '')" class="filter-btn active text-xs px-2.5 py-1 rounded-full border transition-colors" data-filter="all">Todas</button>
+                <button onclick="NexoApp.setFilter('status', 'open')" class="filter-btn text-xs px-2.5 py-1 rounded-full border transition-colors" data-filter="open">Abertas</button>
+                <button onclick="NexoApp.setFilter('unread', '1')" class="filter-btn text-xs px-2.5 py-1 rounded-full border transition-colors" data-filter="unread">Não lidas</button>
+            </div>
+
+            {{-- Busca --}}
+            <div class="relative">
+                <svg class="absolute left-2.5 top-2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <input type="text" id="inbox-search" placeholder="Buscar conversa..."
+                    class="w-full pl-8 pr-3 py-1.5 text-sm bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                    oninput="NexoApp.filterLocal(this.value)">
+            </div>
+        </div>
+
+        {{-- Lista de Conversas --}}
+        <div id="inbox-items" class="flex-1 overflow-y-auto">
+            {{-- Preenchido via JS --}}
+        </div>
+        <div id="inbox-loading" class="flex items-center justify-center py-8">
+            <div class="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+        <div id="inbox-empty" class="hidden flex-col items-center justify-center py-12 text-gray-400">
+            <svg class="w-12 h-12 mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+            <p class="text-sm">Nenhuma conversa encontrada</p>
+        </div>
+    </div>
+
+    {{-- ═══════════════════════════════════════════════════════ --}}
+    {{-- COLUNA 2 — CHAT --}}
+    {{-- ═══════════════════════════════════════════════════════ --}}
+    <div id="chat-panel" class="hidden lg:flex flex-1 flex-col bg-gray-100">
+
+        {{-- Estado vazio --}}
+        <div id="chat-empty" class="flex-1 flex flex-col items-center justify-center text-gray-400">
+            <svg class="w-16 h-16 mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+            <p class="text-sm font-medium">Selecione uma conversa</p>
+            <p class="text-xs mt-1">Clique em um contato na lista ao lado</p>
+        </div>
+
+        {{-- Header do Chat --}}
+        <div id="chat-header" class="hidden items-center justify-between px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+            <div class="flex items-center gap-3">
+                {{-- Botão voltar (mobile) --}}
+                <button onclick="NexoApp.voltarInbox()" class="lg:hidden p-1 rounded hover:bg-gray-200">
+                    <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                </button>
+                <div id="chat-avatar" class="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center text-sm font-semibold"></div>
+                <div>
+                    <p id="chat-contact-name" class="text-sm font-semibold text-gray-800"></p>
+                    <p id="chat-contact-phone" class="text-xs text-gray-500"></p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <span id="chat-status-badge" class="text-xs px-2 py-0.5 rounded-full"></span>
+                <select id="chat-assign-select" onchange="NexoApp.assignResponsavel(this.value)"
+                    class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                    <option value="">Sem responsável</option>
+                    @foreach($users as $user)
+                        <option value="{{ $user->id }}">{{ $user->name }}</option>
+                    @endforeach
+                </select>
+                <button id="chat-toggle-status" onclick="NexoApp.toggleStatus()"
+                    class="text-xs px-3 py-1 rounded border border-gray-300 hover:bg-gray-100 transition-colors text-gray-600">
+                    Fechar
+                </button>
+                {{-- Botão contexto 360 (mobile) --}}
+                <button onclick="NexoApp.toggleContexto()" class="xl:hidden p-1.5 rounded hover:bg-gray-200" title="Contexto 360">
+                    <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </button>
+            </div>
+        </div>
+
+        {{-- Área de Mensagens --}}
+        <div id="chat-messages" class="hidden flex-1 overflow-y-auto px-4 py-3 space-y-1" style="background-color: #e5ddd5; background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFklEQVQYV2P8+vXrfwY8gHHUCvphBQBf9AoL/k2KLAAAAABJRU5ErkJggg=='); background-repeat: repeat;">
+            {{-- Preenchido via JS --}}
+        </div>
+
+        {{-- Barra de Input --}}
+        <div id="chat-input-bar" class="hidden px-4 py-3 bg-gray-50 border-t border-gray-200">
+            <div class="flex items-end gap-2">
+                <textarea id="chat-input" rows="1" placeholder="Digite uma mensagem..."
+                    class="flex-1 resize-none px-4 py-2.5 text-sm bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 max-h-32"
+                    onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); NexoApp.sendMessage()}"
+                    oninput="this.style.height='auto'; this.style.height=Math.min(this.scrollHeight,128)+'px'"></textarea>
+                <button onclick="NexoApp.sendMessage()"
+                    class="flex-shrink-0 w-10 h-10 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center transition-colors shadow-sm">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {{-- ═══════════════════════════════════════════════════════ --}}
+    {{-- COLUNA 3 — CONTEXTO 360 --}}
+    {{-- ═══════════════════════════════════════════════════════ --}}
+    <div id="contexto-panel" class="hidden xl:flex w-[320px] flex-shrink-0 flex-col bg-white border-l border-gray-200 overflow-y-auto">
+
+        {{-- Header --}}
+        <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <h3 class="text-sm font-semibold text-gray-800">Contexto 360°</h3>
+            </div>
+            {{-- Fechar (mobile) --}}
+            <button onclick="NexoApp.toggleContexto()" class="xl:hidden p-1 rounded hover:bg-gray-100">
+                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        {{-- Empty --}}
+        <div id="contexto-empty" class="flex-1 flex items-center justify-center text-gray-400 py-12">
+            <p class="text-sm">Selecione uma conversa</p>
+        </div>
+
+        {{-- Loading --}}
+        <div id="contexto-loading" class="hidden flex items-center justify-center py-12">
+            <div class="w-5 h-5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+
+        {{-- Dados --}}
+        <div id="contexto-data" class="hidden p-4 space-y-3">
+            {{-- Preenchido via JS --}}
+        </div>
+
+        {{-- Ações de Link (quando não vinculado) --}}
+        <div id="contexto-link-actions" class="hidden p-4 border-t border-gray-200">
+            <p class="text-xs text-gray-500 mb-2 font-medium">Vincular manualmente:</p>
+            <div class="space-y-2">
+                <div class="flex gap-1">
+                    <input type="number" id="link-lead-id" placeholder="ID do Lead" class="flex-1 text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                    <button onclick="NexoApp.linkLead(document.getElementById('link-lead-id').value)" class="text-xs px-2 py-1.5 bg-blue-50 text-blue-700 rounded hover:bg-blue-100 border border-blue-200 transition-colors">Lead</button>
+                </div>
+                <div class="flex gap-1">
+                    <input type="number" id="link-cliente-id" placeholder="ID do Cliente" class="flex-1 text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                    <button onclick="NexoApp.linkCliente(document.getElementById('link-cliente-id').value)" class="text-xs px-2 py-1.5 bg-purple-50 text-purple-700 rounded hover:bg-purple-100 border border-purple-200 transition-colors">Cliente</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- ═══════════════════════════════════════════════════════════ --}}
+{{-- ESTILOS --}}
+{{-- ═══════════════════════════════════════════════════════════ --}}
+<style>
+    .filter-btn { border-color: #e5e7eb; color: #6b7280; background: white; }
+    .filter-btn:hover { background: #f9fafb; }
+    .filter-btn.active { background: #059669; color: white; border-color: #059669; }
+
+    .inbox-item { transition: background-color 0.15s; }
+    .inbox-item:hover { background-color: #f3f4f6; }
+    .inbox-item.active { background-color: #dcfce7; }
+
+    .msg-bubble-in {
+        background: white;
+        border-radius: 0 8px 8px 8px;
+        box-shadow: 0 1px 1px rgba(0,0,0,0.08);
+    }
+    .msg-bubble-out {
+        background: #d9fdd3;
+        border-radius: 8px 0 8px 8px;
+        box-shadow: 0 1px 1px rgba(0,0,0,0.08);
+    }
+
+    .ctx-section { border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+    .ctx-section-header { background: #f9fafb; padding: 8px 12px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+    .ctx-section-header:hover { background: #f3f4f6; }
+    .ctx-section-body { padding: 10px 12px; }
+    .ctx-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 12px; }
+    .ctx-label { color: #6b7280; }
+    .ctx-value { color: #1f2937; font-weight: 500; text-align: right; max-width: 60%; }
+
+    #chat-messages::-webkit-scrollbar { width: 6px; }
+    #chat-messages::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 3px; }
+    #inbox-items::-webkit-scrollbar { width: 4px; }
+    #inbox-items::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 2px; }
+    #contexto-panel::-webkit-scrollbar { width: 4px; }
+    #contexto-panel::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 2px; }
+</style>
+
+{{-- ═══════════════════════════════════════════════════════════ --}}
+{{-- JAVASCRIPT --}}
+{{-- ═══════════════════════════════════════════════════════════ --}}
+<script>
+const NexoApp = {
+    // ─── ESTADO ──────────────────────────────────────────────
+    conversas: [],
+    conversaAtual: null,
+    lastRenderedMsgId: null,
+    lastRenderedMsgCount: 0,
+    filters: { status: '', unread: '' },
+    searchTerm: '',
+    pollTimer: null,
+    inboxTimer: null,
+    csrfToken: document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+
+    // ─── INICIALIZAÇÃO ───────────────────────────────────────
+    init() {
+        this.loadConversas();
+        // Polling do inbox a cada 8s
+        this.inboxTimer = setInterval(() => this.loadConversas(true), 8000);
+    },
+
+    // ─── INBOX ───────────────────────────────────────────────
+    async loadConversas(silent = false) {
+        if (!silent) {
+            document.getElementById('inbox-loading').classList.remove('hidden');
+            document.getElementById('inbox-items').innerHTML = '';
+            document.getElementById('inbox-empty').classList.add('hidden');
+        }
+
+        const params = new URLSearchParams();
+        if (this.filters.status) params.set('status', this.filters.status);
+        if (this.filters.unread) params.set('unread', this.filters.unread);
+
+        try {
+            const res = await fetch(`/nexo/atendimento/conversas?${params.toString()}`, {
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const json = await res.json();
+
+            this.conversas = json.data || [];
+            this.renderInbox();
+            document.getElementById('inbox-total').textContent = `${json.total || this.conversas.length} conversas`;
+        } catch (err) {
+            console.error('Erro ao carregar conversas:', err);
+            if (!silent) {
+                document.getElementById('inbox-items').innerHTML =
+                    '<p class="text-center text-red-500 text-sm py-6">Erro ao carregar</p>';
+            }
+        } finally {
+            document.getElementById('inbox-loading').classList.add('hidden');
+        }
+    },
+
+    renderInbox() {
+        const container = document.getElementById('inbox-items');
+        const emptyEl = document.getElementById('inbox-empty');
+        const search = this.searchTerm.toLowerCase();
+
+        let list = this.conversas;
+        if (search) {
+            list = list.filter(c =>
+                (c.name || '').toLowerCase().includes(search) ||
+                (c.phone || '').includes(search)
+            );
+        }
+
+        if (!list.length) {
+            container.innerHTML = '';
+            emptyEl.classList.remove('hidden');
+            return;
+        }
+
+        emptyEl.classList.add('hidden');
+        container.innerHTML = list.map(c => this.renderInboxItem(c)).join('');
+    },
+
+    renderInboxItem(c) {
+        const isActive = this.conversaAtual?.id === c.id;
+        const initials = (c.name || '??').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+        const timeAgo = c.last_message_at ? this.timeAgo(c.last_message_at) : '';
+        const unread = c.unread_count || 0;
+
+        let linkBadge = '';
+        if (c.linked_cliente_id) {
+            linkBadge = '<span class="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium">CLI</span>';
+        } else if (c.linked_lead_id) {
+            linkBadge = '<span class="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium">LEAD</span>';
+        } else {
+            linkBadge = '<span class="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded">?</span>';
+        }
+
+        const assignedName = c.assigned_user?.name ? `<span class="text-[10px] text-gray-400">${c.assigned_user.name.split(' ')[0]}</span>` : '';
+
+        return `
+        <div class="inbox-item ${isActive ? 'active' : ''} flex items-center gap-3 px-4 py-3 cursor-pointer border-b border-gray-100"
+             data-id="${c.id}" onclick="NexoApp.selectConversa(${c.id})">
+            <div class="relative flex-shrink-0">
+                <div class="w-11 h-11 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm font-semibold">${initials}</div>
+                ${unread > 0 ? `<span class="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">${unread}</span>` : ''}
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium text-gray-800 truncate">${this.escapeHtml(c.name || 'Sem nome')}</span>
+                    <span class="text-[10px] text-gray-400 flex-shrink-0 ml-2">${timeAgo}</span>
+                </div>
+                <div class="flex items-center justify-between mt-0.5">
+                    <span class="text-xs text-gray-500 truncate">${this.formatPhone(c.phone || '')}</span>
+                    <div class="flex items-center gap-1 flex-shrink-0 ml-2">
+                        ${assignedName}
+                        ${linkBadge}
+                    </div>
+                </div>
+            </div>
+        </div>`;
+    },
+
+    setFilter(key, value) {
+        // Reset all filters
+        this.filters = { status: '', unread: '' };
+        if (key && value) this.filters[key] = value;
+
+        // Update UI
+        document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+        if (!value) {
+            document.querySelector('[data-filter="all"]').classList.add('active');
+        } else {
+            const target = document.querySelector(`[data-filter="${value === '1' ? 'unread' : value}"]`);
+            if (target) target.classList.add('active');
+        }
+
+        this.loadConversas();
+    },
+
+    filterLocal(term) {
+        this.searchTerm = term;
+        this.renderInbox();
+    },
+
+    // ─── CHAT ────────────────────────────────────────────────
+    async selectConversa(id) {
+        // Limpa polling anterior
+        if (this.pollTimer) clearInterval(this.pollTimer);
+        this.lastRenderedMsgId = null;
+        this.lastRenderedMsgCount = 0;
+
+        try {
+            const res = await fetch(`/nexo/atendimento/conversas/${id}`, {
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const json = await res.json();
+
+            this.conversaAtual = json.conversation;
+
+            // Mostrar chat (mobile: esconder inbox)
+            document.getElementById('chat-empty').classList.add('hidden');
+            document.getElementById('chat-header').classList.remove('hidden');
+            document.getElementById('chat-header').classList.add('flex');
+            document.getElementById('chat-messages').classList.remove('hidden');
+            document.getElementById('chat-input-bar').classList.remove('hidden');
+
+            // Mobile: esconder inbox, mostrar chat
+            if (window.innerWidth < 1024) {
+                document.getElementById('inbox-panel').classList.add('hidden');
+                document.getElementById('chat-panel').classList.remove('hidden');
+                document.getElementById('chat-panel').classList.add('flex');
+            }
+
+            // Header
+            const conv = json.conversation;
+            const initials = (conv.name || '??').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
+            document.getElementById('chat-avatar').textContent = initials;
+            document.getElementById('chat-contact-name').textContent = conv.name || 'Sem nome';
+            document.getElementById('chat-contact-phone').textContent = conv.phone ? this.formatPhone(conv.phone) : '';
+
+            // Status badge
+            const badge = document.getElementById('chat-status-badge');
+            if (conv.status === 'open') {
+                badge.textContent = 'Aberta';
+                badge.className = 'text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700';
+            } else {
+                badge.textContent = 'Fechada';
+                badge.className = 'text-xs px-2 py-0.5 rounded-full bg-gray-200 text-gray-600';
+            }
+
+            document.getElementById('chat-toggle-status').textContent = conv.status === 'open' ? 'Fechar' : 'Reabrir';
+            document.getElementById('chat-assign-select').value = conv.assigned_user_id || '';
+
+            // Mensagens
+            this.renderMessages(json.messages || []);
+
+            // Marcar ativa no inbox
+            document.querySelectorAll('.inbox-item').forEach(el => el.classList.remove('active'));
+            const activeItem = document.querySelector(`.inbox-item[data-id="${id}"]`);
+            if (activeItem) activeItem.classList.add('active');
+
+            // Contexto 360
+            this.loadContexto(id);
+
+            // Iniciar polling a cada 5s
+            this.pollTimer = setInterval(() => this.pollMessages(id), 5000);
+
+        } catch (err) {
+            console.error('Erro ao carregar conversa:', err);
+        }
+    },
+
+    renderMessages(messages) {
+        const container = document.getElementById('chat-messages');
+        if (!messages.length) {
+            container.innerHTML = '<p class="text-center text-gray-500 text-sm py-8">Nenhuma mensagem ainda</p>';
+            this.lastRenderedMsgId = null;
+            this.lastRenderedMsgCount = 0;
+            return;
+        }
+
+        let lastDate = '';
+        let html = '';
+
+        messages.forEach(msg => {
+            // Separador de data
+            const msgDate = msg.sent_at ? msg.sent_at.split('T')[0] : '';
+            if (msgDate && msgDate !== lastDate) {
+                lastDate = msgDate;
+                const dateLabel = this.formatDate(msgDate);
+                html += `<div class="flex justify-center my-2">
+                    <span class="text-[11px] bg-white/90 text-gray-600 px-3 py-1 rounded-lg shadow-sm">${dateLabel}</span>
+                </div>`;
+            }
+
+            const isIncoming = msg.direction === 1;
+            const time = msg.sent_at ? new Date(msg.sent_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+            const body = this.escapeHtml(msg.body || '');
+            const humanBadge = (!isIncoming && msg.is_human)
+                ? '<span class="text-[9px] text-emerald-600 ml-1">✓ humano</span>'
+                : '';
+
+            if (isIncoming) {
+                html += `
+                <div class="flex justify-start mb-1">
+                    <div class="msg-bubble-in px-3 py-1.5 max-w-[75%]">
+                        <p class="text-[13px] text-gray-800 whitespace-pre-wrap break-words">${body}</p>
+                        <p class="text-[10px] text-gray-400 text-right mt-0.5">${time}</p>
+                    </div>
+                </div>`;
+            } else {
+                html += `
+                <div class="flex justify-end mb-1">
+                    <div class="msg-bubble-out px-3 py-1.5 max-w-[75%]">
+                        <p class="text-[13px] text-gray-800 whitespace-pre-wrap break-words">${body}</p>
+                        <p class="text-[10px] text-gray-500 text-right mt-0.5">${time}${humanBadge}</p>
+                    </div>
+                </div>`;
+            }
+        });
+
+        container.innerHTML = html;
+
+        // Gravar estado para comparação no polling
+        this.lastRenderedMsgId = messages[messages.length - 1].id;
+        this.lastRenderedMsgCount = messages.length;
+
+        // Scroll para baixo
+        container.scrollTop = container.scrollHeight;
+    },
+
+    // ─── POLLING ROBUSTO ─────────────────────────────────────
+    async pollMessages(conversaId) {
+        if (!this.conversaAtual || this.conversaAtual.id !== conversaId) return;
+
+        try {
+            const res = await fetch(`/nexo/atendimento/conversas/${conversaId}/poll`, {
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!res.ok) return;
+            const json = await res.json();
+
+            const msgs = json.messages || [];
+            if (!msgs.length) return;
+
+            const lastId = msgs[msgs.length - 1].id;
+            const count = msgs.length;
+
+            // Atualiza SE: novo ID final OU quantidade mudou
+            if (lastId !== this.lastRenderedMsgId || count !== this.lastRenderedMsgCount) {
+                this.renderMessages(msgs);
+                // Atualiza inbox (badges, tempo, etc.)
+                this.loadConversas(true);
+            }
+        } catch (err) {
+            // Silencioso — não travar UI
+            console.warn('Poll error:', err);
+        }
+    },
+
+    // ─── ENVIAR MENSAGEM ─────────────────────────────────────
+    async sendMessage() {
+        if (!this.conversaAtual) return;
+        const input = document.getElementById('chat-input');
+        const text = input.value.trim();
+        if (!text) return;
+
+        input.value = '';
+        input.style.height = 'auto';
+
+        // Renderiza otimisticamente
+        const container = document.getElementById('chat-messages');
+        const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        const tempHtml = `
+        <div class="flex justify-end mb-1">
+            <div class="msg-bubble-out px-3 py-1.5 max-w-[75%] opacity-70">
+                <p class="text-[13px] text-gray-800 whitespace-pre-wrap break-words">${this.escapeHtml(text)}</p>
+                <p class="text-[10px] text-gray-500 text-right mt-0.5">${now} ⏳</p>
+            </div>
+        </div>`;
+        container.insertAdjacentHTML('beforeend', tempHtml);
+        container.scrollTop = container.scrollHeight;
+
+        try {
+            const res = await fetch(`/nexo/atendimento/conversas/${this.conversaAtual.id}/mensagens`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': this.csrfToken,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ text: text })
+            });
+
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+            // Recarregar todas as mensagens para estado consistente
+            const convRes = await fetch(`/nexo/atendimento/conversas/${this.conversaAtual.id}`, {
+                headers: { 'Accept': 'application/json' }
+            });
+            if (convRes.ok) {
+                const convJson = await convRes.json();
+                this.renderMessages(convJson.messages || []);
+            }
+        } catch (err) {
+            console.error('Erro ao enviar:', err);
+            // Mostrar erro no chat
+            container.insertAdjacentHTML('beforeend',
+                '<p class="text-center text-red-500 text-xs py-1">Erro ao enviar. Tente novamente.</p>');
+            container.scrollTop = container.scrollHeight;
+        }
+    },
+
+    // ─── CONTEXTO 360 ────────────────────────────────────────
+    async loadContexto(conversaId) {
+        const emptyEl = document.getElementById('contexto-empty');
+        const loadingEl = document.getElementById('contexto-loading');
+        const dataEl = document.getElementById('contexto-data');
+        const linkEl = document.getElementById('contexto-link-actions');
+
+        emptyEl.classList.add('hidden');
+        loadingEl.classList.remove('hidden');
+        dataEl.classList.add('hidden');
+        linkEl.classList.add('hidden');
+
+        // Mostrar painel em desktop
+        document.getElementById('contexto-panel').classList.remove('hidden');
+        document.getElementById('contexto-panel').classList.add('xl:flex');
+
+        try {
+            const res = await fetch(`/nexo/atendimento/conversas/${conversaId}/contexto`, {
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const json = await res.json();
+
+            let html = '';
+
+            // Badge de tipo
+            const typeConfig = {
+                lead: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Lead' },
+                cliente: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Cliente' },
+                indefinido: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Não vinculado' }
+            };
+            const tc = typeConfig[json.link_type] || typeConfig.indefinido;
+            html += `<div><span class="text-xs px-2.5 py-1 rounded-full ${tc.bg} ${tc.text} font-medium">${tc.label}</span></div>`;
+
+            // Card LEAD
+            if (json.lead) {
+                const l = json.lead;
+                html += `
+                <div class="ctx-section">
+                    <div class="ctx-section-header" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                        <span class="text-xs font-semibold text-gray-700">📋 Lead — ${this.escapeHtml(l.nome || 'N/A')}</span>
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </div>
+                    <div class="ctx-section-body">
+                        <div class="ctx-row"><span class="ctx-label">Área</span><span class="ctx-value">${this.escapeHtml(l.area_interesse || 'N/A')}</span></div>
+                        <div class="ctx-row"><span class="ctx-label">Sub-área</span><span class="ctx-value">${this.escapeHtml(l.sub_area || 'N/A')}</span></div>
+                        <div class="ctx-row"><span class="ctx-label">Intenção</span><span class="ctx-value ${l.intencao_contratar === 'sim' ? 'text-emerald-600' : l.intencao_contratar === 'talvez' ? 'text-amber-600' : 'text-red-600'}">${this.escapeHtml(l.intencao_contratar || 'N/A')}</span></div>
+                        <div class="ctx-row"><span class="ctx-label">Urgência</span><span class="ctx-value">${this.escapeHtml(l.urgencia || 'N/A')}</span></div>
+                        <div class="ctx-row"><span class="ctx-label">Complexidade</span><span class="ctx-value">${this.escapeHtml(l.complexidade || 'N/A')}</span></div>
+                        <div class="ctx-row"><span class="ctx-label">Potencial</span><span class="ctx-value">${this.escapeHtml(l.potencial_honorarios || 'N/A')}</span></div>
+                        <div class="ctx-row"><span class="ctx-label">Gatilho</span><span class="ctx-value">${this.escapeHtml(l.gatilho_emocional || 'N/A')}</span></div>
+                        <div class="ctx-row"><span class="ctx-label">Objeções</span><span class="ctx-value">${this.escapeHtml(l.objecoes || 'N/A')}</span></div>
+                        ${l.resumo_demanda ? `<div class="mt-2 pt-2 border-t border-gray-100">
+                            <p class="text-[10px] text-gray-500 font-medium mb-1">Resumo da demanda</p>
+                            <p class="text-xs text-gray-700 leading-relaxed">${this.escapeHtml(l.resumo_demanda)}</p>
+                        </div>` : ''}
+                        ${l.palavras_chave ? `<div class="mt-2 pt-2 border-t border-gray-100">
+                            <p class="text-[10px] text-gray-500 font-medium mb-1">Palavras-chave</p>
+                            <div class="flex flex-wrap gap-1">${l.palavras_chave.split(',').map(k => `<span class="text-[10px] px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded">${this.escapeHtml(k.trim())}</span>`).join('')}</div>
+                        </div>` : ''}
+                        ${l.intencao_justificativa ? `<div class="mt-2 pt-2 border-t border-gray-100">
+                            <p class="text-[10px] text-gray-500 font-medium mb-1">Justificativa IA</p>
+                            <p class="text-xs text-gray-600 leading-relaxed italic">${this.escapeHtml(l.intencao_justificativa)}</p>
+                        </div>` : ''}
+                    </div>
+                </div>`;
+            }
+
+            // Card CLIENTE
+            if (json.cliente) {
+                const cl = json.cliente;
+                html += `
+                <div class="ctx-section">
+                    <div class="ctx-section-header" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                        <span class="text-xs font-semibold text-gray-700">👤 Cliente — ${this.escapeHtml(cl.nome || 'N/A')}</span>
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </div>
+                    <div class="ctx-section-body">
+                        <div class="ctx-row"><span class="ctx-label">Tipo</span><span class="ctx-value">${cl.tipo_pessoa || 'N/A'}</span></div>
+                        <div class="ctx-row"><span class="ctx-label">Documento</span><span class="ctx-value">${this.escapeHtml(cl.documento || 'N/A')}</span></div>
+                        ${cl.processos_ativos && cl.processos_ativos.length ? `
+                        <div class="mt-2 pt-2 border-t border-gray-100">
+                            <p class="text-[10px] text-gray-500 font-medium mb-1">Processos ativos (${cl.processos_ativos.length})</p>
+                            ${cl.processos_ativos.map(p => `
+                                <div class="text-xs text-gray-600 py-0.5 truncate">• ${this.escapeHtml(p.numero || p.tipo_acao || p.titulo || 'Processo')}</div>
+                            `).join('')}
+                        </div>` : ''}
+                        ${cl.contas_abertas && cl.contas_abertas.length ? `
+                        <div class="mt-2 pt-2 border-t border-gray-100">
+                            <p class="text-[10px] text-gray-500 font-medium mb-1">Contas abertas (${cl.contas_abertas.length})</p>
+                            ${cl.contas_abertas.map(ct => `
+                                <div class="text-xs text-gray-600 py-0.5">• R$ ${this.escapeHtml(ct.valor || '0')} — ${this.escapeHtml(ct.descricao || 'Conta')}</div>
+                            `).join('')}
+                        </div>` : ''}
+                    </div>
+                </div>`;
+            }
+
+            // Se não vinculado, mostrar ações de link
+            if (json.link_type === 'indefinido') {
+                linkEl.classList.remove('hidden');
+            }
+
+            dataEl.innerHTML = html;
+            dataEl.classList.remove('hidden');
+
+        } catch (err) {
+            console.error('Erro contexto 360:', err);
+            dataEl.innerHTML = '<p class="text-sm text-red-500 text-center py-4">Erro ao carregar contexto</p>';
+            dataEl.classList.remove('hidden');
+        } finally {
+            loadingEl.classList.add('hidden');
+        }
+    },
+
+    // ─── AÇÕES ───────────────────────────────────────────────
+    async assignResponsavel(userId) {
+        if (!this.conversaAtual) return;
+        try {
+            await fetch(`/nexo/atendimento/conversas/${this.conversaAtual.id}/assign`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': this.csrfToken, 'Accept': 'application/json' },
+                body: JSON.stringify({ user_id: userId || null })
+            });
+            this.loadConversas(true);
+        } catch (err) {
+            console.error('Erro assign:', err);
+        }
+    },
+
+    async toggleStatus() {
+        if (!this.conversaAtual) return;
+        const newStatus = this.conversaAtual.status === 'open' ? 'closed' : 'open';
+        try {
+            await fetch(`/nexo/atendimento/conversas/${this.conversaAtual.id}/status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': this.csrfToken, 'Accept': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
+            this.selectConversa(this.conversaAtual.id);
+        } catch (err) {
+            console.error('Erro status:', err);
+        }
+    },
+
+    linkLead(leadId) {
+        if (!leadId || !this.conversaAtual) return;
+        fetch(`/nexo/atendimento/conversas/${this.conversaAtual.id}/link-lead`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': this.csrfToken, 'Accept': 'application/json' },
+            body: JSON.stringify({ lead_id: parseInt(leadId) })
+        }).then(() => {
+            this.loadContexto(this.conversaAtual.id);
+            this.loadConversas(true);
+        }).catch(err => console.error('Erro link lead:', err));
+    },
+
+    linkCliente(clienteId) {
+        if (!clienteId || !this.conversaAtual) return;
+        fetch(`/nexo/atendimento/conversas/${this.conversaAtual.id}/link-cliente`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': this.csrfToken, 'Accept': 'application/json' },
+            body: JSON.stringify({ cliente_id: parseInt(clienteId) })
+        }).then(() => {
+            this.loadContexto(this.conversaAtual.id);
+            this.loadConversas(true);
+        }).catch(err => console.error('Erro link cliente:', err));
+    },
+
+    // ─── MOBILE ──────────────────────────────────────────────
+    voltarInbox() {
+        document.getElementById('inbox-panel').classList.remove('hidden');
+        document.getElementById('chat-panel').classList.add('hidden');
+        document.getElementById('chat-panel').classList.remove('flex');
+    },
+
+    toggleContexto() {
+        const panel = document.getElementById('contexto-panel');
+        if (panel.classList.contains('hidden')) {
+            panel.classList.remove('hidden');
+            panel.classList.add('flex');
+            // Mobile: overlay
+            if (window.innerWidth < 1280) {
+                panel.style.position = 'fixed';
+                panel.style.right = '0';
+                panel.style.top = '64px';
+                panel.style.bottom = '0';
+                panel.style.zIndex = '50';
+                panel.style.width = '320px';
+                panel.style.boxShadow = '-4px 0 12px rgba(0,0,0,0.1)';
+            }
+        } else {
+            panel.classList.add('hidden');
+            panel.classList.remove('flex');
+            panel.removeAttribute('style');
+        }
+    },
+
+    // ─── UTILITÁRIOS ─────────────────────────────────────────
+    escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    },
+
+    formatPhone(phone) {
+        if (!phone) return '';
+        const clean = phone.replace(/\D/g, '');
+        if (clean.length === 13) return `+${clean.slice(0,2)} (${clean.slice(2,4)}) ${clean.slice(4,9)}-${clean.slice(9)}`;
+        if (clean.length === 12) return `+${clean.slice(0,2)} (${clean.slice(2,4)}) ${clean.slice(4,8)}-${clean.slice(8)}`;
+        return phone;
+    },
+
+    formatDate(dateStr) {
+        const d = new Date(dateStr + 'T00:00:00');
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        if (d.toDateString() === today.toDateString()) return 'Hoje';
+        if (d.toDateString() === yesterday.toDateString()) return 'Ontem';
+        return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    },
+
+    timeAgo(dateStr) {
+        const d = new Date(dateStr);
+        const now = new Date();
+        const diffMs = now - d;
+        const diffMin = Math.floor(diffMs / 60000);
+
+        if (diffMin < 1) return 'agora';
+        if (diffMin < 60) return `${diffMin}min`;
+        const diffH = Math.floor(diffMin / 60);
+        if (diffH < 24) return `${diffH}h`;
+        const diffD = Math.floor(diffH / 24);
+        return `${diffD}d`;
+    }
+};
+
+// Boot
+document.addEventListener('DOMContentLoaded', () => NexoApp.init());
+</script>
+@endsection

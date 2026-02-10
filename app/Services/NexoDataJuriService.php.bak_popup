@@ -1,0 +1,355 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Cliente;
+use App\Models\WaConversation;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
+
+class NexoDataJuriService
+{
+    /**
+     * Monta o contexto DataJuri completo para uma conversa.
+     */
+    public function getContextoDataJuri(WaConversation $conversation): array
+    {
+        $clienteId = $conversation->linked_cliente_id;
+
+        if (!$clienteId) {
+            return [
+                'has_cliente' => false,
+                'cliente' => null,
+                'processos' => [],
+                'prazos' => [],
+                'processo_vinculado' => null,
+                'linked_processo_id' => null,
+                'datajuri_web_url' => $this->getWebBaseUrl(),
+            ];
+        }
+
+        $cliente = $this->getCliente($clienteId);
+
+        if (!$cliente) {
+            return [
+                'has_cliente' => false,
+                'cliente' => null,
+                'processos' => [],
+                'prazos' => [],
+                'processo_vinculado' => null,
+                'linked_processo_id' => null,
+                'datajuri_web_url' => $this->getWebBaseUrl(),
+            ];
+        }
+
+        $processos = $this->getProcessosAtivos($clienteId);
+        $prazos = $this->getProximosPrazos($clienteId, 10);
+        $processoVinculado = null;
+
+        if ($conversation->linked_processo_id) {
+            $processoVinculado = $this->getProcessoDetalhe($conversation->linked_processo_id);
+        }
+
+        return [
+            'has_cliente' => true,
+            'cliente' => $cliente,
+            'processos' => $processos,
+            'prazos' => $prazos,
+            'processo_vinculado' => $processoVinculado,
+            'linked_processo_id' => $conversation->linked_processo_id,
+            'datajuri_web_url' => $this->getWebBaseUrl(),
+        ];
+    }
+
+    /**
+     * Dados do cliente.
+     */
+    private function getCliente(int $clienteId): ?array
+    {
+        $cliente = Cliente::select([
+            'id', 'nome', 'tipo', 'cpf_cnpj', 'telefone', 'email', 'datajuri_id'
+        ])->find($clienteId);
+
+        return $cliente ? $cliente->toArray() : null;
+    }
+
+    /**
+     * Processos ativos do cliente com andamentos e prazos (zero N+1).
+     * Ordenação: prazo mais próximo primeiro, depois andamento mais recente.
+     */
+    public function getProcessosAtivos(int $clienteId): array
+    {
+        $processos = DB::table('processos')
+            ->where('cliente_id', $clienteId)
+            ->where('status', 'Ativo')
+            ->select([
+                'id', 'numero', 'status', 'titulo', 'data_abertura',
+                'pasta', 'datajuri_id', 'valor_causa'
+            ])
+            ->get();
+
+        if ($processos->isEmpty()) {
+            return [];
+        }
+
+        $pastas = $processos->pluck('pasta')->filter()->unique()->values()->toArray();
+
+        // Batch: últimos andamentos por processo
+        $ultimosAndamentos = $this->batchUltimosAndamentos($pastas);
+
+        // Batch: próximos prazos fatais por processo
+        $proximosPrazos = $this->batchProximosPrazos($pastas);
+
+        // Batch: fases atuais por processo
+        $fasesAtuais = $this->batchFasesAtuais($pastas);
+
+        return $processos->map(function ($p) use ($ultimosAndamentos, $proximosPrazos, $fasesAtuais) {
+            $pasta = $p->pasta;
+            $prazo = $proximosPrazos[$pasta] ?? null;
+            $andamento = $ultimosAndamentos[$pasta] ?? null;
+            $fase = $fasesAtuais[$pasta] ?? null;
+
+            return [
+                'id' => $p->id,
+                'numero' => $p->numero,
+                'status' => $p->status,
+                'descricao' => mb_substr($p->titulo ?? '', 0, 120),
+                'data_abertura' => $p->data_abertura,
+                'pasta' => $pasta,
+                'datajuri_id' => $p->datajuri_id,
+                'valor_causa' => $p->valor_causa,
+                'fase_atual' => $fase,
+                'ultimo_andamento' => $andamento,
+                'proximo_prazo' => $prazo,
+                '_sort_prazo' => $prazo['data'] ?? '9999-12-31',
+                '_sort_andamento' => $andamento['data'] ?? '1900-01-01',
+            ];
+        })->sortBy([
+            ['_sort_prazo', 'asc'],
+            ['_sort_andamento', 'desc'],
+        ])->values()->toArray();
+    }
+
+    /**
+     * Top N próximos prazos fatais do cliente.
+     */
+    public function getProximosPrazos(int $clienteId, int $limit = 10, ?int $processoId = null): array
+    {
+        $query = DB::table('processos')
+            ->where('cliente_id', $clienteId)
+            ->where('status', 'Ativo');
+
+        if ($processoId) {
+            $query->where('id', $processoId);
+        }
+
+        $pastas = $query->pluck('pasta')->filter()->unique()->values()->toArray();
+
+        if (empty($pastas)) {
+            return [];
+        }
+
+        return DB::table('atividades_datajuri as a')
+            ->join('processos as p', 'p.pasta', '=', 'a.processo_pasta')
+            ->whereIn('a.processo_pasta', $pastas)
+            ->whereNotNull('a.data_prazo_fatal')
+            ->where('a.data_prazo_fatal', '>=', now()->toDateString())
+            ->select([
+                'a.data_prazo_fatal',
+                'a.status as atividade',
+                'p.id as processo_id',
+                'p.numero as processo_numero',
+            ])
+            ->orderBy('a.data_prazo_fatal')
+            ->limit($limit)
+            ->get()
+            ->map(function ($prazo) {
+                $dias = (int) now()->startOfDay()->diffInDays(
+                    Carbon::parse($prazo->data_prazo_fatal)->startOfDay(), false
+                );
+                return [
+                    'data' => $prazo->data_prazo_fatal,
+                    'atividade' => mb_substr($prazo->atividade ?? '', 0, 100),
+                    'processo_id' => $prazo->processo_id,
+                    'processo_numero' => $prazo->processo_numero,
+                    'dias_restantes' => $dias,
+                    'urgencia' => $this->calcularUrgencia($dias),
+                ];
+            })->toArray();
+    }
+
+    /**
+     * Busca clientes para vinculação manual.
+     */
+    public function buscarClientes(string $query): array
+    {
+        $q = trim($query);
+        if (mb_strlen($q) < 2) {
+            return [];
+        }
+
+        $isNumeric = preg_match('/^\d+$/', preg_replace('/\D/', '', $q));
+
+        return Cliente::select(['id', 'nome', 'tipo', 'cpf_cnpj', 'telefone'])
+            ->where(function ($builder) use ($q, $isNumeric) {
+                $builder->where('nome', 'LIKE', "%{$q}%");
+                if ($isNumeric) {
+                    $digits = preg_replace('/\D/', '', $q);
+                    $builder->orWhere('telefone', 'LIKE', "%{$digits}%")
+                            ->orWhere('cpf_cnpj', 'LIKE', "%{$digits}%");
+                } else {
+                    $builder->orWhere('cpf_cnpj', 'LIKE', "%{$q}%");
+                }
+            })
+            ->limit(20)
+            ->get()
+            ->toArray();
+    }
+
+    /**
+     * Auto-vincular cliente pelo telefone (reusa padrão NEXO v1.1).
+     */
+    public function autoVincularCliente(WaConversation $conversation): array
+    {
+        $phone = $conversation->phone;
+
+        if (empty($phone)) {
+            return ['success' => false, 'message' => 'Conversa sem telefone registrado.'];
+        }
+
+        // Match exato (padrão NEXO v1.1)
+        $candidates = Cliente::where('telefone', $phone)->get();
+
+        if ($candidates->count() === 0) {
+            $shortPhone = preg_replace('/^55/', '', $phone);
+            $candidates = Cliente::where('telefone', 'LIKE', "%{$shortPhone}")->get();
+        }
+
+        if ($candidates->count() === 1) {
+            $conversation->linked_cliente_id = $candidates->first()->id;
+            $conversation->save();
+
+            return [
+                'success' => true,
+                'cliente_id' => $candidates->first()->id,
+                'cliente_nome' => $candidates->first()->nome,
+            ];
+        }
+
+        if ($candidates->count() > 1) {
+            return [
+                'success' => false,
+                'message' => 'Múltiplos clientes encontrados. Use a busca manual.',
+                'candidates_count' => $candidates->count(),
+            ];
+        }
+
+        return ['success' => false, 'message' => 'Nenhum cliente encontrado para este telefone.'];
+    }
+
+    // ─── Helpers privados ────────────────────────────────────────────
+
+    private function batchUltimosAndamentos(array $pastas): array
+    {
+        if (empty($pastas)) return [];
+
+        $result = [];
+        $rows = DB::table('atividades_datajuri')
+            ->whereIn('processo_pasta', $pastas)
+            ->whereNotNull('data_hora')
+            ->select(['processo_pasta', 'data_hora', 'status as descricao'])
+            ->orderByDesc('data_hora')
+            ->get()
+            ->groupBy('processo_pasta');
+
+        foreach ($rows as $pasta => $items) {
+            $first = $items->first();
+            $result[$pasta] = [
+                'data' => $first->data_hora,
+                'resumo' => mb_substr($first->descricao ?? '', 0, 80),
+            ];
+        }
+
+        return $result;
+    }
+
+    private function batchProximosPrazos(array $pastas): array
+    {
+        if (empty($pastas)) return [];
+
+        $result = [];
+        $rows = DB::table('atividades_datajuri')
+            ->whereIn('processo_pasta', $pastas)
+            ->whereNotNull('data_prazo_fatal')
+            ->where('data_prazo_fatal', '>=', now()->toDateString())
+            ->select(['processo_pasta', 'data_prazo_fatal', 'status as atividade'])
+            ->orderBy('data_prazo_fatal')
+            ->get()
+            ->groupBy('processo_pasta');
+
+        foreach ($rows as $pasta => $items) {
+            $first = $items->first();
+            $dias = (int) now()->startOfDay()->diffInDays(
+                Carbon::parse($first->data_prazo_fatal)->startOfDay(), false
+            );
+            $result[$pasta] = [
+                'data' => $first->data_prazo_fatal,
+                'atividade' => mb_substr($first->atividade ?? '', 0, 80),
+                'dias_restantes' => $dias,
+            ];
+        }
+
+        return $result;
+    }
+
+    private function batchFasesAtuais(array $pastas): array
+    {
+        if (empty($pastas)) return [];
+
+        $result = [];
+        $rows = DB::table('fases_processo')
+            ->whereIn('processo_pasta', $pastas)
+            ->where('fase_atual', 1)
+            ->select(['processo_pasta', 'tipo_fase', 'instancia', 'data_ultimo_andamento'])
+            ->get();
+
+        foreach ($rows as $row) {
+            $result[$row->processo_pasta] = [
+                'tipo_fase' => $row->tipo_fase,
+                'instancia' => $row->instancia,
+                'data_ultimo_andamento' => $row->data_ultimo_andamento,
+            ];
+        }
+
+        return $result;
+    }
+
+    private function getProcessoDetalhe(int $processoId): ?array
+    {
+        $p = DB::table('processos')
+            ->where('id', $processoId)
+            ->select(['id', 'numero', 'status', 'titulo', 'pasta', 'datajuri_id', 'valor_causa'])
+            ->first();
+
+        if (!$p) return null;
+
+        $result = (array) $p;
+        $result['descricao'] = $result['titulo'] ?? '';
+        unset($result['titulo']);
+        return $result;
+    }
+
+    private function getWebBaseUrl(): string
+    {
+        return rtrim(env('DATAJURI_WEB_BASE_URL', ''), '/');
+    }
+
+    private function calcularUrgencia(int $diasRestantes): string
+    {
+        if ($diasRestantes <= 0) return 'vencido';
+        if ($diasRestantes <= 2) return 'critico';
+        if ($diasRestantes <= 5) return 'urgente';
+        if ($diasRestantes <= 15) return 'atencao';
+        return 'normal';
+    }
+}

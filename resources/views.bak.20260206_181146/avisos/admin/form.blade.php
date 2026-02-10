@@ -1,0 +1,113 @@
+@extends('layouts.app')
+
+@section('title', $aviso->exists ? 'Editar Aviso' : 'Novo Aviso')
+
+@section('content')
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-semibold">{{ $aviso->exists ? 'Editar Aviso' : 'Novo Aviso' }}</h1>
+            <p class="text-sm text-gray-600 dark:text-slate-300">Preencha as informações do aviso. Você pode usar Markdown básico.</p>
+        </div>
+        <a href="{{ route('admin.avisos.index') }}" class="text-sm font-semibold text-blue-600 hover:text-blue-500">← Voltar</a>
+    </div>
+
+    @if ($errors->any())
+        <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-200">
+            Verifique os campos destacados.
+            @if($errors->has('store'))
+                <div class="mt-2 text-sm">{{ $errors->first('store') }}</div>
+            @endif
+            <ul class="mt-2 list-disc pl-5 text-sm">
+                @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
+    <form method="POST" action="{{ $aviso->exists ? route('admin.avisos.update', $aviso) : route('admin.avisos.store') }}" class="rounded-xl bg-white p-6 shadow-sm dark:bg-slate-800">
+        @csrf
+        @if($aviso->exists)
+            @method('PUT')
+        @endif
+
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div class="md:col-span-2">
+                <label class="block text-xs font-semibold text-gray-600 dark:text-slate-300">Título</label>
+                <input name="titulo" value="{{ old('titulo', $aviso->titulo) }}" class="mt-1 w-full rounded-lg border-gray-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900" maxlength="255" required />
+                @error('titulo')<div class="mt-1 text-xs text-red-600">{{ $message }}</div>@enderror
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 dark:text-slate-300">Categoria</label>
+                <select name="categoria_id" class="mt-1 w-full rounded-lg border-gray-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900" required>
+                    <option value="">Selecione</option>
+                    @foreach($categorias as $cat)
+                        <option value="{{ $cat->id }}" @selected((string)old('categoria_id', $aviso->categoria_id) === (string)$cat->id)>
+                            {{ $cat->nome }}
+                        </option>
+                    @endforeach
+                </select>
+                @error('categoria_id')<div class="mt-1 text-xs text-red-600">{{ $message }}</div>@enderror
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 dark:text-slate-300">Status</label>
+                <div class="mt-2 flex flex-wrap gap-3 text-sm">
+                    @foreach(['ativo'=>'Ativo','agendado'=>'Agendado','inativo'=>'Inativo'] as $k=>$v)
+                        <label class="inline-flex items-center gap-2">
+                            <input type="radio" name="status" value="{{ $k }}" @checked(old('status', $aviso->status ?? 'ativo') === $k) />
+                            <span>{{ $v }}</span>
+                        </label>
+                    @endforeach
+                </div>
+                @error('status')<div class="mt-1 text-xs text-red-600">{{ $message }}</div>@enderror
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 dark:text-slate-300">Prioridade</label>
+                <div class="mt-2 flex flex-wrap gap-3 text-sm">
+                    @foreach(['baixa'=>'🟢 Baixa','media'=>'🟡 Média','alta'=>'🟠 Alta','critica'=>'🔴 Crítica'] as $k=>$v)
+                        <label class="inline-flex items-center gap-2">
+                            <input type="radio" name="prioridade" value="{{ $k }}" @checked(old('prioridade', $aviso->prioridade ?? 'media') === $k) />
+                            <span>{{ $v }}</span>
+                        </label>
+                    @endforeach
+                </div>
+                @error('prioridade')<div class="mt-1 text-xs text-red-600">{{ $message }}</div>@enderror
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 dark:text-slate-300">Data de início</label>
+                <input type="datetime-local" name="data_inicio" value="{{ old('data_inicio', $aviso->data_inicio ? $aviso->data_inicio->format('Y-m-d\TH:i') : '') }}" class="mt-1 w-full rounded-lg border-gray-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900" />
+                <div class="mt-1 text-xs text-gray-500 dark:text-slate-400">Opcional. Se preenchido, o aviso só aparece a partir desse horário.</div>
+                @error('data_inicio')<div class="mt-1 text-xs text-red-600">{{ $message }}</div>@enderror
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 dark:text-slate-300">Data de fim / validade</label>
+                <input type="datetime-local" name="data_fim" value="{{ old('data_fim', $aviso->data_fim ? $aviso->data_fim->format('Y-m-d\TH:i') : '') }}" class="mt-1 w-full rounded-lg border-gray-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900" />
+                <div class="mt-1 text-xs text-gray-500 dark:text-slate-400">Opcional. Após essa data o aviso não aparece no quadro.</div>
+                @error('data_fim')<div class="mt-1 text-xs text-red-600">{{ $message }}</div>@enderror
+            </div>
+
+            <div class="md:col-span-2">
+                <label class="block text-xs font-semibold text-gray-600 dark:text-slate-300">Descrição</label>
+                <textarea name="descricao" rows="10" class="mt-1 w-full rounded-lg border-gray-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:border-slate-700 dark:bg-slate-900" maxlength="10000" required>{{ old('descricao', $aviso->descricao) }}</textarea>
+                <div class="mt-1 text-xs text-gray-500 dark:text-slate-400">Dica: use **negrito**, _itálico_, listas e links em Markdown.</div>
+                @error('descricao')<div class="mt-1 text-xs text-red-600">{{ $message }}</div>@enderror
+            </div>
+        </div>
+
+        <div class="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <a href="{{ route('admin.avisos.index') }}" class="inline-flex items-center justify-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-50 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800">
+                Cancelar
+            </a>
+            <button type="submit" class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500">
+                Salvar
+            </button>
+        </div>
+    </form>
+</div>
+@endsection

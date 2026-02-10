@@ -1,0 +1,313 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Services\DataJuriSyncOrchestrator;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+
+class SincronizacaoUnificadaController extends Controller
+{
+
+    private function normalizeUtf8($data)
+    {
+        if (is_string($data)) {
+            $enc = mb_detect_encoding($data, ['UTF-8','ISO-8859-1','Windows-1252'], true);
+            if ($enc && $enc !== 'UTF-8') $data = mb_convert_encoding($data, 'UTF-8', $enc);
+            return mb_convert_encoding($data, 'UTF-8', 'UTF-8');
+        }
+        if (is_array($data)) return array_map([$this, 'normalizeUtf8'], $data);
+        return $data;
+    }
+    /**
+     * Exibir página de sincronização unificada
+     */
+    public function index()
+    {
+        // Módulos disponíveis (cards dinâmicos na view)
+        $datajuriConfig = config('datajuri.modulos', []);
+        $modulosDisponiveis = [];
+        $modulesMeta = [
+            'Pessoa'          => ['table' => 'clientes',                  'label' => 'Clientes',        'icon' => '??'],
+            'Processo'        => ['table' => 'processos',                 'label' => 'Processos',       'icon' => '??'],
+            'Fase'            => ['table' => 'fases_processo',            'label' => 'Fases',           'icon' => '??'],
+            'Movimento'       => ['table' => 'movimentos',                'label' => 'Movimentos',      'icon' => '??'],
+            'Contrato'        => ['table' => 'contratos',                 'label' => 'Contratos',       'icon' => '??'],
+            'Atividade'       => ['table' => 'atividades_datajuri',       'label' => 'Atividades',      'icon' => '??'],
+            'HoraTrabalhada'  => ['table' => 'horas_trabalhadas_datajuri','label' => 'Horas',           'icon' => '??'],
+            'OrdemServico'    => ['table' => 'ordens_servico',            'label' => 'Ordens Serviço',  'icon' => '??'],
+            'ContasReceber'   => ['table' => 'contas_receber',            'label' => 'Contas a Receber','icon' => '??'],
+        ];
+
+        foreach ($datajuriConfig as $key => $mod) {
+            if (empty($mod['enabled'])) continue;
+
+            $meta  = $modulesMeta[$key] ?? ['table' => $mod['table'] ?? strtolower($key), 'label' => $key, 'icon' => '??'];
+            $table = $mod['table'] ?? $meta['table'];
+            $count = 0;
+            try { $count = DB::table($table)->count(); } catch (\Exception $e) {}
+
+            $modulosDisponiveis[$key] = [
+                'label'   => $mod['label'] ?? $meta['label'],
+                'icon'    => $mod['icon']  ?? $meta['icon'],
+                'table'   => $table,
+                'count'   => $count,
+                'enabled' => true,
+            ];
+        }
+
+        // Estatísticas DataJuri
+        $movimentos = DB::table('movimentos')->where('origem', 'datajuri')->count();
+        $processos  = DB::table('processos')->count();
+        $clientes   = DB::table('clientes')->count();
+        $atividades = 0;
+        try { $atividades = DB::table('atividades_datajuri')->count(); } catch (\Exception $e) {
+            try { $atividades = DB::table('atividades')->count(); } catch (\Exception $e2) {}
+        }
+
+        // Estatísticas ESPOCRM
+        $leads         = DB::table('leads')->count();
+        $oportunidades = DB::table('oportunidades')->count();
+        $contacts      = 0;
+        try { $contacts = DB::table('contacts')->count(); } catch (\Exception $e) {}
+        $contas = 0;
+        try { $contas = DB::table('accounts')->count(); } catch (\Exception $e) {}
+
+        // Última sincronização
+        $lastSync = DB::table('sync_runs')
+            ->where('status', 'completed')
+            ->orderBy('finished_at', 'desc')
+            ->first();
+
+        $lastSyncDataJuri = $lastSync?->finished_at
+            ? \Carbon\Carbon::parse($lastSync->finished_at)->format('d/m/Y H:i')
+            : 'Nunca';
+        $lastSyncEspocrm = 'N/A';
+        $lastRunTime      = $lastSyncDataJuri;
+
+        // Histórico (inclui mensagem que a view usa)
+        $historico = DB::table('sync_runs')
+            ->select('id', 'run_id', 'tipo', 'status', 'registros_processados',
+                     'registros_criados', 'registros_atualizados', 'erros',
+                     'started_at', 'finished_at', 'mensagem', 'created_at')
+            ->orderBy('created_at', 'desc')
+            ->limit(20)
+            ->get()
+            ->map(function ($run) {
+                $run->created_at = \Carbon\Carbon::parse($run->created_at);
+                $run->duracao = null;
+                if ($run->started_at && $run->finished_at) {
+                    $start = \Carbon\Carbon::parse($run->started_at);
+                    $end   = \Carbon\Carbon::parse($run->finished_at);
+                    $run->duracao = $start->diffInSeconds($end);
+                }
+                $run->mensagem = $run->mensagem ?? '';
+                return $run;
+            });
+
+        return view('admin.sincronizacao-unificada.index', compact(
+            'modulosDisponiveis',
+            'movimentos', 'processos', 'clientes', 'atividades',
+            'leads', 'oportunidades', 'contacts', 'contas',
+            'lastSyncDataJuri', 'lastSyncEspocrm', 'lastRunTime',
+            'historico'
+        ));
+    }
+
+    /**
+     * Retornar contagens atualizadas (AJAX)
+     */
+    public function counts()
+    {
+        $datajuriConfig = config('datajuri.modulos', []);
+        $modulesMeta = [
+            'Pessoa'          => 'clientes',
+            'Processo'        => 'processos',
+            'Fase'            => 'fases_processo',
+            'Movimento'       => 'movimentos',
+            'Contrato'        => 'contratos',
+            'Atividade'       => 'atividades_datajuri',
+            'HoraTrabalhada'  => 'horas_trabalhadas_datajuri',
+            'OrdemServico'    => 'ordens_servico',
+            'ContasReceber'   => 'contas_receber',
+        ];
+
+        $counts = [];
+        foreach ($datajuriConfig as $key => $mod) {
+            if (empty($mod['enabled'])) continue;
+            $table = $mod['table'] ?? ($modulesMeta[$key] ?? strtolower($key));
+            try { $counts[$table] = DB::table($table)->count(); } catch (\Exception $e) { $counts[$table] = 0; }
+        }
+
+        return response()->json(['success' => true, 'counts' => $counts]);
+    }
+
+    /**
+     * Executar smoke test
+     */
+    public function smokeTest()
+    {
+        try {
+            $orchestrator = new DataJuriSyncOrchestrator();
+            $results = $orchestrator->smokeTest();
+
+            $results = $this->normalizeUtf8($results);
+            return response()->json([
+                'success' => $results['token'] && $results['modulos'],
+                'message' => $results['token'] ? 'Conexão OK — Token válido, módulos acessíveis' : 'Falha na autenticação',
+                'results' => $results,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Iniciar sincronização completa
+     */
+    public function syncAll(Request $request)
+    {
+        $orchestrator = new DataJuriSyncOrchestrator();
+        $orchestrator->cleanupStaleRuns();
+
+        $running = DB::table('sync_runs')->where('status', 'running')->first();
+        if ($running) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Já existe uma sincronização em andamento',
+                'run_id'  => $running->run_id,
+            ], 409);
+        }
+
+        try {
+            $results = $orchestrator->syncAll();
+
+            return response()->json([
+                'success' => true,
+                'message' => "Sincronização concluída: {$results['total_processados']} processados, {$results['total_criados']} criados, {$results['total_atualizados']} atualizados",
+                'results' => $results,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Sincronizar módulo específico
+     */
+    public function syncModule(Request $request, string $modulo)
+    {
+        try {
+            $orchestrator = new DataJuriSyncOrchestrator();
+            $orchestrator->cleanupStaleRuns();
+            $orchestrator->startRun('modulo_' . $modulo);
+            $results = $orchestrator->syncModule($modulo);
+            $orchestrator->finishRun('completed', "{$modulo}: {$results['processados']} processados");
+
+            return response()->json([
+                'success' => true,
+                'message' => "{$modulo}: {$results['processados']} processados, {$results['criados']} criados, {$results['atualizados']} atualizados",
+                'results' => $results,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Reprocessar financeiro (full refresh)
+     */
+    public function reprocessarFinanceiro()
+    {
+        $orchestrator = new DataJuriSyncOrchestrator();
+        $orchestrator->cleanupStaleRuns();
+
+        $running = DB::table('sync_runs')->where('status', 'running')->first();
+        if ($running) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Já existe uma sincronização em andamento',
+            ], 409);
+        }
+
+        try {
+            $results = $orchestrator->reprocessarFinanceiro();
+
+            return response()->json([
+                'success' => true,
+                'message' => "Reprocessamento concluído: {$results['processados']} processados, {$results['deletados']} obsoletos removidos",
+                'results' => $results,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Obter status da sincronização
+     */
+    public function status(string $runId = null)
+    {
+        $run = $runId
+            ? DB::table('sync_runs')->where('run_id', $runId)->first()
+            : DB::table('sync_runs')->orderBy('created_at', 'desc')->first();
+
+        if (!$run) {
+            return response()->json(['success' => false, 'message' => 'Nenhuma execução encontrada'], 404);
+        }
+
+        return response()->json(['success' => true, 'run' => $run]);
+    }
+
+    /**
+     * Cancelar sincronização em andamento
+     */
+    public function cancel(string $runId)
+    {
+        $updated = DB::table('sync_runs')
+            ->where('run_id', $runId)
+            ->where('status', 'running')
+            ->update([
+                'status'      => 'cancelled',
+                'mensagem'    => 'Cancelado pelo usuário',
+                'finished_at' => now(),
+                'updated_at'  => now(),
+            ]);
+
+        return response()->json([
+            'success' => (bool) $updated,
+            'message' => $updated ? 'Sincronização cancelada' : 'Não foi possível cancelar',
+        ]);
+    }
+
+    /**
+     * Limpar histórico de execuções antigas
+     */
+    public function clearHistory(Request $request)
+    {
+        $days = $request->input('days', 30);
+
+        $deleted = DB::table('sync_runs')
+            ->where('created_at', '<', now()->subDays($days))
+            ->where('status', '!=', 'running')
+            ->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$deleted} registros removidos",
+        ]);
+    }
+}

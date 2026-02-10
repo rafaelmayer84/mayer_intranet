@@ -1,9 +1,41 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
-
     RewriteBase /Intranet/
-
-    # Redireciona tudo para /public
-    RewriteCond %{REQUEST_URI} !^/Intranet/public/
+    
+    # Permitir acesso a arquivos reais (CSS, JS, images)
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^ - [L]
+    
+    # Permitir acesso a diretórios reais
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+    
+    # Se já está em /public/, não reescrever
+    RewriteCond %{REQUEST_URI} ^/Intranet/public/
+    RewriteRule ^ - [L]
+    
+    # ESTRATÉGIA 1: Rewrite para /public/ (funciona com symlink)
     RewriteRule ^(.*)$ public/$1 [L,QSA]
+</IfModule>
+
+# Segurança
+Options -Indexes -MultiViews
+
+# Bloquear arquivos sensíveis
+<FilesMatch "^\.">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Bloquear acesso direto a .env
+<Files .env>
+    Order allow,deny
+    Deny from all
+</Files>
+
+# Headers de segurança
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
 </IfModule>

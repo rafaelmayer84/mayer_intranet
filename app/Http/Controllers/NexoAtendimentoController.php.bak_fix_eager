@@ -1,0 +1,328 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\WaConversation;
+use App\Models\WaMessage;
+use App\Services\NexoConversationSyncService;
+use App\Services\SendPulseWhatsAppService;
+use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use App\Services\NexoClienteResolverService;
+
+/**
+ * NexoAtendimentoController
+ *
+ * Fase 1: Endpoints funcionais (JSON) — a view Blade será entregue na Fase 2.
+ * Fase 2: View completa com layout 3 colunas.
+ *
+ * v1.1: Polling com rate-limit por usuário+conversa, contexto 360 resiliente.
+ */
+class NexoAtendimentoController extends Controller
+{
+    /** Rate limit: mínimo de segundos entre polls por usuário+conversa */
+    private const POLL_RATE_LIMIT_SECONDS = 8;
+
+    public function __construct(
+        protected NexoConversationSyncService $syncService,
+        protected SendPulseWhatsAppService $sendpulseService
+    ) {}
+
+    /**
+     * Tela principal — STUB Fase 1 (será substituída na Fase 2).
+     */
+    public function index()
+    {
+        $users = \App\Models\User::select('id', 'name')
+            ->orderBy('name')
+            ->get();
+
+        return view('nexo.atendimento.index', compact('users'));
+    }
+
+    /**
+     * Lista inbox (JSON paginado com filtros).
+     */
+    public function conversas(Request $request): JsonResponse
+    {
+        $query = WaConversation::query()
+            ->with('assignedUser:id,name')
+            ->orderByDesc('last_message_at');
+
+        // Filtros
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+        if ($request->filled('responsavel')) {
+            $query->where('assigned_user_id', $request->input('responsavel'));
+        }
+        if ($request->filled('unread') && $request->input('unread') === '1') {
+            $query->where('unread_count', '>', 0);
+        }
+        if ($request->filled('tipo')) {
+            $tipo = $request->input('tipo');
+            if ($tipo === 'lead') {
+                $query->whereNotNull('linked_lead_id');
+            } elseif ($tipo === 'cliente') {
+                $query->whereNotNull('linked_cliente_id');
+            } elseif ($tipo === 'indefinido') {
+                $query->whereNull('linked_lead_id')->whereNull('linked_cliente_id');
+            }
+        }
+
+        $conversas = $query->paginate(30);
+
+        return response()->json($conversas);
+    }
+
+    /**
+     * Detalhes de conversa + mensagens.
+     */
+    public function conversa(int $id): JsonResponse
+    {
+        $conversation = WaConversation::with([
+            'assignedUser:id,name',
+            'lead:id,nome,telefone,intencao_contratar,area_interesse,urgencia',
+            'cliente:id,nome,telefone,cpf_cnpj,tipo',
+        ])->findOrFail($id);
+
+        $messages = $conversation->messages()
+            ->orderBy('sent_at', 'asc')
+            ->limit(200)
+            ->get();
+
+        return response()->json([
+            'conversation' => $conversation,
+            'messages'     => $messages,
+        ]);
+    }
+
+    /**
+     * Enviar mensagem humana.
+     */
+    public function enviarMensagem(Request $request, int $id): JsonResponse
+    {
+        $request->validate([
+            'text' => 'required|string|max:4096',
+        ]);
+
+        $conversation = WaConversation::findOrFail($id);
+        $userId = auth()->id();
+
+        $result = $this->syncService->sendHumanMessage(
+            $conversation,
+            $request->input('text'),
+            $userId
+        );
+
+        if (!$result['success']) {
+            return response()->json([
+                'success' => false,
+                'error'   => $result['error'],
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $result['message'],
+        ]);
+    }
+
+    /**
+     * Polling: buscar mensagens novas do chat atual.
+     *
+     * v1.1: Rate-limit por usuário+conversa (mín. 8s entre chamadas).
+     * Se bloqueado por lock/rate-limit, retorna mensagens do banco sem chamar API.
+     */
+    public function pollMessages(int $id): JsonResponse
+    {
+        $conversation = WaConversation::findOrFail($id);
+        $userId = auth()->id();
+
+        $newCount = 0;
+
+        // Rate limit por usuário + conversa
+        $rateLimitKey = "nexo_poll_rate_{$userId}_{$id}";
+        $canPoll = !Cache::has($rateLimitKey);
+
+        if ($canPoll) {
+            // Marcar rate limit ANTES de chamar API
+            Cache::put($rateLimitKey, true, self::POLL_RATE_LIMIT_SECONDS);
+
+            $syncResult = $this->syncService->syncMessages($conversation, 50);
+
+            // -1 significa bloqueado por lock ou backoff no service
+            $newCount = $syncResult >= 0 ? $syncResult : 0;
+        }
+
+        // Sempre retornar mensagens do banco (mesmo se rate-limited)
+        $messages = $conversation->messages()
+            ->orderBy('sent_at', 'asc')
+            ->limit(200)
+            ->get();
+
+        return response()->json([
+            'new_count' => $newCount,
+            'messages'  => $messages,
+            'throttled' => !$canPoll,
+        ]);
+    }
+
+    /**
+     * Atribuir responsável.
+     */
+    public function assignUser(Request $request, int $id): JsonResponse
+    {
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+        ]);
+
+        $conversation = WaConversation::findOrFail($id);
+        $conversation->update(['assigned_user_id' => $request->input('user_id')]);
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Alterar status (open/close).
+     */
+    public function changeStatus(Request $request, int $id): JsonResponse
+    {
+        $request->validate([
+            'status' => 'required|in:open,closed',
+        ]);
+
+        $conversation = WaConversation::findOrFail($id);
+
+        $updateData = ['status' => $request->input('status')];
+
+        // Se fechando, zerar unread
+        if ($request->input('status') === 'closed') {
+            $updateData['unread_count'] = 0;
+        }
+
+        $conversation->update($updateData);
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Vincular conversa a lead.
+     */
+    public function linkLead(Request $request, int $id): JsonResponse
+    {
+        $request->validate([
+            'lead_id' => 'required|exists:leads,id',
+        ]);
+
+        $conversation = WaConversation::findOrFail($id);
+        $conversation->update(['linked_lead_id' => $request->input('lead_id')]);
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Vincular conversa a cliente.
+     */
+    public function linkCliente(Request $request, int $id): JsonResponse
+    {
+        $request->validate([
+            'cliente_id' => 'required|exists:clientes,id',
+        ]);
+
+        $conversation = WaConversation::findOrFail($id);
+        $conversation->update(['linked_cliente_id' => $request->input('cliente_id')]);
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Contexto 360 - Dados do lead IA + cliente DataJuri.
+     * GET /nexo/atendimento/conversas/{id}/contexto
+     *
+     * @since v2.0 - Integracao DataJuri (resolucao de identidade)
+     */
+    public function contexto360(int $id)
+    {
+        $conversation = \App\Models\WaConversation::findOrFail($id);
+
+        $context = [
+            'link_type'    => 'indefinido',
+            'lead'         => null,
+            'cliente'      => null,
+            'datajuri'     => null,
+            'datajuri_url' => null,
+            'resumo_texto' => null,
+        ];
+
+        // === BLOCO LEAD (padrao v1.1 preservado) ===
+        try {
+            if ($conversation->linked_lead_id) {
+                $lead = $conversation->lead;
+                if ($lead) {
+                    $context['link_type'] = 'lead';
+                    $context['lead'] = [
+                        'id'                     => $lead->id,
+                        'nome'                   => $lead->nome,
+                        'telefone'               => $lead->telefone,
+                        'email'                  => $lead->email,
+                        'area_interesse'         => $lead->area_interesse,
+                        'intencao_contratar'     => $lead->intencao_contratar,
+                        'urgencia'               => $lead->urgencia,
+                        'sub_area'               => $lead->sub_area,
+                        'complexidade'           => $lead->complexidade,
+                        'objecoes'               => $lead->objecoes,
+                        'gatilho_emocional'      => $lead->gatilho_emocional,
+                        'potencial_honorarios'   => $lead->potencial_honorarios,
+                        'resumo_demanda'         => $lead->resumo_demanda,
+                        'palavras_chave'         => $lead->palavras_chave,
+                        'intencao_justificativa' => $lead->intencao_justificativa,
+                    ];
+                }
+            }
+        } catch (\Throwable $e) {
+            $context['lead'] = ['_error' => $e->getMessage()];
+        }
+
+        // === BLOCO CLIENTE DATAJURI (resolucao de identidade) ===
+        try {
+            $resolver = new NexoClienteResolverService();
+            $cliente  = $resolver->resolve($conversation);
+
+            if ($cliente) {
+                $context['link_type'] = 'cliente';
+                $contextoCliente      = $resolver->contextoCliente($cliente);
+                $context['datajuri']  = $contextoCliente;
+
+                if ($cliente->datajuri_id) {
+                    $context['datajuri_url'] = 'https://dj21.datajuri.com.br/#/pessoa/' . $cliente->datajuri_id;
+                }
+
+                $context['resumo_texto'] = $resolver->gerarResumo($cliente, $contextoCliente);
+
+                $context['cliente'] = [
+                    'id'               => $cliente->id,
+                    'nome'             => $cliente->nome,
+                    'tipo_pessoa'      => $cliente->tipo ?? 'PF',
+                    'documento'        => $contextoCliente['cartao']['documento'] ?? null,
+                    'processos_ativos' => is_array($contextoCliente['processos']) && !isset($contextoCliente['processos']['_error'])
+                        ? $contextoCliente['processos']
+                        : [],
+                    'contas_abertas'   => is_array($contextoCliente['financeiro']) && !isset($contextoCliente['financeiro']['_error'])
+                        ? [$contextoCliente['financeiro']]
+                        : [],
+                ];
+            }
+        } catch (\Throwable $e) {
+            $context['datajuri'] = ['_error' => $e->getMessage()];
+            \Illuminate\Support\Facades\Log::warning('Contexto360 DataJuri error', [
+                'conversation_id' => $id,
+                'error'           => $e->getMessage(),
+            ]);
+        }
+
+        return response()->json($context);
+    }
+}

@@ -31,6 +31,29 @@ return [
 
     'connections' => [
 
+        'legacy' => [
+            'driver' => 'mysql',
+            'host' => 'localhost',
+            'database' => 'u492856976_automsendpulse',
+            'username' => 'u492856976_manusai',
+            'password' => 'Manus01.',
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+        ],
+
+        'backup_sendpulse' => [
+            'driver' => 'mysql',
+            'host' => 'localhost',
+            'port' => '3306',
+            'database' => 'u492856976_backupsendpls',
+            'username' => 'u492856976_manusai1',
+            'password' => 'Manus01.',
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => false,
+        ],
+
         'sqlite' => [
             'driver' => 'sqlite',
             'url' => env('DB_URL'),

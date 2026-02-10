@@ -71,7 +71,7 @@ class DashboardController extends Controller
         $dashboardData = $this->dashboardFinance->getDashboardData($ano, $mes);
 
         // Opções fixas conforme escopo atual do projeto
-        $anosDisponiveis = [2020, 2021, 2022, 2023, 2024, 2025, 2026];
+        $anosDisponiveis = [2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028];
         $mesesDisponiveis = [
             1 => 'Jan', 2 => 'Fev', 3 => 'Mar', 4 => 'Abr', 5 => 'Mai', 6 => 'Jun',
             7 => 'Jul', 8 => 'Ago', 9 => 'Set', 10 => 'Out', 11 => 'Nov', 12 => 'Dez'
