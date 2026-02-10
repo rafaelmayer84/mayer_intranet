@@ -1,18 +1,20 @@
-<?php $__env->startSection('title', 'Visão Gerencial'); ?>
+@extends('layouts.app')
 
-<?php $__env->startSection('content'); ?>
-<link rel="stylesheet" href="<?php echo e(asset('css/dashboard-custom.css')); ?>">
+@section('title', 'Visão Gerencial')
 
-<?php
+@section('content')
+<link rel="stylesheet" href="{{ asset('css/dashboard-custom.css') }}">
+
+@php
     $d = $dashboardData ?? [];
     $resumo = $d['resumoExecutivo'] ?? [];
     $saude = $d['saudeFinanceira'] ?? [];
 
     $fmtMoeda = fn($v) => 'R$ ' . number_format((float) $v, 2, ',', '.');
     $fmtPct = fn($v) => number_format((float) $v, 1, ',', '.') . '%';
-?>
+@endphp
 
-<div id="dashboard-root" class="space-y-6 dashboard-fadein" data-api-url="<?php echo e(route('api.visao-gerencial')); ?>" data-export-url="<?php echo e(route('visao-gerencial.export')); ?>">
+<div id="dashboard-root" class="space-y-6 dashboard-fadein" data-api-url="{{ route('api.visao-gerencial') }}" data-export-url="{{ route('visao-gerencial.export') }}">
 
     <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
@@ -24,18 +26,18 @@
             <div class="flex items-center gap-2">
                 <label for="filter-ano" class="text-xs text-gray-600 dark:text-gray-400">Ano</label>
                 <select id="filter-ano" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
-                    <?php $__currentLoopData = ($anosDisponiveis ?? []); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $a): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                        <option value="<?php echo e($a); ?>" <?php if((int)$a === (int)$ano): echo 'selected'; endif; ?>><?php echo e($a); ?></option>
-                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                    @foreach(($anosDisponiveis ?? []) as $a)
+                        <option value="{{ $a }}" @selected((int)$a === (int)$ano)>{{ $a }}</option>
+                    @endforeach
                 </select>
             </div>
 
             <div class="flex items-center gap-2">
                 <label for="filter-mes" class="text-xs text-gray-600 dark:text-gray-400">Mês</label>
                 <select id="filter-mes" class="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
-                    <?php $__currentLoopData = ($mesesDisponiveis ?? []); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $mNum => $mLabel): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                        <option value="<?php echo e($mNum); ?>" <?php if((int)$mNum === (int)$mes): echo 'selected'; endif; ?>><?php echo e($mLabel); ?></option>
-                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                    @foreach(($mesesDisponiveis ?? []) as $mNum => $mLabel)
+                        <option value="{{ $mNum }}" @selected((int)$mNum === (int)$mes)>{{ $mLabel }}</option>
+                    @endforeach
                 </select>
             </div>
 
@@ -53,7 +55,7 @@
     </div>
 
     <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <?php echo $__env->make('dashboard.partials._kpi-card', [
+        @include('dashboard.partials._kpi-card', [
             'id' => 'receita',
             'title' => 'Receita Total',
             'value' => $fmtMoeda($resumo['receitaTotal'] ?? 0),
@@ -62,9 +64,9 @@
             'trend' => $resumo['receitaTrend'] ?? 0,
             'accent' => 'green',
             'icon' => '💰'
-        ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+        ])
 
-        <?php echo $__env->make('dashboard.partials._kpi-card', [
+        @include('dashboard.partials._kpi-card', [
             'id' => 'despesas',
             'title' => 'Despesas Totais',
             'value' => $fmtMoeda($resumo['despesasTotal'] ?? 0),
@@ -73,9 +75,9 @@
             'trend' => $resumo['despesasTrend'] ?? 0,
             'accent' => 'blue',
             'icon' => '📊'
-        ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+        ])
 
-        <?php echo $__env->make('dashboard.partials._kpi-card', [
+        @include('dashboard.partials._kpi-card', [
             'id' => 'resultado',
             'title' => 'Resultado Líquido',
             'value' => $fmtMoeda($resumo['resultadoLiquido'] ?? 0),
@@ -84,9 +86,9 @@
             'trend' => $resumo['resultadoTrend'] ?? 0,
             'accent' => 'orange',
             'icon' => '📈'
-        ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+        ])
 
-        <?php echo $__env->make('dashboard.partials._kpi-card', [
+        @include('dashboard.partials._kpi-card', [
             'id' => 'margem',
             'title' => 'Margem Líquida',
             'value' => $fmtPct($resumo['margemLiquida'] ?? 0),
@@ -95,10 +97,10 @@
             'trend' => $resumo['margemTrend'] ?? 0,
             'accent' => 'purple',
             'icon' => '📉'
-        ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+        ])
     </div>
 
-<?php
+@php
     $mix = $d['mixReceita'] ?? [];
     $yoy = $d['receitaYoY'] ?? [];
     $expense = $d['expenseRatio'] ?? [];
@@ -121,7 +123,7 @@
         if ($real >= $meta * 0.90) return ['label' => 'Atenção', 'class' => 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200'];
         return ['label' => 'Crítico', 'class' => 'bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-200'];
     };
-?>
+@endphp
 
 <!-- Metas do mês (Gap vs Meta + Semáforo) -->
 <div class="mt-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
@@ -140,31 +142,31 @@
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-200 dark:divide-gray-800 text-gray-800 dark:text-gray-200">
-                <?php
+                @php
                     $itemsMetas = [
                         ['label' => 'Receita', 'real' => $resumo['receitaTotal'] ?? 0, 'meta' => $resumo['receitaMeta'] ?? 0, 'dir' => 'HIGH', 'fmt' => $fmtMoeda],
                         ['label' => 'Despesas', 'real' => $resumo['despesasTotal'] ?? 0, 'meta' => $resumo['despesasMeta'] ?? 0, 'dir' => 'LOWER', 'fmt' => $fmtMoeda],
                         ['label' => 'Resultado', 'real' => $resumo['resultadoLiquido'] ?? 0, 'meta' => $resumo['resultadoMeta'] ?? 0, 'dir' => 'HIGH', 'fmt' => $fmtMoeda],
                         ['label' => 'Margem', 'real' => $resumo['margemLiquida'] ?? 0, 'meta' => $resumo['margemMeta'] ?? 0, 'dir' => 'HIGH', 'fmt' => $fmtPct],
                     ];
-                ?>
-                <?php $__currentLoopData = $itemsMetas; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $it): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                    <?php
+                @endphp
+                @foreach($itemsMetas as $it)
+                    @php
                         $real = (float) $it['real'];
                         $meta = (float) $it['meta'];
                         $pct = $meta > 0 ? ($real / $meta) * 100 : 0;
                         $st = $statusMeta($real, $meta, $it['dir']);
-                    ?>
+                    @endphp
                     <tr>
-                        <td class="px-3 py-2 font-medium"><?php echo e($it['label']); ?></td>
-                        <td class="px-3 py-2"><?php echo e(($it['fmt'])($real)); ?></td>
-                        <td class="px-3 py-2"><?php echo e(($it['fmt'])($meta)); ?></td>
-                        <td class="px-3 py-2"><?php echo e(number_format($pct, 1, ',', '.')); ?>%</td>
+                        <td class="px-3 py-2 font-medium">{{ $it['label'] }}</td>
+                        <td class="px-3 py-2">{{ ($it['fmt'])($real) }}</td>
+                        <td class="px-3 py-2">{{ ($it['fmt'])($meta) }}</td>
+                        <td class="px-3 py-2">{{ number_format($pct, 1, ',', '.') }}%</td>
                         <td class="px-3 py-2">
-                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium <?php echo e($st['class']); ?>"><?php echo e($st['label']); ?></span>
+                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $st['class'] }}">{{ $st['label'] }}</span>
                         </td>
                     </tr>
-                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                @endforeach
             </tbody>
         </table>
     </div>
@@ -175,56 +177,49 @@
     <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
         <p class="text-xs text-gray-600 dark:text-gray-400">Mix Receita PF/PJ</p>
         <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">
-            PF <?php echo e($fmtPct($mix['pfPct'] ?? 0)); ?> • PJ <?php echo e($fmtPct($mix['pjPct'] ?? 0)); ?>
-
+            PF {{ $fmtPct($mix['pfPct'] ?? 0) }} • PJ {{ $fmtPct($mix['pjPct'] ?? 0) }}
         </p>
         <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
-            PF <?php echo e($fmtMoeda($mix['pfValor'] ?? 0)); ?> • PJ <?php echo e($fmtMoeda($mix['pjValor'] ?? 0)); ?>
-
+            PF {{ $fmtMoeda($mix['pfValor'] ?? 0) }} • PJ {{ $fmtMoeda($mix['pjValor'] ?? 0) }}
         </p>
     </div>
 
     <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
         <p class="text-xs text-gray-600 dark:text-gray-400">Receita YoY</p>
-        <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100"><?php echo e($fmtPct($yoy['yoyPct'] ?? 0)); ?></p>
+        <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">{{ $fmtPct($yoy['yoyPct'] ?? 0) }}</p>
         <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
-            Atual <?php echo e($fmtMoeda($yoy['atual'] ?? 0)); ?> • Ano ant. <?php echo e($fmtMoeda($yoy['anoAnterior'] ?? 0)); ?>
-
+            Atual {{ $fmtMoeda($yoy['atual'] ?? 0) }} • Ano ant. {{ $fmtMoeda($yoy['anoAnterior'] ?? 0) }}
         </p>
     </div>
 
     <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
         <p class="text-xs text-gray-600 dark:text-gray-400">Expense Ratio</p>
-        <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100"><?php echo e($fmtPct($expense['pct'] ?? 0)); ?></p>
+        <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">{{ $fmtPct($expense['pct'] ?? 0) }}</p>
         <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
-            Desp <?php echo e($fmtMoeda($expense['despesas'] ?? 0)); ?> / Rec <?php echo e($fmtMoeda($expense['receita'] ?? 0)); ?>
-
+            Desp {{ $fmtMoeda($expense['despesas'] ?? 0) }} / Rec {{ $fmtMoeda($expense['receita'] ?? 0) }}
         </p>
     </div>
 
     <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
         <p class="text-xs text-gray-600 dark:text-gray-400">Inadimplência (% receita)</p>
-        <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100"><?php echo e($fmtPct($inad['inadimplencia'] ?? 0)); ?></p>
+        <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">{{ $fmtPct($inad['inadimplencia'] ?? 0) }}</p>
         <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
-            Vencido <?php echo e($fmtMoeda($inad['totalVencido'] ?? 0)); ?> • Receita <?php echo e($fmtMoeda($d['resumo']['receitaTotal'] ?? 0)); ?>
-
+            Vencido {{ $fmtMoeda($inad['totalVencido'] ?? 0) }} • Receita {{ $fmtMoeda($d['resumo']['receitaTotal'] ?? 0) }}
         </p>
     </div>
 
     <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
         <p class="text-xs text-gray-600 dark:text-gray-400">Qualidade do dado</p>
         <p class="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">
-            Concil. <?php echo e($fmtPct($qual['pctConciliadoCount'] ?? 0)); ?>
-
+            Concil. {{ $fmtPct($qual['pctConciliadoCount'] ?? 0) }}
         </p>
         <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">
-            Receita qualif. <?php echo e($fmtMoeda($qual['receitaQualificada'] ?? 0)); ?> / <?php echo e($fmtMoeda($qual['receitaTotal'] ?? 0)); ?>
-
+            Receita qualif. {{ $fmtMoeda($qual['receitaQualificada'] ?? 0) }} / {{ $fmtMoeda($qual['receitaTotal'] ?? 0) }}
         </p>
     </div>
 </div>
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <?php echo $__env->make('dashboard.partials._health-card', [
+        @include('dashboard.partials._health-card', [
             'id' => 'atraso',
             'title' => 'Contas em Atraso',
             'value' => $fmtMoeda($saude['contasAtraso'] ?? 0),
@@ -233,9 +228,9 @@
             'statusValue' => $saude['contasAtrasoPercent'] ?? 0,
             'trend' => $saude['contasAtrasoTrend'] ?? 0,
             'icon' => '⏰'
-        ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+        ])
 
-        <?php echo $__env->make('dashboard.partials._health-card', [
+        @include('dashboard.partials._health-card', [
             'id' => 'dias',
             'title' => 'Dias Médio Atraso',
             'value' => (int)($saude['diasMedioAtraso'] ?? 0) . ' dias',
@@ -244,9 +239,9 @@
             'statusValue' => $saude['diasMedioAtraso'] ?? 0,
             'trend' => $saude['diasMedioAtrasoTrend'] ?? 0,
             'icon' => '📅'
-        ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+        ])
 
-        <?php echo $__env->make('dashboard.partials._health-card', [
+        @include('dashboard.partials._health-card', [
             'id' => 'cobranca',
             'title' => 'Taxa de Cobrança',
             'value' => $fmtPct($saude['taxaCobranca'] ?? 0),
@@ -255,7 +250,7 @@
             'statusValue' => $saude['taxaCobranca'] ?? 0,
             'trend' => $saude['taxaCobrancaTrend'] ?? 0,
             'icon' => '✅'
-        ], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+        ])
     </div>
 
 
@@ -378,7 +373,7 @@
     <div class="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900">
         <div class="flex items-center justify-between">
             <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100">Concentração do Atraso (Top Clientes)</h2>
-            <span class="text-xs text-gray-500 dark:text-gray-400">Top3 = <?php echo e(number_format((float)($topAtraso['top3SharePct'] ?? 0), 1, ',', '.')); ?>%</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400">Top3 = {{ number_format((float)($topAtraso['top3SharePct'] ?? 0), 1, ',', '.') }}%</span>
         </div>
 
         <div class="mt-4 overflow-x-auto">
@@ -391,16 +386,16 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200 dark:divide-gray-800 text-gray-800 dark:text-gray-200">
-                    <?php $__currentLoopData = ($topAtraso['top'] ?? []); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $r): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                    @foreach(($topAtraso['top'] ?? []) as $r)
                         <tr>
-                            <td class="px-3 py-2"><?php echo e($r['cliente_nome'] ?? ''); ?></td>
-                            <td class="px-3 py-2"><?php echo e($fmtMoeda($r['valor'] ?? 0)); ?></td>
-                            <td class="px-3 py-2"><?php echo e($fmtPct($r['sharePct'] ?? 0)); ?></td>
+                            <td class="px-3 py-2">{{ $r['cliente_nome'] ?? '' }}</td>
+                            <td class="px-3 py-2">{{ $fmtMoeda($r['valor'] ?? 0) }}</td>
+                            <td class="px-3 py-2">{{ $fmtPct($r['sharePct'] ?? 0) }}</td>
                         </tr>
-                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                    <?php if(empty($topAtraso['top'])): ?>
+                    @endforeach
+                    @if(empty($topAtraso['top']))
                         <tr><td class="px-3 py-2 text-gray-500 dark:text-gray-400" colspan="3">Sem contas vencidas em aberto.</td></tr>
-                    <?php endif; ?>
+                    @endif
                 </tbody>
             </table>
         </div>
@@ -422,15 +417,15 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200 dark:divide-gray-800 text-gray-800 dark:text-gray-200">
-                        <?php $__currentLoopData = ($rubMoM['topAumentos'] ?? []); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $r): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                        @foreach(($rubMoM['topAumentos'] ?? []) as $r)
                             <tr>
-                                <td class="px-3 py-2"><?php echo e($r['rubrica'] ?? ''); ?></td>
-                                <td class="px-3 py-2"><?php echo e($fmtPct($r['pct'] ?? 0)); ?></td>
+                                <td class="px-3 py-2">{{ $r['rubrica'] ?? '' }}</td>
+                                <td class="px-3 py-2">{{ $fmtPct($r['pct'] ?? 0) }}</td>
                             </tr>
-                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                        <?php if(empty($rubMoM['topAumentos'])): ?>
+                        @endforeach
+                        @if(empty($rubMoM['topAumentos']))
                             <tr><td class="px-3 py-2 text-gray-500 dark:text-gray-400" colspan="2">Sem dados.</td></tr>
-                        <?php endif; ?>
+                        @endif
                     </tbody>
                 </table>
             </div>
@@ -445,15 +440,15 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200 dark:divide-gray-800 text-gray-800 dark:text-gray-200">
-                        <?php $__currentLoopData = ($rubMoM['topReducoes'] ?? []); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $r): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                        @foreach(($rubMoM['topReducoes'] ?? []) as $r)
                             <tr>
-                                <td class="px-3 py-2"><?php echo e($r['rubrica'] ?? ''); ?></td>
-                                <td class="px-3 py-2"><?php echo e($fmtPct($r['pct'] ?? 0)); ?></td>
+                                <td class="px-3 py-2">{{ $r['rubrica'] ?? '' }}</td>
+                                <td class="px-3 py-2">{{ $fmtPct($r['pct'] ?? 0) }}</td>
                             </tr>
-                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                        <?php if(empty($rubMoM['topReducoes'])): ?>
+                        @endforeach
+                        @if(empty($rubMoM['topReducoes']))
                             <tr><td class="px-3 py-2 text-gray-500 dark:text-gray-400" colspan="2">Sem dados.</td></tr>
-                        <?php endif; ?>
+                        @endif
                     </tbody>
                 </table>
             </div>
@@ -465,16 +460,16 @@
     </div>
 </div>
 
-<script type="application/json" id="dashboard-exec-data-json"><?php echo json_encode($dashboardData ?? [], 15, 512) ?></script>
+<script type="application/json" id="dashboard-exec-data-json">@json($dashboardData ?? [])</script>
 <script>
     // Mantém compatibilidade com versões anteriores (e facilita debug pelo console)
-    window.__DASHBOARD_EXEC_DATA__ = window.__DASHBOARD_EXEC_DATA__ ?? <?php echo json_encode($dashboardData ?? [], 15, 512) ?>;
-    window.__DASHBOARD_API_URL__ = window.__DASHBOARD_API_URL__ ?? "<?php echo e(route('api.visao-gerencial')); ?>";
-    window.__DASHBOARD_EXPORT_URL__ = window.__DASHBOARD_EXPORT_URL__ ?? "<?php echo e(route('visao-gerencial.export')); ?>";
+    window.__DASHBOARD_EXEC_DATA__ = window.__DASHBOARD_EXEC_DATA__ ?? @json($dashboardData ?? []);
+    window.__DASHBOARD_API_URL__ = window.__DASHBOARD_API_URL__ ?? "{{ route('api.visao-gerencial') }}";
+    window.__DASHBOARD_EXPORT_URL__ = window.__DASHBOARD_EXPORT_URL__ ?? "{{ route('visao-gerencial.export') }}";
 </script>
 
-
-<script src="<?php echo e(asset('js/dashboard-charts.js')); ?>?v=<?php echo e(filemtime(public_path('js/dashboard-charts.js'))); ?>"></script>
+{{-- Cache-buster: evita o browser manter JS antigo (problema típico: gráfico “pisca” e some) --}}
+<script src="{{ asset('js/dashboard-charts.js') }}?v={{ filemtime(public_path('js/dashboard-charts.js')) }}"></script>
 
 <script>
 (function () {
@@ -973,5 +968,4 @@
 })();
 </script>
 
-<?php $__env->stopSection(); ?>
-<?php echo $__env->make('layouts.app', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?><?php /**PATH /home/u492856976/domains/mayeradvogados.adv.br/public_html/Intranet/resources/views/dashboard/visao-gerencial.blade.php ENDPATH**/ ?>
+@endsection

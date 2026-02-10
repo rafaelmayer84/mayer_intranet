@@ -145,8 +145,11 @@ class ProcessosInternosController extends Controller
         $sessao = session($sessionKey, []);
 
         $filtros = [
-            'ano'                      => (int) $request->get('ano', $sessao['ano'] ?? date('Y')),
-            'mes'                      => (int) $request->get('mes', $sessao['mes'] ?? date('n')),
+            'periodo'                  => $request->get('periodo', $sessao['periodo'] ?? '30'),
+            'data_inicio'              => $request->get('data_inicio', $sessao['data_inicio'] ?? null),
+            'data_fim'                 => $request->get('data_fim', $sessao['data_fim'] ?? null),
+            'responsavel'              => $request->get('responsavel', $sessao['responsavel'] ?? []),
+            'grupo'                    => $request->get('grupo', $sessao['grupo'] ?? []),
             'area'                     => $request->get('area', $sessao['area'] ?? null),
             'tipo_atividade'           => $request->get('tipo_atividade', $sessao['tipo_atividade'] ?? null),
             'status_processo'          => $request->get('status_processo', $sessao['status_processo'] ?? null),

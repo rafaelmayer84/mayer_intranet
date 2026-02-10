@@ -1,213 +1,177 @@
-# IMPLEMENTAÇÃO — Processos Internos (BSC)
-**Data:** 10/02/2026 | **Módulo:** RESULTADOS! > BSC > Processos Internos
+# IMPLEMENTAÇÃO — LOTE 1: Dashboard Financeiro
+## KPI Card Universal v2 + Waterfall + Pareto + Insights + Sparklines
+### Data: 2026-02-10
 
 ---
 
-## ARQUIVOS ENTREGUES
+## VISÃO GERAL
 
-### Bloco 1 — Migrations + Models
+Este lote entrega 4 melhorias ao Dashboard Financeiro (Visão Gerencial):
 
-| Arquivo | Descrição |
-|---------|-----------|
-| `database/migrations/2026_02_10_010000_create_andamentos_fase_table.php` | Nova tabela `andamentos_fase` (módulo DataJuri: AndamentoFase) |
-| `database/migrations/2026_02_10_020000_add_processos_internos_fields.php` | Campos extras: `tipo_atividade`, `data_vencimento`, `responsavel_nome` em `atividades_datajuri`; `area_atuacao`, `grupo_responsavel` em `processos`; `descricao_fase` em `fases_processo` |
-| `app/Models/AndamentoFase.php` | Model Eloquent para nova tabela |
-| `app/Models/FaseProcesso.php` | Model Eloquent (tabela já existe, model pode ser novo) |
+1. **KPI Card v2** — componente universal com suporte a meta null ("Meta: —"), status visual (ok/atenção/crítico/sem_meta), sparkline SVG inline (12 pontos), e trend com seta colorida. Retrocompatível com chamadas v1.
 
-### Bloco 2 — Service + Controller + Rotas
+2. **Waterfall DRE** — gráfico de barras flutuantes mostrando Receita → Deduções → Despesas → Resultado. Usa dados já existentes em `resumoExecutivo`.
 
-| Arquivo | Descrição |
-|---------|-----------|
-| `app/Services/ProcessosInternosService.php` | Lógica de cálculo de todos os KPIs (SLA, Backlog, WIP, sem andamento, throughput, horas) |
-| `app/Http/Controllers/Dashboard/ProcessosInternosController.php` | Controller com index, drilldown, export |
-| `routes/_processos_internos_routes.php` | Arquivo de rotas (incluir via require no web.php) |
+3. **Pareto Inadimplência** — barras com top clientes em atraso + linha de % acumulado (eixo Y duplo). Usa dados já existentes em `topAtrasoClientes`.
 
-### Bloco 3 — View + Config + Deploy
+4. **Insights Automáticos** — bloco com 3 bullets baseados em regras objetivas: maior alta de despesa MoM, concentração de inadimplência, e expense ratio. Sem IA.
 
-| Arquivo | Descrição |
-|---------|-----------|
-| `resources/views/dashboard/processos-internos/index.blade.php` | View completa: filtros, cards, gráficos Chart.js, tabela equipe, processos por fase, top riscos, modal drilldown |
-| `config/_andamento_fase_modulo.php` | Config do módulo AndamentoFase para datajuri.php |
-| `deploy_processos_internos.py` | Script Python de deploy (patches cirúrgicos em web.php, app.blade.php, datajuri.php) |
+5. **Sparklines** — mini gráficos SVG nos KPI cards de Receita e Despesas, mostrando evolução 12 meses.
 
 ---
 
-## CHECKLIST DE DEPLOY
+## ARQUIVOS
 
-```
-[ ] 1. BACKUP
-    cd ~/domains/mayeradvogados.adv.br/public_html/Intranet
-    tar -czf backup-processos-internos-$(date +%Y%m%d_%H%M%S).tar.gz .
+### Criados (3 novos)
 
-[ ] 2. COPIAR ARQUIVOS (via SCP ou upload)
-    - database/migrations/2026_02_10_*.php
-    - app/Models/AndamentoFase.php
-    - app/Models/FaseProcesso.php (verificar se já existe, se sim NÃO sobrescrever)
-    - app/Services/ProcessosInternosService.php
-    - app/Http/Controllers/Dashboard/ProcessosInternosController.php
-    - routes/_processos_internos_routes.php
-    - resources/views/dashboard/processos-internos/index.blade.php
-    - deploy_processos_internos.py
+| Arquivo | Descrição |
+|---------|-----------|
+| `resources/views/dashboard/partials/_kpi-card.blade.php` | Substituição — v2 com sparkline+meta null |
+| `resources/views/dashboard/partials/_insights-financeiro.blade.php` | Novo — bloco de insights |
+| `resources/views/dashboard/partials/_charts-financeiro-extra.blade.php` | Novo — waterfall + pareto |
 
-[ ] 3. EXECUTAR DEPLOY SCRIPT
-    python3 deploy_processos_internos.py
+### Modificados (3 patches cirúrgicos)
 
-[ ] 4. MIGRATIONS
-    php artisan migrate --force
+| Arquivo | Alteração |
+|---------|-----------|
+| `resources/views/dashboard/visao-gerencial.blade.php` | Include dos novos partials + sparkline params nos cards |
+| `app/Services/DashboardFinanceProdService.php` | Método `getSparklineData()` adicionado |
+| `app/Http/Controllers/DashboardController.php` | Passa `sparklines` para a view |
 
-[ ] 5. LIMPAR CACHE
-    php artisan cache:clear && php artisan view:clear && php artisan config:clear && php artisan route:clear
+### NÃO alterados
 
-[ ] 6. SINCRONIZAR ANDAMENTOFASE
-    php artisan sync:datajuri-completo
-    # OU via UI: /admin/sincronizacao-unificada → Sincronizar AndamentoFase
-
-[ ] 7. VERIFICAR NO NAVEGADOR
-    https://intranet.mayeradvogados.adv.br/resultados/bsc/processos-internos
-
-[ ] 8. COMMIT NO GITHUB
-    git add -A
-    git commit -m "feat: módulo Processos Internos (BSC) - dashboard completo"
-    git push origin main
-```
+Nenhuma alteração em: rotas, models, migrations, outros dashboards, menu, CSS, ou qualquer área não solicitada.
 
 ---
 
-## QUERIES DE VALIDAÇÃO
+## COMANDOS SSH — DEPLOY COMPLETO
 
-### Verificar tabela criada e com dados
-```sql
--- Tabelas necessárias com contagens
-SELECT 'processos' as tabela, COUNT(*) as total FROM processos WHERE status = 'Ativo'
-UNION ALL SELECT 'atividades_datajuri', COUNT(*) FROM atividades_datajuri
-UNION ALL SELECT 'fases_processo', COUNT(*) FROM fases_processo
-UNION ALL SELECT 'andamentos_fase', COUNT(*) FROM andamentos_fase
-UNION ALL SELECT 'horas_trabalhadas', COUNT(*) FROM horas_trabalhadas_datajuri;
-```
+Execute na ordem, um bloco por vez.
 
-### Verificar novos campos das migrations
-```sql
--- Campos novos em atividades_datajuri
-SHOW COLUMNS FROM atividades_datajuri WHERE Field IN ('tipo_atividade','data_vencimento','responsavel_nome');
+### Passo 0: Navegar e backup
 
--- Campos novos em processos
-SHOW COLUMNS FROM processos WHERE Field IN ('area_atuacao','grupo_responsavel');
-
--- Campos novos em fases_processo
-SHOW COLUMNS FROM fases_processo WHERE Field IN ('descricao_fase');
-```
-
-### Testar KPIs manualmente
-```sql
--- SLA: Atividades concluídas no prazo (últimos 30 dias)
-SELECT
-    COUNT(*) as total_concluidas,
-    SUM(CASE WHEN data_conclusao <= COALESCE(data_vencimento, data_prazo_fatal) THEN 1 ELSE 0 END) as no_prazo,
-    ROUND(SUM(CASE WHEN data_conclusao <= COALESCE(data_vencimento, data_prazo_fatal) THEN 1 ELSE 0 END) / COUNT(*) * 100, 1) as sla_percent
-FROM atividades_datajuri
-WHERE data_conclusao IS NOT NULL
-  AND data_conclusao >= DATE_SUB(NOW(), INTERVAL 30 DAY);
-
--- Backlog: Vencidas e abertas
-SELECT COUNT(*) as backlog_total,
-       AVG(DATEDIFF(NOW(), COALESCE(data_vencimento, data_prazo_fatal))) as media_dias_atraso
-FROM atividades_datajuri
-WHERE data_conclusao IS NULL
-  AND COALESCE(data_vencimento, data_prazo_fatal) < NOW()
-  AND (status != 'Concluída' OR status IS NULL);
-
--- WIP: Em andamento
-SELECT COUNT(*) as wip
-FROM atividades_datajuri
-WHERE data_conclusao IS NULL
-  AND (status NOT IN ('Concluída', 'Cancelada', 'Cancelado') OR status IS NULL);
-
--- Processos sem andamento > 30 dias
-SELECT COUNT(*) as sem_andamento
-FROM fases_processo fp
-JOIN processos p ON fp.processo_pasta = p.pasta
-WHERE fp.fase_atual = 1
-  AND p.status = 'Ativo'
-  AND (fp.data_ultimo_andamento < DATE_SUB(NOW(), INTERVAL 30 DAY) OR fp.data_ultimo_andamento IS NULL);
-
--- Throughput (últimos 30 dias)
-SELECT COUNT(*) as throughput
-FROM atividades_datajuri
-WHERE data_conclusao IS NOT NULL
-  AND data_conclusao >= DATE_SUB(NOW(), INTERVAL 30 DAY);
-
--- Horas (últimos 30 dias)
-SELECT ROUND(SUM(total_hora_trabalhada), 1) as total_horas
-FROM horas_trabalhadas_datajuri
-WHERE data >= DATE_SUB(NOW(), INTERVAL 30 DAY);
-
--- Rotas registradas (verificar via artisan)
--- php artisan route:list --path=processos-internos
-```
-
-### Verificar rotas
 ```bash
-php artisan route:list --path=processos-internos
-# Deve retornar:
-# GET  resultados/bsc/processos-internos ............. index
-# GET  resultados/bsc/processos-internos/drilldown/{tipo} .. drilldown
-# GET  resultados/bsc/processos-internos/export ...... export
+cd ~/domains/mayeradvogados.adv.br/public_html/Intranet
+
+# Backups
+cp resources/views/dashboard/partials/_kpi-card.blade.php resources/views/dashboard/partials/_kpi-card.blade.php.bak_$(date +%Y%m%d_%H%M%S)
+cp resources/views/dashboard/visao-gerencial.blade.php resources/views/dashboard/visao-gerencial.blade.php.bak_$(date +%Y%m%d_%H%M%S)
+cp app/Services/DashboardFinanceProdService.php app/Services/DashboardFinanceProdService.php.bak_$(date +%Y%m%d_%H%M%S)
+cp app/Http/Controllers/DashboardController.php app/Http/Controllers/DashboardController.php.bak_$(date +%Y%m%d_%H%M%S)
+```
+
+### Passo 1: Upload dos 3 novos arquivos
+
+Os 3 arquivos novos estão no ZIP entregue. Fazer upload via File Manager ou SCP e copiar para os caminhos corretos:
+
+```bash
+# Se fez upload para ~/uploads/:
+cp ~/uploads/_kpi-card-v2.blade.php resources/views/dashboard/partials/_kpi-card.blade.php
+cp ~/uploads/_insights-financeiro.blade.php resources/views/dashboard/partials/_insights-financeiro.blade.php
+cp ~/uploads/_charts-financeiro-extra.blade.php resources/views/dashboard/partials/_charts-financeiro-extra.blade.php
+```
+
+### Passo 2: Executar script Python de patches
+
+```bash
+cd ~/domains/mayeradvogados.adv.br/public_html/Intranet
+
+# Upload deploy_lote1_financeiro.py para o diretório e executar:
+python3 deploy_lote1_financeiro.py
+```
+
+O script faz:
+- Backup automático de todos os arquivos modificados
+- Patches cirúrgicos no service (getSparklineData), controller (sparklines), e view (includes)
+- Cada patch é idempotente (não aplica se já aplicado)
+
+### Passo 3: Verificar e limpar cache
+
+```bash
+php artisan cache:clear
+php artisan view:clear
+php artisan config:clear
+```
+
+### Passo 4: Testar no navegador
+
+Acessar: `https://mayeradvogados.adv.br/Intranet/visao-gerencial`
+
+### Passo 5: Commit no GitHub
+
+```bash
+cd ~/domains/mayeradvogados.adv.br/public_html/Intranet
+git add -A
+git status
+git commit -m "feat(dashboard): Lote 1 - KPI Card v2 + Waterfall DRE + Pareto + Insights + Sparklines"
+git push origin main
 ```
 
 ---
 
-## ESQUEMA DE DADOS
+## CHECKLIST DE VALIDAÇÃO
 
-### Nova tabela: `andamentos_fase`
-```
-id, datajuri_id (UNIQUE), fase_processo_id_datajuri, processo_id_datajuri,
-processo_pasta, data_andamento, descricao, tipo, parecer, parecer_revisado,
-parecer_revisado_por, data_parecer_revisado, proprietario_id, proprietario_nome,
-created_at, updated_at
-```
+Após o deploy, verificar visualmente cada item:
 
-### Campos adicionados em tabelas existentes
-- **atividades_datajuri**: `tipo_atividade`, `data_vencimento`, `responsavel_nome`
-- **processos**: `area_atuacao`, `grupo_responsavel`
-- **fases_processo**: `descricao_fase`
+- [ ] **KPI Cards** — Receita Total mostra sparkline (mini gráfico verde 12 pontos)
+- [ ] **KPI Cards** — Despesas mostra sparkline (mini gráfico azul)
+- [ ] **KPI Cards** — Cards sem meta exibem "Meta: —" e badge cinza
+- [ ] **KPI Cards** — Cards com meta exibem badge colorido (OK verde / Atenção amarelo / Crítico vermelho)
+- [ ] **KPI Cards** — Trend com seta ↑/↓ colorida ao lado da meta
+- [ ] **Waterfall** — Gráfico com 4 barras: Receita (verde), Deduções (amarelo), Despesas (vermelho), Resultado (azul)
+- [ ] **Waterfall** — Barras flutuantes (deduções e despesas "caem" da receita)
+- [ ] **Waterfall** — Tooltip mostra valor formatado em R$
+- [ ] **Pareto** — Barras vermelhas com top clientes em atraso
+- [ ] **Pareto** — Linha amarela de % acumulado no eixo Y direito (0-100%)
+- [ ] **Pareto** — Se não houver inadimplência, mostra mensagem "Sem dados"
+- [ ] **Insights** — Bloco com 3 itens coloridos (verde/amarelo/laranja/vermelho conforme gravidade)
+- [ ] **Insights** — Textos mudam conforme dados reais (não são estáticos)
+- [ ] **Gráficos existentes** — Todos os gráficos anteriores continuam funcionando
+- [ ] **Filtros** — Mudar ano/mês atualiza waterfall, pareto e insights
+- [ ] **Exportar** — CSV/PDF continua funcionando
+- [ ] **Dark Mode** — Todos os novos elementos respeitam dark mode
+- [ ] **Mobile** — Cards e gráficos responsivos
 
 ---
 
-## KPIs IMPLEMENTADOS
+## ROLLBACK
 
-| KPI | Fórmula | Tabela fonte |
-|-----|---------|--------------|
-| SLA (%) | concluídas_no_prazo / total_concluídas × 100 | atividades_datajuri |
-| Backlog Vencido | COUNT vencidas abertas + AVG dias atraso | atividades_datajuri |
-| WIP | COUNT atividades não concluídas | atividades_datajuri |
-| Sem Andamento | Processos com fase ativa e último andamento > X dias | fases_processo + processos |
-| Throughput | COUNT concluídas no período | atividades_datajuri |
-| Horas | SUM horas trabalhadas no período | horas_trabalhadas_datajuri |
+Se algo quebrar:
+
+```bash
+cd ~/domains/mayeradvogados.adv.br/public_html/Intranet
+
+# Listar backups disponíveis
+ls -la resources/views/dashboard/partials/_kpi-card.blade.php.bak_*
+ls -la resources/views/dashboard/visao-gerencial.blade.php.bak_*
+ls -la app/Services/DashboardFinanceProdService.php.bak_*
+ls -la app/Http/Controllers/DashboardController.php.bak_*
+
+# Restaurar (ajustar timestamp):
+cp resources/views/dashboard/partials/_kpi-card.blade.php.bak_YYYYMMDD_HHMMSS resources/views/dashboard/partials/_kpi-card.blade.php
+cp resources/views/dashboard/visao-gerencial.blade.php.bak_YYYYMMDD_HHMMSS resources/views/dashboard/visao-gerencial.blade.php
+cp app/Services/DashboardFinanceProdService.php.bak_YYYYMMDD_HHMMSS app/Services/DashboardFinanceProdService.php
+cp app/Http/Controllers/DashboardController.php.bak_YYYYMMDD_HHMMSS app/Http/Controllers/DashboardController.php
+
+# Remover partials novos (se necessário):
+rm -f resources/views/dashboard/partials/_insights-financeiro.blade.php
+rm -f resources/views/dashboard/partials/_charts-financeiro-extra.blade.php
+
+php artisan cache:clear && php artisan view:clear
+```
 
 ---
 
 ## NOTAS TÉCNICAS
 
-1. **Cache**: TTL 300s (mesmo padrão dos outros dashboards). Cache key inclui hash dos filtros.
+**Sparkline SVG inline**: Escolhi SVG puro ao invés de Chart.js para os sparklines por 3 razões: (a) zero dependência JavaScript adicional, (b) renderiza instantaneamente sem esperar DOMContentLoaded, (c) peso negligível (~200 bytes por sparkline).
 
-2. **Filtros persistidos**: Session key `filtros_processos_internos`. Querystring tem prioridade sobre session.
+**Waterfall como floating bars**: Chart.js não tem tipo "waterfall" nativo. Implementei usando bar chart com arrays `[base, topo]` para cada barra, que é a técnica padrão aceita pela documentação do Chart.js.
 
-3. **SLA sem data_vencimento**: Atividades sem prazo definido são consideradas "no prazo" (sem SLA configurado).
+**Pareto com eixo Y duplo**: Eixo esquerdo para valores em R$ (barras), eixo direito para % acumulado (linha). O `yAxisID` diferencia os datasets.
 
-4. **Score de Risco**: `valor_provisionado × dias_fase_ativa`. Ordena Top 20 desc.
+**Insights sem IA**: As 3 regras são puramente aritméticas: (1) maior diff positiva em `rubricasMoM.topAumentos`, (2) `top3SharePct > 50%` de `topAtrasoClientes`, (3) `expenseRatio.pct` vs limiares 50/70%. Quando não há dado suficiente, exibe texto neutro positivo.
 
-5. **Evolução**: Buckets temporais (dia/semana/mês). Para backlog, usa snapshot no fim de cada bucket.
+**Cache**: O `getSparklineData()` usa cache de 1h (mesmo TTL do `getDashboardData`). A chave é `dash_fin_sparklines:{ano}`.
 
-6. **Model FaseProcesso**: Verificar se já existe antes de copiar. Se existir, apenas adicionar os métodos `scopeParados()` e `scopeAtual()` e o relationship `andamentos()`.
-
-7. **Campos data_vencimento**: A migration adiciona `data_vencimento` na tabela `atividades_datajuri`. Se o campo não for populado via sync, o SLA usará `data_prazo_fatal` como fallback. Para garantir, o sync do módulo Atividade deve mapear o campo correto da API.
-
----
-
-## ÁREAS NÃO ALTERADAS
-
-- ✅ Dashboard Financeiro — INTACTO
-- ✅ Dashboard Clientes & Mercado — INTACTO
-- ✅ NEXO Atendimento — INTACTO
-- ✅ Central de Leads — INTACTO
-- ✅ Sincronização existente (8 módulos) — INTACTO (apenas adição do 9º módulo)
+**Retrocompatibilidade**: O novo `_kpi-card.blade.php` aceita todas as chamadas antigas. Variáveis novas (`sparkline`, `status`, `invertTrend`) são opcionais com defaults seguros.

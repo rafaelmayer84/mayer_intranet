@@ -284,10 +284,9 @@
                             <span class="w-4 h-4 mr-3" aria-hidden="true">⚖️</span>
                             <span class="menu-text">Clientes &amp; Mercado</span>
                         </a>
-                        <a href="#" class="nav-sublink nav-sublink-disabled flex items-center px-4 py-2 text-sm rounded-lg transition-colors opacity-50 cursor-not-allowed" data-tooltip="Processos Internos (Em breve)">
+                        <a href="{{ route('resultados.bsc.processos-internos.index') }}" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('resultados.bsc.processos-internos.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700' }}">
                             <span class="w-4 h-4 mr-3" aria-hidden="true">⚙️</span>
                             <span class="menu-text">Processos Internos</span>
-                            <span class="text-xs ml-auto bg-yellow-600 px-2 py-0.5 rounded menu-text">Em breve</span>
                         </a>
                         <a href="#" class="nav-sublink nav-sublink-disabled flex items-center px-4 py-2 text-sm rounded-lg transition-colors opacity-50 cursor-not-allowed" data-tooltip="Time & Evolução (Em breve)">
                             <span class="w-4 h-4 mr-3" aria-hidden="true">👥</span>

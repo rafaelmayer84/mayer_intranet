@@ -20,26 +20,32 @@
           class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
         <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
             <div>
-                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Ano</label>
-                <select name="ano" onchange="this.form.submit();"
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Período</label>
+                <select name="periodo" onchange="toggleCustomDates(this); this.form.submit();"
                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 text-sm">
-                    @for($a = date('Y'); $a >= 2020; $a--)
-                        <option value="{{ $a }}" {{ (int)($filtros['ano'] ?? date('Y'))===$a ? 'selected' : '' }}>{{ $a }}</option>
-                    @endfor
-                </select>
-            </div>
-            <div>
-                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Mês</label>
-                <select name="mes" onchange="this.form.submit();"
-                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 text-sm">
-                    @foreach(['1'=>'Jan','2'=>'Fev','3'=>'Mar','4'=>'Abr','5'=>'Mai','6'=>'Jun','7'=>'Jul','8'=>'Ago','9'=>'Set','10'=>'Out','11'=>'Nov','12'=>'Dez'] as $mv=>$ml)
-                        <option value="{{ $mv }}" {{ (int)($filtros['mes'] ?? date('n'))===(int)$mv ? 'selected' : '' }}>{{ $ml }}</option>
+                    @foreach(['7'=>'7 dias','15'=>'15 dias','30'=>'30 dias','mes'=>'Mês atual','trimestre'=>'Trimestre','custom'=>'Personalizado'] as $val=>$label)
+                        <option value="{{ $val }}" {{ ($filtros['periodo'] ?? '30')===(string)$val ? 'selected' : '' }}>{{ $label }}</option>
                     @endforeach
                 </select>
             </div>
-
-
-
+            <div id="custom-dates-inicio" style="{{ ($filtros['periodo'] ?? '30')==='custom' ? '' : 'display:none' }}">
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">De</label>
+                <input type="date" name="data_inicio" value="{{ $filtros['data_inicio'] ?? '' }}"
+                       class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 text-sm">
+            </div>
+            <div id="custom-dates-fim" style="{{ ($filtros['periodo'] ?? '30')==='custom' ? '' : 'display:none' }}">
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Até</label>
+                <input type="date" name="data_fim" value="{{ $filtros['data_fim'] ?? '' }}"
+                       class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Responsável</label>
+                <select name="responsavel[]" multiple class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 text-sm" style="min-height:36px">
+                    @foreach($responsaveis ?? [] as $r)
+                        <option value="{{ $r->id }}" {{ in_array($r->id, (array)($filtros['responsavel'] ?? [])) ? 'selected' : '' }}>{{ $r->nome }}</option>
+                    @endforeach
+                </select>
+            </div>
             <div>
                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Área</label>
                 <select name="area" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 text-sm">
@@ -276,6 +282,12 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Toggle datas custom
+function toggleCustomDates(sel) {
+    const show = sel.value === 'custom';
+    document.getElementById('custom-dates-inicio').style.display = show ? '' : 'none';
+    document.getElementById('custom-dates-fim').style.display = show ? '' : 'none';
+}
+
 // Drilldown
 const drilldownTitles = { backlog: 'Backlog Vencido', wip: 'Atividades em Andamento', sem_andamento: 'Processos sem Andamento', throughput: 'Atividades Concluídas' };
 function openDrilldown(tipo) {

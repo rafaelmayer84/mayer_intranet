@@ -1128,43 +1128,4 @@ public function getLucratividadeByMonth(int $ano): array
             'topReducoes' => $maioresReducoes
         ];
     }
-
-    /**
-     * Dados para sparklines dos KPI cards (12 meses).
-     * Retorna array com séries nomeadas, cada uma com 12 valores.
-     *
-     * @return array<string, array<int,float>>
-     */
-    public function getSparklineData(int $ano): array
-    {
-        $cacheKey = "dash_fin_sparklines:{$ano}";
-        return Cache::remember($cacheKey, 3600, function () use ($ano) {
-            $receitas = $this->getReceitaByMonth($ano);
-            $despesas = $this->despesasOperacionaisByMonth($ano);
-            $deducoes = $this->deducoesByMonth($ano);
-            $lucro = $this->getLucratividadeByMonth($ano);
-
-            // Receita total por mês = PF + PJ
-            $receitaTotal = [];
-            for ($i = 0; $i < 12; $i++) {
-                $receitaTotal[$i] = round(($receitas['pf'][$i] ?? 0) + ($receitas['pj'][$i] ?? 0), 2);
-            }
-
-            // Margem por mês
-            $margem = [];
-            for ($i = 0; $i < 12; $i++) {
-                $rt = $receitaTotal[$i];
-                $l = $lucro['lucratividade'][$i] ?? 0;
-                $margem[$i] = $rt > 0 ? round(($l / $rt) * 100, 1) : 0;
-            }
-
-            return [
-                'receita'  => $receitaTotal,
-                'despesas' => $despesas,
-                'resultado' => $lucro['lucratividade'] ?? array_fill(0, 12, 0),
-                'margem'   => $margem,
-            ];
-        });
-    }
-
 }

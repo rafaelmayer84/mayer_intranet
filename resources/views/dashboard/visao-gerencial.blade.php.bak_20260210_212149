@@ -61,7 +61,6 @@
             'value' => $fmtMoeda($resumo['receitaTotal'] ?? 0),
             'meta' => $fmtMoeda($resumo['receitaMeta'] ?? 0),
             'percent' => ($resumo['receitaMeta'] ?? 0) > 0 ? (($resumo['receitaTotal'] ?? 0) / ($resumo['receitaMeta'] ?? 1) * 100) : 0,
-            'sparkline' => $sparklines['receita'] ?? null,
             'trend' => $resumo['receitaTrend'] ?? 0,
             'accent' => 'green',
             'icon' => '💰'
@@ -73,8 +72,6 @@
             'value' => $fmtMoeda($resumo['despesasTotal'] ?? 0),
             'meta' => $fmtMoeda($resumo['despesasMeta'] ?? 0),
             'percent' => ($resumo['despesasMeta'] ?? 0) > 0 ? (($resumo['despesasTotal'] ?? 0) / ($resumo['despesasMeta'] ?? 1) * 100) : 0,
-            'sparkline' => $sparklines['despesas'] ?? null,
-            'invertTrend' => true,
             'trend' => $resumo['despesasTrend'] ?? 0,
             'accent' => 'blue',
             'icon' => '📊'
@@ -970,14 +967,5 @@
 
 })();
 </script>
-
-
-    {{-- ═══ Gráficos Adicionais: Waterfall DRE + Pareto Inadimplência ═══ --}}
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        @include('dashboard.partials._charts-financeiro-extra', ['d' => $dashboardData ?? []])
-    </div>
-
-    {{-- ═══ Insights Automáticos ═══ --}}
-    @include('dashboard.partials._insights-financeiro', ['d' => $dashboardData ?? []])
 
 @endsection
