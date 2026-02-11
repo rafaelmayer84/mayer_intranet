@@ -1,177 +1,154 @@
-# IMPLEMENTAÇÃO — LOTE 1: Dashboard Financeiro
-## KPI Card Universal v2 + Waterfall + Pareto + Insights + Sparklines
-### Data: 2026-02-10
+# SIRIC Fase 1 — Guia de Implantação SSH
+
+**Módulo:** SIRIC (Sistema de Inteligência e Rating Interno de Crédito)  
+**Fase:** 1 (Coleta Interna + Formulário + Decisão Humana)  
+**Data:** 10/02/2026  
+**Pré-requisito:** Acesso SSH ao servidor Hostinger
 
 ---
 
-## VISÃO GERAL
-
-Este lote entrega 4 melhorias ao Dashboard Financeiro (Visão Gerencial):
-
-1. **KPI Card v2** — componente universal com suporte a meta null ("Meta: —"), status visual (ok/atenção/crítico/sem_meta), sparkline SVG inline (12 pontos), e trend com seta colorida. Retrocompatível com chamadas v1.
-
-2. **Waterfall DRE** — gráfico de barras flutuantes mostrando Receita → Deduções → Despesas → Resultado. Usa dados já existentes em `resumoExecutivo`.
-
-3. **Pareto Inadimplência** — barras com top clientes em atraso + linha de % acumulado (eixo Y duplo). Usa dados já existentes em `topAtrasoClientes`.
-
-4. **Insights Automáticos** — bloco com 3 bullets baseados em regras objetivas: maior alta de despesa MoM, concentração de inadimplência, e expense ratio. Sem IA.
-
-5. **Sparklines** — mini gráficos SVG nos KPI cards de Receita e Despesas, mostrando evolução 12 meses.
-
----
-
-## ARQUIVOS
-
-### Criados (3 novos)
-
-| Arquivo | Descrição |
-|---------|-----------|
-| `resources/views/dashboard/partials/_kpi-card.blade.php` | Substituição — v2 com sparkline+meta null |
-| `resources/views/dashboard/partials/_insights-financeiro.blade.php` | Novo — bloco de insights |
-| `resources/views/dashboard/partials/_charts-financeiro-extra.blade.php` | Novo — waterfall + pareto |
-
-### Modificados (3 patches cirúrgicos)
-
-| Arquivo | Alteração |
-|---------|-----------|
-| `resources/views/dashboard/visao-gerencial.blade.php` | Include dos novos partials + sparkline params nos cards |
-| `app/Services/DashboardFinanceProdService.php` | Método `getSparklineData()` adicionado |
-| `app/Http/Controllers/DashboardController.php` | Passa `sparklines` para a view |
-
-### NÃO alterados
-
-Nenhuma alteração em: rotas, models, migrations, outros dashboards, menu, CSS, ou qualquer área não solicitada.
-
----
-
-## COMANDOS SSH — DEPLOY COMPLETO
-
-Execute na ordem, um bloco por vez.
-
-### Passo 0: Navegar e backup
+## Passo 0 — Backup
 
 ```bash
 cd ~/domains/mayeradvogados.adv.br/public_html/Intranet
-
-# Backups
-cp resources/views/dashboard/partials/_kpi-card.blade.php resources/views/dashboard/partials/_kpi-card.blade.php.bak_$(date +%Y%m%d_%H%M%S)
-cp resources/views/dashboard/visao-gerencial.blade.php resources/views/dashboard/visao-gerencial.blade.php.bak_$(date +%Y%m%d_%H%M%S)
-cp app/Services/DashboardFinanceProdService.php app/Services/DashboardFinanceProdService.php.bak_$(date +%Y%m%d_%H%M%S)
-cp app/Http/Controllers/DashboardController.php app/Http/Controllers/DashboardController.php.bak_$(date +%Y%m%d_%H%M%S)
+cp routes/web.php routes/web.php.bak.siric
+cp resources/views/layouts/app.blade.php resources/views/layouts/app.blade.php.bak.siric
 ```
 
-### Passo 1: Upload dos 3 novos arquivos
+---
 
-Os 3 arquivos novos estão no ZIP entregue. Fazer upload via File Manager ou SCP e copiar para os caminhos corretos:
+## Passo 1 — Upload dos arquivos
 
-```bash
-# Se fez upload para ~/uploads/:
-cp ~/uploads/_kpi-card-v2.blade.php resources/views/dashboard/partials/_kpi-card.blade.php
-cp ~/uploads/_insights-financeiro.blade.php resources/views/dashboard/partials/_insights-financeiro.blade.php
-cp ~/uploads/_charts-financeiro-extra.blade.php resources/views/dashboard/partials/_charts-financeiro-extra.blade.php
-```
-
-### Passo 2: Executar script Python de patches
+Fazer upload do pacote `siric_fase1.tar.gz` para o servidor via SFTP ou SCP, depois extrair:
 
 ```bash
 cd ~/domains/mayeradvogados.adv.br/public_html/Intranet
-
-# Upload deploy_lote1_financeiro.py para o diretório e executar:
-python3 deploy_lote1_financeiro.py
+tar -xzf ~/siric_fase1.tar.gz
 ```
 
-O script faz:
-- Backup automático de todos os arquivos modificados
-- Patches cirúrgicos no service (getSparklineData), controller (sparklines), e view (includes)
-- Cada patch é idempotente (não aplica se já aplicado)
+Isso irá extrair os seguintes arquivos na estrutura correta do projeto:
 
-### Passo 3: Verificar e limpar cache
+```
+database/migrations/2026_02_10_100000_create_siric_consultas_table.php
+database/migrations/2026_02_10_100001_create_siric_evidencias_table.php
+database/migrations/2026_02_10_100002_create_siric_relatorios_table.php
+app/Models/SiricConsulta.php
+app/Models/SiricEvidencia.php
+app/Models/SiricRelatorio.php
+app/Services/SiricService.php
+app/Http/Controllers/SiricController.php
+routes/_siric_routes.php
+resources/views/siric/index.blade.php
+resources/views/siric/create.blade.php
+resources/views/siric/show.blade.php
+resources/views/siric/partials/_metric-card.blade.php
+deploy_siric.py
+```
+
+---
+
+## Passo 2 — Executar script de deploy (patches)
 
 ```bash
-php artisan cache:clear
-php artisan view:clear
-php artisan config:clear
+cd ~/domains/mayeradvogados.adv.br/public_html/Intranet
+python3 deploy_siric.py
 ```
 
-### Passo 4: Testar no navegador
+O script aplica 2 patches automaticamente:
+1. **routes/web.php** → adiciona `require __DIR__.'/_siric_routes.php';`
+2. **layouts/app.blade.php** → adiciona item "SIRIC" no menu lateral (antes de Administração)
 
-Acessar: `https://mayeradvogados.adv.br/Intranet/visao-gerencial`
+---
 
-### Passo 5: Commit no GitHub
+## Passo 3 — Rodar migrations
+
+```bash
+cd ~/domains/mayeradvogados.adv.br/public_html/Intranet
+php artisan migrate
+```
+
+Deve criar 3 tabelas: `siric_consultas`, `siric_evidencias`, `siric_relatorios`.
+
+---
+
+## Passo 4 — Limpar caches
+
+```bash
+php artisan cache:clear && php artisan config:clear && php artisan view:clear && php artisan route:clear
+```
+
+---
+
+## Passo 5 — Verificar rotas
+
+```bash
+php artisan route:list --name=siric
+```
+
+Deve exibir 6 rotas:
+| Método | URI | Nome |
+|--------|-----|------|
+| GET | /siric | siric.index |
+| GET | /siric/nova | siric.create |
+| POST | /siric | siric.store |
+| GET | /siric/{id} | siric.show |
+| POST | /siric/{id}/coletar | siric.coletarDados |
+| POST | /siric/{id}/decisao | siric.salvarDecisao |
+
+---
+
+## Passo 6 — Testar no navegador
+
+1. Acessar `https://intranet.mayeradvogados.adv.br/siric`
+2. Verificar se o menu lateral mostra "🏦 SIRIC" antes da seção Administração
+3. Clicar em "Nova Consulta" e preencher o formulário
+4. Na tela de detalhe, clicar em "Coletar Dados Internos"
+5. Verificar se a aba "Interno" mostra os dados coletados do BD
+6. Registrar uma decisão humana (Aprovado/Condicionado/Negado)
+
+---
+
+## Passo 7 — Atualizar GitHub
 
 ```bash
 cd ~/domains/mayeradvogados.adv.br/public_html/Intranet
 git add -A
-git status
-git commit -m "feat(dashboard): Lote 1 - KPI Card v2 + Waterfall DRE + Pareto + Insights + Sparklines"
+git commit -m "feat(siric): Fase 1 - Módulo SIRIC de análise de crédito interno
+
+- 3 migrations (siric_consultas, siric_evidencias, siric_relatorios)
+- 3 models (SiricConsulta, SiricEvidencia, SiricRelatorio)
+- SiricService com coleta interna do BD (clientes, contas_receber, movimentos, processos, leads)
+- SiricController com CRUD + coleta + decisão humana
+- 3 views Blade (lista, formulário, detalhe com 5 abas)
+- Rotas sob middleware auth com prefixo /siric
+- Item de menu no sidebar"
 git push origin main
 ```
 
 ---
 
-## CHECKLIST DE VALIDAÇÃO
-
-Após o deploy, verificar visualmente cada item:
-
-- [ ] **KPI Cards** — Receita Total mostra sparkline (mini gráfico verde 12 pontos)
-- [ ] **KPI Cards** — Despesas mostra sparkline (mini gráfico azul)
-- [ ] **KPI Cards** — Cards sem meta exibem "Meta: —" e badge cinza
-- [ ] **KPI Cards** — Cards com meta exibem badge colorido (OK verde / Atenção amarelo / Crítico vermelho)
-- [ ] **KPI Cards** — Trend com seta ↑/↓ colorida ao lado da meta
-- [ ] **Waterfall** — Gráfico com 4 barras: Receita (verde), Deduções (amarelo), Despesas (vermelho), Resultado (azul)
-- [ ] **Waterfall** — Barras flutuantes (deduções e despesas "caem" da receita)
-- [ ] **Waterfall** — Tooltip mostra valor formatado em R$
-- [ ] **Pareto** — Barras vermelhas com top clientes em atraso
-- [ ] **Pareto** — Linha amarela de % acumulado no eixo Y direito (0-100%)
-- [ ] **Pareto** — Se não houver inadimplência, mostra mensagem "Sem dados"
-- [ ] **Insights** — Bloco com 3 itens coloridos (verde/amarelo/laranja/vermelho conforme gravidade)
-- [ ] **Insights** — Textos mudam conforme dados reais (não são estáticos)
-- [ ] **Gráficos existentes** — Todos os gráficos anteriores continuam funcionando
-- [ ] **Filtros** — Mudar ano/mês atualiza waterfall, pareto e insights
-- [ ] **Exportar** — CSV/PDF continua funcionando
-- [ ] **Dark Mode** — Todos os novos elementos respeitam dark mode
-- [ ] **Mobile** — Cards e gráficos responsivos
-
----
-
-## ROLLBACK
-
-Se algo quebrar:
+## Rollback (se necessário)
 
 ```bash
 cd ~/domains/mayeradvogados.adv.br/public_html/Intranet
 
-# Listar backups disponíveis
-ls -la resources/views/dashboard/partials/_kpi-card.blade.php.bak_*
-ls -la resources/views/dashboard/visao-gerencial.blade.php.bak_*
-ls -la app/Services/DashboardFinanceProdService.php.bak_*
-ls -la app/Http/Controllers/DashboardController.php.bak_*
+# Reverter patches
+cp routes/web.php.bak.siric routes/web.php
+cp resources/views/layouts/app.blade.php.bak.siric resources/views/layouts/app.blade.php
 
-# Restaurar (ajustar timestamp):
-cp resources/views/dashboard/partials/_kpi-card.blade.php.bak_YYYYMMDD_HHMMSS resources/views/dashboard/partials/_kpi-card.blade.php
-cp resources/views/dashboard/visao-gerencial.blade.php.bak_YYYYMMDD_HHMMSS resources/views/dashboard/visao-gerencial.blade.php
-cp app/Services/DashboardFinanceProdService.php.bak_YYYYMMDD_HHMMSS app/Services/DashboardFinanceProdService.php
-cp app/Http/Controllers/DashboardController.php.bak_YYYYMMDD_HHMMSS app/Http/Controllers/DashboardController.php
+# Reverter migrations
+php artisan migrate:rollback --step=3
 
-# Remover partials novos (se necessário):
-rm -f resources/views/dashboard/partials/_insights-financeiro.blade.php
-rm -f resources/views/dashboard/partials/_charts-financeiro-extra.blade.php
-
-php artisan cache:clear && php artisan view:clear
+# Limpar caches
+php artisan cache:clear && php artisan config:clear && php artisan view:clear && php artisan route:clear
 ```
 
 ---
 
-## NOTAS TÉCNICAS
+## Fase 2 (Próxima Entrega)
 
-**Sparkline SVG inline**: Escolhi SVG puro ao invés de Chart.js para os sparklines por 3 razões: (a) zero dependência JavaScript adicional, (b) renderiza instantaneamente sem esperar DOMContentLoaded, (c) peso negligível (~200 bytes por sparkline).
-
-**Waterfall como floating bars**: Chart.js não tem tipo "waterfall" nativo. Implementei usando bar chart com arrays `[base, topo]` para cada barra, que é a técnica padrão aceita pela documentação do Chart.js.
-
-**Pareto com eixo Y duplo**: Eixo esquerdo para valores em R$ (barras), eixo direito para % acumulado (linha). O `yAxisID` diferencia os datasets.
-
-**Insights sem IA**: As 3 regras são puramente aritméticas: (1) maior diff positiva em `rubricasMoM.topAumentos`, (2) `top3SharePct > 50%` de `topAtrasoClientes`, (3) `expenseRatio.pct` vs limiares 50/70%. Quando não há dado suficiente, exibe texto neutro positivo.
-
-**Cache**: O `getSparklineData()` usa cache de 1h (mesmo TTL do `getDashboardData`). A chave é `dash_fin_sparklines:{ano}`.
-
-**Retrocompatibilidade**: O novo `_kpi-card.blade.php` aceita todas as chamadas antigas. Variáveis novas (`sparkline`, `status`, `invertTrend`) são opcionais com defaults seguros.
+- Integração OpenAI Responses API (rating A-E + score + recomendação)
+- Integração Asaas/Serasa (Credit Bureau Report)
+- Provider web_intel (stub plugável)
+- Geração de relatório PDF
+- Rotas: `/{id}/analisar-ia`, `/{id}/consultar-serasa`

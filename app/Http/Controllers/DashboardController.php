@@ -69,6 +69,7 @@ class DashboardController extends Controller
         $mes = max(1, min(12, $mes));
 
         $dashboardData = $this->dashboardFinance->getDashboardData($ano, $mes);
+        $sparklines = $this->dashboardFinance->getSparklineData($ano);
 
         // Opções fixas conforme escopo atual do projeto
         $anosDisponiveis = [2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028];
@@ -77,7 +78,7 @@ class DashboardController extends Controller
             7 => 'Jul', 8 => 'Ago', 9 => 'Set', 10 => 'Out', 11 => 'Nov', 12 => 'Dez'
         ];
 
-        return view('dashboard.visao-gerencial', compact('ano', 'mes', 'dashboardData', 'anosDisponiveis', 'mesesDisponiveis'));
+        return view('dashboard.visao-gerencial', compact('ano', 'mes', 'dashboardData', 'sparklines', 'anosDisponiveis', 'mesesDisponiveis'));
     }
 
     /**

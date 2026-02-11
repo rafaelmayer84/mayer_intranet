@@ -60,11 +60,8 @@
                     : number_format($kpi['valor'], 0, ',', '.'),
                 'meta' => '',
                 'percent' => 0,
-                'trend' => $kpi['trend'] ?? null,
-                'prevValue' => $kpi['prevValue'] ?? null,
-                'subtitle' => $kpi['subtitle'] ?? null,
                 'icon' => $kpi['icon'],
-                'accent' => $kpi['cor'],
+                'accent' => $kpi['cor']
             ])
         @endforeach
     </div>
@@ -72,22 +69,28 @@
     {{-- KPIs Secundários (4 cards) --}}
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         @foreach($dashboardData['kpis_secundarios'] as $key => $kpi)
-            @include('dashboard.partials._kpi-card', [
-                'id' => 'sec-' . $key,
-                'title' => $kpi['label'],
-                'value' => $kpi['formato'] === 'moeda'
-                    ? 'R$ ' . number_format($kpi['valor'], 2, ',', '.')
-                    : ($kpi['formato'] === 'percentual'
-                        ? number_format($kpi['valor'], 1, ',', '.') . '%'
-                        : number_format($kpi['valor'], 0, ',', '.')),
-                'meta' => '',
-                'percent' => 0,
-                'trend' => $kpi['trend'] ?? null,
-                'prevValue' => $kpi['prevValue'] ?? null,
-                'subtitle' => $kpi['subtitle'] ?? null,
-                'icon' => $kpi['icon'],
-                'accent' => $kpi['cor'],
-            ])
+            <div class="rounded-2xl border-t-4 {{ $kpi['cor'] === 'orange' ? 'border-orange-500' : ($kpi['cor'] === 'blue' ? 'border-blue-500' : ($kpi['cor'] === 'purple' ? 'border-purple-500' : 'border-emerald-500')) }} bg-gradient-to-b from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 p-4 shadow-sm">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-xs text-gray-600 dark:text-gray-400">{{ $kpi['label'] }}</p>
+                        <p class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
+                            @if($kpi['formato'] === 'moeda')
+                                R$ {{ number_format($kpi['valor'], 2, ',', '.') }}
+                            @elseif($kpi['formato'] === 'percentual')
+                                {{ number_format($kpi['valor'], 1, ',', '.') }}%
+                            @else
+                                {{ number_format($kpi['valor'], 0, ',', '.') }}
+                            @endif
+                        </p>
+                        @if(isset($kpi['detalhe']))
+                            <p class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">{{ $kpi['detalhe'] }}</p>
+                        @endif
+                    </div>
+                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-700">
+                        <span>{{ $kpi['icon'] }}</span>
+                    </div>
+                </div>
+            </div>
         @endforeach
     </div>
 
@@ -98,7 +101,7 @@
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                 📈 Evolução de Leads (12 meses)
             </h3>
-            <div class="h-[260px]">
+            <div class="h-64">
                 <canvas id="chartLeads12Meses"></canvas>
             </div>
         </div>
@@ -108,7 +111,7 @@
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                 📊 Oportunidades - {{ $dashboardData['competencia']['label'] }}
             </h3>
-            <div class="h-[260px]">
+            <div class="h-64">
                 <canvas id="chartOportunidades"></canvas>
             </div>
             <div class="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
@@ -135,7 +138,7 @@
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                 🎯 Origem dos Leads
             </h3>
-            <div class="h-[260px]">
+            <div class="h-64">
                 <canvas id="chartOrigemLeads"></canvas>
             </div>
         </div>
@@ -145,7 +148,7 @@
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                 💰 Valor Ganho (12 meses)
             </h3>
-            <div class="h-[260px]">
+            <div class="h-64">
                 <canvas id="chartValorGanho"></canvas>
             </div>
         </div>

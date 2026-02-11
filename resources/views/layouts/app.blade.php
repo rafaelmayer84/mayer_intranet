@@ -331,6 +331,15 @@
                     </div>
                 </div>
 
+                
+                <!-- SIRIC - Análise de Crédito -->
+                <a href="{{ route('siric.index') }}"
+                   class="nav-link flex items-center px-4 py-3 rounded-lg transition-colors {{ request()->routeIs('siric.*') ? 'nav-link-active' : '' }}"
+                   data-tooltip="SIRIC - Análise de Crédito">
+                    <span class="w-5 h-5 mr-3" aria-hidden="true">🏦</span>
+                    <span class="menu-text">SIRIC</span>
+                </a>
+
                 <!-- Divisor visual -->
                 <hr class="my-4 border-gray-700/70">
 

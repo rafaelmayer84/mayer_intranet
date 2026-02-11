@@ -45,18 +45,18 @@
 </div>
 
 {{-- ═══ DADOS JSON PARA OS GRÁFICOS ═══ --}}
-<script id="waterfallData" type="application/json">
-@json([
-    'receita'    => (float) ($d['resumoExecutivo']['receitaTotal'] ?? 0),
-    'deducoes'   => (float) ($d['resumoExecutivo']['deducoesTotal'] ?? 0),
-    'despesas'   => (float) ($d['resumoExecutivo']['despesasTotal'] ?? 0),
-    'resultado'  => (float) ($d['resumoExecutivo']['resultadoLiquido'] ?? 0),
-])
-</script>
+@php
+    $waterfallJson = [
+        'receita'   => (float) ($d['resumoExecutivo']['receitaTotal'] ?? 0),
+        'deducoes'  => (float) ($d['resumoExecutivo']['deducoesTotal'] ?? 0),
+        'despesas'  => (float) ($d['resumoExecutivo']['despesasTotal'] ?? 0),
+        'resultado' => (float) ($d['resumoExecutivo']['resultadoLiquido'] ?? 0),
+    ];
+    $paretoJson = $topClientes;
+@endphp
 
-<script id="paretoData" type="application/json">
-@json($topClientes)
-</script>
+<script id="waterfallData" type="application/json">{!! json_encode($waterfallJson, JSON_UNESCAPED_UNICODE) !!}</script>
+<script id="paretoData" type="application/json">{!! json_encode($paretoJson, JSON_UNESCAPED_UNICODE) !!}</script>
 
 @push('scripts')
 <script>

@@ -103,12 +103,10 @@
                     'id'      => $card['id'],
                     'title'   => $card['titulo'],
                     'value'   => $card['formato']==='percent' ? number_format($card['valor'],1).'%' : ($card['formato']==='decimal' ? number_format($card['valor'],1) : number_format($card['valor'],0)),
-                    'meta'    => isset($card['meta']) ? 'Meta: '.$card['meta'].'%' : '',
+                    'meta'    => isset($card['meta']) ? 'Meta: '.$card['meta'].'%' : ($card['subtitulo'] ?? ''),
                     'percent' => $card['variacao'] ?? null,
-                    'trend'   => $card['variacao'] ?? null,
                     'icon'    => $card['icon'] ?? '',
                     'accent'  => $card['accent'] ?? 'blue',
-                    'subtitle' => $card['subtitulo'] ?? null,
                 ])
             </div>
         @endforeach
@@ -118,15 +116,15 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
             <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Evolução SLA (%)</h3>
-            <div class="h-[260px]"><canvas id="chart-sla"></canvas></div>
+            <div style="height:220px"><canvas id="chart-sla"></canvas></div>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
             <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Evolução Backlog</h3>
-            <div class="h-[260px]"><canvas id="chart-backlog"></canvas></div>
+            <div style="height:220px"><canvas id="chart-backlog"></canvas></div>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
             <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Evolução Throughput</h3>
-            <div class="h-[260px]"><canvas id="chart-throughput"></canvas></div>
+            <div style="height:220px"><canvas id="chart-throughput"></canvas></div>
         </div>
     </div>
 
@@ -172,7 +170,7 @@
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
             <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Processos Parados por Fase</h3>
             @if(!empty($processos_por_fase))
-                <div class="h-[260px]"><canvas id="chart-fases"></canvas></div>
+                <div style="height:280px"><canvas id="chart-fases"></canvas></div>
             @else
                 <p class="text-sm text-gray-500 dark:text-gray-400 py-8 text-center">Nenhum processo parado encontrado.</p>
             @endif

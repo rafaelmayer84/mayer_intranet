@@ -41,4 +41,20 @@ return [
         'api_key' => env('OPENAI_API_KEY'),
         'model' => env('OPENAI_MODEL', 'gpt-4o-mini'),
     ],
+
+    // ── SIRIC - Análise de Crédito ──
+    'siric' => [
+        'openai_model' => env('SIRIC_OPENAI_MODEL', 'gpt-5.2'),
+        'openai_fallback' => env('SIRIC_OPENAI_FALLBACK', 'gpt-5'),
+        'openai_max_tokens' => env('SIRIC_OPENAI_MAX_TOKENS', 4000),
+        'openai_temperature' => env('SIRIC_OPENAI_TEMPERATURE', 0.3),
+        'openai_api_key' => env('SIRIC_OPENAI_API_KEY', env('OPENAI_API_KEY')),
+    ],
+
+    // ── Asaas (Serasa via Credit Bureau) ──
+    'asaas' => [
+        'api_key' => env('ASAAS_API_KEY', ''),
+        'environment' => env('ASAAS_ENVIRONMENT', 'production'),
+    ],
+
 ];

@@ -209,3 +209,4 @@ require __DIR__ . '/_manuais_routes.php';
 
 // Processos Internos (BSC)
 require __DIR__ . '/_processos_internos_routes.php';
+require __DIR__.'/_siric_routes.php';

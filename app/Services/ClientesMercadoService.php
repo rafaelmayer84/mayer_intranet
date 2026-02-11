@@ -87,25 +87,39 @@ class ClientesMercadoService
      */
     private function getKpisPrincipais(string $competencia, Carbon $refDate): array
     {
+        // Mês anterior para cálculo de trend
+        $prevDate = $refDate->copy()->subMonth();
+        $compAnterior = $prevDate->format('Y-m');
+
+        // Helper de variação %
+        $pctChange = function($atual, $anterior) {
+            if ($anterior == 0) return $atual > 0 ? 100.0 : 0.0;
+            return round((($atual - $anterior) / abs($anterior)) * 100, 1);
+        };
+        $fmtPrev = function($val, $formato) {
+            if ($formato === 'moeda') return 'R$ ' . number_format((float)$val, 2, ',', '.');
+            return number_format((float)$val, 0, ',', '.');
+        };
+
         // Leads novos no mês (usando created_at)
-        $leadsNovos = Lead::whereRaw("DATE_FORMAT(created_at, '%Y-%m') = ?", [$competencia])
-            ->count();
+        $leadsNovos = Lead::whereRaw("DATE_FORMAT(created_at, '%Y-%m') = ?", [$competencia])->count();
+        $leadsNovosPrev = Lead::whereRaw("DATE_FORMAT(created_at, '%Y-%m') = ?", [$compAnterior])->count();
 
         // Oportunidades ganhas no mês
         $opsGanhas = Oportunidade::where('estagio', 'ganha')
-            ->whereRaw("DATE_FORMAT(data_fechamento, '%Y-%m') = ?", [$competencia])
-            ->count();
+            ->whereRaw("DATE_FORMAT(data_fechamento, '%Y-%m') = ?", [$competencia])->count();
+        $opsGanhasPrev = Oportunidade::where('estagio', 'ganha')
+            ->whereRaw("DATE_FORMAT(data_fechamento, '%Y-%m') = ?", [$compAnterior])->count();
 
-        // Clientes ativos (estoque - processos com status Ativo)
+        // Clientes ativos (estoque)
         $clientesAtivos = Processo::where('status', 'Ativo')
-            ->whereNotNull('cliente_id')
-            ->distinct('cliente_id')
-            ->count('cliente_id');
+            ->whereNotNull('cliente_id')->distinct('cliente_id')->count('cliente_id');
 
         // Valor ganho no mês
         $valorGanho = Oportunidade::where('estagio', 'ganha')
-            ->whereRaw("DATE_FORMAT(data_fechamento, '%Y-%m') = ?", [$competencia])
-            ->sum('valor') ?? 0;
+            ->whereRaw("DATE_FORMAT(data_fechamento, '%Y-%m') = ?", [$competencia])->sum('valor') ?? 0;
+        $valorGanhoPrev = Oportunidade::where('estagio', 'ganha')
+            ->whereRaw("DATE_FORMAT(data_fechamento, '%Y-%m') = ?", [$compAnterior])->sum('valor') ?? 0;
 
         return [
             'leads_novos' => [
@@ -113,14 +127,20 @@ class ClientesMercadoService
                 'label' => 'Leads Novos',
                 'icon' => '👥',
                 'cor' => 'blue',
-                'formato' => 'numero'
+                'formato' => 'numero',
+                'trend' => $pctChange($leadsNovos, $leadsNovosPrev),
+                'prevValue' => $fmtPrev($leadsNovosPrev, 'numero'),
+                'subtitle' => $leadsNovos > 0 ? 'Acumulado mês atual' : 'Nenhum lead no período',
             ],
             'oportunidades_ganhas' => [
                 'valor' => $opsGanhas,
                 'label' => 'Oportunidades Ganhas',
                 'icon' => '🏆',
                 'cor' => 'green',
-                'formato' => 'numero'
+                'formato' => 'numero',
+                'trend' => $pctChange($opsGanhas, $opsGanhasPrev),
+                'prevValue' => $fmtPrev($opsGanhasPrev, 'numero'),
+                'subtitle' => $opsGanhas > 0 ? 'Fechamentos confirmados' : 'Sem fechamentos no mês',
             ],
             'clientes_ativos' => [
                 'valor' => $clientesAtivos,
