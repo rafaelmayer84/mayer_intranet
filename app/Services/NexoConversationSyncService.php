@@ -56,7 +56,7 @@ class NexoConversationSyncService
             }
 
             $now = now();
-            $sentAt = \Carbon\Carbon::createFromTimestamp($parsed['timestamp']);
+            $sentAt = \Carbon\Carbon::createFromTimestamp($parsed['timestamp'], 'UTC')->setTimezone(config('app.timezone'));
 
             if (!$conversation) {
                 $conversation = WaConversation::create([
@@ -345,7 +345,7 @@ class NexoConversationSyncService
     {
         if ($raw instanceof \Carbon\Carbon) return $raw;
         if (is_numeric($raw) && strlen((string) $raw) >= 10) {
-            return \Carbon\Carbon::createFromTimestamp((int) $raw);
+            return \Carbon\Carbon::createFromTimestamp((int) $raw, 'UTC')->setTimezone(config('app.timezone'));
         }
         try { return \Carbon\Carbon::parse($raw); }
         catch (\Throwable $e) { return now(); }

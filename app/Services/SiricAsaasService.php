@@ -89,6 +89,19 @@ class SiricAsaasService
                 'cpf_cnpj' => substr($docLimpo, 0, 3) . '***',
             ]);
 
+            // Extrair texto do PDF Serasa (reportFile = base64)
+            $textoSerasa = null;
+            if (!empty($data['reportFile'])) {
+                try {
+                    $parser = new \Smalot\PdfParser\Parser();
+                    $pdf = $parser->parseContent(base64_decode($data['reportFile']));
+                    $textoSerasa = $pdf->getText();
+                    Log::info('SIRIC Asaas: texto Serasa extraído', ['chars' => strlen($textoSerasa)]);
+                } catch (\Throwable $e) {
+                    Log::warning('SIRIC Asaas: falha ao extrair texto do PDF Serasa', ['error' => $e->getMessage()]);
+                }
+            }
+
             return [
                 'success' => true,
                 'data' => [
@@ -97,6 +110,7 @@ class SiricAsaasService
                     'state' => $data['state'] ?? null,
                     'downloadUrl' => $data['downloadUrl'] ?? null,
                     'hasReportFile' => !empty($data['reportFile']),
+                    'textoSerasa' => $textoSerasa,
                 ],
                 'error' => null,
             ];

@@ -1,0 +1,179 @@
+/* ═══════════════════════════════════════════════════════
+   NEXO ATENDIMENTO — UI/UX v2.0
+   Apenas CSS. Zero lógica. Zero JS novo.
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Scrollbars globais (thin, discreras) ── */
+#nexo-app ::-webkit-scrollbar { width: 5px; height: 5px; }
+#nexo-app ::-webkit-scrollbar-track { background: transparent; }
+#nexo-app ::-webkit-scrollbar-thumb { background: rgba(0,0,0,.12); border-radius: 10px; }
+#nexo-app ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,.22); }
+#nexo-app { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,.12) transparent; }
+
+/* ── Inbox items ── */
+.inbox-item {
+    transition: background-color .18s ease, border-left-color .18s ease;
+    border-left: 3px solid transparent;
+}
+.inbox-item:hover {
+    background-color: #f8f9fb;
+    border-left-color: #cbd5e1;
+}
+.inbox-item.active {
+    background-color: #eef3fb;
+    border-left-color: #1e3a5f;
+}
+
+/* ── Filter buttons ── */
+.filter-btn {
+    border: 1px solid #e2e8f0;
+    color: #64748b;
+    background: #f8fafc;
+    transition: all .2s ease;
+    font-weight: 500;
+}
+.filter-btn:hover { background: #eef2f7; color: #334155; }
+.filter-btn.active {
+    background: #1e3a5f;
+    color: #fff;
+    border-color: #1e3a5f;
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(30,58,95,.25);
+}
+
+/* ── Chat Bubbles ── */
+.msg-bubble-in {
+    background: #fff;
+    border-radius: 2px 12px 12px 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.06);
+}
+.msg-bubble-out {
+    background: #d9fdd3;
+    border-radius: 12px 2px 12px 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.06);
+}
+
+/* ── Day separator ── */
+.nexo-day-sep {
+    background: rgba(255,255,255,.92);
+    backdrop-filter: blur(4px);
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    font-size: 11px;
+    color: #54656f;
+    padding: 4px 14px;
+    font-weight: 600;
+    letter-spacing: .01em;
+}
+
+/* ── Media ── */
+.msg-media-img {
+    max-width: 280px;
+    max-height: 300px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: block;
+    margin-bottom: 4px;
+    transition: opacity .15s;
+}
+.msg-media-img:hover { opacity: .92; }
+.msg-media-audio { width: 100%; max-width: 260px; height: 36px; margin-bottom: 4px; }
+.msg-media-doc {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: rgba(0,0,0,.03);
+    border-radius: 8px;
+    margin-bottom: 4px;
+    text-decoration: none;
+    border: 1px solid rgba(0,0,0,.04);
+    transition: all .15s;
+}
+.msg-media-doc:hover {
+    background: rgba(0,0,0,.06);
+    border-color: rgba(0,0,0,.08);
+}
+
+/* ── Contexto 360 sections ── */
+.ctx-section {
+    border: 1px solid #e8ecf0;
+    border-radius: 10px;
+    overflow: hidden;
+    transition: box-shadow .15s;
+}
+.ctx-section:hover { box-shadow: 0 1px 4px rgba(0,0,0,.04); }
+.ctx-section-header {
+    background: #f8f9fb;
+    padding: 10px 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: background .15s;
+}
+.ctx-section-header:hover { background: #f1f3f5; }
+.ctx-section-body { padding: 12px 14px; }
+.ctx-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 4px 0;
+    font-size: 12px;
+    line-height: 1.5;
+}
+.ctx-label { color: #6b7280; flex-shrink: 0; }
+.ctx-value { color: #1f2937; font-weight: 500; text-align: right; max-width: 60%; word-break: break-word; }
+
+/* ── Priority badges ── */
+.priority-normal { background: #f3f4f6; color: #6b7280; }
+.priority-alta { background: #fef3c7; color: #92400e; }
+.priority-urgente { background: #fed7aa; color: #9a3412; }
+.priority-critica { background: #fecaca; color: #991b1b; }
+
+/* ── Chat input focus ── */
+#chat-input:focus { box-shadow: 0 0 0 2px rgba(30,58,95,.12); }
+
+/* ── Tabs underline ── */
+.nexo-tab {
+    position: relative;
+    transition: color .2s;
+}
+.nexo-tab::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 0;
+    height: 2px;
+    background: #1e3a5f;
+    border-radius: 1px;
+    transition: all .25s ease;
+    transform: translateX(-50%);
+}
+.nexo-tab.active { color: #1e3a5f; font-weight: 600; }
+.nexo-tab.active::after { width: 70%; }
+.nexo-tab:not(.active):hover { color: #374151; }
+
+/* ── Unread badge pulse ── */
+.unread-badge {
+    animation: unreadPulse 2s ease-in-out infinite;
+}
+@keyframes unreadPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(30,58,95,.3); }
+    50% { box-shadow: 0 0 0 4px rgba(30,58,95,0); }
+}
+
+/* ── Mobile responsivo ── */
+@media (max-width: 1023px) {
+    #contexto-panel { position: fixed; right: 0; top: 0; bottom: 0; z-index: 50; width: 100%; max-width: 380px; box-shadow: -4px 0 20px rgba(0,0,0,.15); }
+}
+
+/* ── Smooth transitions globais ── */
+#nexo-app * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+/* ── Chat background pattern (mais sutil) ── */
+.nexo-chat-bg {
+    background-color: #efeae2;
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d5cec3' fill-opacity='0.15'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}

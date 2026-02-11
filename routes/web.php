@@ -99,6 +99,7 @@ Route::middleware(["auth"])->group(function () {
 
 // Quadro de Avisos + Diagnóstico
 require __DIR__ . "/_avisos_routes.php";
+require __DIR__ . "/_precificacao_routes.php";
 
 
 // Metas KPI Mensais

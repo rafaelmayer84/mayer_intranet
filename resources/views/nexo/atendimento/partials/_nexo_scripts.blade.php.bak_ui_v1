@@ -68,9 +68,9 @@ const NexoApp = {
         else lb='<span class="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded">?</span>';
         const pr=c.priority||'normal';
         const pb=pr!=='normal'?`<span class="w-2 h-2 rounded-full inline-block priority-${pr}"></span>`:'';
-        return `<div class="inbox-item ${active?'active':''} flex items-center gap-3 px-4 py-3.5 cursor-pointer border-b border-gray-100/60" onclick="NexoApp.selectConversa(${c.id})">
-            <div class="relative flex-shrink-0"><div class="w-11 h-11 rounded-full bg-gradient-to-br from-[#dfe5e7] to-[#c8d1d6] text-[#4a5568] flex items-center justify-center text-[13px] font-bold shadow-sm">${ini}</div>${unread>0?`<span class="absolute -top-1 -right-1 w-5 h-5 bg-[#1e3a5f] text-white text-[10px] font-bold rounded-full flex items-center justify-center unread-badge shadow-sm">${unread}</span>`:''}</div>
-            <div class="flex-1 min-w-0"><div class="flex items-center justify-between"><span class="text-[13px] font-semibold text-[#111b21] truncate">${this.esc(c.name||'Sem nome')}</span><span class="text-[10px] text-[#8696a0] flex-shrink-0 ml-2">${time}</span></div><div class="flex items-center justify-between mt-0.5"><span class="text-xs text-[#667781] truncate">${this.fmtPhone(c.phone||'')}</span><div class="flex items-center gap-1 flex-shrink-0 ml-2">${pb} ${lb}</div></div></div></div>`;
+        return `<div class="inbox-item ${active?'active':''} flex items-center gap-3 px-4 py-3 cursor-pointer border-b border-gray-100" onclick="NexoApp.selectConversa(${c.id})">
+            <div class="relative flex-shrink-0"><div class="w-11 h-11 rounded-full bg-[#dfe5e7] text-[#54656f] flex items-center justify-center text-sm font-semibold">${ini}</div>${unread>0?`<span class="absolute -top-1 -right-1 w-5 h-5 bg-[#1e3a5f] text-white text-[10px] font-bold rounded-full flex items-center justify-center">${unread}</span>`:''}</div>
+            <div class="flex-1 min-w-0"><div class="flex items-center justify-between"><span class="text-sm font-medium text-[#111b21] truncate">${this.esc(c.name||'Sem nome')}</span><span class="text-[10px] text-[#667781] flex-shrink-0 ml-2">${time}</span></div><div class="flex items-center justify-between mt-0.5"><span class="text-xs text-[#667781] truncate">${this.fmtPhone(c.phone||'')}</span><div class="flex items-center gap-1 flex-shrink-0 ml-2">${pb} ${lb}</div></div></div></div>`;
     },
 
     setFilter(k,v){
@@ -120,14 +120,14 @@ const NexoApp = {
         let lastDate='',html='';
         msgs.forEach(m=>{
             const md=m.sent_at?m.sent_at.split('T')[0]:'';
-            if(md&&md!==lastDate){lastDate=md;html+=`<div class="flex justify-center my-4"><span class="nexo-day-sep">${this.fmtDate(md)}</span></div>`}
+            if(md&&md!==lastDate){lastDate=md;html+=`<div class="flex justify-center my-3"><span class="text-[11px] bg-white text-[#54656f] px-3 py-1.5 rounded-lg shadow-sm font-medium">${this.fmtDate(md)}</span></div>`}
             const isIn=parseInt(m.direction)===1;
             const time=m.sent_at?new Date(m.sent_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'';
             const hb=(!isIn&&m.is_human)?'<span class="text-[9px] text-[#53bdeb] ml-1">✓✓</span>':'';
             const bc=isIn?'msg-bubble-in':'msg-bubble-out';
             const al=isIn?'justify-start':'justify-end';
             const content=this.renderMsgContent(m);
-            html+=`<div class="flex ${al} mb-1"><div class="${bc} px-3 py-2 max-w-[75%] lg:max-w-[60%]">${content}<p class="text-[10px] text-[#8696a0] text-right mt-1 leading-none select-none">${time}${hb}</p></div></div>`;
+            html+=`<div class="flex ${al} mb-0.5"><div class="${bc} px-2.5 py-1.5 max-w-[75%] lg:max-w-[55%]">${content}<p class="text-[10px] text-[#667781] text-right mt-0.5 leading-none">${time}${hb}</p></div></div>`;
         });
         c.innerHTML=html;
         this.lastMsgId=msgs[msgs.length-1].id;
@@ -142,7 +142,7 @@ const NexoApp = {
         const cap=m.media_caption?this.esc(m.media_caption):'';
         const fn=m.media_filename?this.esc(m.media_filename):'';
         const eu=this.esc(url);
-        const txtP=(t)=>`<p class="text-[13.5px] text-[#111b21] whitespace-pre-wrap break-words leading-[22px]">${t}</p>`;
+        const txtP=(t)=>`<p class="text-[13px] text-[#111b21] whitespace-pre-wrap break-words leading-[19px]">${t}</p>`;
 
         switch(type){
             case 'image':case 'sticker':
@@ -185,7 +185,7 @@ const NexoApp = {
         inp.value='';inp.style.height='auto';
         const c=document.getElementById('chat-messages');
         const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-        c.insertAdjacentHTML('beforeend',`<div class="flex justify-end mb-1"><div class="msg-bubble-out px-3 py-2 max-w-[75%] lg:max-w-[60%] opacity-70"><p class="text-[13px] text-[#111b21] whitespace-pre-wrap break-words">${this.esc(text)}</p><p class="text-[10px] text-[#667781] text-right mt-0.5">⏳ ${now}</p></div></div>`);
+        c.insertAdjacentHTML('beforeend',`<div class="flex justify-end mb-0.5"><div class="msg-bubble-out px-2.5 py-1.5 max-w-[75%] lg:max-w-[55%] opacity-70"><p class="text-[13px] text-[#111b21] whitespace-pre-wrap break-words">${this.esc(text)}</p><p class="text-[10px] text-[#667781] text-right mt-0.5">⏳ ${now}</p></div></div>`);
         c.scrollTop=c.scrollHeight;
         try{
             await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/mensagens`,{method:'POST',body:{text}});

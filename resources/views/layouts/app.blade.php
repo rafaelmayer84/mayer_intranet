@@ -332,6 +332,16 @@
                 </div>
 
                 
+                <!-- SIPEX Honorarios -->
+
+                <!-- SIPEX Honorarios -->
+                <a href="{{ route('precificacao.index') }}"
+                   class="nav-link flex items-center px-4 py-3 rounded-lg transition-colors {{ request()->routeIs('precificacao.*') ? 'nav-link-active' : '' }}"
+                   data-tooltip="SIPEX">
+                    <span class="mr-3">💰</span>
+                    <span class="menu-text">SIPEX </span>
+                </a>
+
                 <!-- SIRIC - Análise de Crédito -->
                 <a href="{{ route('siric.index') }}"
                    class="nav-link flex items-center px-4 py-3 rounded-lg transition-colors {{ request()->routeIs('siric.*') ? 'nav-link-active' : '' }}"
