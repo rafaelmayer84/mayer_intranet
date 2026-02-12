@@ -526,7 +526,7 @@ class SincronizacaoUnificadaController extends Controller
         $validated = $request->validate([
             'codigo_plano'  => 'required|string|max:50',
             'nome_plano'    => 'nullable|string|max:255',
-            'classificacao' => 'required|string|in:RECEITA_PF,RECEITA_PJ,RECEITA_FINANCEIRA,DESPESA,DESPESA_FINANCEIRA,OUTRAS_RECEITAS,PENDENTE_CLASSIFICACAO,IGNORAR',
+            'classificacao' => 'required|string|in:RECEITA_PF,RECEITA_PJ,RECEITA_FINANCEIRA,DEDUCAO,DESPESA,OUTRAS_RECEITAS,PENDENTE_CLASSIFICACAO',
             'grupo_dre'     => 'nullable|string|max:20',
             'ativo'         => 'boolean',
         ]);
@@ -574,7 +574,7 @@ class SincronizacaoUnificadaController extends Controller
         $validated = $request->validate([
             'codigo_plano'  => 'required|string|max:50',
             'nome_plano'    => 'nullable|string|max:255',
-            'classificacao' => 'required|string|in:RECEITA_PF,RECEITA_PJ,RECEITA_FINANCEIRA,DESPESA,DESPESA_FINANCEIRA,OUTRAS_RECEITAS,PENDENTE_CLASSIFICACAO,IGNORAR',
+            'classificacao' => 'required|string|in:RECEITA_PF,RECEITA_PJ,RECEITA_FINANCEIRA,DEDUCAO,DESPESA,OUTRAS_RECEITAS,PENDENTE_CLASSIFICACAO',
             'grupo_dre'     => 'nullable|string|max:20',
             'ativo'         => 'boolean',
         ]);
@@ -678,10 +678,6 @@ class SincronizacaoUnificadaController extends Controller
             foreach ($regras as $regra) {
                 $atualizado = DB::table('movimentos')
                     ->where('codigo_plano', $regra->codigo_plano)
-                    ->where(function ($q) {
-                        $q->where('classificacao_manual', '!=', 1)
-                          ->orWhereNull('classificacao_manual');
-                    })
                     ->where(function ($q) use ($regra) {
                         $q->where('classificacao', '!=', $regra->classificacao)
                           ->orWhereNull('classificacao');

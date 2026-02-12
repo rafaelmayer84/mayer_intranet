@@ -44,12 +44,9 @@ class Movimento extends Model
     const DESPESA_FINANCEIRA = 'DESPESA_FINANCEIRA';
 
     /**
-     * FIX v3.0: Constante DEDUCAO para deducoes da receita (3.01.03.*)
      * Ex: Simples Nacional, INSS, Salarios, Distribuicao de lucros.
      * Valores na Arvore do Plano de Contas sao NEGATIVOS.
-     * No DB sao armazenados como POSITIVOS (abs) com classificacao=DEDUCAO.
      */
-    const DEDUCAO = 'DEDUCAO';
 
     // Planos de conta para classificacao automatica
     const PLANOS_PF = ['3.01.01.01', '3.01.01.03'];

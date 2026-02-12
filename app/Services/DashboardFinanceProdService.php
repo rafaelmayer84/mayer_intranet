@@ -405,7 +405,7 @@ public function getReceitaPJByMonth(int $ano): array
 public function getLucratividadeByMonth(int $ano): array
 {
     $receitas = $this->getReceitaByMonth($ano);
-    $deducoes = $this->deducoesByMonth($ano);
+    // DEDUCAO removido - agora e DESPESA
     $despesas = $this->despesasOperacionaisByMonth($ano);
 
     $receitaTotal = [];
@@ -413,7 +413,7 @@ public function getLucratividadeByMonth(int $ano): array
 
     for ($i = 0; $i < 12; $i++) {
         $rt = (float) ($receitas['pf'][$i] ?? 0) + (float) ($receitas['pj'][$i] ?? 0);
-        $dd = (float) ($deducoes[$i] ?? 0);
+        $dd = 0.0;
         $dt = (float) ($despesas[$i] ?? 0);
         $receitaTotal[$i] = round($rt, 2);
         $lucro[$i] = round($rt - $dd - $dt, 2);
@@ -742,19 +742,19 @@ public function getLucratividadeByMonth(int $ano): array
         $receitaTotal = $receitaPf + $receitaPj;
 
         // FIX v3.0: Incluir deducoes (Simples Nacional, INSS, etc.)
-        $deducoesTotal = $this->deducoesTotal($ano, $mes);
+        $deducoesTotal = 0.0;
         $despesasTotal = (float) $this->despesasOperacionaisTotal($ano, $mes);
 
         // FIX v3.0: Resultado = Receita - Deducoes - Despesas
-        $resultado = $receitaTotal - $deducoesTotal - $despesasTotal;
+        $resultado = $receitaTotal - $despesasTotal;
         $margem = $receitaTotal > 0 ? ($resultado / $receitaTotal) * 100 : 0.0;
 
         $receitaPfPrev = $this->sumReceitaTipo($pAno, $pMes, 'pf');
         $receitaPjPrev = $this->sumReceitaTipo($pAno, $pMes, 'pj');
         $receitaPrev = $receitaPfPrev + $receitaPjPrev;
-        $deducoesPrev = $this->deducoesTotal($pAno, $pMes);
+        $deducoesPrev = 0.0;
         $despesasPrev = (float) $this->despesasOperacionaisTotal($pAno, $pMes);
-        $resultadoPrev = $receitaPrev - $deducoesPrev - $despesasPrev;
+        $resultadoPrev = $receitaPrev - $despesasPrev;
         $margemPrev = $receitaPrev > 0 ? ($resultadoPrev / $receitaPrev) * 100 : 0.0;
         // FIX: YoY compara mesmo mes do ano anterior
         $yoyAno = $ano - 1;
@@ -828,9 +828,9 @@ public function getLucratividadeByMonth(int $ano): array
         $receitaPj = $this->sumReceitaTipo($ano, $mes, 'pj');
         $receita = $receitaPf + $receitaPj;
 
-        $deducoes = abs($this->deducoesTotal($ano, $mes));
+        $deducoes = 0.0; // DEDUCAO eliminado
         $despesas = abs((float) $this->despesasOperacionaisTotal($ano, $mes));
-        $resultado = $receita - $deducoes - $despesas;
+        $resultado = $receita - $despesas; // deducoes agora sao DESPESA
         $margem = $receita > 0 ? ($resultado / $receita) * 100 : 0.0;
 
         return [
@@ -1174,7 +1174,7 @@ public function getLucratividadeByMonth(int $ano): array
         return Cache::remember($cacheKey, 3600, function () use ($ano) {
             $receitas = $this->getReceitaByMonth($ano);
             $despesas = $this->despesasOperacionaisByMonth($ano);
-            $deducoes = $this->deducoesByMonth($ano);
+    // DEDUCAO removido - agora e DESPESA
             $lucro = $this->getLucratividadeByMonth($ano);
 
             // Receita total por mês = PF + PJ

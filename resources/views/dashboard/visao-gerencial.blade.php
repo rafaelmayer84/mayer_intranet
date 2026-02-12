@@ -152,7 +152,7 @@
     $kpisAdicionais = [
         ['label' => 'Mix PF/PJ', 'valor' => ($fmtPct($mixReceita['pfPct'] ?? 0)) . ' / ' . ($fmtPct($mixReceita['pjPct'] ?? 0)), 'sub' => $fmt($mixReceita['pfValor'] ?? 0) . ' PF  ·  ' . $fmt($mixReceita['pjValor'] ?? 0) . ' PJ', 'icon' => '📊'],
         ['label' => 'Receita YoY', 'valor' => $fmtPct($receitaYoY['yoyPct'] ?? 0), 'sub' => 'Atual ' . $fmt($receitaYoY['atual'] ?? 0) . '  ·  Ant. ' . $fmt($receitaYoY['anoAnterior'] ?? 0), 'icon' => '📅'],
-        ['label' => 'Expense Ratio', 'valor' => $fmtPct($expense['pct'] ?? 0), 'sub' => 'Desp. ' . $fmt($expense['despesas'] ?? 0) . '  ·  Ded. ' . $fmt($expense['deducoes'] ?? 0), 'icon' => '⚖️'],
+        ['label' => 'Expense Ratio', 'valor' => $fmtPct($expense['pct'] ?? 0), 'sub' => 'Desp. ' . $fmt($expense['despesas'] ?? 0), 'icon' => '⚖️'],
         ['label' => 'Inadimplência', 'valor' => $fmtPct($inadimplencia['pctVencidoSobreAberto'] ?? 0), 'sub' => 'Venc. ' . $fmt($inadimplencia['totalVencido'] ?? 0) . '  ·  Aberto ' . $fmt($inadimplencia['totalAberto'] ?? 0), 'icon' => '📉'],
         ['label' => 'Qualidade Dados', 'valor' => $fmtPct($qualidade['pctConciliadoCount'] ?? 0), 'sub' => 'Classificados sobre total de movimentos', 'icon' => '🎯'],
     ];
@@ -536,7 +536,7 @@
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
                         @php
-                            $indicadores = ['receitaTotal' => 'Receita', 'deducoesTotal' => 'Deduções', 'despesasTotal' => 'Despesas', 'resultadoLiquido' => 'Resultado', 'margemLiquida' => 'Margem %'];
+                            $indicadores = ['receitaTotal' => 'Receita', 'despesasTotal' => 'Despesas', 'resultadoLiquido' => 'Resultado', 'margemLiquida' => 'Margem %'];
                         @endphp
                         @foreach($indicadores as $key => $label)
                             <tr class="text-gray-700 dark:text-gray-300">
@@ -632,7 +632,7 @@
 @php
     $waterfallJson = [
         'receita'   => (float) ($resumo['receitaTotal'] ?? 0),
-        'deducoes'  => (float) ($resumo['deducoesTotal'] ?? 0),
+        // deducoes removido
         'despesas'  => (float) ($resumo['despesasTotal'] ?? 0),
         'resultado' => (float) ($resumo['resultadoLiquido'] ?? 0),
     ];
@@ -727,15 +727,15 @@
         /* ─── WATERFALL DRE ─── */
         var wd = parseJSON('waterfallData');
         if (wd) {
-            var rec = wd.receita || 0, ded = wd.deducoes || 0, desp = wd.despesas || 0, res = wd.resultado || 0;
-            var afterDed = rec - ded;
+            var rec = wd.receita || 0, desp = wd.despesas || 0, res = wd.resultado || 0;
+            // waterfall simplificado: sem deducoes
             new Chart(document.getElementById('chart-waterfall'), {
                 type: 'bar',
                 data: {
-                    labels: ['Receita', 'Dedução', 'Despesas', 'Resultado'],
+                    labels: ['Receita', 'Despesas', 'Resultado'],
                     datasets: [{
-                        label: 'DRE', data: [[0, rec], [afterDed, rec], [res, afterDed], [0, res]],
-                        backgroundColor: ['#10b981', '#f59e0b', '#ef4444', res >= 0 ? '#3b82f6' : '#ef4444'],
+                        label: 'DRE', data: [[0, rec], [res, rec], [0, res]],
+                        backgroundColor: ['#10b981', '#ef4444', res >= 0 ? '#3b82f6' : '#ef4444'],
                         borderRadius: 4, borderSkipped: false, maxBarThickness: 48
                     }]
                 },

@@ -192,6 +192,7 @@
                     <option value="DEDUCAO">Dedução</option>
                     <option value="DESPESA">Despesa</option>
                     <option value="PENDENTE_CLASSIFICACAO">Pendente</option>
+                    <option value="IGNORAR">Ignorar</option>
                 </select>
             </div>
             <div class="overflow-x-auto">
@@ -300,9 +301,9 @@
                         <option value="RECEITA_PF">RECEITA_PF</option>
                         <option value="RECEITA_PJ">RECEITA_PJ</option>
                         <option value="RECEITA_FINANCEIRA">RECEITA_FINANCEIRA</option>
-                        <option value="DEDUCAO">DEDUCAO</option>
                         <option value="DESPESA">DESPESA</option>
                         <option value="PENDENTE_CLASSIFICACAO">PENDENTE</option>
+                        <option value="IGNORAR">IGNORAR</option>
                     </select>
                 </div>
                 <div>
@@ -728,8 +729,8 @@ async function carregarRegras(p = 1) {
                 'RECEITA_PF': 'bg-emerald-100 text-emerald-800',
                 'RECEITA_PJ': 'bg-blue-100 text-blue-800',
                 'DESPESA': 'bg-red-100 text-red-800',
-                'DEDUCAO': 'bg-orange-100 text-orange-800',
-                'PENDENTE_CLASSIFICACAO': 'bg-yellow-100 text-yellow-800'
+                'PENDENTE_CLASSIFICACAO': 'bg-yellow-100 text-yellow-800',
+                'IGNORAR': 'bg-gray-100 text-gray-500'
             };
             tr.innerHTML = `
                 <td class="px-4 py-3 text-sm font-mono">${r.codigo_plano}</td>
