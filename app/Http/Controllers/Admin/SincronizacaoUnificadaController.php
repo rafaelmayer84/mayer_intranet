@@ -678,6 +678,10 @@ class SincronizacaoUnificadaController extends Controller
             foreach ($regras as $regra) {
                 $atualizado = DB::table('movimentos')
                     ->where('codigo_plano', $regra->codigo_plano)
+                    ->where(function ($q) {
+                        $q->where('classificacao_manual', '!=', 1)
+                          ->orWhereNull('classificacao_manual');
+                    })
                     ->where(function ($q) use ($regra) {
                         $q->where('classificacao', '!=', $regra->classificacao)
                           ->orWhereNull('classificacao');

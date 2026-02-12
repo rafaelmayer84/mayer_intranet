@@ -20,24 +20,18 @@ class ClassificacaoService
     public function classificar(?string $codigoPlano, ?string $tipoMovimento = null): string
     {
         if (empty($codigoPlano)) {
-            return $this->classificarPorTipo($tipoMovimento);
+            return 'PENDENTE_CLASSIFICACAO';
         }
 
-        // 1. Buscar regra na tabela (exata ou wildcard)
+        // Fonte UNICA: tabela classificacao_regras (gerenciada pela UI)
         $regra = ClassificacaoRegra::buscarRegraMaisEspecifica($codigoPlano);
 
         if ($regra) {
             return $regra->classificacao;
         }
 
-        // 2. Tentar inferir pela estrutura do código contábil
-        $classificacaoInferida = $this->inferirPorPadraoContabil($codigoPlano);
-        if ($classificacaoInferida !== 'PENDENTE_CLASSIFICACAO') {
-            return $classificacaoInferida;
-        }
-
-        // 3. Fallback: classificar por tipo
-        return $this->classificarPorTipo($tipoMovimento);
+        // Sem regra = pendente (operador deve criar regra na UI)
+        return 'PENDENTE_CLASSIFICACAO';
     }
 
     /**
@@ -326,6 +320,10 @@ class ClassificacaoService
 
         DB::table('movimentos')
             ->whereNotNull('codigo_plano')
+            ->where(function($q) {
+                $q->where('classificacao_manual', '!=', 1)
+                  ->orWhereNull('classificacao_manual');
+            })
             ->orderBy('id')
             ->chunk(500, function ($movimentos) use (&$stats) {
                 foreach ($movimentos as $mov) {

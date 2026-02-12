@@ -7,6 +7,7 @@ use App\Models\Processo;
 use App\Models\Movimento;
 use App\Models\IntegrationLog;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -389,28 +390,39 @@ class DataJuriSyncService
                                 $mes = (int) substr($dataFormatada, 5, 2);
                             }
                             
-                            $classificacao = $this->classificarMovimento($codigoPlano, $valor);
-                            
+                            $pessoaIdDj = $this->toNullableInt($movimento['pessoaId'] ?? null);
+                            $classificacao = $this->classificarMovimento($codigoPlano, $valor, $pessoaIdDj);
+
+                            // Verificar se registro existente tem classificacao manual
+                            $existente = Movimento::where('datajuri_id', $movimento['id'] ?? null)->first();
+                            $mantemManual = ($existente && $existente->classificacao_manual == 1);
+
+                            $dados = [
+                                'descricao' => substr($movimento['descricao'] ?? '', 0, 500),
+                                'observacao' => substr($movimento['observacao'] ?? '', 0, 1000),
+                                'data' => $dataFormatada,
+                                'ano' => $ano,
+                                'mes' => $mes,
+                                'valor' => $valor,
+                                'plano_contas' => substr($planoContaCompleto ?? '', 0, 500),
+                                'codigo_plano' => $codigoPlano,
+                                'pessoa' => substr($movimento['pessoa.nome'] ?? $movimento['pessoa'] ?? '', 0, 255),
+                                'conta' => substr($movimento['contaId'] ?? '', 0, 100),
+                                'conciliado' => ($movimento['conciliado'] ?? '') === 'Sim',
+                                'plano_conta_id' => $this->toNullableInt($movimento['planoContaId'] ?? null),
+                                'pessoa_id_datajuri' => $pessoaIdDj,
+                                'contrato_id_datajuri' => $this->toNullableInt($movimento['contratoId'] ?? null),
+                                'proprietario_id' => $this->toNullableInt($movimento['proprietarioId'] ?? null),
+                            ];
+
+                            // So sobrescreve classificacao se NAO for manual
+                            if (!$mantemManual) {
+                                $dados['classificacao'] = $classificacao;
+                            }
+
                             Movimento::updateOrCreate(
                                 ['datajuri_id' => $movimento['id'] ?? null],
-                                [
-                                    'descricao' => substr($movimento['descricao'] ?? '', 0, 500),
-                                    'observacao' => substr($movimento['observacao'] ?? '', 0, 1000),
-                                    'data' => $dataFormatada,
-                                    'ano' => $ano,
-                                    'mes' => $mes,
-                                    'valor' => $valor,
-                                    'plano_contas' => substr($planoContaCompleto ?? '', 0, 500),
-                                    'codigo_plano' => $codigoPlano,
-                                    'classificacao' => $classificacao,
-                                    'pessoa' => substr($movimento['pessoa.nome'] ?? $movimento['pessoa'] ?? '', 0, 255),
-                                    'conta' => substr($movimento['contaId'] ?? '', 0, 100),
-                                    'conciliado' => ($movimento['conciliado'] ?? '') === 'Sim',
-                                    'plano_conta_id' => $this->toNullableInt($movimento['planoContaId'] ?? null),
-                                    'pessoa_id_datajuri' => $this->toNullableInt($movimento['pessoaId'] ?? null),
-                                    'contrato_id_datajuri' => $this->toNullableInt($movimento['contratoId'] ?? null),
-                                    'proprietario_id' => $this->toNullableInt($movimento['proprietarioId'] ?? null),
-                                ]
+                                $dados
                             );
                             $totalSincronizadas++;
                         } catch (Exception $e) {
@@ -563,38 +575,65 @@ class DataJuriSyncService
     }
 
     /**
-     * Classifica um movimento usando ClassificacaoService ou inferência
+     * Classifica um movimento usando tabela de regras + fallback PF/PJ
      */
-    private function classificarMovimento(?string $codigoPlano, float $valor): string
+    private function classificarMovimento(?string $codigoPlano, float $valor, ?int $pessoaIdDatajuri = null): string
     {
+        $classificacao = 'PENDENTE_CLASSIFICACAO';
+
         if (!empty($codigoPlano)) {
-            if ($this->classificacaoService) {
-                try {
-                    $tipo = $valor < 0 ? 'DESPESA' : 'RECEITA';
-                    return $this->classificacaoService->classificar($codigoPlano, $tipo);
-                } catch (Exception $e) {
-                    // Fallback se ClassificacaoService falhar
+            // Fonte unica: tabela classificacao_regras
+            try {
+                $regra = \App\Models\ClassificacaoRegra::buscarRegraMaisEspecifica($codigoPlano);
+                if ($regra) {
+                    $classificacao = $regra->classificacao;
                 }
+            } catch (Exception $e) {
+                Log::warning("Erro ao buscar regra para {$codigoPlano}: " . $e->getMessage());
             }
-            
-            return $this->inferirPorPadraoContabil($codigoPlano, $valor);
         }
-        
-        return $valor < 0 ? 'DESPESA' : 'PENDENTE_CLASSIFICACAO';
+
+        // Se nao encontrou regra, default por sinal do valor
+        if ($classificacao === 'PENDENTE_CLASSIFICACAO' && $valor < 0) {
+            $classificacao = 'DESPESA';
+        }
+
+        // Fallback PF/PJ: se receita pendente, tentar por CPF/CNPJ do cliente
+        if ($classificacao === 'PENDENTE_CLASSIFICACAO'
+            && $valor > 0
+            && $pessoaIdDatajuri) {
+            $classificacao = $this->fallbackPfPjPorDocumento($pessoaIdDatajuri, $classificacao);
+        }
+
+        return $classificacao;
     }
 
     /**
-     * Infere classificação baseada em padrões contábeis conhecidos
+     * Fallback: determina PF/PJ pelo CPF/CNPJ do cliente vinculado
      */
-    private function inferirPorPadraoContabil(string $codigo, float $valor): string
+    private function fallbackPfPjPorDocumento(int $pessoaIdDatajuri, string $classificacaoAtual): string
     {
-        if (in_array($codigo, ['3.01.01.01', '3.01.01.03'])) return 'RECEITA_PF';
-        if (in_array($codigo, ['3.01.01.02', '3.01.01.05'])) return 'RECEITA_PJ';
-        if (str_starts_with($codigo, '3.01.02') || str_starts_with($codigo, '3.01.03')) return 'DEDUCAO';
-        if (str_starts_with($codigo, '3.02')) return 'DESPESA';
-        if (str_starts_with($codigo, '3.03')) return 'RECEITA_FINANCEIRA';
-        if (str_starts_with($codigo, '3.04')) return 'DESPESA_FINANCEIRA';
-        return $valor < 0 ? 'DESPESA' : 'PENDENTE_CLASSIFICACAO';
+        try {
+            $cliente = DB::table('clientes')
+                ->where('datajuri_id', $pessoaIdDatajuri)
+                ->first(['cpf', 'cnpj']);
+
+            if (!$cliente) {
+                return $classificacaoAtual;
+            }
+
+            if (!empty($cliente->cnpj)) {
+                return 'RECEITA_PJ';
+            }
+
+            if (!empty($cliente->cpf)) {
+                return 'RECEITA_PF';
+            }
+        } catch (Exception $e) {
+            Log::warning("Fallback PF/PJ falhou para pessoa {$pessoaIdDatajuri}: " . $e->getMessage());
+        }
+
+        return $classificacaoAtual;
     }
 
     // =========================================================================

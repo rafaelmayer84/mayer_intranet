@@ -213,7 +213,7 @@
          ═══════════════════════════════════════════════════════════════════ --}}
 
     {{-- ═══ SEÇÃO 1: 4 KPI CARDS HERO ═══ --}}
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         @foreach($cards as $c)
             @php
                 $val = (float) $c['value'];
