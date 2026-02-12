@@ -96,7 +96,14 @@
             'color' => '#ef4444', 'accent' => 'border-l-rose-500',
             'bg' => 'bg-rose-50 dark:bg-rose-950/20', 'invert' => true,
         ],
-
+        [
+            'label' => 'Caixa', 'icon' => '🏦',
+            'value' => $saude['totalAberto'] ?? 0,
+            'trend' => $saude['contasAtrasoTrend'] ?? 0,
+            'spark' => null,
+            'color' => '#3b82f6', 'accent' => 'border-l-blue-500',
+            'bg' => 'bg-blue-50 dark:bg-blue-950/20', 'invert' => true,
+        ],
     ];
 
     /* Contas em atraso — resumo */

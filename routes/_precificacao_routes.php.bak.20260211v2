@@ -27,9 +27,6 @@ Route::prefix('precificacao')->group(function () {
     // Escolher proposta
     Route::post('/{id}/escolher', [PrecificacaoController::class, 'escolher'])->name('precificacao.escolher')->whereNumber('id');
 
-    // Excluir proposta (admin only)
-    Route::delete('/{id}/excluir', [PrecificacaoController::class, 'excluir'])->name('precificacao.excluir')->whereNumber('id');
-
     // Ver proposta individual
     Route::get('/{id}', [PrecificacaoController::class, 'show'])->name('precificacao.show')->whereNumber('id');
 

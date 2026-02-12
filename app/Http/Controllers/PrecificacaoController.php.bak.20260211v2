@@ -75,7 +75,6 @@ class PrecificacaoController extends Controller
             'tipo_proponente' => 'required|in:lead,cliente',
             'proponente_id' => 'required|integer',
             'area_direito' => 'nullable|string|max:100',
-            'tipo_acao' => 'nullable|string|max:200',
             'valor_causa' => 'nullable|numeric',
             'valor_economico' => 'nullable|numeric',
             'descricao_demanda' => 'nullable|string|max:5000',
@@ -106,9 +105,6 @@ class PrecificacaoController extends Controller
         if ($request->filled('descricao_demanda')) {
             $dadosProponente['demanda']['descricao_completa'] = $request->descricao_demanda;
         }
-        if ($request->filled('tipo_acao')) {
-            $dadosProponente['demanda']['tipo_acao'] = $request->tipo_acao;
-        }
 
         $areaDireito = $request->area_direito ?? ($dadosProponente['demanda']['area_interesse'] ?? null);
 
@@ -135,7 +131,6 @@ class PrecificacaoController extends Controller
             'documento_proponente' => $dadosProponente['proponente']['documento'] ?? null,
             'tipo_pessoa' => $dadosProponente['proponente']['tipo_pessoa'] ?? null,
             'area_direito' => $areaDireito,
-            'tipo_acao' => $request->tipo_acao,
             'descricao_demanda' => $request->descricao_demanda ?? ($dadosProponente['demanda']['resumo_demanda'] ?? null),
             'valor_causa' => $request->valor_causa,
             'valor_economico' => $request->valor_economico,
@@ -213,25 +208,6 @@ class PrecificacaoController extends Controller
 
         $propostas = $query->orderByDesc('created_at')->paginate(20);
         return view('precificacao.historico', compact('propostas'));
-    }
-
-
-    /**
-     * Excluir proposta (admin/sócio only)
-     */
-    public function excluir(int $id)
-    {
-        $userRole = Auth::user()->role ?? '';
-        if (!in_array($userRole, ['admin', 'socio'])) {
-            return response()->json(['erro' => 'Acesso restrito à administração'], 403);
-        }
-
-        $proposal = PricingProposal::findOrFail($id);
-        $proposal->delete();
-
-        Log::info('Precificação: Proposta excluída', ['id' => $id, 'user' => Auth::id()]);
-
-        return response()->json(['success' => true]);
     }
 
     // ===================== CALIBRAÇÃO (ADMIN ONLY) =====================

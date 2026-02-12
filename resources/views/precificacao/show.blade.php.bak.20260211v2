@@ -34,12 +34,6 @@
                 <span class="text-gray-400">Área:</span>
                 <p class="font-medium text-gray-800 dark:text-white">{{ $proposta->area_direito ?? '-' }}</p>
             </div>
-            @if($proposta->tipo_acao)
-            <div>
-                <span class="text-gray-400">Tipo de Ação:</span>
-                <p class="font-medium text-gray-800 dark:text-white">{{ $proposta->tipo_acao }}</p>
-            </div>
-            @endif
             <div>
                 <span class="text-gray-400">Data:</span>
                 <p class="font-medium text-gray-800 dark:text-white">{{ $proposta->created_at->format('d/m/Y H:i') }}</p>
@@ -102,7 +96,7 @@
     {{-- Justificativa IA --}}
     @if($proposta->justificativa_ia)
     <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 mb-6">
-        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Análise Estratégica</h2>
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Análise da IA</h2>
         <p class="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{{ $proposta->justificativa_ia }}</p>
     </div>
     @endif

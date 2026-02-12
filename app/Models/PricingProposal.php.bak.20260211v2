@@ -11,7 +11,7 @@ class PricingProposal extends Model
     protected $fillable = [
         'user_id', 'lead_id', 'cliente_id', 'oportunidade_id',
         'nome_proponente', 'documento_proponente', 'tipo_pessoa',
-        'area_direito', 'tipo_acao', 'descricao_demanda', 'valor_causa', 'valor_economico',
+        'area_direito', 'descricao_demanda', 'valor_causa', 'valor_economico',
         'contexto_adicional',
         'siric_score', 'siric_rating', 'siric_limite', 'siric_recomendacao',
         'calibracao_snapshot', 'historico_agregado',

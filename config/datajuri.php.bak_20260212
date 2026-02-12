@@ -304,7 +304,7 @@ return [
             'label' => 'Contas a Receber',
             'icon' => '💵',
             'table' => 'contas_receber',
-            'campos' => 'id,descricao,valor,dataVencimento,dataPagamento,prazo,tipo,pessoa.nome,pessoaId,cliente.nome,clienteId,processo.pasta,processoId,contrato.numero,contratoId,observacao,dataCadastro',
+            'campos' => 'id,descricao,valor,dataVencimento,dataPagamento,status,tipo,pessoa.nome,pessoaId,cliente.nome,clienteId,processo.pasta,processoId,contrato.numero,contratoId,observacao,dataCadastro',
             'criterio' => null,
             'mapping' => [
                 'id'                => 'datajuri_id',
@@ -312,7 +312,7 @@ return [
                 'valor'             => 'valor',
                 'dataVencimento'    => 'data_vencimento',
                 'dataPagamento'     => 'data_pagamento',
-                'prazo'             => 'status',
+                'status'            => 'status',
                 'tipo'              => 'tipo',
                 'pessoa.nome'       => 'cliente',
                 'pessoaId'          => 'pessoa_datajuri_id',

@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\Configuracao;
 use App\Models\ContaReceber;
 use App\Models\Movimento;
-use App\Models\ClassificacaoRegra;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -443,7 +442,7 @@ public function getLucratividadeByMonth(int $ano): array
             )
             ->where('ano', $ano)
             ->where('mes', $mes)
-            ->whereIn('classificacao', $this->getClassificacoesPorTipo('DESPESA'));
+            ->where('classificacao', Movimento::DESPESA);
 
         $this->applyRubricasExcluidas($q);
 
@@ -456,7 +455,7 @@ public function getLucratividadeByMonth(int $ano): array
         $qPrev = Movimento::select('codigo_plano', DB::raw('SUM(valor) as total'))
             ->where('ano', $pAno)
             ->where('mes', $pMes)
-            ->whereIn('classificacao', $this->getClassificacoesPorTipo('DESPESA'));
+            ->where('classificacao', Movimento::DESPESA);
 
         $this->applyRubricasExcluidas($qPrev);
 
@@ -691,35 +690,26 @@ public function getLucratividadeByMonth(int $ano): array
         $m2 = $this->resumoBasico($ano2, $mes2);
         $m3 = $this->resumoBasico($ano, $mes);
 
-        // Nomes dos meses para labels
-        $meses = ['', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        // Contas em atraso e taxa de cobranca (por competencia)
+        $ref1 = $this->refDateCompetencia($ano1, $mes1);
+        $ref2 = $this->refDateCompetencia($ano2, $mes2);
+        $ref3 = $this->refDateCompetencia($ano, $mes);
+        $at1 = (float) $this->overdueQuery($ref1)->sum('valor');
+        $at2 = (float) $this->overdueQuery($ref2)->sum('valor');
+        $at3 = (float) $this->overdueQuery($ref3)->sum('valor');
 
-        // Retornar array de 3 meses com keys que a view espera
+        [$taxa1] = $this->taxaCobrancaMes($ano1, $mes1);
+        [$taxa2] = $this->taxaCobrancaMes($ano2, $mes2);
+        [$taxa3] = $this->taxaCobrancaMes($ano, $mes);
+
         return [
-            [
-                'label' => $meses[$mes1] . '/' . $ano1,
-                'receitaTotal' => $m1['receita'],
-                'deducoesTotal' => $m1['deducoes'],
-                'despesasTotal' => $m1['despesas'],
-                'resultadoLiquido' => $m1['resultado'],
-                'margemLiquida' => $m1['margem'],
-            ],
-            [
-                'label' => $meses[$mes2] . '/' . $ano2,
-                'receitaTotal' => $m2['receita'],
-                'deducoesTotal' => $m2['deducoes'],
-                'despesasTotal' => $m2['despesas'],
-                'resultadoLiquido' => $m2['resultado'],
-                'margemLiquida' => $m2['margem'],
-            ],
-            [
-                'label' => $meses[$mes] . '/' . $ano,
-                'receitaTotal' => $m3['receita'],
-                'deducoesTotal' => $m3['deducoes'],
-                'despesasTotal' => $m3['despesas'],
-                'resultadoLiquido' => $m3['resultado'],
-                'margemLiquida' => $m3['margem'],
-            ],
+            ['metrica' => 'Receita', 'mes1' => $m1['receita'], 'mes2' => $m2['receita'], 'mes3' => $m3['receita'], 'trend' => $this->percentChange($m3['receita'], $m2['receita'])],
+            ['metrica' => 'Deduções', 'mes1' => $m1['deducoes'], 'mes2' => $m2['deducoes'], 'mes3' => $m3['deducoes'], 'trend' => $this->percentChange($m3['deducoes'], $m2['deducoes'])],
+            ['metrica' => 'Despesas', 'mes1' => $m1['despesas'], 'mes2' => $m2['despesas'], 'mes3' => $m3['despesas'], 'trend' => $this->percentChange($m3['despesas'], $m2['despesas'])],
+            ['metrica' => 'Resultado Líquido', 'mes1' => $m1['resultado'], 'mes2' => $m2['resultado'], 'mes3' => $m3['resultado'], 'trend' => $this->percentChange($m3['resultado'], $m2['resultado'])],
+            ['metrica' => 'Margem Líquida', 'mes1' => $m1['margem'], 'mes2' => $m2['margem'], 'mes3' => $m3['margem'], 'trend' => $this->percentChange($m3['margem'], $m2['margem'])],
+            ['metrica' => 'Contas Atraso', 'mes1' => $at1, 'mes2' => $at2, 'mes3' => $at3, 'trend' => $this->percentChange($at3, $at2)],
+            ['metrica' => 'Taxa Cobrança', 'mes1' => $taxa1, 'mes2' => $taxa2, 'mes3' => $taxa3, 'trend' => $this->percentChange($taxa3, $taxa2)],
         ];
     }
 
@@ -799,37 +789,14 @@ public function getLucratividadeByMonth(int $ano): array
      * Totais basicos do mes.
      * FIX v3.0: Inclui deducoes no calculo do resultado.
      */
-
-    /**
-     * Busca classificações por tipo da tabela classificacao_regras.
-     */
-    private function getClassificacoesPorTipo(string $tipo): array
-    {
-        static $cache = [];
-        
-        if (!isset($cache[$tipo])) {
-            // Buscar códigos da tabela de regras
-            $codigos = \DB::table('classificacao_regras')
-                ->where('ativo', 1)
-                ->where('classificacao', $tipo)
-                ->pluck('codigo_plano')
-                ->toArray();
-            
-            // Incluir o próprio tipo como valor válido
-            $cache[$tipo] = array_unique(array_merge([$tipo], $codigos));
-        }
-        
-        return $cache[$tipo];
-    }
-
     private function resumoBasico(int $ano, int $mes): array
     {
         $receitaPf = $this->sumReceitaTipo($ano, $mes, 'pf');
         $receitaPj = $this->sumReceitaTipo($ano, $mes, 'pj');
         $receita = $receitaPf + $receitaPj;
 
-        $deducoes = abs($this->deducoesTotal($ano, $mes));
-        $despesas = abs((float) $this->despesasOperacionaisTotal($ano, $mes));
+        $deducoes = $this->deducoesTotal($ano, $mes);
+        $despesas = (float) $this->despesasOperacionaisTotal($ano, $mes);
         $resultado = $receita - $deducoes - $despesas;
         $margem = $receita > 0 ? ($resultado / $receita) * 100 : 0.0;
 
@@ -845,7 +812,7 @@ public function getLucratividadeByMonth(int $ano): array
     private function overdueQuery(Carbon $ref)
     {
         return ContaReceber::query()
-            ->whereNotIn('status', ['Concluído', 'Concluido', 'Pago', 'Cancelado', 'Excluido', 'Excluído'])
+            ->where('status', 'Não lançado')
             ->whereNull('data_pagamento')
             ->whereNotNull('data_vencimento')
             ->whereDate('data_vencimento', '<=', $ref->toDateString())
@@ -1035,7 +1002,7 @@ public function getLucratividadeByMonth(int $ano): array
     {
         $q = Movimento::where('ano', $ano)
             ->where('mes', $mes)
-            ->whereIn('classificacao', $this->getClassificacoesPorTipo('DESPESA'));
+            ->where('classificacao', Movimento::DESPESA);
 
         $this->applyRubricasExcluidas($q);
 
@@ -1054,7 +1021,7 @@ public function getLucratividadeByMonth(int $ano): array
 
         $q = Movimento::select(DB::raw('mes'), DB::raw('SUM(valor) as total'))
             ->where('ano', $ano)
-            ->whereIn('classificacao', $this->getClassificacoesPorTipo('DESPESA'));
+            ->where('classificacao', Movimento::DESPESA);
         $this->applyRubricasExcluidas($q);
 
         $rows = $q->groupBy('mes')->pluck('total', 'mes')->toArray();

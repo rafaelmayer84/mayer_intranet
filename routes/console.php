@@ -36,3 +36,20 @@ Schedule::command('cron:sync-espo')
     ->dailyAt('17:00')
     ->timezone('America/Sao_Paulo')
     ->appendOutputTo(storage_path('logs/cron-espo.log'));
+
+// Contas a Receber → 3x/dia (logo após DataJuri)
+Schedule::command('sync:contas-receber-rapido')
+    ->dailyAt('02:05')
+    ->timezone('America/Sao_Paulo')
+    ->appendOutputTo(storage_path('logs/cron-contas-receber.log'));
+
+Schedule::command('sync:contas-receber-rapido')
+    ->dailyAt('10:05')
+    ->timezone('America/Sao_Paulo')
+    ->appendOutputTo(storage_path('logs/cron-contas-receber.log'));
+
+Schedule::command('sync:contas-receber-rapido')
+    ->dailyAt('18:05')
+    ->timezone('America/Sao_Paulo')
+    ->appendOutputTo(storage_path('logs/cron-contas-receber.log'));
+

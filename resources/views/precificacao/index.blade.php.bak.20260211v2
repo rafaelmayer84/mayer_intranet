@@ -46,40 +46,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Área do Direito</label>
-                <select id="area-direito" onchange="filtrarTiposAcao()" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                    <option value="">Selecione a área...</option>
-                    <option value="Atuação Avulsa/Extrajudicial">Atuação Avulsa/Extrajudicial</option>
-                    <option value="Juizados Especiais">Juizados Especiais</option>
-                    <option value="Direito Administrativo/Público">Direito Administrativo/Público</option>
-                    <option value="Direito Civil e Empresarial">Direito Civil e Empresarial</option>
-                    <option value="Direito Falimentar">Direito Falimentar</option>
-                    <option value="Direito de Família">Direito de Família</option>
-                    <option value="Direito das Sucessões">Direito das Sucessões</option>
-                    <option value="Direito Eleitoral">Direito Eleitoral</option>
-                    <option value="Direito Militar">Direito Militar</option>
-                    <option value="Direito Penal">Direito Penal</option>
-                    <option value="Direito do Trabalho">Direito do Trabalho</option>
-                    <option value="Direito Previdenciário">Direito Previdenciário</option>
-                    <option value="Direito Tributário">Direito Tributário</option>
-                    <option value="Direito do Consumidor">Direito do Consumidor</option>
-                    <option value="Tribunais e Conselhos">Tribunais e Conselhos</option>
-                    <option value="Direito Desportivo">Direito Desportivo</option>
-                    <option value="Direito Marítimo/Portuário/Aduaneiro">Direito Marítimo/Portuário/Aduaneiro</option>
-                    <option value="Direito de Partido">Direito de Partido</option>
-                    <option value="Propriedade Intelectual">Propriedade Intelectual</option>
-                    <option value="Direito Ambiental">Direito Ambiental</option>
-                    <option value="Direito da Criança e Adolescente">Direito da Criança e Adolescente</option>
-                    <option value="Direito Digital">Direito Digital</option>
-                    <option value="Assistência Social">Assistência Social</option>
-                    <option value="Direito Imobiliário">Direito Imobiliário</option>
-                    <option value="Mediação e Conciliação">Mediação e Conciliação</option>
-                </select>
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo de Ação</label>
-                <select id="tipo-acao" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white">
-                    <option value="">Selecione primeiro a área...</option>
-                </select>
+                <input type="text" id="area-direito" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white" placeholder="Ex: Trabalhista, Cível, Tributário...">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Valor da Causa (R$)</label>
@@ -117,7 +84,7 @@
 
         <div class="mt-6 flex justify-end">
             <button onclick="gerarPropostas()" id="btn-gerar" class="px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-semibold transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-                <span id="btn-gerar-text">Gerar Propostas</span>
+                <span id="btn-gerar-text">Gerar Propostas com IA</span>
                 <svg id="btn-gerar-spinner" class="hidden animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -133,7 +100,7 @@
 
         {{-- Justificativa da IA --}}
         <div id="justificativa-box" class="mt-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-            <p class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Análise Estratégica</p>
+            <p class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Análise da IA</p>
             <p id="justificativa-texto" class="text-gray-700 dark:text-gray-300 text-sm leading-relaxed"></p>
             <div id="observacoes-estrategicas" class="mt-3 text-sm text-gray-500 dark:text-gray-400"></div>
         </div>
@@ -150,7 +117,7 @@
                         <th class="pb-2 font-medium">Data</th>
                         <th class="pb-2 font-medium">Proponente</th>
                         <th class="pb-2 font-medium">Área</th>
-                        <th class="pb-2 font-medium">Recomendação</th>
+                        <th class="pb-2 font-medium">Recomendação IA</th>
                         <th class="pb-2 font-medium">Escolhida</th>
                         <th class="pb-2 font-medium">Status</th>
                         <th class="pb-2 font-medium"></th>
@@ -181,11 +148,8 @@
                                 {{ ucfirst($p->status) }}
                             </span>
                         </td>
-                        <td class="py-2 flex items-center gap-2">
+                        <td class="py-2">
                             <a href="{{ route('precificacao.show', $p->id) }}" class="text-indigo-600 hover:text-indigo-800 text-xs">Ver</a>
-                            @if(in_array(auth()->user()->role ?? '', ['admin', 'socio']))
-                            <button onclick="excluirProposta({{ $p->id }})" class="text-red-500 hover:text-red-700 text-xs" title="Excluir">✕</button>
-                            @endif
                         </td>
                     </tr>
                     @endforeach
@@ -263,20 +227,9 @@ function selecionarProponente(item) {
 }
 
 function preencherFormulario(dados, tipo) {
-    // Área de interesse - selecionar no dropdown
+    // Área de interesse
     if (dados.demanda?.area_interesse) {
-        const selArea = document.getElementById('area-direito');
-        const areaVal = dados.demanda.area_interesse;
-        // Tentar match exato, senão match parcial
-        let matched = false;
-        for (let opt of selArea.options) {
-            if (opt.value && opt.value.toLowerCase().includes(areaVal.toLowerCase())) {
-                opt.selected = true;
-                matched = true;
-                filtrarTiposAcao();
-                break;
-            }
-        }
+        document.getElementById('area-direito').value = dados.demanda.area_interesse;
     }
     // Descrição
     if (dados.demanda?.resumo_demanda) {
@@ -345,14 +298,13 @@ function gerarPropostas() {
     const spinner = document.getElementById('btn-gerar-spinner');
 
     btn.disabled = true;
-    txt.textContent = 'Analisando dados...';
+    txt.textContent = 'Analisando com IA...';
     spinner.classList.remove('hidden');
 
     const payload = {
         tipo_proponente: proponenteSelecionado.tipo,
         proponente_id: proponenteSelecionado.id,
         area_direito: document.getElementById('area-direito').value,
-        tipo_acao: document.getElementById('tipo-acao').value,
         valor_causa: document.getElementById('valor-causa').value || null,
         valor_economico: document.getElementById('valor-economico').value || null,
         descricao_demanda: document.getElementById('descricao-demanda').value,
@@ -371,7 +323,7 @@ function gerarPropostas() {
     .then(r => r.json())
     .then(data => {
         btn.disabled = false;
-        txt.textContent = 'Gerar Propostas';
+        txt.textContent = 'Gerar Propostas com IA';
         spinner.classList.add('hidden');
 
         if (data.erro) {
@@ -384,7 +336,7 @@ function gerarPropostas() {
     })
     .catch(err => {
         btn.disabled = false;
-        txt.textContent = 'Gerar Propostas';
+        txt.textContent = 'Gerar Propostas com IA';
         spinner.classList.add('hidden');
         alert('Erro de conexão. Tente novamente.');
         console.error(err);
@@ -461,313 +413,6 @@ function escolherProposta(tipo, valor) {
         }
     });
 }
-
-// ===== TABELA OAB/SC - TIPOS DE AÇÃO POR ÁREA =====
-const tiposAcaoPorArea = {
-    'Atuação Avulsa/Extrajudicial': [
-        'Consulta ou parecer verbal',
-        'Consulta ou parecer escrito',
-        'Elaboração de contrato',
-        'Elaboração de distrato',
-        'Acompanhamento de audiência',
-        'Mediação ou conciliação extrajudicial',
-        'Notificação extrajudicial',
-        'Análise e revisão de contrato',
-        'Assessoria jurídica mensal (PF)',
-        'Assessoria jurídica mensal (PJ)',
-        'Diligência em cartório ou órgão público',
-        'Assembleia societária',
-        'Sustentação oral',
-        'Interpelação extrajudicial',
-    ],
-    'Juizados Especiais': [
-        'Ação cível até 20 salários mínimos',
-        'Ação cível de 20 a 40 salários mínimos',
-        'Recurso inominado',
-        'Embargos de declaração',
-        'Ação no Juizado Especial Criminal',
-        'Ação no Juizado Especial Federal',
-        'Ação no Juizado da Fazenda Pública',
-    ],
-    'Direito Administrativo/Público': [
-        'Mandado de segurança',
-        'Ação popular',
-        'Ação civil pública',
-        'Procedimento administrativo disciplinar',
-        'Licitação - impugnação ou recurso',
-        'Defesa em processo administrativo',
-        'Habeas data',
-        'Ação contra o poder público',
-        'Representação em tribunal de contas',
-    ],
-    'Direito Civil e Empresarial': [
-        'Processo cível de conhecimento',
-        'Ação de execução',
-        'Ação monitória',
-        'Embargos à execução',
-        'Embargos de terceiro',
-        'Cumprimento de sentença',
-        'Ação de cobrança',
-        'Ação de indenização por danos morais',
-        'Ação de indenização por danos materiais',
-        'Ação possessória',
-        'Ação de usucapião',
-        'Ação renovatória',
-        'Ação revisional de contrato',
-        'Ação de despejo',
-        'Ação de consignação em pagamento',
-        'Ação de dissolução de sociedade',
-        'Ação de responsabilidade civil',
-        'Tutela de urgência (cautelar)',
-        'Habilitação de crédito',
-        'Impugnação de crédito',
-        'Recuperação extrajudicial',
-        'Ação de regresso',
-        'Produção antecipada de provas',
-    ],
-    'Direito Falimentar': [
-        'Recuperação judicial',
-        'Falência - requerimento',
-        'Falência - defesa',
-        'Habilitação de crédito na falência',
-        'Impugnação de crédito na falência',
-        'Ação revocatória falencial',
-        'Pedido de restituição',
-    ],
-    'Direito de Família': [
-        'Ação de divórcio consensual',
-        'Ação de divórcio litigioso',
-        'Ação de alimentos',
-        'Ação revisional de alimentos',
-        'Ação de execução de alimentos',
-        'Ação de regulamentação de guarda',
-        'Ação de regulamentação de visitas',
-        'Ação de investigação de paternidade',
-        'Ação de negatória de paternidade',
-        'Ação de reconhecimento e dissolução de união estável',
-        'Inventário e partilha consensual',
-        'Inventário e partilha litigiosa',
-        'Medida protetiva (Lei Maria da Penha)',
-        'Interdição',
-        'Curatela',
-        'Adoção',
-    ],
-    'Direito das Sucessões': [
-        'Inventário judicial',
-        'Inventário extrajudicial',
-        'Arrolamento sumário',
-        'Arrolamento comum',
-        'Testamento - elaboração',
-        'Testamento - impugnação',
-        'Ação de petição de herança',
-        'Sobrepartilha',
-        'Alvará judicial',
-    ],
-    'Direito Eleitoral': [
-        'Ação de impugnação de mandato eletivo',
-        'Ação de investigação judicial eleitoral',
-        'Recurso eleitoral',
-        'Representação eleitoral',
-        'Registro de candidatura',
-        'Defesa em processo eleitoral',
-    ],
-    'Direito Militar': [
-        'Defesa em processo administrativo militar',
-        'Defesa em conselho de justificação',
-        'Defesa em conselho de disciplina',
-        'Ação judicial militar',
-    ],
-    'Direito Penal': [
-        'Inquérito policial - acompanhamento',
-        'Ação penal - defesa',
-        'Ação penal - assistência de acusação',
-        'Habeas corpus',
-        'Revisão criminal',
-        'Liberdade provisória',
-        'Relaxamento de prisão',
-        'Execução penal',
-        'Tribunal do Júri',
-        'Crimes de trânsito',
-        'Crimes contra a honra (queixa-crime)',
-        'Crimes ambientais',
-        'Crimes tributários',
-        'Suspensão condicional do processo',
-        'Acordo de não persecução penal',
-        'Colaboração premiada',
-    ],
-    'Direito do Trabalho': [
-        'Reclamação trabalhista',
-        'Ação de consignação em pagamento trabalhista',
-        'Mandado de segurança trabalhista',
-        'Ação rescisória trabalhista',
-        'Execução trabalhista',
-        'Embargos à execução trabalhista',
-        'Recurso ordinário trabalhista',
-        'Recurso de revista',
-        'Agravo de instrumento trabalhista',
-        'Defesa em inquérito para apuração de falta grave',
-        'Ação de cumprimento',
-        'Dissídio coletivo',
-        'Consultoria trabalhista preventiva',
-    ],
-    'Direito Previdenciário': [
-        'Aposentadoria por idade',
-        'Aposentadoria por tempo de contribuição',
-        'Aposentadoria especial',
-        'Aposentadoria por invalidez',
-        'Auxílio-doença',
-        'Auxílio-acidente',
-        'Pensão por morte',
-        'Benefício assistencial (BPC/LOAS)',
-        'Revisão de benefício',
-        'Recurso ao CRPS',
-        'Ação de concessão de benefício',
-        'Ação de restabelecimento de benefício',
-        'Complementação de aposentadoria',
-        'Desaposentação',
-    ],
-    'Direito Tributário': [
-        'Mandado de segurança tributário',
-        'Ação anulatória de débito fiscal',
-        'Ação declaratória tributária',
-        'Ação de repetição de indébito',
-        'Embargos à execução fiscal',
-        'Exceção de pré-executividade',
-        'Defesa em processo administrativo tributário',
-        'Planejamento tributário',
-        'Consulta tributária',
-        'Recuperação de créditos tributários',
-        'Ação de consignação em pagamento tributária',
-    ],
-    'Direito do Consumidor': [
-        'Ação indenizatória consumerista',
-        'Ação de obrigação de fazer/não fazer',
-        'Ação de rescisão contratual',
-        'Ação revisional (relação de consumo)',
-        'Defesa do fornecedor',
-        'Ação coletiva de consumo',
-        'Reclamação junto ao Procon',
-    ],
-    'Tribunais e Conselhos': [
-        'Apelação cível',
-        'Agravo de instrumento',
-        'Embargos de declaração',
-        'Recurso especial',
-        'Recurso extraordinário',
-        'Ação rescisória',
-        'Reclamação constitucional',
-        'Mandado de segurança em tribunal',
-        'Habeas corpus em tribunal',
-        'Sustentação oral',
-        'Agravo interno',
-        'Embargos de divergência',
-    ],
-    'Direito Desportivo': [
-        'Defesa perante Tribunal de Justiça Desportiva',
-        'Recurso ao STJD',
-        'Consultoria desportiva',
-        'Contrato desportivo - elaboração',
-    ],
-    'Direito Marítimo/Portuário/Aduaneiro': [
-        'Ação marítima',
-        'Consultoria portuária/aduaneira',
-        'Defesa em processo aduaneiro',
-        'Contencioso marítimo',
-    ],
-    'Direito de Partido': [
-        'Consultoria partidária',
-        'Defesa em processo de fidelidade',
-    ],
-    'Propriedade Intelectual': [
-        'Registro de marca',
-        'Registro de patente',
-        'Ação de infração de marca',
-        'Ação de infração de patente',
-        'Consultoria em propriedade intelectual',
-        'Contrato de licenciamento',
-    ],
-    'Direito Ambiental': [
-        'Defesa em ação civil pública ambiental',
-        'Licenciamento ambiental',
-        'Defesa em processo administrativo ambiental',
-        'Ação de reparação de dano ambiental',
-        'Consultoria ambiental',
-    ],
-    'Direito da Criança e Adolescente': [
-        'Ação de guarda',
-        'Ação de adoção',
-        'Medida socioeducativa - defesa',
-        'Destituição do poder familiar',
-        'Acolhimento institucional',
-    ],
-    'Direito Digital': [
-        'Ação de remoção de conteúdo',
-        'Ação de indenização por violação digital',
-        'Consultoria em LGPD',
-        'Adequação à LGPD',
-        'Crimes cibernéticos - defesa',
-    ],
-    'Assistência Social': [
-        'Benefício assistencial (BPC/LOAS)',
-        'Defesa em processo de inclusão/exclusão',
-    ],
-    'Direito Imobiliário': [
-        'Ação de usucapião',
-        'Retificação de registro imobiliário',
-        'Ação de adjudicação compulsória',
-        'Ação de imissão na posse',
-        'Due diligence imobiliária',
-        'Elaboração de contrato imobiliário',
-        'Ação de despejo',
-        'Ação renovatória de locação',
-    ],
-    'Mediação e Conciliação': [
-        'Mediação privada',
-        'Conciliação judicial',
-        'Câmara de mediação/arbitragem',
-        'Arbitragem',
-    ],
-};
-
-function filtrarTiposAcao() {
-    const area = document.getElementById('area-direito').value;
-    const selectTipo = document.getElementById('tipo-acao');
-    selectTipo.innerHTML = '<option value="">Selecione o tipo de ação...</option>';
-
-    if (area && tiposAcaoPorArea[area]) {
-        tiposAcaoPorArea[area].forEach(tipo => {
-            const opt = document.createElement('option');
-            opt.value = tipo;
-            opt.textContent = tipo;
-            selectTipo.appendChild(opt);
-        });
-    } else {
-        selectTipo.innerHTML = '<option value="">Selecione primeiro a área...</option>';
-    }
-}
-
-// ===== EXCLUIR PROPOSTA (ADMIN) =====
-function excluirProposta(id) {
-    if (!confirm('Tem certeza que deseja excluir esta proposta? Esta ação não pode ser desfeita.')) return;
-
-    fetch(`{{ url('/precificacao') }}/${id}/excluir`, {
-        method: 'DELETE',
-        headers: {
-            'Accept': 'application/json',
-            'X-CSRF-TOKEN': csrfToken,
-        },
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            window.location.reload();
-        } else {
-            alert('Erro: ' + (data.erro || 'Não foi possível excluir'));
-        }
-    })
-    .catch(() => alert('Erro de conexão'));
-}
-
 </script>
 @endpush
 @endsection
