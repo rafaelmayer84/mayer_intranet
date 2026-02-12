@@ -3,7 +3,7 @@
 use App\Http\Controllers\Admin\SincronizacaoUnificadaController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth', 'admin'])->prefix('admin/sincronizacao-unificada')->name('admin.sincronizacao-unificada.')->group(function () {
+Route::middleware(['auth'])->prefix('admin/sincronizacao-unificada')->name('admin.sincronizacao-unificada.')->group(function () {
     Route::get('/', [SincronizacaoUnificadaController::class, 'index'])->name('index');
     Route::get('/counts', [SincronizacaoUnificadaController::class, 'getCounts'])->name('counts');
     Route::post('/smoke-test', [SincronizacaoUnificadaController::class, 'smokeTest'])->name('smoke-test');

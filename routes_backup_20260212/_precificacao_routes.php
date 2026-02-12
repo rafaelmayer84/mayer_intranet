@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth', 'user.active', 'modulo:operacional.precificacao,visualizar'])->prefix('precificacao')->group(function () {
+Route::prefix('precificacao')->group(function () {
     // Tela principal
     Route::get('/', [PrecificacaoController::class, 'index'])->name('precificacao.index');
 

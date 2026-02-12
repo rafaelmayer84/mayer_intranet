@@ -27,12 +27,12 @@ Route::middleware(["auth"])->group(function () {
     Route::get("/api/ranking", [DashboardController::class, "getRankingAdvogados"]);
     
     // Visão Gerencial (Resultados)
-    Route::get("/visao-gerencial", [DashboardController::class, "visaoGerencial"])->name("visao-gerencial")->middleware("modulo:resultados.visao-gerencial,visualizar");
+    Route::get("/visao-gerencial", [DashboardController::class, "visaoGerencial"])->name("visao-gerencial");
     Route::get("/api/visao-gerencial", [DashboardController::class, "visaoGerencialData"])->name("api.visao-gerencial");
     Route::get("/visao-gerencial/export", [DashboardController::class, "visaoGerencialExport"])->name("visao-gerencial.export");
     
     // Configurar Metas
-    Route::get("/configurar-metas", [DashboardController::class, "configurarMetas"])->name("configurar-metas")->middleware("admin");
+    Route::get("/configurar-metas", [DashboardController::class, "configurarMetas"])->name("configurar-metas");
     Route::put("/configurar-metas", [DashboardController::class, "updateMetas"])->name("configurar-metas.update");
     Route::post("/api/metas/salvar", [DashboardController::class, "salvarMetas"])->name("metas.salvar");
     
@@ -89,7 +89,7 @@ Route::middleware(["auth"])->group(function () {
     Route::get("/api/configuracoes/datajuri/test", [ConfiguracaoController::class, "testDataJuriConnection"]);
     
     // Clientes & Mercado
-    Route::get("/clientes-mercado", [App\Http\Controllers\ClientesMercadoController::class, "index"])->name("clientes-mercado")->middleware("modulo:resultados.clientes-mercado,visualizar");
+    Route::get("/clientes-mercado", [App\Http\Controllers\ClientesMercadoController::class, "index"])->name("clientes-mercado");
     Route::get("/api/clientes-mercado/top", [App\Http\Controllers\ClientesMercadoController::class, "topClientes"])->name("api.clientes-mercado.top");
     Route::get("/api/clientes-mercado/leads", [App\Http\Controllers\ClientesMercadoController::class, "leadsRecentes"])->name("api.clientes-mercado.leads");
     Route::get("/clientes-mercado/export", [App\Http\Controllers\ClientesMercadoController::class, "exportCsv"])->name("clientes-mercado.export");

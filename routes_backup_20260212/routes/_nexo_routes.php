@@ -3,8 +3,8 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\NexoAtendimentoController;
 use App\Http\Controllers\NexoGerencialController;
 use App\Http\Controllers\NexoDataJuriController;
-Route::middleware(['auth', 'user.active'])->group(function () {
-    Route::prefix('nexo/atendimento')->middleware('modulo:operacional.nexo,visualizar')->group(function () {
+Route::middleware(['auth'])->group(function () {
+    Route::prefix('nexo/atendimento')->group(function () {
         // -- Rotas existentes (INTOCADAS) ------------------------------
         Route::get('/', [NexoAtendimentoController::class, 'index'])->name('nexo.atendimento');
         Route::get('/conversas', [NexoAtendimentoController::class, 'conversas'])->name('nexo.atendimento.conversas');
@@ -41,7 +41,7 @@ Route::middleware(['auth', 'user.active'])->group(function () {
     Route::get('/nexo/atendimento/conversas/{id}/tags', [NexoAtendimentoController::class, 'getTags'])->name('nexo.atendimento.tags');
     Route::patch('/nexo/atendimento/conversas/{id}/tags', [NexoAtendimentoController::class, 'updateTags'])->name('nexo.atendimento.tags.update');
 
-    Route::prefix('nexo/gerencial')->middleware('modulo:operacional.nexo-gerencial,visualizar')->group(function () {
+    Route::prefix('nexo/gerencial')->group(function () {
         Route::get('/', [NexoGerencialController::class, 'index'])->name('nexo.gerencial');
         Route::get('/data', [NexoGerencialController::class, 'data'])->name('nexo.gerencial.data');
     });

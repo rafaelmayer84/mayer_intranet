@@ -27,12 +27,12 @@ Route::middleware(["auth"])->group(function () {
     Route::get("/api/ranking", [DashboardController::class, "getRankingAdvogados"]);
     
     // Visão Gerencial (Resultados)
-    Route::get("/visao-gerencial", [DashboardController::class, "visaoGerencial"])->name("visao-gerencial")->middleware("modulo:resultados.visao-gerencial,visualizar");
+    Route::get("/visao-gerencial", [DashboardController::class, "visaoGerencial"])->name("visao-gerencial");
     Route::get("/api/visao-gerencial", [DashboardController::class, "visaoGerencialData"])->name("api.visao-gerencial");
     Route::get("/visao-gerencial/export", [DashboardController::class, "visaoGerencialExport"])->name("visao-gerencial.export");
     
     // Configurar Metas
-    Route::get("/configurar-metas", [DashboardController::class, "configurarMetas"])->name("configurar-metas")->middleware("admin");
+    Route::get("/configurar-metas", [DashboardController::class, "configurarMetas"])->name("configurar-metas");
     Route::put("/configurar-metas", [DashboardController::class, "updateMetas"])->name("configurar-metas.update");
     Route::post("/api/metas/salvar", [DashboardController::class, "salvarMetas"])->name("metas.salvar");
     
@@ -77,7 +77,6 @@ Route::middleware(["auth"])->group(function () {
     Route::post("/configuracoes", [ConfiguracaoController::class, "update"])->name("configuracoes.update");
     Route::post("/configuracoes/metas", [ConfiguracaoController::class, "saveMetas"])->name("configuracoes.metas");
     Route::post("/configuracoes/vincular", [ConfiguracaoController::class, "vincularAdvogado"])->name("configuracoes.vincular");
-    Route::get("/configuracoes/resetar-classificacoes", [ConfiguracaoController::class, "resetarClassificacoes"])->name("configuracoes.resetar-classificacoes");
     
     // Classificação Manual
     Route::get("/classificacao", [ClassificacaoController::class, "index"])->name("classificacao");
@@ -89,17 +88,15 @@ Route::middleware(["auth"])->group(function () {
     Route::get("/api/configuracoes/datajuri/test", [ConfiguracaoController::class, "testDataJuriConnection"]);
     
     // Clientes & Mercado
-    Route::get("/clientes-mercado", [App\Http\Controllers\ClientesMercadoController::class, "index"])->name("clientes-mercado")->middleware("modulo:resultados.clientes-mercado,visualizar");
-    Route::get("/api/clientes-mercado/top", [App\Http\Controllers\ClientesMercadoController::class, "topClientes"])->name("api.clientes-mercado.top");
-    Route::get("/api/clientes-mercado/leads", [App\Http\Controllers\ClientesMercadoController::class, "leadsRecentes"])->name("api.clientes-mercado.leads");
-    Route::get("/clientes-mercado/export", [App\Http\Controllers\ClientesMercadoController::class, "exportCsv"])->name("clientes-mercado.export");
-    Route::get("/clientes-mercado/pdf", [App\Http\Controllers\ClientesMercadoController::class, "exportPdf"])->name("clientes-mercado.pdf");
+    Route::get("/clientes-mercado", [App\Http\Controllers\Dashboard\ClientesMercadoController::class, "index"])->name("clientes-mercado");
+    Route::get("/api/clientes-mercado/top", [App\Http\Controllers\Dashboard\ClientesMercadoController::class, "topClientes"])->name("api.clientes-mercado.top");
+    Route::get("/api/clientes-mercado/leads", [App\Http\Controllers\Dashboard\ClientesMercadoController::class, "leadsRecentes"])->name("api.clientes-mercado.leads");
+    Route::get("/clientes-mercado/export", [App\Http\Controllers\Dashboard\ClientesMercadoController::class, "exportCsv"])->name("clientes-mercado.export");
 });
 
 
 // Quadro de Avisos + Diagnóstico
 require __DIR__ . "/_avisos_routes.php";
-require __DIR__ . "/_precificacao_routes.php";
 
 
 // Metas KPI Mensais
@@ -126,88 +123,7 @@ Route::middleware(["auth"])->group(function () {
 // ============================================================================
 // MÓDULO CLIENTES & MERCADO
 // ============================================================================
-use App\Http\Controllers\ClientesMercadoController;
-
-// ============================================================================
-// MÓDULO CLASSIFICAÇÃO DE REGRAS
-// ============================================================================
-Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
-    
-    // Rotas de CRUD
-    Route::resource('classificacao-regras', \App\Http\Controllers\Admin\ClassificacaoRegrasController::class)
-        ->parameters(['classificacao-regras' => 'regra']);
-    
-    // Ações especiais
-    Route::post('classificacao-regras/importar', 
-        [\App\Http\Controllers\Admin\ClassificacaoRegrasController::class, 'importar'])
-        ->name('classificacao-regras.importar');
-    
-    Route::post('classificacao-regras/reclassificar', 
-        [\App\Http\Controllers\Admin\ClassificacaoRegrasController::class, 'reclassificar'])
-        ->name('classificacao-regras.reclassificar');
-    
-    Route::patch('classificacao-regras/{regra}/toggle', 
-        [\App\Http\Controllers\Admin\ClassificacaoRegrasController::class, 'toggleStatus'])
-        ->name('classificacao-regras.toggle');
-    
-    Route::get('classificacao-regras/exportar/csv', 
-        [\App\Http\Controllers\Admin\ClassificacaoRegrasController::class, 'exportar'])
-        ->name('classificacao-regras.exportar');
-});
+use App\Http\Controllers\Dashboard\ClientesMercadoController;
 
 // Rotas de Sincronização
 require __DIR__.'/sincronizacao.php';
-
-// Classificação de Planos de Contas - CORRIGIDO COM MIDDLEWARE E NOMES DE ROTA
-Route::middleware(['auth'])->prefix('admin/classificacao')->group(function () {
-    Route::get('/', [App\Http\Controllers\Admin\ClassificacaoRegraController::class, 'index'])
-        ->name('admin.classificacao.index');
-    
-    Route::post('/', [App\Http\Controllers\Admin\ClassificacaoRegraController::class, 'store'])
-        ->name('admin.classificacao.store');
-    
-    Route::get('/{id}', [App\Http\Controllers\Admin\ClassificacaoRegraController::class, 'show'])
-        ->name('admin.classificacao.show');
-    
-    Route::delete('/{id}', [App\Http\Controllers\Admin\ClassificacaoRegraController::class, 'destroy'])
-        ->name('admin.classificacao.destroy');
-    
-    Route::post('/reclassificar', [App\Http\Controllers\Admin\ClassificacaoRegraController::class, 'reclassificar'])
-        ->name('admin.classificacao.reclassificar');
-    
-    Route::post('/importar', [App\Http\Controllers\Admin\ClassificacaoRegraController::class, 'importar'])
-        ->name('admin.classificacao.importar');
-    
-    Route::get('/estatisticas', [App\Http\Controllers\Admin\ClassificacaoRegraController::class, 'estatisticas'])
-        ->name('admin.classificacao.estatisticas');
-});
-
-// Sincronização Unificada (substitui sincronizacao.php)
-require __DIR__."/sincronizacao-unificada.php";
-
-// Rotas de Sincronização DataJuri (Admin)
-Route::post('/admin/integracoes/sync-datajuri', [App\Http\Controllers\Admin\IntegracoesController::class, 'syncDataJuri'])->middleware('auth')->name('admin.integracoes.sync-datajuri');
-
-// Gestão de Usuários
-require __DIR__ . '/_usuarios_routes.php';
-
-Route::middleware(['auth'])->get('admin/sincronizacao-unificada/testar-conexao', [\App\Http\Controllers\Admin\SincronizacaoUnificadaController::class, 'smokeTest'])->name('admin.sincronizacao-unificada.testar-conexao');
-
-// Central de Leads
-require __DIR__."/_leads_routes.php";
-require __DIR__.'/_leads_routes.php';
-require __DIR__ . "/_nexo_routes.php";
-
-
-use App\Http\Controllers\NexoMonitorController;
-Route::middleware(['auth'])->prefix('nexo')->group(function () {
-    Route::get('/automacoes/monitor', [NexoMonitorController::class, 'index'])->name('nexo.monitor');
-    Route::get('/automacoes/dados', [NexoMonitorController::class, 'dados'])->name('nexo.monitor.dados');
-});
-
-// Manuais Normativos
-require __DIR__ . '/_manuais_routes.php';
-
-// Processos Internos (BSC)
-require __DIR__ . '/_processos_internos_routes.php';
-require __DIR__.'/_siric_routes.php';

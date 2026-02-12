@@ -12,13 +12,13 @@ use App\Http\Controllers\Admin\ManuaisNormativosController;
 */
 
 // ── Tela pública (usuário logado) ──
-Route::middleware(['auth', 'user.active', 'modulo:operacional.manuais,visualizar'])->group(function () {
+Route::middleware(['auth'])->group(function () {
     Route::get('/manuais-normativos', [ManualNormativoController::class, 'index'])
         ->name('manuais-normativos.index');
 });
 
 // ── Admin CRUD ──
-Route::middleware(['auth', 'user.active', 'admin'])->prefix('admin/manuais-normativos')->group(function () {
+Route::middleware(['auth'])->prefix('admin/manuais-normativos')->group(function () {
 
     // Grupos
     Route::get('/grupos', [ManuaisNormativosController::class, 'gruposIndex'])

@@ -16,7 +16,6 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('resultados/bsc/processos-internos')
     ->name('resultados.bsc.processos-internos.')
-    ->middleware(['auth', 'user.active', 'modulo:resultados.processos-internos,visualizar'])
     ->group(function () {
 
         // Dashboard principal

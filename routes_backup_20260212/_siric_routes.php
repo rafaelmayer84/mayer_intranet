@@ -9,7 +9,7 @@ use App\Http\Controllers\SiricController;
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth', 'user.active', 'modulo:operacional.siric,visualizar'])->prefix('siric')->name('siric.')->group(function () {
+Route::middleware('auth')->prefix('siric')->name('siric.')->group(function () {
 
     Route::get('/', [SiricController::class, 'index'])->name('index');
     Route::get('/nova', [SiricController::class, 'create'])->name('create');
