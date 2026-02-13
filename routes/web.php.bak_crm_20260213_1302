@@ -19,7 +19,7 @@ Route::get("/", function () {    return redirect()->route("visao-gerencial");
 
 Route::middleware(["auth"])->group(function () {
     // Dashboard
-    Route::get("/dashboard", [DashboardController::class, "index"])->name("dashboard");
+    Route::get("/dashboard", function() { return redirect("/avisos"); })->name("dashboard");
     Route::get("/api/kpis/financeiros", [DashboardController::class, "getKpisFinanceiros"]);
     Route::get("/api/kpis/processos", [DashboardController::class, "getKpisProcessos"]);
     Route::get("/api/kpis/atividades", [DashboardController::class, "getKpisAtividades"]);
@@ -190,6 +190,7 @@ Route::post('/admin/integracoes/sync-datajuri', [App\Http\Controllers\Admin\Inte
 
 // Gestão de Usuários
 require __DIR__ . '/_usuarios_routes.php';
+require __DIR__ . '/_perfil_routes.php';
 
 Route::middleware(['auth'])->get('admin/sincronizacao-unificada/testar-conexao', [\App\Http\Controllers\Admin\SincronizacaoUnificadaController::class, 'smokeTest'])->name('admin.sincronizacao-unificada.testar-conexao');
 
@@ -211,6 +212,3 @@ require __DIR__ . '/_manuais_routes.php';
 // Processos Internos (BSC)
 require __DIR__ . '/_processos_internos_routes.php';
 require __DIR__.'/_siric_routes.php';
-
-// CRM V2
-require __DIR__ . '/_crm_routes.php';
