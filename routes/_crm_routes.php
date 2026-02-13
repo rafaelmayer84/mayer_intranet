@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Crm\CrmLeadsController;
 use App\Http\Controllers\Crm\CrmCarteiraController;
 use App\Http\Controllers\Crm\CrmPipelineController;
 use App\Http\Controllers\Crm\CrmAccountController;
@@ -11,16 +12,19 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 | CRM V2 Routes
 |--------------------------------------------------------------------------
-| Include this file in routes/web.php:
-|   require __DIR__ . '/_crm_routes.php';
 */
 
 Route::middleware(['auth'])->prefix('crm')->name('crm.')->group(function () {
 
+    // Leads (qualificados)
+    Route::get('/leads', [CrmLeadsController::class, 'index'])->name('leads');
+    Route::post('/leads/{id}/status', [CrmLeadsController::class, 'updateStatus'])->name('leads.status');
+    Route::post('/leads/{id}/assign', [CrmLeadsController::class, 'assignOwner'])->name('leads.assign');
+
     // Carteira
     Route::get('/carteira', [CrmCarteiraController::class, 'index'])->name('carteira');
 
-    // Pipeline
+    // Pipeline (Oportunidades)
     Route::get('/pipeline', [CrmPipelineController::class, 'index'])->name('pipeline');
     Route::post('/pipeline/{id}/move', [CrmPipelineController::class, 'moveStage'])->name('pipeline.move');
     Route::post('/pipeline/{id}/won', [CrmPipelineController::class, 'markWon'])->name('pipeline.won');

@@ -14,7 +14,9 @@ class CrmOpportunity extends Model
     protected $fillable = [
         'account_id', 'stage_id', 'type', 'title', 'area', 'source',
         'value_estimated', 'owner_user_id', 'next_action_at', 'status',
-        'lost_reason', 'won_at', 'lost_at',
+        'lost_reason', 'tipo_demanda', 'lead_source', 'espo_id',
+        'amount', 'currency', 'probability', 'close_date',
+        'won_at', 'lost_at',
         'datajuri_contrato_id', 'datajuri_processo_id',
     ];
 

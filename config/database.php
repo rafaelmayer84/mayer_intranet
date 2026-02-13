@@ -66,8 +66,25 @@ return [
             'transaction_mode' => 'DEFERRED',
         ],
 
-        'mysql' => [
+        
+        'mysql_espo' => [
+            'driver'    => 'mysql',
+            'host'      => env('ESPO_DB_HOST', '127.0.0.1'),
+            'port'      => env('ESPO_DB_PORT', '3306'),
+            'database'  => env('ESPO_DB_DATABASE', ''),
+            'username'  => env('ESPO_DB_USERNAME', ''),
+            'password'  => env('ESPO_DB_PASSWORD', ''),
+            'charset'   => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix'    => '',
+            'strict'    => false,
+        ],
+
+'mysql' => [
             'driver' => 'mysql',
+
+
+
             'url' => env('DB_URL'),
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', '3306'),
