@@ -6,15 +6,18 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Intranet') - {{ config('app.name', 'Mayer Advogados') }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>tailwind.config = { darkMode: 'class' }</script>
+    <script>tailwind.config = {}</script>
+    <!-- CSS Band-aid removido — agora em mayer-brand.css -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Inter removida - Montserrat e a font oficial da marca -->
     <!-- CSS auxiliar (transições, tema claro/escuro, pequenos fixes) -->
     <link rel="stylesheet" href="{{ asset('css/intranet-ui.css') }}">
     <!-- Hotfix legado (mantido) -->
     <link rel="stylesheet" href="{{ asset('css/theme.css') }}">
+    <!-- Identidade Visual Unificada Mayer Advogados -->
+    <link rel="stylesheet" href="{{ asset('css/mayer-brand.css') }}">
     <style>
-        body { font-family: 'Inter', sans-serif; }
+        body { font-family: 'Montserrat', 'Inter', system-ui, sans-serif; }
         .submenu { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
         .submenu.open { max-height: 500px; }
         .menu-arrow { transition: transform 0.3s ease; }
@@ -449,12 +452,7 @@
                     </button>
                     <h1 class="text-lg font-semibold text-white">Intranet</h1>
                 </div>
-                <!-- Botão de Tema (visível em mobile) -->
-                <button id="theme-toggle-btn-mobile" class="theme-toggle md:hidden" aria-label="Alternar tema">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" class="w-5 h-5">
-                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-                    </svg>
-                </button>
+                <!-- Theme toggle removido - modo unico light -->
             </header>
 
             <div class="p-4 md:p-8">
@@ -516,7 +514,7 @@
     </script>
 
     <!-- Scripts de Tema e Menu Mobile -->
-    <script src="{{ asset('theme-toggle.js') }}"></script>
+    <!-- theme-toggle.js removido - modo unico light -->
     <script src="{{ asset('mobile-menu.js') }}"></script>
 
     @stack('scripts')
