@@ -1,353 +1,213 @@
 @extends('layouts.app')
-
 @section('title', 'Times & Evolução')
-
-@section('head')
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<style>
-    .te-header {
-        background: linear-gradient(135deg, #1B334A 0%, #385776 100%);
-        border-radius: 12px;
-        padding: 24px 32px;
-        margin-bottom: 24px;
-        color: #fff;
-    }
-    .te-header h1 { font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 1.5rem; }
-    .te-header p { opacity: 0.85; font-size: 0.875rem; margin-top: 4px; }
-
-    .te-kpi-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 16px;
-        margin-bottom: 24px;
-    }
-    @media (max-width: 1280px) { .te-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
-    @media (max-width: 640px)  { .te-kpi-grid { grid-template-columns: 1fr; } }
-
-    .te-card {
-        background: #fff;
-        border-radius: 12px;
-        padding: 20px 24px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
-        position: relative;
-        overflow: hidden;
-    }
-    .te-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-    }
-    .te-card::before {
-        content: '';
-        position: absolute;
-        top: 0; left: 0;
-        width: 4px; height: 100%;
-        border-radius: 12px 0 0 12px;
-    }
-    .te-card.green::before  { background: #10B981; }
-    .te-card.blue::before   { background: #385776; }
-    .te-card.amber::before  { background: #F59E0B; }
-    .te-card.red::before    { background: #EF4444; }
-
-    .te-card-label {
-        font-size: 0.7rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: #6B7280;
-        margin-bottom: 8px;
-    }
-    .te-card-value {
-        font-family: 'Montserrat', sans-serif;
-        font-size: 1.75rem;
-        font-weight: 700;
-        color: #1B334A;
-        line-height: 1;
-    }
-    .te-card-unit {
-        font-size: 0.875rem;
-        font-weight: 400;
-        color: #9CA3AF;
-        margin-left: 2px;
-    }
-    .te-card-detail {
-        font-size: 0.75rem;
-        color: #6B7280;
-        margin-top: 8px;
-    }
-    .te-card-meta {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        margin-top: 8px;
-    }
-    .te-pill {
-        display: inline-flex;
-        align-items: center;
-        padding: 2px 8px;
-        border-radius: 9999px;
-        font-size: 0.65rem;
-        font-weight: 600;
-    }
-    .te-pill.ok   { background: #D1FAE5; color: #065F46; }
-    .te-pill.warn { background: #FEF3C7; color: #92400E; }
-    .te-pill.bad  { background: #FEE2E2; color: #991B1B; }
-
-    .te-chart-box {
-        background: #fff;
-        border-radius: 12px;
-        padding: 24px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-        margin-bottom: 24px;
-    }
-    .te-chart-box h3 {
-        font-family: 'Montserrat', sans-serif;
-        font-size: 1rem;
-        font-weight: 600;
-        color: #1B334A;
-        margin-bottom: 16px;
-    }
-
-    .te-filter-bar {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        flex-wrap: wrap;
-    }
-    .te-filter-bar select {
-        padding: 6px 12px;
-        border: 1px solid #D1D5DB;
-        border-radius: 8px;
-        font-size: 0.85rem;
-        color: #374151;
-        background: #fff;
-    }
-    .te-filter-bar button {
-        padding: 6px 16px;
-        background: #385776;
-        color: #fff;
-        border: none;
-        border-radius: 8px;
-        font-size: 0.85rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: background 0.15s;
-    }
-    .te-filter-bar button:hover { background: #1B334A; }
-</style>
-@endsection
-
 @section('content')
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<div class="space-y-6">
 
-    {{-- ═══════ HEADER ═══════ --}}
-    <div class="te-header">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-                <h1>Times & Evolução</h1>
-                <p>Maturidade operacional — {{ $refDate->translatedFormat('F/Y') }}</p>
-            </div>
-            <form method="GET" action="{{ route('times-evolucao.index') }}" class="te-filter-bar">
-                <select name="month" id="filter-month">
-                    @for ($m = 1; $m <= 12; $m++)
-                        <option value="{{ $m }}" {{ $month === $m ? 'selected' : '' }}>
-                            {{ Carbon\Carbon::create(null, $m)->translatedFormat('F') }}
-                        </option>
-                    @endfor
-                </select>
-                <select name="year" id="filter-year">
-                    @for ($y = 2024; $y <= now()->year; $y++)
-                        <option value="{{ $y }}" {{ $year === $y ? 'selected' : '' }}>{{ $y }}</option>
-                    @endfor
-                </select>
-                <button type="submit">Filtrar</button>
-            </form>
+    {{-- Cabeçalho com filtros (padrão BSC) --}}
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Times & Evolução</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400">
+                Dashboard BSC — Maturidade Operacional | Competência: {{ $refDate->translatedFormat('F/Y') }}
+            </p>
         </div>
+        <form method="GET" action="{{ route('times-evolucao.index') }}" class="flex items-center gap-2">
+            <select name="month" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                @for ($m = 1; $m <= 12; $m++)
+                    <option value="{{ $m }}" {{ $month === $m ? 'selected' : '' }}>
+                        {{ Carbon\Carbon::create(null, $m)->translatedFormat('F') }}
+                    </option>
+                @endfor
+            </select>
+            <select name="year" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+                @for ($y = 2024; $y <= now()->year; $y++)
+                    <option value="{{ $y }}" {{ $year === $y ? 'selected' : '' }}>{{ $y }}</option>
+                @endfor
+            </select>
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium">
+                Filtrar
+            </button>
+        </form>
     </div>
 
-    {{-- ═══════ KPI CARDS (8) ═══════ --}}
-    <div class="te-kpi-grid">
+    {{-- ═══════ KPI CARDS — Linha 1 (Disciplina Interna) ═══════ --}}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 
         {{-- 1. Aderência ao Registro --}}
         @php
             $ad = $kpis['aderencia_registro'];
-            $adColor = $ad['valor'] >= 80 ? 'green' : ($ad['valor'] >= 50 ? 'amber' : 'red');
-            $adPill  = $ad['valor'] >= 80 ? 'ok' : ($ad['valor'] >= 50 ? 'warn' : 'bad');
-            $adMeta  = $metas['aderencia_registro'] ?? null;
+            $adMeta = $metas['aderencia_registro'] ?? null;
+            $adPercent = $adMeta ? min(($ad['valor'] / max($adMeta['meta_valor'], 1)) * 100, 150) : 0;
         @endphp
-        <div class="te-card {{ $adColor }}">
-            <div class="te-card-label">Aderência ao Registro</div>
-            <div class="te-card-value">{{ number_format($ad['valor'], 1, ',', '.') }}<span class="te-card-unit">%</span></div>
-            <div class="te-card-detail">{{ $ad['dias_com_lancto'] }} de {{ $ad['dias_uteis'] }} dias úteis com lançamento</div>
-            <div class="te-card-meta">
-                <span class="te-pill {{ $adPill }}">{{ $ad['valor'] >= 80 ? 'Disciplinado' : ($ad['valor'] >= 50 ? 'Irregular' : 'Crítico') }}</span>
-                @if($adMeta)
-                    <span class="te-pill {{ $ad['valor'] >= $adMeta['meta_valor'] ? 'ok' : 'warn' }}">Meta: {{ number_format($adMeta['meta_valor'], 0) }}%</span>
-                @endif
-            </div>
-        </div>
+        @include('dashboard.partials._kpi-card', [
+            'id'       => 'te-aderencia',
+            'title'    => 'Aderência ao Registro',
+            'value'    => number_format($ad['valor'], 1, ',', '.') . '%',
+            'subtitle' => $ad['dias_com_lancto'] . ' de ' . $ad['dias_uteis'] . ' dias úteis com lançamento',
+            'icon'     => '📋',
+            'accent'   => $ad['valor'] >= 80 ? 'green' : ($ad['valor'] >= 50 ? 'orange' : 'red'),
+            'meta'     => $adMeta ? number_format($adMeta['meta_valor'], 0) . '%' : null,
+            'percent'  => $adPercent,
+            'status'   => $ad['valor'] >= 80 ? 'ok' : ($ad['valor'] >= 50 ? 'atencao' : 'critico'),
+        ])
 
         {{-- 2. Pontualidade --}}
         @php
             $pt = $kpis['pontualidade'];
-            $ptColor = $pt['valor'] >= 80 ? 'green' : ($pt['valor'] >= 60 ? 'amber' : 'red');
-            $ptPill  = $pt['valor'] >= 80 ? 'ok' : ($pt['valor'] >= 60 ? 'warn' : 'bad');
-            $ptMeta  = $metas['pontualidade'] ?? null;
+            $ptMeta = $metas['pontualidade'] ?? null;
+            $ptPercent = $ptMeta ? min(($pt['valor'] / max($ptMeta['meta_valor'], 1)) * 100, 150) : 0;
         @endphp
-        <div class="te-card {{ $ptColor }}">
-            <div class="te-card-label">Pontualidade</div>
-            <div class="te-card-value">{{ number_format($pt['valor'], 1, ',', '.') }}<span class="te-card-unit">%</span></div>
-            <div class="te-card-detail">{{ $pt['no_prazo'] }} de {{ $pt['total'] }} atividades concluídas no prazo</div>
-            <div class="te-card-meta">
-                <span class="te-pill {{ $ptPill }}">{{ $pt['valor'] >= 80 ? 'Excelente' : ($pt['valor'] >= 60 ? 'Atenção' : 'Crítico') }}</span>
-                @if($ptMeta)
-                    <span class="te-pill {{ $pt['valor'] >= $ptMeta['meta_valor'] ? 'ok' : 'warn' }}">Meta: {{ number_format($ptMeta['meta_valor'], 0) }}%</span>
-                @endif
-            </div>
-        </div>
+        @include('dashboard.partials._kpi-card', [
+            'id'       => 'te-pontualidade',
+            'title'    => 'Pontualidade',
+            'value'    => number_format($pt['valor'], 1, ',', '.') . '%',
+            'subtitle' => $pt['no_prazo'] . ' de ' . $pt['total'] . ' atividades concluídas no prazo',
+            'icon'     => '⏱️',
+            'accent'   => $pt['valor'] >= 80 ? 'green' : ($pt['valor'] >= 60 ? 'orange' : 'red'),
+            'meta'     => $ptMeta ? number_format($ptMeta['meta_valor'], 0) . '%' : null,
+            'percent'  => $ptPercent,
+            'status'   => $pt['valor'] >= 80 ? 'ok' : ($pt['valor'] >= 60 ? 'atencao' : 'critico'),
+        ])
 
         {{-- 3. Backlog Operacional --}}
         @php
             $bk = $kpis['backlog_operacional'];
-            $bkColor = $bk['em_atraso'] == 0 ? 'green' : ($bk['em_atraso'] <= 10 ? 'amber' : 'red');
-            $bkPill  = $bk['em_atraso'] == 0 ? 'ok' : ($bk['em_atraso'] <= 10 ? 'warn' : 'bad');
-            $bkMeta  = $metas['backlog_operacional'] ?? null;
+            $bkMeta = $metas['backlog_operacional'] ?? null;
+            $bkPercent = $bkMeta ? min((max($bkMeta['meta_valor'] - $bk['valor'], 0) / max($bkMeta['meta_valor'], 1)) * 100, 100) : 0;
         @endphp
-        <div class="te-card {{ $bkColor }}">
-            <div class="te-card-label">Backlog Operacional</div>
-            <div class="te-card-value">{{ $bk['valor'] }}<span class="te-card-unit">atividades</span></div>
-            <div class="te-card-detail">
-                <span style="color:#EF4444;font-weight:600;">{{ $bk['em_atraso'] }} em atraso</span> ·
-                <span style="color:#10B981;">{{ $bk['no_prazo'] }} no prazo</span>
-            </div>
-            <div class="te-card-meta">
-                <span class="te-pill {{ $bkPill }}">{{ $bk['em_atraso'] == 0 ? 'Limpo' : ($bk['em_atraso'] <= 10 ? 'Gerenciável' : 'Acumulado') }}</span>
-                @if($bkMeta)
-                    <span class="te-pill {{ $bk['valor'] <= $bkMeta['meta_valor'] ? 'ok' : 'warn' }}">Meta: ≤{{ number_format($bkMeta['meta_valor'], 0) }}</span>
-                @endif
-            </div>
-        </div>
+        @include('dashboard.partials._kpi-card', [
+            'id'       => 'te-backlog',
+            'title'    => 'Backlog Operacional',
+            'value'    => $bk['valor'] . ' atividades',
+            'subtitle' => $bk['em_atraso'] . ' em atraso · ' . $bk['no_prazo'] . ' no prazo',
+            'icon'     => '📦',
+            'accent'   => $bk['em_atraso'] == 0 ? 'green' : ($bk['em_atraso'] <= 10 ? 'orange' : 'red'),
+            'meta'     => $bkMeta ? '≤' . number_format($bkMeta['meta_valor'], 0) : null,
+            'percent'  => $bkPercent,
+            'status'   => $bk['em_atraso'] == 0 ? 'ok' : ($bk['em_atraso'] <= 10 ? 'atencao' : 'critico'),
+        ])
 
         {{-- 4. SLA WhatsApp --}}
         @php
             $sla = $kpis['sla_whatsapp'];
-            $slaColor = $sla['valor'] <= 15 ? 'green' : ($sla['valor'] <= 60 ? 'amber' : 'red');
-            $slaPill  = $sla['valor'] <= 15 ? 'ok' : ($sla['valor'] <= 60 ? 'warn' : 'bad');
-            $slaMeta  = $metas['sla_whatsapp'] ?? null;
+            $slaMeta = $metas['sla_whatsapp'] ?? null;
+            $slaPercent = $slaMeta ? min((max($slaMeta['meta_valor'] - $sla['valor'], 0) / max($slaMeta['meta_valor'], 1)) * 100, 100) : 0;
         @endphp
-        <div class="te-card {{ $slaColor }}">
-            <div class="te-card-label">SLA WhatsApp</div>
-            <div class="te-card-value">{{ number_format($sla['valor'], 1, ',', '.') }}<span class="te-card-unit">min</span></div>
-            <div class="te-card-detail">Tempo médio de primeira resposta ({{ $sla['total_conversas'] }} conversas)</div>
-            <div class="te-card-meta">
-                <span class="te-pill {{ $slaPill }}">{{ $sla['valor'] <= 15 ? 'Rápido' : ($sla['valor'] <= 60 ? 'Aceitável' : 'Lento') }}</span>
-                @if($slaMeta)
-                    <span class="te-pill {{ $sla['valor'] <= $slaMeta['meta_valor'] ? 'ok' : 'warn' }}">Meta: ≤{{ number_format($slaMeta['meta_valor'], 0) }}min</span>
-                @endif
-            </div>
-        </div>
+        @include('dashboard.partials._kpi-card', [
+            'id'          => 'te-sla-wa',
+            'title'       => 'SLA WhatsApp',
+            'value'       => number_format($sla['valor'], 1, ',', '.') . ' min',
+            'subtitle'    => 'Tempo médio 1ª resposta (' . $sla['total_conversas'] . ' conversas)',
+            'icon'        => '💬',
+            'accent'      => $sla['valor'] <= 15 ? 'green' : ($sla['valor'] <= 60 ? 'orange' : 'red'),
+            'meta'        => $slaMeta ? '≤' . number_format($slaMeta['meta_valor'], 0) . ' min' : null,
+            'percent'     => $slaPercent,
+            'invertTrend' => true,
+            'status'      => $sla['valor'] <= 15 ? 'ok' : ($sla['valor'] <= 60 ? 'atencao' : 'critico'),
+        ])
+    </div>
+
+    {{-- ═══════ KPI CARDS — Linha 2 (Engajamento e Sistemas) ═══════ --}}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 
         {{-- 5. Conversas sem Resposta --}}
         @php
             $sr = $kpis['conversas_sem_resposta'];
-            $srColor = $sr['valor'] <= 5 ? 'green' : ($sr['valor'] <= 15 ? 'amber' : 'red');
-            $srPill  = $sr['valor'] <= 5 ? 'ok' : ($sr['valor'] <= 15 ? 'warn' : 'bad');
-            $srMeta  = $metas['conversas_sem_resposta'] ?? null;
+            $srMeta = $metas['conversas_sem_resposta'] ?? null;
+            $srPercent = $srMeta ? min((max($srMeta['meta_valor'] - $sr['valor'], 0) / max($srMeta['meta_valor'], 1)) * 100, 100) : 0;
         @endphp
-        <div class="te-card {{ $srColor }}">
-            <div class="te-card-label">Conversas sem Resposta</div>
-            <div class="te-card-value">{{ number_format($sr['valor'], 1, ',', '.') }}<span class="te-card-unit">%</span></div>
-            <div class="te-card-detail">{{ $sr['sem_resposta'] }} de {{ $sr['total'] }} conversas sem retorno em 4h</div>
-            <div class="te-card-meta">
-                <span class="te-pill {{ $srPill }}">{{ $sr['valor'] <= 5 ? 'Controlado' : ($sr['valor'] <= 15 ? 'Atenção' : 'Crítico') }}</span>
-                @if($srMeta)
-                    <span class="te-pill {{ $sr['valor'] <= $srMeta['meta_valor'] ? 'ok' : 'warn' }}">Meta: ≤{{ number_format($srMeta['meta_valor'], 0) }}%</span>
-                @endif
-            </div>
-        </div>
+        @include('dashboard.partials._kpi-card', [
+            'id'          => 'te-sem-resposta',
+            'title'       => 'Conversas sem Resposta',
+            'value'       => number_format($sr['valor'], 1, ',', '.') . '%',
+            'subtitle'    => $sr['sem_resposta'] . ' de ' . $sr['total'] . ' conversas sem retorno em 4h',
+            'icon'        => '🔇',
+            'accent'      => $sr['valor'] <= 5 ? 'green' : ($sr['valor'] <= 15 ? 'orange' : 'red'),
+            'meta'        => $srMeta ? '≤' . number_format($srMeta['meta_valor'], 0) . '%' : null,
+            'percent'     => $srPercent,
+            'invertTrend' => true,
+            'status'      => $sr['valor'] <= 5 ? 'ok' : ($sr['valor'] <= 15 ? 'atencao' : 'critico'),
+        ])
 
         {{-- 6. Alcance de Avisos --}}
         @php
             $av = $kpis['alcance_avisos'];
-            $avColor = $av['valor'] >= 80 ? 'green' : ($av['valor'] >= 50 ? 'amber' : 'red');
-            $avPill  = $av['valor'] >= 80 ? 'ok' : ($av['valor'] >= 50 ? 'warn' : 'bad');
-            $avMeta  = $metas['alcance_avisos'] ?? null;
+            $avMeta = $metas['alcance_avisos'] ?? null;
+            $avPercent = $avMeta ? min(($av['valor'] / max($avMeta['meta_valor'], 1)) * 100, 150) : 0;
         @endphp
-        <div class="te-card {{ $avColor }}">
-            <div class="te-card-label">Alcance de Avisos</div>
-            <div class="te-card-value">{{ number_format($av['valor'], 1, ',', '.') }}<span class="te-card-unit">%</span></div>
-            <div class="te-card-detail">{{ $av['avisos_publicados'] }} avisos publicados no mês</div>
-            <div class="te-card-meta">
-                <span class="te-pill {{ $avPill }}">{{ $av['valor'] >= 80 ? 'Engajado' : ($av['valor'] >= 50 ? 'Parcial' : 'Baixo') }}</span>
-                @if($avMeta)
-                    <span class="te-pill {{ $av['valor'] >= $avMeta['meta_valor'] ? 'ok' : 'warn' }}">Meta: {{ number_format($avMeta['meta_valor'], 0) }}%</span>
-                @endif
-            </div>
-        </div>
+        @include('dashboard.partials._kpi-card', [
+            'id'       => 'te-alcance-avisos',
+            'title'    => 'Alcance de Avisos',
+            'value'    => number_format($av['valor'], 1, ',', '.') . '%',
+            'subtitle' => $av['avisos_publicados'] . ' avisos publicados no mês',
+            'icon'     => '📢',
+            'accent'   => $av['valor'] >= 80 ? 'green' : ($av['valor'] >= 50 ? 'orange' : 'red'),
+            'meta'     => $avMeta ? number_format($avMeta['meta_valor'], 0) . '%' : null,
+            'percent'  => $avPercent,
+            'status'   => $av['avisos_publicados'] == 0 ? 'sem_meta' : ($av['valor'] >= 80 ? 'ok' : ($av['valor'] >= 50 ? 'atencao' : 'critico')),
+        ])
 
         {{-- 7. Saúde de Sincronização --}}
         @php
             $sy = $kpis['saude_sincronizacao'];
-            $syColor = $sy['valor'] >= 95 ? 'green' : ($sy['valor'] >= 80 ? 'amber' : 'red');
-            $syPill  = $sy['valor'] >= 95 ? 'ok' : ($sy['valor'] >= 80 ? 'warn' : 'bad');
-            $syMeta  = $metas['saude_sincronizacao'] ?? null;
+            $syMeta = $metas['saude_sincronizacao'] ?? null;
+            $syPercent = $syMeta ? min(($sy['valor'] / max($syMeta['meta_valor'], 1)) * 100, 150) : 0;
         @endphp
-        <div class="te-card {{ $syColor }}">
-            <div class="te-card-label">Saúde de Sincronização</div>
-            <div class="te-card-value">{{ number_format($sy['valor'], 1, ',', '.') }}<span class="te-card-unit">%</span></div>
-            <div class="te-card-detail">{{ $sy['sucesso'] }} de {{ $sy['total'] }} syncs com sucesso</div>
-            <div class="te-card-meta">
-                <span class="te-pill {{ $syPill }}">{{ $sy['valor'] >= 95 ? 'Estável' : ($sy['valor'] >= 80 ? 'Instável' : 'Degradado') }}</span>
-                @if($syMeta)
-                    <span class="te-pill {{ $sy['valor'] >= $syMeta['meta_valor'] ? 'ok' : 'warn' }}">Meta: {{ number_format($syMeta['meta_valor'], 0) }}%</span>
-                @endif
-            </div>
-        </div>
+        @include('dashboard.partials._kpi-card', [
+            'id'       => 'te-saude-sync',
+            'title'    => 'Saúde de Sincronização',
+            'value'    => number_format($sy['valor'], 1, ',', '.') . '%',
+            'subtitle' => $sy['sucesso'] . ' de ' . $sy['total'] . ' syncs com sucesso',
+            'icon'     => '🔄',
+            'accent'   => $sy['valor'] >= 95 ? 'green' : ($sy['valor'] >= 80 ? 'orange' : 'red'),
+            'meta'     => $syMeta ? number_format($syMeta['meta_valor'], 0) . '%' : null,
+            'percent'  => $syPercent,
+            'status'   => $sy['valor'] >= 95 ? 'ok' : ($sy['valor'] >= 80 ? 'atencao' : 'critico'),
+        ])
 
         {{-- 8. Adoção do CRM --}}
         @php
             $crm = $kpis['adocao_crm'];
-            $crmColor = $crm['valor'] >= 70 ? 'green' : ($crm['valor'] >= 40 ? 'amber' : 'red');
-            $crmPill  = $crm['valor'] >= 70 ? 'ok' : ($crm['valor'] >= 40 ? 'warn' : 'bad');
-            $crmMeta  = $metas['adocao_crm'] ?? null;
+            $crmMeta = $metas['adocao_crm'] ?? null;
+            $crmPercent = $crmMeta ? min(($crm['valor'] / max($crmMeta['meta_valor'], 1)) * 100, 150) : 0;
         @endphp
-        <div class="te-card {{ $crmColor }}">
-            <div class="te-card-label">Adoção do CRM</div>
-            <div class="te-card-value">{{ number_format($crm['valor'], 1, ',', '.') }}<span class="te-card-unit">%</span></div>
-            <div class="te-card-detail">{{ $crm['com_atividade'] }} de {{ $crm['total_oportunidades'] }} oportunidades com atividade</div>
-            <div class="te-card-meta">
-                <span class="te-pill {{ $crmPill }}">{{ $crm['valor'] >= 70 ? 'Adotado' : ($crm['valor'] >= 40 ? 'Parcial' : 'Subutilizado') }}</span>
-                @if($crmMeta)
-                    <span class="te-pill {{ $crm['valor'] >= $crmMeta['meta_valor'] ? 'ok' : 'warn' }}">Meta: {{ number_format($crmMeta['meta_valor'], 0) }}%</span>
-                @endif
-            </div>
-        </div>
-
+        @include('dashboard.partials._kpi-card', [
+            'id'       => 'te-adocao-crm',
+            'title'    => 'Adoção do CRM',
+            'value'    => number_format($crm['valor'], 1, ',', '.') . '%',
+            'subtitle' => $crm['com_atividade'] . ' de ' . $crm['total_oportunidades'] . ' oportunidades com atividade',
+            'icon'     => '🎯',
+            'accent'   => $crm['valor'] >= 70 ? 'green' : ($crm['valor'] >= 40 ? 'purple' : 'red'),
+            'meta'     => $crmMeta ? number_format($crmMeta['meta_valor'], 0) . '%' : null,
+            'percent'  => $crmPercent,
+            'status'   => $crm['total_oportunidades'] == 0 ? 'sem_meta' : ($crm['valor'] >= 70 ? 'ok' : ($crm['valor'] >= 40 ? 'atencao' : 'critico')),
+        ])
     </div>
 
     {{-- ═══════ GRÁFICO TENDÊNCIA 6 MESES ═══════ --}}
-    <div class="te-chart-box">
-        <h3>Tendência de Maturidade — Últimos 6 meses</h3>
+    <div class="rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-sm">
+        <h3 class="text-base font-semibold text-gray-900 dark:text-white mb-4">Tendência de Maturidade — Últimos 6 meses</h3>
         <canvas id="trendChart" height="100"></canvas>
     </div>
 
 </div>
 @endsection
 
-@section('scripts')
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const trend = @json($trend);
     const labels = trend.map(t => t.label);
 
     const datasets = [
-        { label: 'Aderência Registro (%)',     key: 'aderencia_registro',     color: '#385776', dash: [] },
-        { label: 'Pontualidade (%)',           key: 'pontualidade',           color: '#10B981', dash: [] },
-        { label: 'SLA WhatsApp (min)',         key: 'sla_whatsapp',           color: '#F59E0B', dash: [5,5] },
-        { label: 'Conversas s/ Resposta (%)',  key: 'conversas_sem_resposta', color: '#EF4444', dash: [5,5] },
-        { label: 'Alcance Avisos (%)',         key: 'alcance_avisos',         color: '#8B5CF6', dash: [] },
-        { label: 'Saúde Sync (%)',             key: 'saude_sincronizacao',    color: '#06B6D4', dash: [] },
-        { label: 'Adoção CRM (%)',             key: 'adocao_crm',            color: '#EC4899', dash: [] },
+        { label: 'Aderência Registro (%)',    key: 'aderencia_registro',     color: '#385776', dash: [] },
+        { label: 'Pontualidade (%)',          key: 'pontualidade',           color: '#10B981', dash: [] },
+        { label: 'SLA WhatsApp (min)',        key: 'sla_whatsapp',           color: '#F59E0B', dash: [5,5] },
+        { label: 'Conversas s/ Resposta (%)', key: 'conversas_sem_resposta', color: '#EF4444', dash: [5,5] },
+        { label: 'Alcance Avisos (%)',        key: 'alcance_avisos',         color: '#8B5CF6', dash: [] },
+        { label: 'Saúde Sync (%)',            key: 'saude_sincronizacao',    color: '#06B6D4', dash: [] },
+        { label: 'Adoção CRM (%)',            key: 'adocao_crm',            color: '#EC4899', dash: [] },
     ];
 
     new Chart(document.getElementById('trendChart'), {
@@ -399,4 +259,4 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
-@endsection
+@endpush

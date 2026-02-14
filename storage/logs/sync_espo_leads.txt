@@ -1,5 +1,0 @@
-Sincronizando leads...
-✓ Sincronização de leads concluída!
-  Criados: 0
-  Atualizados: 195
-  Ignorados: 0
