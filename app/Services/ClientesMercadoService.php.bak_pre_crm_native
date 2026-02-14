@@ -2,8 +2,7 @@
 
 namespace App\Services;
 
-use App\Models\{Cliente, Lead, Processo};
-use App\Models\Crm\CrmOpportunity;
+use App\Models\{Cliente, Lead, Oportunidade, Processo};
 use Illuminate\Support\Facades\{DB, Cache};
 use Carbon\Carbon;
 
@@ -25,9 +24,9 @@ use Carbon\Carbon;
  *    - Taxa conversão: (convertidos_mes / novos_mes) * 100
  * 
  * 3. OPORTUNIDADES (mensal):
- *    - Ganha no mês: status='won' AND DATE_FORMAT(data_fechamento,'%Y-%m')=competência
- *    - Valor ganho: SUM(value_estimated) das ganhas no mês
- *    - Pipeline aberto: SUM(value_estimated) WHERE estagio IN ('prospectando','qualificacao','proposta','negociacao')
+ *    - Ganha no mês: estagio='ganha' AND DATE_FORMAT(data_fechamento,'%Y-%m')=competência
+ *    - Valor ganho: SUM(valor) das ganhas no mês
+ *    - Pipeline aberto: SUM(valor) WHERE estagio IN ('prospectando','qualificacao','proposta','negociacao')
  *    - Win rate: ganhas / (ganhas + perdidas) no mês
  * 
  * 4. TOP 10 CLIENTES:
@@ -53,7 +52,7 @@ class ClientesMercadoService
     /**
      * Estágios considerados como "pipeline aberto"
      */
-    // Pipeline no CRM nativo = status 'open' (não precisa listar estágios)
+    private const ESTAGIOS_PIPELINE = ['prospectando', 'qualificacao', 'proposta', 'negociacao'];
 
     /**
      * Obter todos os dados do dashboard para uma competência
@@ -107,20 +106,20 @@ class ClientesMercadoService
         $leadsNovosPrev = Lead::whereRaw("DATE_FORMAT(created_at, '%Y-%m') = ?", [$compAnterior])->count();
 
         // Oportunidades ganhas no mês
-        $opsGanhas = CrmOpportunity::where('status', 'won')
-            ->whereRaw("DATE_FORMAT(won_at, '%Y-%m') = ?", [$competencia])->count();
-        $opsGanhasPrev = CrmOpportunity::where('status', 'won')
-            ->whereRaw("DATE_FORMAT(won_at, '%Y-%m') = ?", [$compAnterior])->count();
+        $opsGanhas = Oportunidade::where('estagio', 'ganha')
+            ->whereRaw("DATE_FORMAT(data_fechamento, '%Y-%m') = ?", [$competencia])->count();
+        $opsGanhasPrev = Oportunidade::where('estagio', 'ganha')
+            ->whereRaw("DATE_FORMAT(data_fechamento, '%Y-%m') = ?", [$compAnterior])->count();
 
         // Clientes ativos (estoque)
         $clientesAtivos = Processo::where('status', 'Ativo')
             ->whereNotNull('cliente_id')->distinct('cliente_id')->count('cliente_id');
 
         // Valor ganho no mês
-        $valorGanho = CrmOpportunity::where('status', 'won')
-            ->whereRaw("DATE_FORMAT(won_at, '%Y-%m') = ?", [$competencia])->sum('value_estimated') ?? 0;
-        $valorGanhoPrev = CrmOpportunity::where('status', 'won')
-            ->whereRaw("DATE_FORMAT(won_at, '%Y-%m') = ?", [$compAnterior])->sum('value_estimated') ?? 0;
+        $valorGanho = Oportunidade::where('estagio', 'ganha')
+            ->whereRaw("DATE_FORMAT(data_fechamento, '%Y-%m') = ?", [$competencia])->sum('valor') ?? 0;
+        $valorGanhoPrev = Oportunidade::where('estagio', 'ganha')
+            ->whereRaw("DATE_FORMAT(data_fechamento, '%Y-%m') = ?", [$compAnterior])->sum('valor') ?? 0;
 
         return [
             'leads_novos' => [
@@ -180,9 +179,9 @@ class ClientesMercadoService
             : 0;
 
         // Oportunidades ganhas no mês para ticket médio
-        $opsGanhasData = CrmOpportunity::where('status', 'won')
-            ->whereRaw("DATE_FORMAT(won_at, '%Y-%m') = ?", [$competencia])
-            ->selectRaw('COUNT(*) as qtd, SUM(value_estimated) as total')
+        $opsGanhasData = Oportunidade::where('estagio', 'ganha')
+            ->whereRaw("DATE_FORMAT(data_fechamento, '%Y-%m') = ?", [$competencia])
+            ->selectRaw('COUNT(*) as qtd, SUM(valor) as total')
             ->first();
 
         $ticketMedio = ($opsGanhasData->qtd ?? 0) > 0 
@@ -190,16 +189,16 @@ class ClientesMercadoService
             : 0;
 
         // Pipeline aberto (estoque - não depende de competência)
-        $pipelineAberto = CrmOpportunity::where('status', 'open')
-            ->sum('value_estimated') ?? 0;
+        $pipelineAberto = Oportunidade::whereIn('estagio', self::ESTAGIOS_PIPELINE)
+            ->sum('valor') ?? 0;
 
         // Win rate no mês
-        $opsGanhasMes = CrmOpportunity::where('status', 'won')
-            ->whereRaw("DATE_FORMAT(won_at, '%Y-%m') = ?", [$competencia])
+        $opsGanhasMes = Oportunidade::where('estagio', 'ganha')
+            ->whereRaw("DATE_FORMAT(data_fechamento, '%Y-%m') = ?", [$competencia])
             ->count();
         
-        $opsPerdidasMes = CrmOpportunity::where('status', 'lost')
-            ->whereRaw("DATE_FORMAT(lost_at, '%Y-%m') = ?", [$competencia])
+        $opsPerdidasMes = Oportunidade::where('estagio', 'perdida')
+            ->whereRaw("DATE_FORMAT(data_fechamento, '%Y-%m') = ?", [$competencia])
             ->count();
 
         $totalFechadas = $opsGanhasMes + $opsPerdidasMes;
@@ -264,14 +263,14 @@ class ClientesMercadoService
                 ->count();
 
             // Oportunidades ganhas no mês
-            $opsGanhas = CrmOpportunity::where('status', 'won')
-                ->whereRaw("DATE_FORMAT(won_at, '%Y-%m') = ?", [$competencia])
+            $opsGanhas = Oportunidade::where('estagio', 'ganha')
+                ->whereRaw("DATE_FORMAT(data_fechamento, '%Y-%m') = ?", [$competencia])
                 ->count();
 
             // Valor ganho no mês
-            $valorGanho = CrmOpportunity::where('status', 'won')
-                ->whereRaw("DATE_FORMAT(won_at, '%Y-%m') = ?", [$competencia])
-                ->sum('value_estimated') ?? 0;
+            $valorGanho = Oportunidade::where('estagio', 'ganha')
+                ->whereRaw("DATE_FORMAT(data_fechamento, '%Y-%m') = ?", [$competencia])
+                ->sum('valor') ?? 0;
 
             $dados[] = [
                 'competencia' => $competencia,
@@ -292,20 +291,20 @@ class ClientesMercadoService
     private function getOportunidadesPorEstagio(string $competencia): array
     {
         // Ganhas no mês
-        $ganhas = CrmOpportunity::where('status', 'won')
-            ->whereRaw("DATE_FORMAT(won_at, '%Y-%m') = ?", [$competencia])
-            ->selectRaw('COUNT(*) as qtd, COALESCE(SUM(value_estimated), 0) as valor')
+        $ganhas = Oportunidade::where('estagio', 'ganha')
+            ->whereRaw("DATE_FORMAT(data_fechamento, '%Y-%m') = ?", [$competencia])
+            ->selectRaw('COUNT(*) as qtd, COALESCE(SUM(valor), 0) as valor')
             ->first();
 
         // Perdidas no mês
-        $perdidas = CrmOpportunity::where('status', 'lost')
-            ->whereRaw("DATE_FORMAT(lost_at, '%Y-%m') = ?", [$competencia])
-            ->selectRaw('COUNT(*) as qtd, COALESCE(SUM(value_estimated), 0) as valor')
+        $perdidas = Oportunidade::where('estagio', 'perdida')
+            ->whereRaw("DATE_FORMAT(data_fechamento, '%Y-%m') = ?", [$competencia])
+            ->selectRaw('COUNT(*) as qtd, COALESCE(SUM(valor), 0) as valor')
             ->first();
 
         // Pipeline aberto (estoque atual)
-        $pipeline = CrmOpportunity::where('status', 'open')
-            ->selectRaw('COUNT(*) as qtd, COALESCE(SUM(value_estimated), 0) as valor')
+        $pipeline = Oportunidade::whereIn('estagio', self::ESTAGIOS_PIPELINE)
+            ->selectRaw('COUNT(*) as qtd, COALESCE(SUM(valor), 0) as valor')
             ->first();
 
         return [
@@ -390,7 +389,7 @@ class ClientesMercadoService
         return [
             'total_clientes' => Cliente::count(),
             'total_leads' => Lead::count(),
-            'total_oportunidades' => CrmOpportunity::count(),
+            'total_oportunidades' => Oportunidade::count(),
             'total_processos' => Processo::count(),
             'processos_ativos' => Processo::where('status', 'Ativo')->count()
         ];

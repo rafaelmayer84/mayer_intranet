@@ -448,12 +448,11 @@ PROMPT;
     }
 
     /**
-     * Enviar lead para EspoCRM
+     * Enviar lead para CRM (ESPO desativado 13/02/2026 - CRM Nativo)
      */
     public function sendToEspoCRM(Lead $lead): ?string
     {
-        return null; // ESPO CRM desativado 13/02/2026
-        if(false){
+        return null; // ESPO CRM desativado - CRM Nativo v1.0
         try {
             $description = "[ÁREA JURÍDICA]: " . ($lead->area_interesse ?? 'Não informado') . "\n";
             if ($lead->sub_area) {
@@ -657,10 +656,7 @@ PROMPT;
                     'erro_processamento' => 'Mensagens não recuperadas da API SendPulse',
                     'data_entrada' => now()
                 ]);
-                $crmLeadId = null; // ESPO removido 13/02/2026
-                if ($crmLeadId) {
-                    $lead->update(['espocrm_id' => $crmLeadId]);
-                }
+                // ESPO desativado - CRM Nativo
                 return $lead;
             }
 
@@ -718,11 +714,7 @@ PROMPT;
             // Salvar mensagens
             $this->saveMessages($lead, $chatMessages);
 
-            // Enviar para EspoCRM
-            $crmLeadId = null; // ESPO removido 13/02/2026
-            if ($crmLeadId) {
-                $lead->update(['espocrm_id' => $crmLeadId]);
-            }
+            // ESPO desativado - CRM Nativo v1.0
 
             Log::info('Lead processado com sucesso', [
                 'lead_id' => $lead->id,
@@ -819,8 +811,8 @@ PROMPT;
             $this->saveMessages($lead, $chatMessages);
 
             // Enviar para EspoCRM se ainda não foi
-            if (false) { // ESPO removido 13/02/2026
-                $crmLeadId = null; // ESPO removido 13/02/2026
+            if (!$lead->espocrm_id) {
+                $crmLeadId = $this->sendToEspoCRM($lead);
                 if ($crmLeadId) {
                     $lead->update(['espocrm_id' => $crmLeadId]);
                 }

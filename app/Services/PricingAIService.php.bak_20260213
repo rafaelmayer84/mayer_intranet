@@ -7,8 +7,8 @@ use Illuminate\Support\Facades\Log;
 
 class PricingAIService
 {
-    private string $model = 'gpt-5.2';
-    private array $fallbackModels = ['gpt-5', 'gpt-5.1'];
+    private string $model = 'gpt-4o';
+    private array $fallbackModels = ['gpt-4o-mini'];
 
     /**
      * Gera as 3 propostas de precificação via IA
@@ -34,10 +34,6 @@ Você é um consultor sênior de precificação estratégica para escritórios d
 Sua função é deliberar sobre o valor de honorários advocatícios de forma racional, multidimensional e estratégica.
 
 Você NÃO calcula preços mecanicamente. Você RACIOCINA sobre o preço ideal considerando TODAS as variáveis fornecidas.
-
-DIFERENCIAL: Você tem acesso a dados REAIS de oportunidades ganhas e perdidas do escritório (campo "historico_crm_conversao").
-Esses dados mostram em quais faixas de preço e tipos de demanda o escritório efetivamente FECHA contratos.
-USE ESSES DADOS como âncora principal. O objetivo é encontrar o MELHOR PREÇO para o escritório que seja VIÁVEL para o cliente pagar.
 
 Regras absolutas:
 1. Sempre produza EXATAMENTE 3 propostas: "rapida", "equilibrada" e "premium"
@@ -86,33 +82,17 @@ DADOS DO CASO:
 {$json}
 
 INSTRUÇÕES DE RACIOCÍNIO:
-
-ETAPA 1 - ANÁLISE DE DADOS REAIS DE CONVERSÃO (PRIORIDADE MÁXIMA):
-O campo "historico_crm_conversao" contém dados REAIS de oportunidades ganhas e perdidas pelo escritório.
-Use esses dados como ÂNCORA PRINCIPAL de precificação:
-- "resumo_geral": win rate geral, ticket médio de propostas ganhas vs perdidas
-- "conversao_por_tipo_demanda": win rate e tickets por área do direito (Cível, Trabalhista, etc.)
-- "area_especifica": se disponível, dados filtrados para a área exata desta demanda
-- "motivos_perda": por que o escritório perde clientes (atenção especial a "Preço dos honorários")
-- "faixas_preco_conversao": em qual faixa de valor o escritório tem MAIOR taxa de conversão
-- "insight_preco": ticket médio das propostas perdidas especificamente por preço
-
-REGRA CRÍTICA: Se existirem dados de propostas perdidas por preço, a proposta RÁPIDA deve ficar
-ABAIXO desse ticket médio. A proposta EQUILIBRADA deve ficar na faixa de maior conversão.
-
-ETAPA 2 - ANÁLISE COMPLEMENTAR:
-1. Perfil do proponente (PF/PJ, histórico, capacidade de pagamento via SIRIC se disponível)
-2. Complexidade da demanda (área, valor envolvido, urgência)
-3. Histórico do escritório em processos similares (valores de causa, tempo médio, contratos)
-4. Parâmetros de calibração estratégica da administração (cada eixo vai de 0 a 100)
-5. Momento do escritório (meta vs realizado, pipeline, capacidade)
-
-ETAPA 3 - GERAÇÃO DAS PROPOSTAS:
-Produza 3 propostas calibradas pelos dados reais:
-- RÁPIDA: valor que facilita fechamento imediato, baseado no piso da faixa de maior conversão
-- EQUILIBRADA: melhor relação valor/probabilidade, baseado no ticket médio de propostas ganhas na área
-- PREMIUM: valor que maximiza receita, para clientes que valorizam exclusividade e qualidade
-Recomende a mais adequada para ESTE contexto específico
+1. Analise o perfil do proponente (pessoa física ou jurídica, histórico, capacidade de pagamento)
+2. Avalie a complexidade da demanda (área, valor envolvido, urgência)
+3. Considere o histórico do escritório em casos similares (valores médios, tempo médio)
+4. Pondere os parâmetros de calibração estratégica da administração (cada eixo vai de 0 a 100)
+5. Considere o momento do escritório (meta vs realizado, pipeline, capacidade)
+6. Se houver análise de crédito SIRIC, use como fator de risco/confiança
+7. Produza as 3 propostas com estratégias distintas:
+   - RÁPIDA: valor que facilita o fechamento imediato, margem menor
+   - EQUILIBRADA: melhor relação valor/probabilidade de fechamento
+   - PREMIUM: valor que maximiza a receita, para clientes que valorizam exclusividade
+8. Recomende a mais adequada para ESTE contexto específico
 
 Responda APENAS com o JSON, sem nenhum texto adicional.
 PROMPT;

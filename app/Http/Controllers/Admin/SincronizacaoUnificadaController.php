@@ -406,57 +406,25 @@ class SincronizacaoUnificadaController extends Controller
     }
 
     /**
-     * Testar conexao ESPO CRM
+     * Testar conexao ESPO CRM (DESATIVADO 13/02/2026 - CRM Nativo)
      */
     public function espocrmTest()
     {
-        return response()->json(['success' => false, 'message' => 'ESPO CRM desativado - CRM Nativo']);
-        if(false){
-        try {
-            $service = app(EspoCrmService::class);
-            $result = $service->testConnection();
-            $result = $this->normalizeUtf8($result);
-
-            return response()->json([
-                'success' => $result['success'] ?? false,
-                'message' => $result['message'] ?? 'Sem resposta',
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Erro: ' . $e->getMessage(),
-            ], 500);
-        }
+        return response()->json([
+            'success' => false,
+            'message' => 'ESPO CRM desativado em 13/02/2026 - substituido por CRM Nativo',
+        ]);
     }
 
     /**
-     * Sincronizar ESPO CRM (Leads, Contacts, Accounts)
+     * Sincronizar ESPO CRM (DESATIVADO 13/02/2026 - CRM Nativo)
      */
     public function espocrmSync()
     {
-        return response()->json(['success' => false, 'message' => 'ESPO CRM desativado - CRM Nativo']);
-        if(false){
-        try {
-            $service = app(EspoCrmService::class);
-            $results = $service->syncAll();
-            $results = $this->normalizeUtf8($results);
-
-            $success = $results['success'] ?? false;
-            $msg = $success
-                ? 'ESPO CRM sincronizado com sucesso'
-                : ($results['message'] ?? 'Falha na sincronizacao');
-
-            return response()->json([
-                'success' => $success,
-                'message' => $msg,
-                'results' => $results,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Erro: ' . $e->getMessage(),
-            ], 500);
-        }
+        return response()->json([
+            'success' => false,
+            'message' => 'ESPO CRM desativado em 13/02/2026 - substituido por CRM Nativo',
+        ]);
     }
 
     // ================================================================

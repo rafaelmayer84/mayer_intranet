@@ -71,11 +71,11 @@
             <div class="space-y-2">
                 @foreach($conversion as $c)
                 <div class="flex items-center gap-2 text-sm">
-                    <span class="w-32 text-gray-600 truncate">{{ $c['from'] }} → {{ $c['to'] }}</span>
+                    <span class="w-32 text-gray-600 truncate">{{ $c['from'] ?? $c['from_stage'] ?? '?' }} → {{ $c['to'] ?? $c['to_stage'] ?? '?' }}</span>
                     <div class="flex-1 bg-gray-100 rounded-full h-4 overflow-hidden">
-                        <div class="h-full bg-[#385776] rounded-full" style="width: {{ min($c['rate'], 100) }}%"></div>
+                        <div class="h-full bg-[#385776] rounded-full" style="width: {{ min($c['rate'] ?? $c['avg_days'] ?? 0, 100) }}%"></div>
                     </div>
-                    <span class="text-xs font-medium w-12 text-right">{{ number_format($c['rate'], 1) }}%</span>
+                    <span class="text-xs font-medium w-12 text-right">{{ number_format($c['rate'] ?? $c['avg_days'] ?? 0, 1) }}%</span>
                 </div>
                 @endforeach
             </div>
@@ -97,8 +97,8 @@
             <div class="space-y-2">
                 @foreach($lostReasons as $lr)
                 <div class="flex items-center justify-between text-sm border-b pb-2">
-                    <span class="text-gray-700">{{ $lr->lost_reason ?: '(Sem motivo)' }}</span>
-                    <span class="text-red-600 font-medium">{{ $lr->total }}</span>
+                    <span class="text-gray-700">{{ ($lr->reason ?? $lr->lost_reason ?? '(Sem motivo)') }}</span>
+                    <span class="text-red-600 font-medium">{{ ($lr->count ?? $lr->total ?? 0) }}</span>
                 </div>
                 @endforeach
             </div>

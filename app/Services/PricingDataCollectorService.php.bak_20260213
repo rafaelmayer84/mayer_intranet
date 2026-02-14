@@ -226,170 +226,6 @@ class PricingDataCollectorService
     /**
      * Coleta histórico agregado do escritório para casos similares
      */
-
-    /**
-     * Analisa histórico de oportunidades ganhas/perdidas do CRM
-     * para calibrar precificação com dados reais de conversão.
-     */
-    public function getHistoricoCRM(?string $areaDireito): array
-    {
-        try {
-            $baseQuery = DB::table('crm_opportunities')
-                ->whereIn('status', ['won', 'lost'])
-                ->where('value_estimated', '>', 0);
-
-            // ---- GERAL (todas as áreas) ----
-            $geral = (clone $baseQuery)->selectRaw("
-                COUNT(*) as total,
-                SUM(CASE WHEN status='won' THEN 1 ELSE 0 END) as ganhas,
-                SUM(CASE WHEN status='lost' THEN 1 ELSE 0 END) as perdidas,
-                ROUND(AVG(CASE WHEN status='won' THEN value_estimated END), 2) as ticket_medio_won,
-                ROUND(AVG(CASE WHEN status='lost' THEN value_estimated END), 2) as ticket_medio_lost,
-                ROUND(MIN(CASE WHEN status='won' THEN value_estimated END), 2) as menor_won,
-                ROUND(MAX(CASE WHEN status='won' THEN value_estimated END), 2) as maior_won
-            ")->first();
-
-            $winRate = ($geral->total > 0) ? round(($geral->ganhas / $geral->total) * 100, 1) : 0;
-
-            // ---- POR TIPO DE DEMANDA ----
-            $porTipo = (clone $baseQuery)
-                ->whereNotNull('tipo_demanda')
-                ->groupBy('tipo_demanda', 'status')
-                ->selectRaw("
-                    tipo_demanda,
-                    status,
-                    COUNT(*) as qtd,
-                    ROUND(AVG(value_estimated), 2) as ticket_medio,
-                    ROUND(MIN(value_estimated), 2) as menor,
-                    ROUND(MAX(value_estimated), 2) as maior
-                ")->get();
-
-            $analise_por_tipo = [];
-            foreach ($porTipo as $row) {
-                $tipo = $row->tipo_demanda;
-                if (!isset($analise_por_tipo[$tipo])) {
-                    $analise_por_tipo[$tipo] = ['won' => null, 'lost' => null];
-                }
-                $analise_por_tipo[$tipo][$row->status] = [
-                    'qtd' => $row->qtd,
-                    'ticket_medio' => $row->ticket_medio,
-                    'faixa' => "{$row->menor} - {$row->maior}",
-                ];
-            }
-
-            // Calcular win rate por tipo
-            $conversao_por_tipo = [];
-            foreach ($analise_por_tipo as $tipo => $dados) {
-                $w = $dados['won']['qtd'] ?? 0;
-                $l = $dados['lost']['qtd'] ?? 0;
-                $total = $w + $l;
-                $conversao_por_tipo[$tipo] = [
-                    'won' => $w,
-                    'lost' => $l,
-                    'win_rate' => $total > 0 ? round(($w / $total) * 100, 1) : 0,
-                    'ticket_medio_won' => $dados['won']['ticket_medio'] ?? null,
-                    'ticket_medio_lost' => $dados['lost']['ticket_medio'] ?? null,
-                    'faixa_won' => $dados['won']['faixa'] ?? null,
-                ];
-            }
-
-            // ---- FILTRO POR ÁREA ESPECÍFICA (se informada) ----
-            $area_especifica = null;
-            if ($areaDireito) {
-                $areaQuery = (clone $baseQuery)->where(function($q) use ($areaDireito) {
-                    $q->where('tipo_demanda', 'like', "%{$areaDireito}%")
-                      ->orWhere('area', 'like', "%{$areaDireito}%");
-                });
-
-                $areaStats = $areaQuery->selectRaw("
-                    COUNT(*) as total,
-                    SUM(CASE WHEN status='won' THEN 1 ELSE 0 END) as ganhas,
-                    SUM(CASE WHEN status='lost' THEN 1 ELSE 0 END) as perdidas,
-                    ROUND(AVG(CASE WHEN status='won' THEN value_estimated END), 2) as ticket_medio_won,
-                    ROUND(AVG(CASE WHEN status='lost' THEN value_estimated END), 2) as ticket_medio_lost
-                ")->first();
-
-                if ($areaStats->total > 0) {
-                    $area_especifica = [
-                        'area' => $areaDireito,
-                        'total' => $areaStats->total,
-                        'ganhas' => $areaStats->ganhas,
-                        'perdidas' => $areaStats->perdidas,
-                        'win_rate' => round(($areaStats->ganhas / $areaStats->total) * 100, 1),
-                        'ticket_medio_won' => $areaStats->ticket_medio_won,
-                        'ticket_medio_lost' => $areaStats->ticket_medio_lost,
-                    ];
-                }
-            }
-
-            // ---- MOTIVOS DE PERDA ----
-            $motivos = DB::table('crm_opportunities')
-                ->where('status', 'lost')
-                ->whereNotNull('lost_reason')
-                ->where('lost_reason', '!=', '')
-                ->groupBy('lost_reason')
-                ->selectRaw("lost_reason, COUNT(*) as qtd, ROUND(AVG(value_estimated), 2) as ticket_medio")
-                ->orderByDesc('qtd')
-                ->get()
-                ->map(fn($r) => [
-                    'motivo' => $r->lost_reason,
-                    'qtd' => $r->qtd,
-                    'ticket_medio' => $r->ticket_medio,
-                ])
-                ->toArray();
-
-            // ---- FAIXAS DE PREÇO COM TAXA DE CONVERSÃO ----
-            $faixas = DB::select("
-                SELECT
-                    CASE
-                        WHEN value_estimated <= 2000 THEN 'ate_2000'
-                        WHEN value_estimated <= 5000 THEN '2001_a_5000'
-                        WHEN value_estimated <= 10000 THEN '5001_a_10000'
-                        WHEN value_estimated <= 20000 THEN '10001_a_20000'
-                        ELSE 'acima_20000'
-                    END as faixa,
-                    COUNT(*) as total,
-                    SUM(CASE WHEN status='won' THEN 1 ELSE 0 END) as ganhas,
-                    ROUND(SUM(CASE WHEN status='won' THEN 1 ELSE 0 END) / COUNT(*) * 100, 1) as win_rate
-                FROM crm_opportunities
-                WHERE status IN ('won','lost') AND value_estimated > 0
-                GROUP BY faixa
-                ORDER BY MIN(value_estimated)
-            ");
-
-            $faixas_conversao = [];
-            foreach ($faixas as $f) {
-                $faixas_conversao[$f->faixa] = [
-                    'total' => $f->total,
-                    'ganhas' => $f->ganhas,
-                    'win_rate' => $f->win_rate,
-                ];
-            }
-
-            return [
-                'resumo_geral' => [
-                    'total_oportunidades' => $geral->total,
-                    'ganhas' => $geral->ganhas,
-                    'perdidas' => $geral->perdidas,
-                    'win_rate_geral' => $winRate,
-                    'ticket_medio_ganhas' => $geral->ticket_medio_won,
-                    'ticket_medio_perdidas' => $geral->ticket_medio_lost,
-                    'faixa_ganhas' => "{$geral->menor_won} - {$geral->maior_won}",
-                ],
-                'conversao_por_tipo_demanda' => $conversao_por_tipo,
-                'area_especifica' => $area_especifica,
-                'motivos_perda' => $motivos,
-                'faixas_preco_conversao' => $faixas_conversao,
-                'insight_preco' => "Propostas perdidas por preco tinham ticket medio de R$" .
-                    collect($motivos)->firstWhere('motivo', 'Preço dos honorários')['ticket_medio'] ?? 'N/A',
-            ];
-
-        } catch (\Exception $e) {
-            Log::warning('PricingDataCollector: Erro no historico CRM', ['erro' => $e->getMessage()]);
-            return ['resumo_geral' => ['total_oportunidades' => 0, 'win_rate_geral' => 0]];
-        }
-    }
-
     public function getHistoricoAgregado(?string $areaDireito): array
     {
         try {
@@ -478,9 +314,9 @@ class PricingDataCollectorService
                 ->count();
 
             // Pipeline aberto
-            $pipelineAberto = DB::table('crm_opportunities')
-                ->where('status', 'open')
-                ->sum('value_estimated');
+            $pipelineAberto = DB::table('oportunidades')
+                ->whereNotIn('estagio', ['ganha', 'perdida', 'Closed Won', 'Closed Lost'])
+                ->sum('valor');
 
             return [
                 'receita_mes_atual' => round($receitaMes, 2),
@@ -512,7 +348,6 @@ class PricingDataCollectorService
             'financeiro_cliente' => $dadosProponente['financeiro_cliente'] ?? [],
             'siric' => $dadosProponente['siric'] ?? [],
             'historico_escritorio' => $historico,
-            'historico_crm_conversao' => $historicoCRM,
             'macro_escritorio' => $macro,
             'calibracao_estrategica' => $calibracao,
             'contexto_adicional' => $contextoAdicional,
