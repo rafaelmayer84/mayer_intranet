@@ -27,8 +27,10 @@
 /* ==================== 2. RESET GLOBAL ==================== */
 body {
     font-family: var(--font-family) !important;
-    background-color: var(--brand-light) !important;
+    background: linear-gradient(135deg, #EFF3F8 0%, #E2E8F0 50%, #DBEAFE 100%) !important;
+    background-attachment: fixed !important;
     color: var(--brand-text) !important;
+    min-height: 100vh;
 }
 
 .dark body, .dark main, .dark div, .dark section,
@@ -170,7 +172,7 @@ body {
 
 /* ==================== 4. MAIN CONTENT AREA ==================== */
 #main-content {
-    background-color: var(--brand-light) !important;
+    background-color: transparent !important;
 }
 
 .mobile-header {
@@ -181,6 +183,26 @@ body {
 /* ==================== 5. CARDS E CONTAINERS ==================== */
 .bg-white {
     background-color: #FFFFFF !important;
+}
+/* Profundidade visual em cards sobre fundo gradiente */
+#main-content .bg-white,
+#main-content [class*="rounded-xl"][class*="shadow"],
+#main-content [class*="rounded-lg"][class*="shadow"],
+#main-content [class*="rounded-2xl"][class*="shadow"] {
+    box-shadow: 0 1px 3px rgba(27, 51, 74, 0.06), 0 4px 12px rgba(27, 51, 74, 0.04) !important;
+    border: 1px solid rgba(226, 232, 240, 0.6);
+}
+
+#main-content .bg-white:not(button):not(a):not(select):not(input):not(textarea) {
+    backdrop-filter: blur(8px);
+    background-color: rgba(255, 255, 255, 0.92) !important;
+}
+
+#main-content a.bg-white:hover,
+#main-content [class*="hover"].bg-white:hover {
+    box-shadow: 0 2px 8px rgba(27, 51, 74, 0.1), 0 8px 24px rgba(27, 51, 74, 0.06) !important;
+    transform: translateY(-1px);
+    transition: all 0.2s ease;
 }
 
 /* ==================== 6. BOTÕES UNIFICADOS ==================== */
