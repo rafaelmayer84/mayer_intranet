@@ -13,7 +13,7 @@
             <p class="text-sm text-gray-500 dark:text-gray-400">Lead #{{ $lead->id }} • {{ $lead->data_entrada ? $lead->data_entrada->format('d/m/Y H:i') : 'Sem data' }}</p>
         </div>
         <div class="flex gap-2">
-            @if(false) {{-- ESPO removido 13/02/2026 --}}
+            @if(!$lead->espocrm_id)
                 <button onclick="sendToCRM({{ $lead->id }})" class="inline-flex items-center px-4 py-2 bg-purple-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-purple-700 transition">
                     Enviar para CRM
                 </button>
@@ -67,7 +67,7 @@
                     <span class="text-xs text-gray-500 dark:text-gray-400">Contact ID</span>
                     <p class="text-sm font-mono text-gray-500 dark:text-gray-400 break-all">{{ $lead->contact_id ?: '-' }}</p>
                 </div>
-                @if(false) {{-- ESPO removido --}}
+                @if($lead->espocrm_id)
                 <div>
                     <span class="text-xs text-gray-500 dark:text-gray-400">EspoCRM ID</span>
                     <p class="text-sm font-mono text-green-600 dark:text-green-400">✅ {{ $lead->espocrm_id }}</p>
@@ -266,7 +266,7 @@ function updateStatus(leadId, status) {
 }
 
 function sendToCRM(leadId) {
-    alert('ESPO CRM desativado'); return; // ESPO removido
+    if (!confirm('Enviar este lead para o EspoCRM?')) return;
     fetch(`/leads/${leadId}/send-crm`, {
         method: 'POST',
         headers: {

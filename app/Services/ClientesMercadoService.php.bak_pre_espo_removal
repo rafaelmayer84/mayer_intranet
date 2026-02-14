@@ -36,7 +36,7 @@ use Carbon\Carbon;
  *    id, nome, telefone, contact_id, area_interesse, sub_area, complexidade, urgencia,
  *    objecoes, gatilho_emocional, perfil_socioeconomico, potencial_honorarios, origem_canal,
  *    cidade, resumo_demanda, palavras_chave, intencao_contratar, intencao_justificativa,
- *    gclid, status, espocrm_id /* legado */, erro_processamento, metadata, data_entrada, created_at, updated_at
+ *    gclid, status, espocrm_id, erro_processamento, metadata, data_entrada, created_at, updated_at
  * 
  * @author Claude
  * @date 04/02/2026 - Criação

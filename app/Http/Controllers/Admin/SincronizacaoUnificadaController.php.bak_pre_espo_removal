@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Services\DataJuriSyncOrchestrator;
-// EspoCrmService removido em 13/02/2026
+use App\Services\EspoCrmService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -69,7 +69,7 @@ class SincronizacaoUnificadaController extends Controller
             try { $atividades = DB::table('atividades')->count(); } catch (\Exception $e2) {}
         }
 
-        // Estatisticas ESPOCRM (removido 13/02/2026)
+        // Estatisticas ESPOCRM
         $leads         = DB::table('leads')->count();
         $oportunidades = DB::table('oportunidades')->count();
         $contacts      = 0;
@@ -86,7 +86,7 @@ class SincronizacaoUnificadaController extends Controller
         $lastSyncDataJuri = $lastSync?->finished_at
             ? \Carbon\Carbon::parse($lastSync->finished_at)->format('d/m/Y H:i')
             : 'Nunca';
-        $lastSyncEspocrm = 'Desativado - CRM Nativo';
+        $lastSyncEspocrm = 'N/A';
         $lastRunTime      = $lastSyncDataJuri;
 
         // Historico (inclui mensagem que a view usa)
@@ -410,8 +410,6 @@ class SincronizacaoUnificadaController extends Controller
      */
     public function espocrmTest()
     {
-        return response()->json(['success' => false, 'message' => 'ESPO CRM desativado - CRM Nativo']);
-        if(false){
         try {
             $service = app(EspoCrmService::class);
             $result = $service->testConnection();
@@ -434,8 +432,6 @@ class SincronizacaoUnificadaController extends Controller
      */
     public function espocrmSync()
     {
-        return response()->json(['success' => false, 'message' => 'ESPO CRM desativado - CRM Nativo']);
-        if(false){
         try {
             $service = app(EspoCrmService::class);
             $results = $service->syncAll();

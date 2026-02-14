@@ -48,7 +48,7 @@ class IntegracoesController extends Controller
     {
         $status = [
             'datajuri' => $this->checkDataJuriStatus(),
-            'espocrm' => ['status' => 'disabled', 'message' => 'ESPO CRM desativado - CRM Nativo', 'last_check' => now()->toDateTimeString()], // desativado 13/02/2026
+            'espocrm' => $this->checkEspoCrmStatus(),
         ];
 
         return response()->json($status);

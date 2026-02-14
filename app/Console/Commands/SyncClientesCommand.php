@@ -19,7 +19,7 @@ class SyncClientesCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Sincroniza clientes do DataJuri e ESPO CRM';
+    protected $description = 'Sincroniza clientes do DataJuri';
 
     /**
      * Execute the console command.

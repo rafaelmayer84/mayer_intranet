@@ -5,33 +5,33 @@ namespace App\Console\Commands;
 use App\Services\Orchestration\IntegrationOrchestrator;
 use Illuminate\Console\Command;
 
-class SyncLeadsCommand extends Command
+class SyncClientesCommand extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'sync:leads';
+    protected $signature = 'sync:clientes';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Sincroniza leads do sistema';
+    protected $description = 'Sincroniza clientes do DataJuri e ESPO CRM';
 
     /**
      * Execute the console command.
      */
     public function handle(IntegrationOrchestrator $orchestrator): int
     {
-        $this->info('Sincronizando leads...');
+        $this->info('Sincronizando clientes...');
         
-        $result = $orchestrator->syncLeads();
+        $result = $orchestrator->syncClientes();
         
         if ($result['success']) {
-            $this->info('✓ Sincronização de leads concluída!');
+            $this->info('✓ Sincronização de clientes concluída!');
             $this->info("  Criados: {$result['criados']}");
             $this->info("  Atualizados: {$result['atualizados']}");
             $this->info("  Ignorados: {$result['ignorados']}");

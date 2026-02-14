@@ -32,7 +32,7 @@ Route::prefix('clientes-mercado')->group(function () {
 Route::prefix('integracao')->group(function () {
     Route::get('/dados', [IntegracaoController::class, 'dados']);
     Route::post('/sincronizar-datajuri', [IntegracaoController::class, 'sincronizarDataJuri']);
-    // ESPO CRM rota removida em 13/02/2026
+    Route::post('/sincronizar-espocrm', [IntegracaoController::class, 'sincronizarEspoCrm']);
     Route::get('/detalhes/{id}', [IntegracaoController::class, 'detalhes']);
 });
 

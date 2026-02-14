@@ -25,7 +25,11 @@ return [
         'email' => env('DATAJURI_EMAIL', 'rafaelmayer@mayeradvogados.adv.br'),
         'password' => env('DATAJURI_PASSWORD', 'Mayer01.'),
     ],
-    // espocrm removido em 13/02/2026 - substituído por CRM Nativo
+    'espocrm' => [
+        'base_url' => env('ESPO_CRM_BASE_URL', 'https://www.mayeradvogados.adv.br/CRM'),
+        'api_key' => env('ESPO_CRM_API_KEY', 'c2d399133dc730549073361f39dd4a11'),
+        'url' => env('ESPOCRM_URL', 'https://mayeradvogados.adv.br/CRM/api/v1'),
+    ],
     'sendpulse' => [
         'api_id' => env('SENDPULSE_API_ID'),
         'api_secret' => env('SENDPULSE_API_SECRET'),

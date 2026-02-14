@@ -2,7 +2,7 @@
 
 namespace App\Services\Orchestration;
 
-use App\Services\Integration\DataJuriService;
+use App\Services\Integration\{DataJuriService, EspoCrmService};
 use App\Services\ETL\DataTransformerService;
 use App\Models\{Cliente, Lead, Oportunidade, IntegrationLog};
 use Illuminate\Support\Facades\{DB, Log};
@@ -11,7 +11,7 @@ class IntegrationOrchestrator
 {
     public function __construct(
         protected DataJuriService $dataJuri,
-        // EspoCrmService removido em 13/02/2026
+        protected EspoCrmService $espo,
         protected DataTransformerService $transformer
     ) {}
 
@@ -85,7 +85,7 @@ class IntegrationOrchestrator
                 }
             }
             
-            $contas = [] /* ESPO removido */;
+            $contas = $this->espo->getAllEntities('Account');
             foreach ($contas['data'] as $c) {
                 $data = $this->transformer->normalizeCliente($c, 'espocrm');
                 if (empty($data['espocrm_id'])) {
@@ -143,7 +143,7 @@ class IntegrationOrchestrator
         
         DB::beginTransaction();
         try {
-            $leads = [] /* ESPO removido */;
+            $leads = $this->espo->getAllEntities('Lead');
             
             Log::info("Sync Leads: Recebidos " . count($leads['data']) . " leads da API");
             
@@ -288,7 +288,7 @@ class IntegrationOrchestrator
         
         DB::beginTransaction();
         try {
-            $ops = [] /* ESPO removido */;
+            $ops = $this->espo->getAllEntities('Opportunity');
             
             Log::info("Sync Oportunidades: Recebidas " . count($ops['data']) . " oportunidades da API");
             

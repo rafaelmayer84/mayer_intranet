@@ -26,7 +26,16 @@ Schedule::command('cron:sync-datajuri')
     ->timezone('America/Sao_Paulo')
     ->appendOutputTo(storage_path('logs/cron-datajuri.log'));
 
-// ESPO CRM removido em 13/02/2026 - substituído por CRM Nativo
+// ESPO CRM → 2x/dia (9h, 17h) - Horário de Brasília
+Schedule::command('cron:sync-espo')
+    ->dailyAt('09:00')
+    ->timezone('America/Sao_Paulo')
+    ->appendOutputTo(storage_path('logs/cron-espo.log'));
+
+Schedule::command('cron:sync-espo')
+    ->dailyAt('17:00')
+    ->timezone('America/Sao_Paulo')
+    ->appendOutputTo(storage_path('logs/cron-espo.log'));
 
 // Contas a Receber → 3x/dia (logo após DataJuri)
 Schedule::command('sync:contas-receber-rapido')

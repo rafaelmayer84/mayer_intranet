@@ -120,7 +120,7 @@ Route::middleware(["auth"])->group(function () {
     Route::get("/integracao/sync", [App\Http\Controllers\IntegracaoController::class, "sync"])->name("integration.sync");
     Route::get("/integracao/{log}", [App\Http\Controllers\IntegracaoController::class, "show"])->name("integration.show");
     Route::post("/integracao/sincronizar-datajuri", [App\Http\Controllers\IntegracaoController::class, "sincronizarDataJuri"])->name("integration.sync.datajuri");
-    // ESPO CRM rota removida em 13/02/2026
+    Route::post("/integracao/sincronizar-espocrm", [App\Http\Controllers\IntegracaoController::class, "sincronizarEspoCrm"])->name("integration.sync.espocrm");
 });
 
 // ============================================================================

@@ -14,7 +14,7 @@ class Kernel extends ConsoleKernel
      */
     protected $commands = [
         Commands\CronSyncDataJuri::class,
-        // CronSyncEspoCrm removido em 13/02/2026
+        Commands\CronSyncEspoCrm::class,
     ];
 
     /**

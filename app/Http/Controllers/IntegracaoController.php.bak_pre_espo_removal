@@ -57,7 +57,7 @@ class IntegracaoController extends Controller
             // Executar sincronização baseado no tipo
             $resultado = match($type) {
                 'datajuri' => $this->sincronizarDataJuri($log),
-                'espocrm' => ['sucesso' => false, 'registros' => 0, 'mensagem' => 'Desativado'], // ESPO removido
+                'espocrm' => $this->sincronizarEspoCRM($log),
                 'all' => $this->sincronizarTudo($log),
                 default => ['sucesso' => false, 'erro' => 'Tipo inválido'],
             };
@@ -165,7 +165,7 @@ class IntegracaoController extends Controller
             }
             
             // Sincronizar ESPO CRM
-            $resultadoEspoCRM = ['sucesso' => false, 'registros' => 0]; // ESPO removido
+            $resultadoEspoCRM = $this->sincronizarEspoCRM($log);
             if ($resultadoEspoCRM['sucesso']) {
                 $totalRegistros += $resultadoEspoCRM['registros'];
             }

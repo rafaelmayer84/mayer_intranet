@@ -19,7 +19,7 @@ class SyncLeadsCommand extends Command
      *
      * @var string
      */
-    protected $description = 'Sincroniza leads do sistema';
+    protected $description = 'Sincroniza leads do ESPO CRM';
 
     /**
      * Execute the console command.

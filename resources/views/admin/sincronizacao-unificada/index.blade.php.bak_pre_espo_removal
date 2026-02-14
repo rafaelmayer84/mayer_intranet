@@ -6,7 +6,7 @@
     <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
             <h1 class="text-2xl font-bold text-gray-900 dark:text-white">&#x1F504; Sincronização Unificada</h1>
-            <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Gerenciamento centralizado de dados DataJuri</p>
+            <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Gerenciamento centralizado de dados DataJuri + ESPO CRM</p>
         </div>
         <div class="flex items-center gap-2">
             <span class="text-xs text-gray-500">Última sync:</span>
@@ -114,9 +114,33 @@
             </div>
         </div>
 
-        {{-- SEÇÃO ESPOCRM REMOVIDA em 13/02/2026 - substituído por CRM Nativo --}}
+        {{-- SEÇÃO ESPOCRM --}}
+        <div class="mt-6 rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">&#x1F517; ESPO CRM</h2>
+            <div class="grid grid-cols-3 gap-4 mb-4">
+                <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-700">
+                    <p class="text-xs text-gray-500">Leads</p>
+                    <p class="text-xl font-bold">{{ number_format($leads, 0, ',', '.') }}</p>
+                </div>
+                <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-700">
+                    <p class="text-xs text-gray-500">Contatos</p>
+                    <p class="text-xl font-bold">{{ number_format($contacts, 0, ',', '.') }}</p>
+                </div>
+                <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-700">
+                    <p class="text-xs text-gray-500">Contas</p>
+                    <p class="text-xl font-bold">{{ number_format($contas, 0, ',', '.') }}</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-3 mb-4">
+                <button id="btn-test-espocrm" class="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 flex items-center gap-2">
+                    <span>&#x1F50C;</span> Testar Conexão
+                </button>
+                <button id="btn-sync-espocrm" class="rounded-lg bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700 flex items-center gap-2">
+                    <span>&#x1F504;</span> Sincronizar
+                </button>
+            </div>
 
-                    {{-- LOG EM TEMPO REAL ESPOCRM --}}
+            {{-- LOG EM TEMPO REAL ESPOCRM --}}
             <div id="espo-log-container" class="mt-4">
                 <div class="flex items-center justify-between mb-2">
                     <span class="text-sm font-medium text-gray-700 dark:text-gray-300">&#x1F4CB; Log de Execução</span>
@@ -585,7 +609,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    /* ESPOCRM REMOVIDO 13/02/2026
+    // ESPOCRM - Testar Conexão
     document.getElementById('btn-test-espocrm').addEventListener('click', async () => {
         addLog('Testando conexão com ESPO CRM...', 'info', 'espo-log-output');
         try {
@@ -640,7 +664,6 @@ document.addEventListener('DOMContentLoaded', function() {
             syncInProgress = false;
         }
     });
-    ESPOCRM JS REMOVIDO */
 
     // Limpar histórico
     document.getElementById('btn-limpar-historico').addEventListener('click', async () => {
