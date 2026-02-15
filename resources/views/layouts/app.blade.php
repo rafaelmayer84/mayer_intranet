@@ -209,7 +209,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap" rel="stylesheet">
-    </head>
+        <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
 <body class="min-h-screen">
     <div class="flex min-h-screen">
         <!-- Sidebar -->
@@ -244,7 +245,7 @@
                 <a href="{{ route('avisos.index') }}"
                    class="nav-link flex items-center px-4 py-3 rounded-lg transition-colors {{ (request()->routeIs('avisos.*') || request()->routeIs('admin.avisos.*') || request()->routeIs('admin.categorias-avisos.*')) ? 'nav-link-active' : '' }}"
                    data-tooltip="Quadro de Avisos">
-                    <span class="w-5 h-5 mr-3" aria-hidden="true">📢</span>
+                    <span class="w-5 h-5 mr-3" role="img" aria-label="Avisos">📢</span>
                     <span class="menu-text">Quadro de Avisos</span>
                 </a>
                     <!-- Manuais Normativos -->
@@ -261,7 +262,7 @@
                 <div class="menu-group">
                     <button onclick="toggleSubmenu('resultados')" class="nav-link w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors {{ request()->is('visao-gerencial*') || request()->is('clientes-mercado*') || request()->is('processos-internos*') || request()->is('times-evolucao*') ? 'nav-link-active' : '' }}" data-tooltip="RESULTADOS!">
                         <div class="flex items-center">
-                            <span class="w-5 h-5 mr-3" aria-hidden="true">🎯</span>
+                            <span class="w-5 h-5 mr-3" role="img" aria-label="Metas">🎯</span>
                             <span class="font-medium menu-text">RESULTADOS!</span>
                         </div>
                         <svg id="arrow-resultados" class="w-4 h-4 menu-arrow {{ request()->is('visao-gerencial*') || request()->is('clientes-mercado*') || request()->is('processos-internos*') || request()->is('times-evolucao*') ? 'rotated' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -272,21 +273,21 @@
                         <a href="{{ route('visao-gerencial') }}"
                            class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('visao-gerencial') ? 'nav-sublink-active' : '' }}"
                            data-tooltip="Finanças">
-                            <span class="w-4 h-4 mr-3" aria-hidden="true">💰</span>
+                            <span class="w-4 h-4 mr-3" role="img" aria-label="Financas">💰</span>
                             <span class="menu-text">Finanças</span>
                         </a>
                         <a href="{{ route('clientes-mercado') }}"
                            class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('clientes-mercado') ? 'nav-sublink-active' : '' }}"
                            data-tooltip="Clientes & Mercado">
-                            <span class="w-4 h-4 mr-3" aria-hidden="true">⚖️</span>
+                            <span class="w-4 h-4 mr-3" role="img" aria-label="Juridico">⚖️</span>
                             <span class="menu-text">Clientes &amp; Mercado</span>
                         </a>
                         <a href="{{ route('resultados.bsc.processos-internos.index') }}" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('resultados.bsc.processos-internos.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700' }}">
-                            <span class="w-4 h-4 mr-3" aria-hidden="true">⚙️</span>
+                            <span class="w-4 h-4 mr-3" role="img" aria-label="Processos">⚙️</span>
                             <span class="menu-text">Processos Internos</span>
                         </a>
                         <a href="{{ route('times-evolucao.index') }}" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('times-evolucao.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700' }}">
-                            <span class="w-4 h-4 mr-3" aria-hidden="true">👥</span>
+                            <span class="w-4 h-4 mr-3" role="img" aria-label="Equipe">👥</span>
                             <span class="menu-text">Times &amp; Evolução</span>
                         </a>
                     </div>
@@ -365,7 +366,7 @@
                 <a href="{{ route('siric.index') }}"
                    class="nav-link flex items-center px-4 py-3 rounded-lg transition-colors {{ request()->routeIs('siric.*') ? 'nav-link-active' : '' }}"
                    data-tooltip="SIRIC - Análise de Crédito">
-                    <span class="w-5 h-5 mr-3" aria-hidden="true">🏦</span>
+                    <span class="w-5 h-5 mr-3" role="img" aria-label="Precificacao">🏦</span>
                     <span class="menu-text">SIRIC</span>
                 </a>
 
@@ -391,7 +392,7 @@
                 <a href="{{ route('admin.usuarios.index') }}"
                    class="nav-link flex items-center px-4 py-3 rounded-lg transition-colors {{ request()->routeIs('admin.usuarios.*') ? 'nav-link-active' : '' }}"
                    data-tooltip="Config. Usuários">
-                    <span class="w-5 h-5 mr-3" aria-hidden="true">👤</span>
+                    <span class="w-5 h-5 mr-3" role="img" aria-label="Usuarios">👤</span>
                     <span class="menu-text">Config. Usuários</span>
                 </a>
 
@@ -425,7 +426,7 @@
             <!-- Usuário -->
             <div class="p-4 border-t border-white/10">
                 <div class="flex items-center">
-                    <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
+                    <div class="w-10 h-10 rounded-full bg-brand flex items-center justify-center text-white font-semibold">
                         {{ substr(auth()->user()->name, 0, 1) }}
                     </div>
                     <div class="ml-3 flex-1">

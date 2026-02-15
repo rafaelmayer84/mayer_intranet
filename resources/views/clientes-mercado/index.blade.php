@@ -25,7 +25,7 @@
                     <option value="{{ $a }}" {{ $anoSelecionado == $a ? 'selected' : '' }}>{{ $a }}</option>
                 @endforeach
             </select>
-            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium">
+            <button type="submit" class="px-4 py-2 bg-brand text-white rounded-lg hover-bg-brand-dark transition text-sm font-medium">
                 Filtrar
             </button>
         </form>
@@ -81,7 +81,7 @@
         {{-- Gráfico de Linha: Leads novos vs Convertidos (12 meses) --}}
         <div class="rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-sm">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                📈 Evolução de Leads (12 meses)
+                <span role="img" aria-label="Tendencia">📈</span> Evolução de Leads (12 meses)
             </h3>
             <div class="h-64">
                 <canvas id="chartLeads12Meses"></canvas>
@@ -91,7 +91,7 @@
         {{-- Gráfico de Barras: Oportunidades por Estágio --}}
         <div class="rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-sm">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                📊 Oportunidades - {{ $dashboardData['competencia']['label'] }}
+                <span role="img" aria-label="Grafico">📊</span> Oportunidades - {{ $dashboardData['competencia']['label'] }}
             </h3>
             <div class="h-64">
                 <canvas id="chartOportunidades"></canvas>
@@ -118,7 +118,7 @@
         {{-- Gráfico Donut: Origem dos Leads --}}
         <div class="rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-sm">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                🎯 Origem dos Leads
+                <span role="img" aria-label="Meta">🎯</span> Origem dos Leads
             </h3>
             <div class="h-64">
                 <canvas id="chartOrigemLeads"></canvas>
@@ -182,10 +182,10 @@
     {{-- Rodapé com totais e timestamp --}}
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4">
         <div class="flex flex-wrap gap-4">
-            <span>📊 Total Clientes: <strong>{{ number_format($totaisAcumulados['total_clientes'], 0, ',', '.') }}</strong></span>
-            <span>👥 Total Leads: <strong>{{ number_format($totaisAcumulados['total_leads'], 0, ',', '.') }}</strong></span>
-            <span>🎯 Total Oportunidades: <strong>{{ number_format($totaisAcumulados['total_oportunidades'], 0, ',', '.') }}</strong></span>
-            <span>⚖️ Processos Ativos: <strong>{{ number_format($totaisAcumulados['processos_ativos'], 0, ',', '.') }}</strong></span>
+            <span><span role="img" aria-label="Grafico">📊</span> Total Clientes: <strong>{{ number_format($totaisAcumulados['total_clientes'], 0, ',', '.') }}</strong></span>
+            <span><span role="img" aria-label="Equipe">👥</span> Total Leads: <strong>{{ number_format($totaisAcumulados['total_leads'], 0, ',', '.') }}</strong></span>
+            <span><span role="img" aria-label="Meta">🎯</span> Total Oportunidades: <strong>{{ number_format($totaisAcumulados['total_oportunidades'], 0, ',', '.') }}</strong></span>
+            <span><span role="img" aria-label="Juridico">⚖️</span> Processos Ativos: <strong>{{ number_format($totaisAcumulados['processos_ativos'], 0, ',', '.') }}</strong></span>
         </div>
         <div class="mt-2 sm:mt-0">
             Atualizado em: {{ $dashboardData['gerado_em'] }}

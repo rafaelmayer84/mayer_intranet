@@ -28,6 +28,7 @@
     $value = $value ?? '—';
     $subtitle = $subtitle ?? null;
     $icon = $icon ?? '📊';
+    $iconLabel = $iconLabel ?? null;
     $accent = $accent ?? 'blue';
     $trend = isset($trend) ? (float) $trend : null;
     $invertTrend = $invertTrend ?? false;
@@ -77,7 +78,8 @@
             ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30'
             : 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30';
         $trendText = $arrow . ' ' . number_format(abs($trend), 1, ',', '.') . '%';
-        $trendHtml = '<span class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ' . $trendColor . '">' . $trendText . '</span>';
+        $ariaDirection = $trend >= 0 ? 'Aumento de' : 'Reducao de';
+        $trendHtml = '<span aria-label="' . $ariaDirection . ' ' . number_format(abs($trend), 1, ',', '.') . ' por cento" class="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ' . $trendColor . '">' . $trendText . '</span>';
     }
 @endphp
 
@@ -129,7 +131,7 @@
         </div>
 
         <div class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl {{ $ac['bg'] }} group-hover:scale-110 transition-transform">
-            <span class="text-xl">{{ $icon }}</span>
+            <span class="text-xl" role="img" @if($iconLabel) aria-label="{{ $iconLabel }}" @else aria-hidden="true" @endif>{{ $icon }}</span>
         </div>
     </div>
 

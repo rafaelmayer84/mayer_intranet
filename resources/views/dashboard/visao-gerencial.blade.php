@@ -74,15 +74,15 @@
     $cards = [
         [
             'label' => 'Resultado', 'icon' => '💰',
-            'value' => $resumo['resultadoLiquido'] ?? 0,
+            'value' => $resumo['resultadoLiquido'] ?? 0, 'metaVal' => $resumo['resultadoMeta'] ?? 0,
             'trend' => $resumo['resultadoTrend'] ?? 0,
             'spark' => $spark['resultado'] ?? null,
             'color' => '#8b5cf6', 'accent' => 'border-l-violet-500',
             'bg' => 'bg-violet-50 dark:bg-violet-950/20', 'invert' => false,
         ],
         [
-            'label' => 'Receita', 'icon' => '📈',
-            'value' => $resumo['receitaTotal'] ?? 0,
+            'label' => 'Receita', 'icon' => '📈', 'iconLabel' => 'Grafico de receita',
+            'value' => $resumo['receitaTotal'] ?? 0, 'metaVal' => $resumo['receitaMeta'] ?? 0,
             'trend' => $resumo['receitaTrend'] ?? 0,
             'spark' => $spark['receita'] ?? null,
             'color' => '#10b981', 'accent' => 'border-l-emerald-500',
@@ -90,7 +90,7 @@
         ],
         [
             'label' => 'Despesas', 'icon' => '🔴',
-            'value' => $resumo['despesasTotal'] ?? 0,
+            'value' => $resumo['despesasTotal'] ?? 0, 'metaVal' => $resumo['despesasMeta'] ?? 0,
             'trend' => $resumo['despesasTrend'] ?? 0,
             'spark' => $spark['despesas'] ?? null,
             'color' => '#ef4444', 'accent' => 'border-l-rose-500',
@@ -150,11 +150,11 @@
 
     /* KPIs adicionais — array para renderizar grid */
     $kpisAdicionais = [
-        ['label' => 'Mix PF/PJ', 'valor' => ($fmtPct($mixReceita['pfPct'] ?? 0)) . ' / ' . ($fmtPct($mixReceita['pjPct'] ?? 0)), 'sub' => $fmt($mixReceita['pfValor'] ?? 0) . ' PF  ·  ' . $fmt($mixReceita['pjValor'] ?? 0) . ' PJ', 'icon' => '📊'],
+        ['label' => 'Mix PF/PJ', 'valor' => ($fmtPct($mixReceita['pfPct'] ?? 0)) . ' / ' . ($fmtPct($mixReceita['pjPct'] ?? 0)), 'sub' => $fmt($mixReceita['pfValor'] ?? 0) . ' PF  ·  ' . $fmt($mixReceita['pjValor'] ?? 0) . ' PJ', 'icon' => '📊', 'iconLabel' => 'Grafico de dados'],
         ['label' => 'Receita YoY', 'valor' => $fmtPct($receitaYoY['yoyPct'] ?? 0), 'sub' => 'Atual ' . $fmt($receitaYoY['atual'] ?? 0) . '  ·  Ant. ' . $fmt($receitaYoY['anoAnterior'] ?? 0), 'icon' => '📅'],
         ['label' => 'Expense Ratio', 'valor' => $fmtPct($expense['pct'] ?? 0), 'sub' => 'Desp. ' . $fmt($expense['despesas'] ?? 0), 'icon' => '⚖️'],
         ['label' => 'Inadimplência', 'valor' => $fmtPct($inadimplencia['pctVencidoSobreAberto'] ?? 0), 'sub' => 'Venc. ' . $fmt($inadimplencia['totalVencido'] ?? 0) . '  ·  Aberto ' . $fmt($inadimplencia['totalAberto'] ?? 0), 'icon' => '📉'],
-        ['label' => 'Qualidade Dados', 'valor' => $fmtPct($qualidade['pctConciliadoCount'] ?? 0), 'sub' => 'Classificados sobre total de movimentos', 'icon' => '🎯'],
+        ['label' => 'Qualidade Dados', 'valor' => $fmtPct($qualidade['pctConciliadoCount'] ?? 0), 'sub' => 'Classificados sobre total de movimentos', 'icon' => '🎯', 'iconLabel' => 'Meta'],
     ];
 
     /* Health cards */
@@ -179,7 +179,7 @@
     <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
             <h1 class="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-gray-100">
-                <span class="text-lg">📊</span> Dashboard Financeira Executiva
+                <span class="text-lg" role="img" aria-label="Grafico">📊</span> Dashboard Financeira Executiva
             </h1>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Visão gerencial por competência com métricas, inadimplência e alertas.
@@ -219,13 +219,16 @@
                 $val = (float) $c['value'];
                 $accentMap = ['border-l-violet-500'=>'purple','border-l-emerald-500'=>'green','border-l-rose-500'=>'red','border-l-blue-500'=>'blue'];
                 $cardAccent = $accentMap[$c['accent']] ?? 'blue';
+                $mVal = (float) ($c['metaVal'] ?? 0);
+                $cardMeta = $mVal > 0 ? $fmtS($mVal) : '';
+                $cardPct = ($mVal > 0 && abs($val) > 0) ? (abs($val) / $mVal) * 100 : 0;
             @endphp
             @include('dashboard.partials._kpi-card', [
                 'id' => Str::slug($c['label']),
                 'title' => $c['label'],
                 'value' => $val != 0 ? $fmtS($val) : '—',
-                'meta' => '',
-                'percent' => 0,
+                'meta' => $cardMeta,
+                'percent' => $cardPct,
                 'trend' => (float) ($c['trend'] ?? 0),
                 'invertTrend' => $c['invert'] ?? false,
                 'icon' => $c['icon'],
@@ -397,7 +400,7 @@
                 </div>
             </div>
             <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-                <h2 class="flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100">💡 Insights do Mês</h2>
+                <h2 class="flex items-center gap-1.5 text-sm font-semibold text-gray-900 dark:text-gray-100"><span role="img" aria-label="Dica">💡</span> Insights do Mês</h2>
                 <div class="mt-3 space-y-2">
                     @foreach($insights as $ins)
                         <div class="flex items-start gap-2 rounded-lg {{ $ins['bg'] }} px-3 py-2">
@@ -456,18 +459,18 @@
     {{-- ═══ RECEITA PF + PJ 12 MESES ═══ --}}
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-            <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">📊 Receita PF — 12 meses</h2>
+            <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100"><span role="img" aria-label="Grafico">📊</span> Receita PF — 12 meses</h2>
             <div class="mt-4 h-[260px]"><canvas id="chart-receita-pf"></canvas></div>
         </div>
         <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-            <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">📊 Receita PJ — 12 meses</h2>
+            <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100"><span role="img" aria-label="Grafico">📊</span> Receita PJ — 12 meses</h2>
             <div class="mt-4 h-[260px]"><canvas id="chart-receita-pj"></canvas></div>
         </div>
     </div>
 
     {{-- ═══ RENTABILIDADE 12 MESES ═══ --}}
     <div class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
-        <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">📈 Rentabilidade — 12 meses</h2>
+        <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100"><span role="img" aria-label="Tendencia">📈</span> Rentabilidade — 12 meses</h2>
         <div class="mt-4 h-[260px]"><canvas id="chart-rentabilidade"></canvas></div>
     </div>
 

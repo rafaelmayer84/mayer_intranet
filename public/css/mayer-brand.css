@@ -27,10 +27,8 @@
 /* ==================== 2. RESET GLOBAL ==================== */
 body {
     font-family: var(--font-family) !important;
-    background: linear-gradient(135deg, #EFF3F8 0%, #E2E8F0 50%, #DBEAFE 100%) !important;
-    background-attachment: fixed !important;
+    background-color: var(--brand-light) !important;
     color: var(--brand-text) !important;
-    min-height: 100vh;
 }
 
 .dark body, .dark main, .dark div, .dark section,
@@ -172,7 +170,7 @@ body {
 
 /* ==================== 4. MAIN CONTENT AREA ==================== */
 #main-content {
-    background-color: transparent !important;
+    background-color: var(--brand-light) !important;
 }
 
 .mobile-header {
@@ -183,26 +181,6 @@ body {
 /* ==================== 5. CARDS E CONTAINERS ==================== */
 .bg-white {
     background-color: #FFFFFF !important;
-}
-/* Profundidade visual em cards sobre fundo gradiente */
-#main-content .bg-white,
-#main-content [class*="rounded-xl"][class*="shadow"],
-#main-content [class*="rounded-lg"][class*="shadow"],
-#main-content [class*="rounded-2xl"][class*="shadow"] {
-    box-shadow: 0 1px 3px rgba(27, 51, 74, 0.06), 0 4px 12px rgba(27, 51, 74, 0.04) !important;
-    border: 1px solid rgba(226, 232, 240, 0.6);
-}
-
-#main-content .bg-white:not(button):not(a):not(select):not(input):not(textarea) {
-    backdrop-filter: blur(8px);
-    background-color: rgba(255, 255, 255, 0.92) !important;
-}
-
-#main-content a.bg-white:hover,
-#main-content [class*="hover"].bg-white:hover {
-    box-shadow: 0 2px 8px rgba(27, 51, 74, 0.1), 0 8px 24px rgba(27, 51, 74, 0.06) !important;
-    transform: translateY(-1px);
-    transition: all 0.2s ease;
 }
 
 /* ==================== 6. BOTÕES UNIFICADOS ==================== */
@@ -322,3 +300,70 @@ table td { color: var(--brand-text); }
 ::-webkit-scrollbar-track { background: var(--brand-light); }
 ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+/* ==================== 10. ACESSIBILIDADE ==================== */
+
+/* Classe para texto visível apenas por leitores de tela */
+.sr-only {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border-width: 0 !important;
+}
+
+/* ==================== 11. TIPOGRAFIA MINIMA ==================== */
+[class*="text-[10px]"],
+.text-\[10px\] {
+    font-size: 11px !important;
+    line-height: 1.4 !important;
+}
+
+.text-xs {
+    line-height: 1.4 !important;
+}
+
+.text-sm {
+    line-height: 1.5 !important;
+}
+
+/* ==================== 12. CONTRASTE MINIMO ==================== */
+#main-content .text-gray-400 {
+    color: #6B7280 !important;
+}
+
+#main-content .text-gray-300:not(svg):not([class*="border"]):not([class*="divide"]) {
+    color: #9CA3AF !important;
+}
+
+/* ==================== 13. FOCUS VISIBLE ==================== */
+a:focus-visible,
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+[role="button"]:focus-visible {
+    outline: 2px solid var(--brand-blue, #385776) !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 0 0 4px rgba(56, 87, 118, 0.15) !important;
+}
+
+/* ==================== 14. FORM LABELS ==================== */
+label {
+    font-weight: 500;
+}
+
+select,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+input[type="tel"],
+input[type="number"],
+textarea {
+    min-height: 40px;
+}
