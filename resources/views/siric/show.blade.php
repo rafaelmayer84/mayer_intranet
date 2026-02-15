@@ -88,7 +88,7 @@
             <form method="POST" action="{{ route('siric.coletar', $consulta->id) }}">
                 @csrf
                 <button type="submit"
-                    class="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg shadow transition">
+                    class="btn-mayer shadow">
                     📥 Coletar Dados Internos
                 </button>
             </form>
@@ -439,7 +439,7 @@
                     <textarea name="nota_decisao" rows="3" placeholder="Justificativa da decisão (opcional)..."
                               class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 text-sm"></textarea>
                     <button type="submit"
-                        class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow transition">
+                        class="px-4 py-2 bg-brand hover-bg-brand-dark text-white text-sm font-medium rounded-lg shadow transition">
                         Registrar Decisão
                     </button>
                 </form>

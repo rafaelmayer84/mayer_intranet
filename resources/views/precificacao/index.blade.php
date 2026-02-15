@@ -116,7 +116,7 @@
         </div>
 
         <div class="mt-6 flex justify-end">
-            <button onclick="gerarPropostas()" id="btn-gerar" class="px-6 py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-semibold transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+            <button onclick="gerarPropostas()" id="btn-gerar" class="btn-mayer rounded-xl font-semibold flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
                 <span id="btn-gerar-text">Gerar Propostas</span>
                 <svg id="btn-gerar-spinner" class="hidden animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -409,7 +409,7 @@ function exibirPropostas(resultado) {
 
         return `
         <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 ${borderClass} relative hover:shadow-md transition">
-            ${isRecommended ? '<div class="absolute -top-2 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-indigo-600 text-white text-xs rounded-full font-semibold">Recomendada</div>' : ''}
+            ${isRecommended ? '<div class="absolute -top-2 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-brand text-white text-xs rounded-full font-semibold">Recomendada</div>' : ''}
             <div class="text-center mb-4">
                 <span class="text-2xl">${t.icon}</span>
                 <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider">${t.label}</h3>
@@ -418,8 +418,7 @@ function exibirPropostas(resultado) {
             </div>
             <p class="text-sm text-gray-600 dark:text-gray-300 mb-4 leading-relaxed">${p.justificativa_estrategica || ''}</p>
             <button onclick="escolherProposta('${t.key}', ${p.valor_honorarios})"
-                class="w-full py-2 px-4 rounded-lg text-sm font-semibold transition
-                ${isRecommended ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'}">
+                class="btn-mayer font-semibold">
                 Selecionar
             </button>
         </div>

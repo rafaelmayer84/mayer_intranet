@@ -31,7 +31,7 @@
                 <div class="mb-4 flex flex-wrap gap-3">
                     <button
                         onclick="importarDoDataJuri()"
-                        class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                        class="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover-bg-brand-dark">
                         📥 Importar do DataJuri
                     </button>
                     <button
@@ -138,7 +138,7 @@
                             type="text"
                             id="edit-codigo"
                             readonly
-                            class="mt-1 w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white">
+                            class="mt-1 w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-sm dark:border-gray-600 dark:bg-[#385776] dark:text-white">
                     </div>
 
                     <div>
@@ -181,7 +181,7 @@
                 </button>
                 <button
                     onclick="salvarRegra()"
-                    class="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                    class="flex-1 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover-bg-brand-dark">
                     💾 Salvar
                 </button>
             </div>

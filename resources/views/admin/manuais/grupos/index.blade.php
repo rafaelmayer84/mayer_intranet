@@ -7,7 +7,7 @@
         <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4">Admin — Manuais Normativos</h1>
         <div class="flex space-x-2 border-b border-gray-200 dark:border-gray-700 pb-2">
             <a href="{{ route('admin.manuais.grupos.index') }}"
-               class="px-4 py-2 text-sm font-medium rounded-t-lg bg-blue-600 text-white">Grupos</a>
+               class="px-4 py-2 text-sm font-medium rounded-t-lg bg-brand text-white">Grupos</a>
             <a href="{{ route('admin.manuais.documentos.index') }}"
                class="px-4 py-2 text-sm font-medium rounded-t-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Documentos</a>
             <a href="{{ route('admin.manuais.permissoes.index') }}"
@@ -25,7 +25,7 @@
     {{-- Botão criar --}}
     <div class="flex justify-end mb-4">
         <a href="{{ route('admin.manuais.grupos.create') }}"
-           class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition">
+           class="btn-mayer">
             + Novo Grupo
         </a>
     </div>

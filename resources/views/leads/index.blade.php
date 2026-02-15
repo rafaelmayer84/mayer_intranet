@@ -185,7 +185,7 @@
             @foreach($topPalavras as $palavra => $count)
                 @php
                     $ratio = $maxCount > 0 ? $count / $maxCount : 0;
-                    if ($ratio > 0.7) { $sizeClass = 'text-xl font-bold'; $bgClass = 'bg-blue-600 text-white'; }
+                    if ($ratio > 0.7) { $sizeClass = 'text-xl font-bold'; $bgClass = 'bg-brand text-white'; }
                     elseif ($ratio > 0.4) { $sizeClass = 'text-base font-semibold'; $bgClass = 'bg-blue-500 text-white'; }
                     elseif ($ratio > 0.2) { $sizeClass = 'text-sm font-medium'; $bgClass = 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'; }
                     else { $sizeClass = 'text-xs'; $bgClass = 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'; }
@@ -222,7 +222,7 @@
                         CSV Google Ads
                     </a>
                     <a href="{{ route('leads.export-google-ads', array_merge(request()->query(), ['formato' => 'xls'])) }}"
-                       class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition">
+                       class="btn-mayer">
                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                         XLS Google Ads
                     </a>

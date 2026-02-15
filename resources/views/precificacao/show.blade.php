@@ -81,7 +81,7 @@
                 {{ $isRecommended ? 'ring-2 ring-indigo-500' : '' }}
                 {{ $isChosen ? 'ring-2 ring-green-500' : '' }}">
                 @if($isRecommended)
-                    <div class="absolute -top-2 left-4 px-2 py-0.5 bg-indigo-600 text-white text-xs rounded-full">Recomendada</div>
+                    <div class="absolute -top-2 left-4 px-2 py-0.5 bg-brand text-white text-xs rounded-full">Recomendada</div>
                 @endif
                 @if($isChosen)
                     <div class="absolute -top-2 right-4 px-2 py-0.5 bg-green-600 text-white text-xs rounded-full">Escolhida</div>

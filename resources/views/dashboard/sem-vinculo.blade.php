@@ -28,7 +28,7 @@
         </div>
         
         <div class="space-y-3">
-            <a href="{{ url('/') }}" class="block w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition">
+            <a href="{{ url('/') }}" class="block w-full bg-brand hover-bg-brand-dark text-white font-medium py-2 px-4 rounded-lg transition">
                 Voltar ao Dashboard
             </a>
             

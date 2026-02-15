@@ -31,7 +31,7 @@
             </div>
             
             <div class="pt-4">
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition">
+                <button type="submit" class="bg-brand hover-bg-brand-dark text-white font-medium py-2 px-4 rounded-lg transition">
                     Salvar Configurações
                 </button>
             </div>

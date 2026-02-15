@@ -14,7 +14,7 @@
             <a href="{{ route('admin.categorias-avisos.index') }}" class="inline-flex items-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-gray-900 shadow-sm hover:bg-gray-50 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">
                 Categorias
             </a>
-            <a href="{{ route('admin.avisos.create') }}" class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500">
+            <a href="{{ route('admin.avisos.create') }}" class="inline-flex items-center rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover-bg-brand-dark">
                 Novo aviso
             </a>
         </div>
@@ -65,7 +65,7 @@
                 </select>
             </div>
             <div class="flex items-end gap-2 md:col-span-1">
-                <button class="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white" type="submit">Filtrar</button>
+                <button class="w-full rounded-lg btn-mayer" type="submit">Filtrar</button>
             </div>
         </div>
     </form>
@@ -103,7 +103,7 @@
                         <td class="px-4 py-3 text-sm text-gray-700 dark:text-slate-200">{{ $aviso->autor->name ?? '—' }}</td>
                         <td class="px-4 py-3 text-right text-sm">
                             <div class="flex justify-end gap-2">
-                                    <a href="{{ route('admin.avisos.edit', $aviso) }}" class="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 dark:bg-slate-100 dark:text-slate-900">Editar</a>
+                                    <a href="{{ route('admin.avisos.edit', $aviso) }}" class="rounded-lg btn-mayer-sm">Editar</a>
                                     <form method="POST" action="{{ route('admin.avisos.destroy', $aviso) }}" onsubmit="return confirm('Remover este aviso?');">
                                         @csrf
                                         @method('DELETE')

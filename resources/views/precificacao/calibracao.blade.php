@@ -43,7 +43,7 @@
                 <button type="button" onclick="resetarPadroes()" class="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 transition">
                     Resetar Padrões
                 </button>
-                <button type="submit" class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold transition">
+                <button type="submit" class="btn-mayer font-semibold">
                     Salvar Calibração
                 </button>
             </div>

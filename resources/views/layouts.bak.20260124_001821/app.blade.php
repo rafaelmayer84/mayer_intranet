@@ -213,7 +213,7 @@
             <!-- Usuário -->
             <div class="p-4 border-t border-gray-700">
                 <div class="flex items-center">
-                    <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
+                    <div class="w-10 h-10 rounded-full bg-brand flex items-center justify-center text-white font-semibold">
                         {{ substr(auth()->user()->name, 0, 1) }}
                     </div>
                     <div class="ml-3 flex-1">

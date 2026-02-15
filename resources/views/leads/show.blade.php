@@ -2,6 +2,7 @@
 
 @section('title', 'Lead #' . $lead->id . ' — ' . $lead->nome)
 
+
 @section('content')
 <div class="space-y-6">
 
@@ -207,7 +208,7 @@
                     onclick="updateStatus({{ $lead->id }}, '{{ $status }}')"
                     class="px-4 py-2 text-sm rounded-lg border transition
                         {{ $lead->status === $status
-                            ? 'bg-blue-600 text-white border-blue-600'
+                            ? 'btn-status-active border-transparent'
                             : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
                         }}"
                 >
@@ -229,7 +230,7 @@
                     <div class="max-w-xs sm:max-w-md lg:max-w-lg px-4 py-2 rounded-xl text-sm
                         {{ $message->direction === 'in'
                             ? 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
-                            : 'bg-blue-600 text-white'
+                            : 'msg-outgoing'
                         }}">
                         <p class="break-words">{{ $message->message_text }}</p>
                         <p class="text-xs mt-1 {{ $message->direction === 'in' ? 'text-gray-400' : 'text-blue-200' }}">

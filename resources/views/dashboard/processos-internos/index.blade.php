@@ -1,24 +1,26 @@
 @extends('layouts.app')
 @section('title', 'Processos Internos — BSC')
 @section('content')
-<div class="p-4 md:p-6 space-y-6">
+<div class="space-y-6">
 
-    {{-- HEADER --}}
-    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+    {{-- HEADER padrão BSC --}}
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-            <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Processos Internos</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">BSC — Perspectiva de Processos Internos</p>
+            <h1 class="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-gray-100">
+                <span class="text-lg">📊</span> Processos Internos
+            </h1>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">BSC — Perspectiva de Processos Internos</p>
         </div>
         <a href="{{ route('resultados.bsc.processos-internos.export', request()->query()) }}"
-           class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-            <span class="mr-1">📥</span> Exportar CSV
+           class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-white shadow-sm transition" style="background-color:#385776;border:1px solid #385776;">
+            📥 Exportar CSV
         </a>
     </div>
 
     {{-- FILTROS --}}
     <form method="GET" action="{{ route('resultados.bsc.processos-internos.index') }}" id="filtros-form"
           class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             <div>
                 <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Ano</label>
                 <select name="ano" onchange="this.form.submit();"
@@ -90,7 +92,7 @@
                 </label>
             </div>
             <div class="flex items-end">
-                <button type="submit" class="w-full px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition">Filtrar</button>
+                <button type="submit" class="w-full px-4 py-2 bg-brand text-white text-sm font-medium rounded-lg hover-bg-brand-dark transition">Filtrar</button>
             </div>
         </div>
     </form>
@@ -99,12 +101,23 @@
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         @foreach($cards ?? [] as $card)
             <div class="cursor-pointer transition hover:scale-[1.02]" onclick="openDrilldown('{{ $card['id'] }}')" title="Clique para detalhes">
+                @php
+                    $piMeta = (float) ($card['meta'] ?? 0);
+                    $piMetaFmt = '';
+                    $piPct = 0;
+                    if ($piMeta > 0) {
+                        $piMetaFmt = $card['formato'] === 'percent'
+                            ? number_format($piMeta, 1) . '%'
+                            : number_format($piMeta, 0, ',', '.');
+                        $piPct = (float)$card['valor'] > 0 ? ((float)$card['valor'] / $piMeta) * 100 : 0;
+                    }
+                @endphp
                 @include('dashboard.partials._kpi-card', [
                     'id'      => $card['id'],
                     'title'   => $card['titulo'],
                     'value'   => $card['formato']==='percent' ? number_format($card['valor'],1).'%' : ($card['formato']==='decimal' ? number_format($card['valor'],1) : number_format($card['valor'],0)),
-                    'meta'    => isset($card['meta']) ? 'Meta: '.$card['meta'].'%' : '',
-                    'percent' => $card['variacao'] ?? null,
+                    'meta'    => $piMetaFmt,
+                    'percent' => $piPct,
                     'trend'   => $card['variacao'] ?? null,
                     'icon'    => $card['icon'] ?? '',
                     'accent'  => $card['accent'] ?? 'blue',

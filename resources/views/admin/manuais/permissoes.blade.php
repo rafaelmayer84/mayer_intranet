@@ -11,7 +11,7 @@
             <a href="{{ route('admin.manuais.documentos.index') }}"
                class="px-4 py-2 text-sm font-medium rounded-t-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Documentos</a>
             <a href="{{ route('admin.manuais.permissoes.index') }}"
-               class="px-4 py-2 text-sm font-medium rounded-t-lg bg-blue-600 text-white">Permissões</a>
+               class="px-4 py-2 text-sm font-medium rounded-t-lg bg-brand text-white">Permissões</a>
         </div>
     </div>
 
@@ -73,7 +73,7 @@
             <div class="flex items-center justify-between mt-6">
                 <a href="{{ route('manuais-normativos.index') }}" class="text-sm text-gray-500 dark:text-gray-400 hover:underline">&larr; Voltar aos Manuais</a>
                 <button type="submit"
-                        class="px-6 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition">
+                        class="btn-mayer">
                     Salvar Permissões
                 </button>
             </div>

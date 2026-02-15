@@ -394,7 +394,7 @@
                     Cancelar
                 </a>
                 <button type="submit"
-                        class="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow transition">
+                        class="btn-mayer shadow">
                     Registrar Ficha de Crédito
                 </button>
             </div>

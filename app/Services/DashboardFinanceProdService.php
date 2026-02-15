@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use App\Helpers\KpiMetaHelper;
 
 /**
  * DashboardFinanceProdService
@@ -760,16 +761,13 @@ public function getLucratividadeByMonth(int $ano): array
         $yoyAno = $ano - 1;
         $receitaYoYPrev = $this->sumReceitaTipo($yoyAno, $mes, 'pf') + $this->sumReceitaTipo($yoyAno, $mes, 'pj');
 
-        $metaPf = (float) Configuracao::get("meta_pf_{$ano}_{$mes}", 0);
-        $metaPj = (float) Configuracao::get("meta_pj_{$ano}_{$mes}", 0);
+        $metaPf = (float) KpiMetaHelper::get('receita_pf', $ano, $mes, 0);
+        $metaPj = (float) KpiMetaHelper::get('receita_pj', $ano, $mes, 0);
         $metaReceita = $metaPf + $metaPj;
-        $metaDespesas = (float) Configuracao::get("meta_despesas_{$ano}_{$mes}", 0);
+        $metaDespesas = (float) KpiMetaHelper::get('despesas', $ano, $mes, 0);
 
-        $metaResultado = (float) Configuracao::get("meta_resultado_{$ano}_{$mes}", max($metaReceita - $metaDespesas, 0));
-        $metaMargem = (float) Configuracao::get(
-            "meta_margem_{$ano}_{$mes}",
-            $metaReceita > 0 ? round((($metaReceita - $metaDespesas) / $metaReceita) * 100, 1) : 0
-        );
+        $metaResultado = (float) KpiMetaHelper::get('resultado_operacional', $ano, $mes, max($metaReceita - $metaDespesas, 0));
+        $metaMargem = $metaReceita > 0 ? round((($metaReceita - $metaDespesas) / $metaReceita) * 100, 1) : 0;
 
         return [
             'receitaPf' => round($receitaPf, 2),
@@ -953,9 +951,11 @@ public function getLucratividadeByMonth(int $ano): array
 
     private function getMetasMensais(string $tipo, int $ano): array
     {
+        $keyMap = ['meta_pf' => 'receita_pf', 'meta_pj' => 'receita_pj'];
+        $kpiKey = $keyMap[$tipo] ?? $tipo;
         $metas = [];
         for ($m = 1; $m <= 12; $m++) {
-            $metas[$m] = (float) Configuracao::get("{$tipo}_{$ano}_{$m}", 0);
+            $metas[$m] = (float) KpiMetaHelper::get($kpiKey, $ano, $m, 0);
         }
         return $metas;
     }

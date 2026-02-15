@@ -8,7 +8,7 @@
     <!-- Info do Advogado -->
     <div class="bg-white rounded-xl shadow-sm p-6">
         <div class="flex items-center">
-            <div class="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+            <div class="w-16 h-16 bg-brand rounded-full flex items-center justify-center text-white text-2xl font-bold">
                 {{ substr($advogado->nome, 0, 1) }}
             </div>
             <div class="ml-4">

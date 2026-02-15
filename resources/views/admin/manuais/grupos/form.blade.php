@@ -57,7 +57,7 @@
         <div class="flex items-center justify-between pt-4">
             <a href="{{ route('admin.manuais.grupos.index') }}" class="text-sm text-gray-500 dark:text-gray-400 hover:underline">&larr; Cancelar</a>
             <button type="submit"
-                    class="px-6 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition">
+                    class="btn-mayer">
                 {{ $grupo ? 'Salvar' : 'Criar' }}
             </button>
         </div>

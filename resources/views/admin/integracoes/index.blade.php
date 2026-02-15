@@ -12,7 +12,7 @@
             </h1>
             <p class="text-gray-600 dark:text-gray-400 mt-1">Controle e monitoramento das integrações com DataJuri e ESPO CRM</p>
         </div>
-        <button onclick="checkStatus()" class="mt-4 md:mt-0 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">
+        <button onclick="checkStatus()" class="mt-4 md:mt-0 bg-brand hover-bg-brand-dark text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors">
             🔄 Verificar Status
         </button>
     </div>
@@ -40,7 +40,7 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <!-- DataJuri API -->
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-            <div class="bg-blue-600 text-white px-6 py-4">
+            <div class="bg-brand text-white px-6 py-4">
                 <h5 class="text-lg font-semibold flex items-center gap-2">
                     🗄️ DataJuri API
                 </h5>

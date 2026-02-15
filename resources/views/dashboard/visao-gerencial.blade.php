@@ -197,7 +197,7 @@
                 @endforeach
             </select>
             <div class="relative">
-                <button id="btn-export" type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-gray-800">
+                <button id="btn-export" type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-[#385776] bg-[#385776] px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-[#1B334A] hover:border-[#1B334A] transition">
                     📥 Exportar
                 </button>
                 <div id="export-menu" class="absolute right-0 z-20 mt-1 hidden w-40 rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">

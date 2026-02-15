@@ -21,7 +21,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
             </svg>
             <p class="text-sm font-medium text-yellow-800 mb-3">Sem cliente vinculado</p>
-            <button onclick="NexoDataJuri.autoVincular()" class="w-full mb-2 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition">
+            <button onclick="NexoDataJuri.autoVincular()" class="w-full mb-2 px-3 py-2 bg-brand text-white text-sm rounded-lg hover-bg-brand-dark transition">
                 Auto-vincular por telefone
             </button>
             <div class="relative mt-3">
@@ -115,7 +115,7 @@
         {{-- Header --}}
         <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-gray-50 rounded-t-xl">
             <div class="flex items-center gap-3 min-w-0">
-                <div class="flex-shrink-0 w-8 h-8 bg-blue-600 text-white rounded-lg flex items-center justify-center">
+                <div class="flex-shrink-0 w-8 h-8 bg-brand text-white rounded-lg flex items-center justify-center">
                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 </div>
                 <div class="min-w-0">
@@ -124,7 +124,7 @@
                 </div>
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
-                <a id="dj-modal-link-dj" href="#" target="_blank" class="hidden px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition flex items-center gap-1.5">
+                <a id="dj-modal-link-dj" href="#" target="_blank" class="hidden px-3 py-1.5 bg-brand text-white text-xs font-medium rounded-lg hover-bg-brand-dark transition flex items-center gap-1.5">
                     <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
                     DataJuri
                 </a>

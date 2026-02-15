@@ -10,7 +10,7 @@
             <h1 class="text-3xl font-bold text-gray-900 dark:text-white">🔗 Integrações</h1>
             <p class="text-gray-600 dark:text-gray-400 mt-2">Gerenciamento de sincronização de dados entre sistemas</p>
         </div>
-        <button onclick="openSyncModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition">
+        <button onclick="openSyncModal()" class="bg-brand hover-bg-brand-dark text-white px-6 py-3 rounded-lg font-medium transition">
             ⚡ Sincronizar Agora
         </button>
     </div>
@@ -103,7 +103,7 @@
                 <p class="text-sm"><strong>Registros sincronizados:</strong> 302 clientes + 418 contratos</p>
                 <p class="text-sm"><strong>Frequência:</strong> A cada 12 horas</p>
             </div>
-            <button onclick="syncDataJuri()" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition">
+            <button onclick="syncDataJuri()" class="w-full bg-brand hover-bg-brand-dark text-white px-4 py-2 rounded-lg font-medium transition">
                 Sincronizar DataJuri
             </button>
         </div>
@@ -211,10 +211,10 @@
         <p class="text-gray-600 dark:text-gray-400 mb-6">Escolha qual sistema sincronizar:</p>
         
         <div class="space-y-3">
-            <button onclick="syncAll()" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg font-medium transition">
+            <button onclick="syncAll()" class="w-full bg-brand hover-bg-brand-dark text-white px-4 py-3 rounded-lg font-medium transition">
                 Sincronizar Tudo
             </button>
-            <button onclick="syncDataJuri()" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-3 rounded-lg font-medium transition">
+            <button onclick="syncDataJuri()" class="w-full bg-blue-500 hover:bg-brand text-white px-4 py-3 rounded-lg font-medium transition">
                 Apenas DataJuri
             </button>
             <button onclick="syncEspoCRM()" class="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-3 rounded-lg font-medium transition">

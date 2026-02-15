@@ -5,25 +5,25 @@
 @section('content')
 <div class="space-y-6">
     {{-- Cabeçalho com filtros (igual Dashboard Financeiro) --}}
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Clientes & Mercado</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
+            <h1 class="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-gray-100">
+                <span class="text-lg">📊</span> Clientes & Mercado
+            </h1>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Dashboard BSC - Perspectiva Clientes | Competência: {{ $dashboardData['competencia']['label'] }}
             </p>
         </div>
         
         {{-- Filtros estilo Dashboard Financeiro --}}
         <div class="flex items-center gap-2">
-            <span class="text-sm text-gray-500 dark:text-gray-400">Ano</span>
-            <select id="filtroAno" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500 py-1.5">
+                        <select id="filtroAno" class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm shadow-sm focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
                 @foreach($anosDisponiveis as $a)
                     <option value="{{ $a }}" {{ $anoSelecionado == $a ? 'selected' : '' }}>{{ $a }}</option>
                 @endforeach
             </select>
             
-            <span class="text-sm text-gray-500 dark:text-gray-400 ml-2">Mês</span>
-            <select id="filtroMes" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500 py-1.5">
+                        <select id="filtroMes" class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm shadow-sm focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
                 @foreach($meses as $num => $nome)
                     <option value="{{ $num }}" {{ $mesSelecionado == $num ? 'selected' : '' }}>{{ substr($nome, 0, 3) }}</option>
                 @endforeach
@@ -31,7 +31,7 @@
             
             {{-- Botão Exportar --}}
             <div class="relative ml-2" x-data="{ open: false }">
-                <button @click="open = !open" type="button" class="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition text-sm font-medium">
+                <button @click="open = !open" type="button" class="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold shadow-sm" style="background-color: #1B334A; color: #fff; border: none;">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                     </svg>
@@ -52,14 +52,25 @@
     {{-- KPIs Principais (4 cards) --}}
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         @foreach($dashboardData['kpis_principais'] as $key => $kpi)
+            @php
+                $kpiMeta = (float) ($kpi['meta'] ?? 0);
+                $kpiMetaFmt = '';
+                $kpiPct = 0;
+                if ($kpiMeta > 0) {
+                    $kpiMetaFmt = $kpi['formato'] === 'moeda'
+                        ? 'R$ ' . number_format($kpiMeta, 2, ',', '.')
+                        : number_format($kpiMeta, 0, ',', '.');
+                    $kpiPct = $kpi['valor'] > 0 ? ($kpi['valor'] / $kpiMeta) * 100 : 0;
+                }
+            @endphp
             @include('dashboard.partials._kpi-card', [
                 'id' => $key,
                 'title' => $kpi['label'],
                 'value' => $kpi['formato'] === 'moeda' 
                     ? 'R$ ' . number_format($kpi['valor'], 2, ',', '.') 
                     : number_format($kpi['valor'], 0, ',', '.'),
-                'meta' => '',
-                'percent' => 0,
+                'meta' => $kpiMetaFmt,
+                'percent' => $kpiPct,
                 'trend' => $kpi['trend'] ?? null,
                 'prevValue' => $kpi['prevValue'] ?? null,
                 'subtitle' => $kpi['subtitle'] ?? null,
@@ -72,6 +83,19 @@
     {{-- KPIs Secundários (4 cards) --}}
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         @foreach($dashboardData['kpis_secundarios'] as $key => $kpi)
+            @php
+                $secMeta = (float) ($kpi['meta'] ?? 0);
+                $secMetaFmt = '';
+                $secPct = 0;
+                if ($secMeta > 0) {
+                    $secMetaFmt = $kpi['formato'] === 'moeda'
+                        ? 'R$ ' . number_format($secMeta, 2, ',', '.')
+                        : ($kpi['formato'] === 'percentual'
+                            ? number_format($secMeta, 1, ',', '.') . '%'
+                            : number_format($secMeta, 0, ',', '.'));
+                    $secPct = $secMeta > 0 && $kpi['valor'] > 0 ? ($kpi['valor'] / $secMeta) * 100 : 0;
+                }
+            @endphp
             @include('dashboard.partials._kpi-card', [
                 'id' => 'sec-' . $key,
                 'title' => $kpi['label'],
@@ -80,8 +104,8 @@
                     : ($kpi['formato'] === 'percentual'
                         ? number_format($kpi['valor'], 1, ',', '.') . '%'
                         : number_format($kpi['valor'], 0, ',', '.')),
-                'meta' => '',
-                'percent' => 0,
+                'meta' => $secMetaFmt,
+                'percent' => $secPct,
                 'trend' => $kpi['trend'] ?? null,
                 'prevValue' => $kpi['prevValue'] ?? null,
                 'subtitle' => $kpi['subtitle'] ?? null,

@@ -44,7 +44,7 @@
 
         <div class="mt-6 text-center">
             <a href="{{ url('/nexo/atendimento/conversas') }}" 
-               class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm">
+               class="inline-flex items-center px-4 py-2 bg-brand text-white rounded-lg hover-bg-brand-dark transition text-sm">
                 Ver API JSON (Conversas)
             </a>
         </div>

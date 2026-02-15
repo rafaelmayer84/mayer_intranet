@@ -1,0 +1,328 @@
+@extends('layouts.app')
+@section('title', 'Processos Internos — BSC')
+@section('content')
+<div class="p-4 md:p-6 space-y-6">
+
+    {{-- HEADER --}}
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Processos Internos</h1>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">BSC — Perspectiva de Processos Internos</p>
+        </div>
+        <a href="{{ route('resultados.bsc.processos-internos.export', request()->query()) }}"
+           class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+            <span class="mr-1">📥</span> Exportar CSV
+        </a>
+    </div>
+
+    {{-- FILTROS --}}
+    <form method="GET" action="{{ route('resultados.bsc.processos-internos.index') }}" id="filtros-form"
+          class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Ano</label>
+                <select name="ano" onchange="this.form.submit();"
+                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 text-sm">
+                    @for($a = date('Y'); $a >= 2020; $a--)
+                        <option value="{{ $a }}" {{ (int)($filtros['ano'] ?? date('Y'))===$a ? 'selected' : '' }}>{{ $a }}</option>
+                    @endfor
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Mês</label>
+                <select name="mes" onchange="this.form.submit();"
+                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 text-sm">
+                    @foreach(['1'=>'Jan','2'=>'Fev','3'=>'Mar','4'=>'Abr','5'=>'Mai','6'=>'Jun','7'=>'Jul','8'=>'Ago','9'=>'Set','10'=>'Out','11'=>'Nov','12'=>'Dez'] as $mv=>$ml)
+                        <option value="{{ $mv }}" {{ (int)($filtros['mes'] ?? date('n'))===(int)$mv ? 'selected' : '' }}>{{ $ml }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+
+
+            <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Área</label>
+                <select name="area" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 text-sm">
+                    <option value="">Todas</option>
+                    @foreach($areas ?? [] as $area)
+                        <option value="{{ $area }}" {{ ($filtros['area'] ?? '')===$area ? 'selected' : '' }}>{{ $area }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Tipo Atividade</label>
+                <select name="tipo_atividade" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 text-sm">
+                    <option value="">Todos</option>
+                    @foreach($tipos_atividade ?? [] as $tipo)
+                        <option value="{{ $tipo }}" {{ ($filtros['tipo_atividade'] ?? '')===$tipo ? 'selected' : '' }}>{{ $tipo }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Status Processo</label>
+                <select name="status_processo" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 text-sm">
+                    <option value="">Todos</option>
+                    @foreach(['Ativo','Inativo','Encerrado','Arquivado'] as $st)
+                        <option value="{{ $st }}" {{ ($filtros['status_processo'] ?? '')===$st ? 'selected' : '' }}>{{ $st }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Agrupar por</label>
+                <select name="agrupamento_evolucao" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 text-sm">
+                    @foreach(['dia'=>'Dia','semana'=>'Semana','mes'=>'Mês'] as $val=>$label)
+                        <option value="{{ $val }}" {{ ($filtros['agrupamento_evolucao'] ?? 'semana')===$val ? 'selected' : '' }}>{{ $label }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Dias s/ andamento</label>
+                <input type="number" name="dias_sem_andamento" min="1" max="365" value="{{ $filtros['dias_sem_andamento'] ?? 30 }}"
+                       class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 text-sm">
+            </div>
+            <div class="flex items-end pb-1">
+                <label class="inline-flex items-center text-sm text-gray-600 dark:text-gray-400">
+                    <input type="hidden" name="comparar_periodo_anterior" value="0">
+                    <input type="checkbox" name="comparar_periodo_anterior" value="1"
+                           {{ ($filtros['comparar_periodo_anterior'] ?? '0')==='1' ? 'checked' : '' }}
+                           class="rounded border-gray-300 dark:border-gray-600 text-blue-600 mr-2">
+                    Comparar anterior
+                </label>
+            </div>
+            <div class="flex items-end">
+                <button type="submit" class="w-full px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition">Filtrar</button>
+            </div>
+        </div>
+    </form>
+
+    {{-- CARDS KPIs (6) --}}
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        @foreach($cards ?? [] as $card)
+            <div class="cursor-pointer transition hover:scale-[1.02]" onclick="openDrilldown('{{ $card['id'] }}')" title="Clique para detalhes">
+                @include('dashboard.partials._kpi-card', [
+                    'id'      => $card['id'],
+                    'title'   => $card['titulo'],
+                    'value'   => $card['formato']==='percent' ? number_format($card['valor'],1).'%' : ($card['formato']==='decimal' ? number_format($card['valor'],1) : number_format($card['valor'],0)),
+                    'meta'    => isset($card['meta']) ? 'Meta: '.$card['meta'].'%' : '',
+                    'percent' => $card['variacao'] ?? null,
+                    'trend'   => $card['variacao'] ?? null,
+                    'icon'    => $card['icon'] ?? '',
+                    'accent'  => $card['accent'] ?? 'blue',
+                    'subtitle' => $card['subtitulo'] ?? null,
+                ])
+            </div>
+        @endforeach
+    </div>
+
+    {{-- GRÁFICOS DE EVOLUÇÃO (3) --}}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Evolução SLA (%)</h3>
+            <div class="h-[260px]"><canvas id="chart-sla"></canvas></div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Evolução Backlog</h3>
+            <div class="h-[260px]"><canvas id="chart-backlog"></canvas></div>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Evolução Throughput</h3>
+            <div class="h-[260px]"><canvas id="chart-throughput"></canvas></div>
+        </div>
+    </div>
+
+    {{-- TABELA EQUIPE --}}
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Desempenho da Equipe</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-900">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Responsável</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">SLA (%)</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Backlog</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">WIP</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Throughput</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Horas</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    @forelse($equipe ?? [] as $m)
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
+                        <td class="px-4 py-3 text-sm text-gray-900 dark:text-gray-100 font-medium">{{ $m['nome'] }}</td>
+                        <td class="px-4 py-3 text-sm text-center">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ $m['sla']>=80?'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400':($m['sla']>=60?'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400':'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400') }}">{{ number_format($m['sla'],1) }}%</span>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-center {{ $m['backlog']>0?'text-red-600 dark:text-red-400 font-semibold':'text-gray-600 dark:text-gray-400' }}">{{ $m['backlog'] }}</td>
+                        <td class="px-4 py-3 text-sm text-center text-gray-600 dark:text-gray-400">{{ $m['wip'] }}</td>
+                        <td class="px-4 py-3 text-sm text-center text-green-600 dark:text-green-400 font-semibold">{{ $m['throughput'] }}</td>
+                        <td class="px-4 py-3 text-sm text-center text-gray-600 dark:text-gray-400">{{ number_format($m['horas'],1) }}h</td>
+                    </tr>
+                    @empty
+                    <tr><td colspan="6" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">Nenhum dado disponível para o período.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {{-- SEÇÃO INFERIOR: Fases + Riscos --}}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Processos Parados por Fase</h3>
+            @if(!empty($processos_por_fase))
+                <div class="h-[260px]"><canvas id="chart-fases"></canvas></div>
+            @else
+                <p class="text-sm text-gray-500 dark:text-gray-400 py-8 text-center">Nenhum processo parado encontrado.</p>
+            @endif
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Top 20 Riscos</h3>
+            </div>
+            <div class="overflow-x-auto" style="max-height:360px; overflow-y:auto;">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead class="bg-gray-50 dark:bg-gray-900 sticky top-0">
+                        <tr>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Pasta</th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Responsável</th>
+                            <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Fase</th>
+                            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Dias</th>
+                            <th class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Valor Prov.</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                        @forelse($top_riscos ?? [] as $r)
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
+                            <td class="px-3 py-2 text-sm"><a href="#" class="text-blue-600 dark:text-blue-400 hover:underline">{{ $r['pasta'] }}</a></td>
+                            <td class="px-3 py-2 text-sm text-gray-700 dark:text-gray-300">{{ $r['responsavel'] }}</td>
+                            <td class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">{{ $r['fase'] ?? '—' }}</td>
+                            <td class="px-3 py-2 text-sm text-right font-semibold {{ $r['dias_parado']>60?'text-red-600 dark:text-red-400':'text-yellow-600 dark:text-yellow-400' }}">{{ $r['dias_parado'] }}d</td>
+                            <td class="px-3 py-2 text-sm text-right text-gray-700 dark:text-gray-300">{{ $r['valor_provisionado'] ? 'R$ '.number_format($r['valor_provisionado'],2,',','.') : '—' }}</td>
+                        </tr>
+                        @empty
+                        <tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">Nenhum risco identificado.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {{-- MODAL DRILLDOWN --}}
+    <div id="drilldown-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                <h3 id="drilldown-title" class="text-lg font-semibold text-gray-800 dark:text-gray-100">Detalhes</h3>
+                <button onclick="closeDrilldown()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+            <div id="drilldown-body" class="overflow-auto flex-1 p-4">
+                <div class="flex items-center justify-center py-12">
+                    <div class="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent"></div>
+                </div>
+            </div>
+            <div id="drilldown-pagination" class="px-4 py-3 border-t border-gray-200 dark:border-gray-700 text-sm text-gray-500 text-center"></div>
+        </div>
+    </div>
+</div>
+@endsection
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const isDark = document.documentElement.classList.contains('dark');
+    const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+    const textColor = isDark ? '#9ca3af' : '#6b7280';
+    const defaultOpts = {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: textColor, font: { size: 11 } } } },
+        scales: {
+            x: { ticks: { color: textColor, font: { size: 10 } }, grid: { color: gridColor } },
+            y: { ticks: { color: textColor, font: { size: 10 } }, grid: { color: gridColor }, beginAtZero: true },
+        },
+    };
+
+    function buildLineChart(canvasId, dataObj, color, label, opts = {}) {
+        if (!dataObj || !dataObj.labels || dataObj.labels.length === 0) return;
+        const datasets = [{ label: label, data: dataObj.data, borderColor: color, backgroundColor: color + '22', fill: true, tension: 0.3 }];
+        if (dataObj.data_anterior && dataObj.data_anterior.length > 0) {
+            datasets.push({ label: 'Período anterior', data: dataObj.data_anterior, borderColor: '#9ca3af', borderDash: [5,5], fill: false, tension: 0.3 });
+        }
+        new Chart(document.getElementById(canvasId), { type: 'line', data: { labels: dataObj.labels, datasets }, options: { ...defaultOpts, ...opts } });
+    }
+
+    // Gráficos de evolução
+    buildLineChart('chart-sla', @json($evolucao_sla ?? null), '#10b981', 'SLA (%)', { scales: { ...defaultOpts.scales, y: { ...defaultOpts.scales.y, min: 0, max: 100 } } });
+    buildLineChart('chart-backlog', @json($evolucao_backlog ?? null), '#ef4444', 'Backlog Vencido');
+    buildLineChart('chart-throughput', @json($evolucao_throughput ?? null), '#3b82f6', 'Throughput');
+
+    // Gráfico de barras: Processos por fase
+    const fasesData = @json($processos_por_fase ?? []);
+    if (fasesData.length > 0 && document.getElementById('chart-fases')) {
+        new Chart(document.getElementById('chart-fases'), {
+            type: 'bar',
+            data: {
+                labels: fasesData.map(f => f.fase),
+                datasets: [{
+                    label: 'Processos parados',
+                    data: fasesData.map(f => f.total),
+                    backgroundColor: ['#ef4444','#f59e0b','#3b82f6','#8b5cf6','#06b6d4','#84cc16','#f97316','#ec4899'],
+                    borderRadius: 6,
+                }]
+            },
+            options: { ...defaultOpts, indexAxis: 'y', plugins: { ...defaultOpts.plugins, legend: { display: false } } },
+        });
+    }
+});
+
+// Toggle datas custom
+// Drilldown
+const drilldownTitles = { backlog: 'Backlog Vencido', wip: 'Atividades em Andamento', sem_andamento: 'Processos sem Andamento', throughput: 'Atividades Concluídas' };
+function openDrilldown(tipo) {
+    if (!drilldownTitles[tipo]) return;
+    document.getElementById('drilldown-modal').classList.remove('hidden');
+    document.getElementById('drilldown-title').textContent = drilldownTitles[tipo];
+    loadDrilldownPage(tipo, 1);
+}
+function closeDrilldown() { document.getElementById('drilldown-modal').classList.add('hidden'); }
+
+function loadDrilldownPage(tipo, page) {
+    const params = new URLSearchParams(window.location.search);
+    params.set('page', page);
+    const url = `{{ url('resultados/bsc/processos-internos/drilldown') }}/${tipo}?${params.toString()}`;
+    document.getElementById('drilldown-body').innerHTML = '<div class="flex items-center justify-center py-12"><div class="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent"></div></div>';
+
+    fetch(url).then(r => r.json()).then(res => {
+        let html = '<table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm"><thead class="bg-gray-50 dark:bg-gray-900"><tr>';
+        const rows = res.data || [];
+        if (rows.length > 0) {
+            Object.keys(rows[0]).forEach(k => { html += `<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">${k}</th>`; });
+            html += '</tr></thead><tbody class="divide-y divide-gray-200 dark:divide-gray-700">';
+            rows.forEach(row => {
+                html += '<tr>';
+                Object.values(row).forEach(v => { html += `<td class="px-3 py-2">${v ?? '—'}</td>`; });
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+        } else {
+            html = '<p class="text-center text-gray-500 py-8">Nenhum registro encontrado.</p>';
+        }
+        document.getElementById('drilldown-body').innerHTML = html;
+
+        // Paginação
+        const pag = document.getElementById('drilldown-pagination');
+        if (res.last_page > 1) {
+            let pagHtml = `Página ${res.current_page} de ${res.last_page} `;
+            if (res.current_page > 1) pagHtml += `<button onclick="loadDrilldownPage('${tipo}',${res.current_page-1})" class="text-blue-600 hover:underline mx-1">← Anterior</button>`;
+            if (res.current_page < res.last_page) pagHtml += `<button onclick="loadDrilldownPage('${tipo}',${res.current_page+1})" class="text-blue-600 hover:underline mx-1">Próxima →</button>`;
+            pag.innerHTML = pagHtml;
+        } else { pag.innerHTML = ''; }
+    }).catch(() => { document.getElementById('drilldown-body').innerHTML = '<p class="text-center text-red-500 py-8">Erro ao carregar dados.</p>'; });
+}
+
+// Fechar modal com Esc
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrilldown(); });
+</script>
+@endpush

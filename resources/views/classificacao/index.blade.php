@@ -44,7 +44,7 @@
                 </select>
             </div>
             <div class="pt-6">
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2 rounded-lg transition-colors">
+                <button type="submit" class="bg-brand hover-bg-brand-dark text-white font-medium px-6 py-2 rounded-lg transition-colors">
                     Filtrar
                 </button>
             </div>

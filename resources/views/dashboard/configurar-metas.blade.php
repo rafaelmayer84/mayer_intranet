@@ -56,7 +56,7 @@
             <span class="text-xl font-bold text-white" id="total-pf">R$ 0,00</span>
         </div>
         <div class="mt-4 flex justify-end">
-            <button type="button" class="btn-salvar px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center">
+            <button type="button" class="btn-salvar px-4 py-2 bg-brand hover-bg-brand-dark text-white font-medium rounded-lg transition-colors flex items-center">
                 <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
                 </svg>

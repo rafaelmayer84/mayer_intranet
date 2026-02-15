@@ -12,10 +12,10 @@
         </div>
 
             <div class="flex gap-2">
-                <a href="{{ route('admin.avisos.index') }}" class="inline-flex items-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white">
+                <a href="{{ route('admin.avisos.index') }}" class="btn-mayer">
                     Gerenciar
                 </a>
-                <a href="{{ route('admin.avisos.create') }}" class="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500">
+                <a href="{{ route('admin.avisos.create') }}" class="btn-mayer">
                     Novo aviso
                 </a>
             </div>
@@ -59,7 +59,7 @@
                 <label class="block text-xs font-semibold text-gray-600 dark:text-slate-300">Buscar</label>
                 <div class="mt-1 flex gap-2">
                     <input name="busca" value="{{ $filtros['busca'] ?? '' }}" class="w-full rounded-lg border-gray-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900" placeholder="Título ou descrição" />
-                    <button class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white" type="submit">Filtrar</button>
+                    <button class="btn-mayer" type="submit">Filtrar</button>
                 </div>
             </div>
         </div>

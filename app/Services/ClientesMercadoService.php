@@ -6,6 +6,7 @@ use App\Models\{Cliente, Lead, Processo};
 use App\Models\Crm\CrmOpportunity;
 use Illuminate\Support\Facades\{DB, Cache};
 use Carbon\Carbon;
+use App\Helpers\KpiMetaHelper;
 
 /**
  * ClientesMercadoService
@@ -132,6 +133,7 @@ class ClientesMercadoService
                 'trend' => $pctChange($leadsNovos, $leadsNovosPrev),
                 'prevValue' => $fmtPrev($leadsNovosPrev, 'numero'),
                 'subtitle' => $leadsNovos > 0 ? 'Acumulado mês atual' : 'Nenhum lead no período',
+                'meta' => KpiMetaHelper::get('leads_novos', $refDate->year, $refDate->month, 0),
             ],
             'oportunidades_ganhas' => [
                 'valor' => $opsGanhas,
@@ -142,20 +144,23 @@ class ClientesMercadoService
                 'trend' => $pctChange($opsGanhas, $opsGanhasPrev),
                 'prevValue' => $fmtPrev($opsGanhasPrev, 'numero'),
                 'subtitle' => $opsGanhas > 0 ? 'Fechamentos confirmados' : 'Sem fechamentos no mês',
+                'meta' => KpiMetaHelper::get('oportunidades_ganhas', $refDate->year, $refDate->month, 0),
             ],
             'clientes_ativos' => [
                 'valor' => $clientesAtivos,
                 'label' => 'Clientes Ativos (estoque)',
                 'icon' => '🏢',
                 'cor' => 'purple',
-                'formato' => 'numero'
+                'formato' => 'numero',
+                'meta' => KpiMetaHelper::get('clientes_ativos', $refDate->year, $refDate->month, 0),
             ],
             'valor_ganho' => [
                 'valor' => $valorGanho,
                 'label' => 'Valor Ganho',
                 'icon' => '💰',
                 'cor' => 'green',
-                'formato' => 'moeda'
+                'formato' => 'moeda',
+                'meta' => KpiMetaHelper::get('valor_ganho', $refDate->year, $refDate->month, 0),
             ]
         ];
     }
@@ -214,21 +219,24 @@ class ClientesMercadoService
                 'icon' => '📊',
                 'cor' => 'orange',
                 'formato' => 'percentual',
-                'detalhe' => "{$leadsConvertidos} de {$leadsNovos} leads"
+                'detalhe' => "{$leadsConvertidos} de {$leadsNovos} leads",
+                'meta' => 0,
             ],
             'ticket_medio' => [
                 'valor' => $ticketMedio,
                 'label' => 'Ticket Médio',
                 'icon' => '🎫',
                 'cor' => 'blue',
-                'formato' => 'moeda'
+                'formato' => 'moeda',
+                'meta' => 0,
             ],
             'pipeline_aberto' => [
                 'valor' => $pipelineAberto,
                 'label' => 'Pipeline Aberto',
                 'icon' => '📈',
                 'cor' => 'purple',
-                'formato' => 'moeda'
+                'formato' => 'moeda',
+                'meta' => 0,
             ],
             'win_rate' => [
                 'valor' => $winRate,
@@ -236,7 +244,8 @@ class ClientesMercadoService
                 'icon' => '🎯',
                 'cor' => 'green',
                 'formato' => 'percentual',
-                'detalhe' => "{$opsGanhasMes} de {$totalFechadas} fechadas"
+                'detalhe' => "{$opsGanhasMes} de {$totalFechadas} fechadas",
+                'meta' => KpiMetaHelper::get('win_rate', $refDate->year, $refDate->month, 0),
             ]
         ];
     }

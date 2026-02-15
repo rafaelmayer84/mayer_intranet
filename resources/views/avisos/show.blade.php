@@ -15,7 +15,7 @@
         <a href="{{ route('avisos.index') }}" class="text-sm font-semibold text-blue-600 hover:text-blue-500">← Voltar</a>
 
         <div class="flex gap-2">
-                <a href="{{ route('admin.avisos.edit', $aviso) }}" class="inline-flex items-center rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white">
+                <a href="{{ route('admin.avisos.edit', $aviso) }}" class="inline-flex items-center rounded-lg btn-mayer">
                     Editar
                 </a>
                 <form method="POST" action="{{ route('admin.avisos.destroy', $aviso) }}" onsubmit="return confirm('Remover este aviso?');">
@@ -94,7 +94,7 @@
                     </div>
 
                     @if(!$jaLeu)
-                        <button type="button" data-marcar-lido class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500">
+                        <button type="button" data-marcar-lido class="inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white hover-bg-brand-dark">
                             Marcar como lido
                         </button>
                     @else

@@ -260,16 +260,16 @@
 
                 <!-- 2) RESULTADOS! (colapsável) -->
                 <div class="menu-group">
-                    <button onclick="toggleSubmenu('resultados')" class="nav-link w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors {{ request()->is('visao-gerencial*') || request()->is('clientes-mercado*') || request()->is('processos-internos*') || request()->is('times-evolucao*') ? 'nav-link-active' : '' }}" data-tooltip="RESULTADOS!">
+                    <button onclick="toggleSubmenu('resultados')" class="nav-link w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors {{ request()->is('visao-gerencial*') || request()->is('clientes-mercado*') || request()->is('processos-internos*') || request()->is('resultados/bsc/processos-internos*') || request()->is('times-evolucao*') ? 'nav-link-active' : '' }}" data-tooltip="RESULTADOS!">
                         <div class="flex items-center">
                             <span class="w-5 h-5 mr-3" role="img" aria-label="Metas">🎯</span>
                             <span class="font-medium menu-text">RESULTADOS!</span>
                         </div>
-                        <svg id="arrow-resultados" class="w-4 h-4 menu-arrow {{ request()->is('visao-gerencial*') || request()->is('clientes-mercado*') || request()->is('processos-internos*') || request()->is('times-evolucao*') ? 'rotated' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg id="arrow-resultados" class="w-4 h-4 menu-arrow {{ request()->is('visao-gerencial*') || request()->is('clientes-mercado*') || request()->is('processos-internos*') || request()->is('resultados/bsc/processos-internos*') || request()->is('times-evolucao*') ? 'rotated' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                         </svg>
                     </button>
-                    <div id="submenu-resultados" class="submenu {{ request()->is('visao-gerencial*') || request()->is('clientes-mercado*') || request()->is('processos-internos*') || request()->is('times-evolucao*') ? 'open' : '' }} ml-4 mt-1 space-y-1">
+                    <div id="submenu-resultados" class="submenu {{ request()->is('visao-gerencial*') || request()->is('clientes-mercado*') || request()->is('processos-internos*') || request()->is('resultados/bsc/processos-internos*') || request()->is('times-evolucao*') ? 'open' : '' }} ml-4 mt-1 space-y-1">
                         <a href="{{ route('visao-gerencial') }}"
                            class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('visao-gerencial') ? 'nav-sublink-active' : '' }}"
                            data-tooltip="Finanças">
@@ -342,12 +342,7 @@
                             <a href="{{ route('crm.reports') }}" class="block px-3 py-1 text-xs rounded-lg hover:bg-gray-100 {{ request()->routeIs('crm.reports') ? 'text-[#385776] font-medium' : 'text-gray-400' }}">Relatórios</a>
                         </div>
                     </div>
-                        <a href="{{ route('crm.carteira') }}"
-                           class="nav-sublink flex items-center px-4 py-2 rounded-lg text-sm transition-colors {{ request()->is('crm/*') ? 'nav-link-active' : '' }}"
-                           data-tooltip="CRM">
-                            <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                            <span class="menu-text">CRM</span>
-                        </a>
+{{-- CRM avulso removido 15/02 --}}
                     </div>
                 </div>
 

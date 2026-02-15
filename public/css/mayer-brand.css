@@ -367,3 +367,5 @@ input[type="number"],
 textarea {
     min-height: 40px;
 }
+
+/* Botoes export: estilizados inline nos blade templates (15/02) */

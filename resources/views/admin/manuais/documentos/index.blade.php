@@ -9,7 +9,7 @@
             <a href="{{ route('admin.manuais.grupos.index') }}"
                class="px-4 py-2 text-sm font-medium rounded-t-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Grupos</a>
             <a href="{{ route('admin.manuais.documentos.index') }}"
-               class="px-4 py-2 text-sm font-medium rounded-t-lg bg-blue-600 text-white">Documentos</a>
+               class="px-4 py-2 text-sm font-medium rounded-t-lg bg-brand text-white">Documentos</a>
             <a href="{{ route('admin.manuais.permissoes.index') }}"
                class="px-4 py-2 text-sm font-medium rounded-t-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Permissões</a>
         </div>
@@ -34,7 +34,7 @@
             </select>
         </form>
         <a href="{{ route('admin.manuais.documentos.create') }}"
-           class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition">
+           class="btn-mayer">
             + Novo Documento
         </a>
     </div>

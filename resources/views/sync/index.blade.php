@@ -20,7 +20,7 @@
         </select>
       </form>
 
-      <button id="btnSyncAll" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2 rounded-lg transition-colors" onclick="iniciarSincronizacao()">
+      <button id="btnSyncAll" class="bg-brand hover-bg-brand-dark text-white font-medium px-6 py-2 rounded-lg transition-colors" onclick="iniciarSincronizacao()">
         Sincronizar (ano {{ $ano }})
       </button>
 
@@ -53,7 +53,7 @@
         <div id="progressText" class="text-gray-400 text-sm">Aguardando...</div>
       </div>
       <div class="w-full bg-gray-700 rounded-full h-5 overflow-hidden">
-        <div id="progressBar" class="bg-blue-600 h-5 rounded-full transition-all duration-300 flex items-center justify-center text-xs text-white font-medium" style="width: 0%">0%</div>
+        <div id="progressBar" class="bg-brand h-5 rounded-full transition-all duration-300 flex items-center justify-center text-xs text-white font-medium" style="width: 0%">0%</div>
       </div>
     </div>
   </div>
@@ -226,7 +226,7 @@ function updateProgress(percent, text) {
   if (text) progressText.textContent = text;
 
   if (percent >= 100) {
-    bar.classList.remove('bg-blue-600');
+    bar.classList.remove('bg-brand');
     bar.classList.add('bg-green-600');
   }
 }

@@ -5,6 +5,7 @@ namespace App\Services;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Carbon;
+use App\Helpers\KpiMetaHelper;
 
 /**
  * ProcessosInternosService
@@ -142,6 +143,9 @@ class ProcessosInternosService
         $horasAtual = $this->calcHoras($periodo, $filtros);
         $horasAnterior = $this->calcHoras($periodoAnterior, $filtros);
 
+        $_kpiAno = (int) $periodo['fim']->year;
+        $_kpiMes = (int) $periodo['fim']->month;
+
         return [
             'sla' => [
                 'id'        => 'sla',
@@ -151,7 +155,7 @@ class ProcessosInternosService
                 'variacao'  => $this->variacao($slaAtual, $slaAnterior),
                 'icon'      => '⏱️',
                 'accent'    => $slaAtual >= 80 ? 'green' : ($slaAtual >= 60 ? 'yellow' : 'red'),
-                'meta'      => 80,
+                'meta'      => KpiMetaHelper::get('sla_percentual', $_kpiAno, $_kpiMes, 80),
             ],
             'backlog' => [
                 'id'        => 'backlog',
@@ -161,6 +165,7 @@ class ProcessosInternosService
                 'subtitulo' => 'Média: ' . number_format($backlog['media_dias'], 1) . ' dias atraso',
                 'icon'      => '📋',
                 'accent'    => $backlog['total'] == 0 ? 'green' : ($backlog['total'] <= 10 ? 'yellow' : 'red'),
+                'meta'      => KpiMetaHelper::get('backlog', $_kpiAno, $_kpiMes, 0),
             ],
             'wip' => [
                 'id'        => 'wip',
@@ -169,6 +174,7 @@ class ProcessosInternosService
                 'formato'   => 'integer',
                 'icon'      => '🔄',
                 'accent'    => 'blue',
+                'meta'      => 0,
             ],
             'sem_andamento' => [
                 'id'        => 'sem_andamento',
@@ -177,6 +183,7 @@ class ProcessosInternosService
                 'formato'   => 'integer',
                 'icon'      => '⚠️',
                 'accent'    => $semAndamento == 0 ? 'green' : ($semAndamento <= 5 ? 'yellow' : 'red'),
+                'meta'      => KpiMetaHelper::get('sem_movimentacao', $_kpiAno, $_kpiMes, 0),
             ],
             'throughput' => [
                 'id'        => 'throughput',
@@ -186,6 +193,7 @@ class ProcessosInternosService
                 'variacao'  => $this->variacao($throughputAtual, $throughputAnterior),
                 'icon'      => '✅',
                 'accent'    => 'green',
+                'meta'      => KpiMetaHelper::get('throughput', $_kpiAno, $_kpiMes, 0),
             ],
             'horas' => [
                 'id'        => 'horas',
@@ -195,6 +203,7 @@ class ProcessosInternosService
                 'variacao'  => $this->variacao($horasAtual, $horasAnterior),
                 'icon'      => '🕐',
                 'accent'    => 'purple',
+                'meta'      => KpiMetaHelper::get('horas_trabalhadas', $_kpiAno, $_kpiMes, 0),
             ],
         ];
     }

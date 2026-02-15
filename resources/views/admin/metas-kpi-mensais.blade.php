@@ -11,7 +11,7 @@
             </div>
             <div class="bg-blue-100 dark:bg-blue-900 px-6 py-3 rounded-lg">
                 <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Ano</label>
-                <select id="ano-filter" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500">
+                <select id="ano-filter" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-[#385776] text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500">
                     @for($y = 2020; $y <= 2030; $y++)
                         <option value="{{ $y }}" {{ $ano == $y ? 'selected' : '' }}>{{ $y }}</option>
                     @endfor
@@ -380,7 +380,7 @@
             </button>
             <button 
                 type="submit" 
-                class="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition shadow-lg flex items-center gap-2"
+                class="px-8 py-3 bg-brand hover-bg-brand-dark text-white font-bold rounded-lg transition shadow-lg flex items-center gap-2"
             >
                 💾 Salvar Metas
             </button>

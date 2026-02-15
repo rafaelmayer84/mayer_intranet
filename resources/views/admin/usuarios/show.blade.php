@@ -154,7 +154,7 @@
                                                            value="1"
                                                            {{ $item['tem_permissao'] ? 'checked' : '' }}
                                                            class="sr-only peer">
-                                                    <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-500 peer-checked:bg-blue-600"></div>
+                                                    <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-500 peer-checked:bg-brand"></div>
                                                 </label>
                                                 <div>
                                                     <p class="text-sm font-medium text-gray-900 dark:text-white">
@@ -210,7 +210,7 @@
 
                         <div class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
                             <button type="submit" 
-                                    class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
+                                    class="w-full px-4 py-2 bg-brand hover-bg-brand-dark text-white font-medium rounded-lg transition-colors">
                                 Salvar Permissões
                             </button>
                         </div>

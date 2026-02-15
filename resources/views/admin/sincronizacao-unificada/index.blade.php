@@ -62,7 +62,7 @@
 
             {{-- BOTÕES DE AÇÃO GLOBAL --}}
             <div class="flex flex-wrap gap-3 mb-4">
-                <button id="btn-test-datajuri" class="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 flex items-center gap-2">
+                <button id="btn-test-datajuri" class="rounded-lg bg-brand px-4 py-2 text-sm text-white hover-bg-brand-dark flex items-center gap-2">
                     <span>&#x1F50C;</span> Testar Conexão
                 </button>
                 <button id="btn-sync-all" class="rounded-lg bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700 flex items-center gap-2">
@@ -97,7 +97,7 @@
                     <span class="text-sm text-gray-500" id="progress-percent">0%</span>
                 </div>
                 <div class="w-full bg-gray-200 rounded-full h-3 dark:bg-gray-700">
-                    <div id="progress-bar" class="bg-blue-600 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    <div id="progress-bar" class="bg-brand h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
                 </div>
                 <p class="mt-2 text-xs text-gray-500" id="progress-detail"></p>
             </div>
@@ -153,7 +153,7 @@
             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between mb-6">
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Regras de Classificação</h2>
                 <div class="flex flex-wrap gap-2">
-                    <button id="btn-nova-regra" class="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700">+ Nova Regra</button>
+                    <button id="btn-nova-regra" class="rounded-lg bg-brand px-4 py-2 text-sm text-white hover-bg-brand-dark">+ Nova Regra</button>
                     <button id="btn-importar-datajuri" class="rounded-lg bg-green-600 px-4 py-2 text-sm text-white hover:bg-green-700">&#x1F4E5; Importar do DataJuri</button>
                     <button id="btn-reclassificar" class="rounded-lg bg-purple-600 px-4 py-2 text-sm text-white hover:bg-purple-700">&#x1F504; Reclassificar</button>
                 </div>
@@ -289,7 +289,7 @@
             </form>
             <div class="border-t px-6 py-4 flex gap-3 dark:border-gray-700">
                 <button onclick="fecharModal()" class="flex-1 rounded-lg border px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700">Cancelar</button>
-                <button onclick="salvarRegra()" class="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700">Salvar</button>
+                <button onclick="salvarRegra()" class="flex-1 rounded-lg bg-brand px-4 py-2 text-sm text-white hover-bg-brand-dark">Salvar</button>
             </div>
         </div>
     </div>

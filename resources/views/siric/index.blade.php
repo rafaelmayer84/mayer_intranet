@@ -12,7 +12,7 @@
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Sistema de análise para parcelamento de honorários</p>
         </div>
         <a href="{{ route('siric.create') }}"
-           class="mt-3 sm:mt-0 inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg shadow transition">
+           class="btn-mayer shadow">
             + Nova Consulta
         </a>
     </div>

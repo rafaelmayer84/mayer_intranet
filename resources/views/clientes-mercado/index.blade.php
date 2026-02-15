@@ -25,7 +25,7 @@
                     <option value="{{ $a }}" {{ $anoSelecionado == $a ? 'selected' : '' }}>{{ $a }}</option>
                 @endforeach
             </select>
-            <button type="submit" class="px-4 py-2 bg-brand text-white rounded-lg hover-bg-brand-dark transition text-sm font-medium">
+            <button type="submit" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-white shadow-sm transition" style="background-color:#385776;border:1px solid #385776;">
                 Filtrar
             </button>
         </form>

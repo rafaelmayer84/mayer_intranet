@@ -3,28 +3,30 @@
 @section('content')
 <div class="space-y-6">
 
-    {{-- Cabeçalho com filtros (padrão BSC) --}}
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    {{-- HEADER padrão BSC --}}
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Times & Evolução</h1>
-            <p class="text-sm text-gray-500 dark:text-gray-400">
+            <h1 class="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-gray-100">
+                <span class="text-lg">📊</span> Times & Evolução
+            </h1>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Dashboard BSC — Maturidade Operacional | Competência: {{ $refDate->translatedFormat('F/Y') }}
             </p>
         </div>
         <form method="GET" action="{{ route('times-evolucao.index') }}" class="flex items-center gap-2">
-            <select name="month" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+            <select name="month" class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm shadow-sm focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
                 @for ($m = 1; $m <= 12; $m++)
                     <option value="{{ $m }}" {{ $month === $m ? 'selected' : '' }}>
                         {{ Carbon\Carbon::create(null, $m)->translatedFormat('F') }}
                     </option>
                 @endfor
             </select>
-            <select name="year" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-blue-500 focus:border-blue-500">
+            <select name="year" class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm shadow-sm focus:ring-2 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
                 @for ($y = 2024; $y <= now()->year; $y++)
                     <option value="{{ $y }}" {{ $year === $y ? 'selected' : '' }}>{{ $y }}</option>
                 @endfor
             </select>
-            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium">
+            <button type="submit" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-white shadow-sm transition" style="background-color:#385776;border:1px solid #385776;">
                 Filtrar
             </button>
         </form>

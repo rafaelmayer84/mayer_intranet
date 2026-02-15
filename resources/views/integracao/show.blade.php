@@ -10,7 +10,7 @@
             <h1 class="text-3xl font-bold text-gray-900 dark:text-white">📋 Detalhes da Sincronização</h1>
             <p class="text-gray-600 dark:text-gray-400 mt-2">Informações detalhadas sobre a sincronização #{{ $log->id }}</p>
         </div>
-        <a href="{{ route('integration.index') }}" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition">
+        <a href="{{ route('integration.index') }}" class="bg-brand hover-bg-brand-dark text-white px-6 py-3 rounded-lg font-medium transition">
             ← Voltar
         </a>
     </div>
@@ -125,7 +125,7 @@
         <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-4">🕐 Timeline</h2>
         <div class="space-y-4">
             <div class="flex items-center">
-                <div class="w-4 h-4 bg-blue-600 rounded-full"></div>
+                <div class="w-4 h-4 bg-brand rounded-full"></div>
                 <div class="ml-4">
                     <p class="text-sm text-gray-600 dark:text-gray-400">Iniciado</p>
                     <p class="text-lg font-bold text-gray-900 dark:text-white">
