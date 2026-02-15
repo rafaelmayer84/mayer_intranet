@@ -1,0 +1,805 @@
+<?php
+
+namespace App\Services\Nexo;
+
+use App\Models\NexoAutomationLog;
+use App\Models\NexoClienteValidacao;
+use App\Models\NexoTicket;
+use App\Models\Cliente;
+use App\Models\Processo;
+use App\Services\OpenAI\OpenAIService;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
+class NexoAutoatendimentoService
+{
+    private OpenAIService $openAIService;
+    private string $dataJuriBaseUrl;
+    private ?string $dataJuriToken = null;
+
+    public function __construct(OpenAIService $openAIService)
+    {
+        $this->openAIService = $openAIService;
+        $this->dataJuriBaseUrl = config('services.datajuri.base_url', 'https://api.datajuri.com.br');
+    }
+
+    // =====================================================
+    // 1. FINANCEIRO — TÍTULOS ABERTOS
+    // =====================================================
+
+    public function titulosAbertos(string $telefone): array
+    {
+        $inicio = microtime(true);
+        $telefoneNormalizado = $this->normalizarTelefone($telefone);
+
+        $cliente = $this->obterClienteAutenticado($telefoneNormalizado);
+        if (isset($cliente['erro'])) {
+            return $cliente;
+        }
+
+        // Cache 60s por cliente
+        $cacheKey = "nexo_financeiro_{$cliente->id}";
+        $resultado = Cache::remember($cacheKey, 60, function () use ($cliente) {
+            return $this->buscarTitulosAbertosHibrido($cliente);
+        });
+
+        $tempoMs = (int)((microtime(true) - $inicio) * 1000);
+
+        $this->logarAcao($telefoneNormalizado, 'consulta_financeiro', [
+            'cliente_id' => $cliente->id,
+            'total_titulos' => $resultado['total'] ?? 0,
+            'fonte' => $resultado['fonte'] ?? 'desconhecida',
+        ], null, $tempoMs);
+
+        return $resultado;
+    }
+
+    private function buscarTitulosAbertosHibrido(Cliente $cliente): array
+    {
+        // Tentativa 1: tabela local (sync 3x/dia)
+        $titulos = DB::table('contas_receber')
+            ->where('cliente_datajuri_id', $cliente->datajuri_id)
+            ->where('status', 'Não lançado')
+            ->whereNotNull('data_vencimento')
+            ->orderBy('data_vencimento', 'asc')
+            ->limit(10)
+            ->get();
+
+        if ($titulos->isNotEmpty()) {
+            return $this->formatarTitulosLocal($titulos, $cliente->nome, 'local');
+        }
+
+        // Fallback: API DataJuri on-demand
+        if ($cliente->datajuri_id) {
+            $titulosApi = $this->buscarContasReceberDataJuri($cliente->datajuri_id);
+            if (!empty($titulosApi)) {
+                return $this->formatarTitulosApi($titulosApi, $cliente->nome);
+            }
+        }
+
+        return [
+            'encontrado' => false,
+            'total' => 0,
+            'mensagem' => "Olá {$cliente->nome}! Não encontrei títulos em aberto no seu nome. Se acredita que há algo pendente, nossa equipe pode verificar.",
+            'fonte' => 'nenhuma',
+        ];
+    }
+
+    private function formatarTitulosLocal($titulos, string $nomeCliente, string $fonte): array
+    {
+        $totalValor = 0;
+        $lista = [];
+
+        foreach ($titulos as $i => $t) {
+            $n = $i + 1;
+            $vencimento = $t->data_vencimento
+                ? \Carbon\Carbon::parse($t->data_vencimento)->format('d/m/Y')
+                : 'Sem data';
+
+            $valor = number_format((float)$t->valor, 2, ',', '.');
+            $totalValor += (float)$t->valor;
+
+            $situacao = 'Em aberto';
+            if ($t->data_vencimento && \Carbon\Carbon::parse($t->data_vencimento)->isPast()) {
+                $situacao = 'Vencido';
+            }
+
+            $lista[] = [
+                'numero' => $n,
+                'descricao' => $t->descricao ?? 'Título',
+                'valor' => "R$ {$valor}",
+                'vencimento' => $vencimento,
+                'situacao' => $situacao,
+            ];
+        }
+
+        $totalFormatado = number_format($totalValor, 2, ',', '.');
+        $qtd = count($lista);
+
+        // Mensagem flat para SendPulse
+        $resultado = [
+            'encontrado' => true,
+            'total' => $qtd,
+            'valor_total' => "R$ {$totalFormatado}",
+            'fonte' => $fonte,
+            'mensagem' => "Olá {$nomeCliente}! Encontrei {$qtd} título(s) em aberto, totalizando R$ {$totalFormatado}.",
+        ];
+
+        // Flat para variáveis SendPulse (máximo 5)
+        foreach (array_slice($lista, 0, 5) as $i => $item) {
+            $n = $i + 1;
+            $resultado["titulo{$n}_desc"] = $item['descricao'];
+            $resultado["titulo{$n}_valor"] = $item['valor'];
+            $resultado["titulo{$n}_vencimento"] = $item['vencimento'];
+            $resultado["titulo{$n}_situacao"] = $item['situacao'];
+        }
+
+        return $resultado;
+    }
+
+    private function formatarTitulosApi(array $titulosApi, string $nomeCliente): array
+    {
+        $lista = [];
+        $totalValor = 0;
+
+        foreach ($titulosApi as $i => $t) {
+            $valor = $this->parseValorBR($t['valor'] ?? '0');
+            $totalValor += $valor;
+
+            $vencimento = isset($t['dataVencimento'])
+                ? $this->formatarDataBRparaExibicao($t['dataVencimento'])
+                : 'Sem data';
+
+            $lista[] = [
+                'numero' => $i + 1,
+                'descricao' => $t['descricao'] ?? 'Título',
+                'valor' => 'R$ ' . number_format($valor, 2, ',', '.'),
+                'vencimento' => $vencimento,
+                'situacao' => (isset($t['dataVencimento']) && $this->dataPassada($t['dataVencimento'])) ? 'Vencido' : 'Em aberto',
+            ];
+        }
+
+        $totalFormatado = number_format($totalValor, 2, ',', '.');
+        $qtd = count($lista);
+
+        $resultado = [
+            'encontrado' => true,
+            'total' => $qtd,
+            'valor_total' => "R$ {$totalFormatado}",
+            'fonte' => 'datajuri_api',
+            'mensagem' => "Olá {$nomeCliente}! Encontrei {$qtd} título(s) em aberto, totalizando R$ {$totalFormatado}.",
+        ];
+
+        foreach (array_slice($lista, 0, 5) as $i => $item) {
+            $n = $i + 1;
+            $resultado["titulo{$n}_desc"] = $item['descricao'];
+            $resultado["titulo{$n}_valor"] = $item['valor'];
+            $resultado["titulo{$n}_vencimento"] = $item['vencimento'];
+            $resultado["titulo{$n}_situacao"] = $item['situacao'];
+        }
+
+        return $resultado;
+    }
+
+    private function buscarContasReceberDataJuri(int $datajuriId): array
+    {
+        $this->autenticarDataJuri();
+        if (!$this->dataJuriToken) {
+            return [];
+        }
+
+        $url = $this->dataJuriBaseUrl . '/v1/entidades/ContasReceber?' . http_build_query([
+            'offset' => 0,
+            'limit' => 10,
+            'campos' => 'id,descricao,valor,dataVencimento,dataPagamento,status,cliente.nome',
+            'criterio' => 'pessoaId | igual a | ' . $datajuriId,
+        ]);
+
+        $response = $this->dataJuriRequest($url);
+
+        if (!$response || empty($response['rows'])) {
+            return [];
+        }
+
+        // Filtrar apenas não pagos
+        return array_filter($response['rows'], function ($row) {
+            $status = $row['status'] ?? '';
+            return stripos($status, 'conclu') === false && stripos($status, 'exclu') === false;
+        });
+    }
+
+    // =====================================================
+    // 2. SEGUNDA VIA (informativo, sem PDF)
+    // =====================================================
+
+    public function segundaVia(string $telefone): array
+    {
+        // Reutiliza titulosAbertos — a resposta já contém status+vencimento+valor
+        $resultado = $this->titulosAbertos($telefone);
+
+        if (!($resultado['encontrado'] ?? false)) {
+            return $resultado;
+        }
+
+        $resultado['mensagem'] .= "\n\n📌 Para solicitar segunda via do boleto ou informações de pagamento, entre em contato com nossa equipe financeira.";
+
+        return $resultado;
+    }
+
+    // =====================================================
+    // 3. COMPROMISSOS — PRÓXIMAS AUDIÊNCIAS/PRAZOS
+    // =====================================================
+
+    public function proximosCompromissos(string $telefone): array
+    {
+        $inicio = microtime(true);
+        $telefoneNormalizado = $this->normalizarTelefone($telefone);
+
+        $cliente = $this->obterClienteAutenticado($telefoneNormalizado);
+        if (isset($cliente['erro'])) {
+            return $cliente;
+        }
+
+        // Cache 120s por cliente (compromissos mudam menos)
+        $cacheKey = "nexo_compromissos_{$cliente->id}";
+        $resultado = Cache::remember($cacheKey, 120, function () use ($cliente) {
+            return $this->buscarCompromissosCliente($cliente);
+        });
+
+        $tempoMs = (int)((microtime(true) - $inicio) * 1000);
+
+        $this->logarAcao($telefoneNormalizado, 'consulta_compromissos', [
+            'cliente_id' => $cliente->id,
+            'total_compromissos' => $resultado['total'] ?? 0,
+        ], null, $tempoMs);
+
+        return $resultado;
+    }
+
+    private function buscarCompromissosCliente(Cliente $cliente): array
+    {
+        $processos = Processo::where('cliente_datajuri_id', $cliente->datajuri_id)
+            ->where('status', '!=', 'Encerrado')
+            ->get();
+
+        if ($processos->isEmpty()) {
+            return [
+                'encontrado' => false,
+                'total' => 0,
+                'mensagem' => "Olá {$cliente->nome}! Não encontrei processos ativos para buscar compromissos.",
+            ];
+        }
+
+        $this->autenticarDataJuri();
+        if (!$this->dataJuriToken) {
+            return [
+                'encontrado' => false,
+                'total' => 0,
+                'mensagem' => "Olá {$cliente->nome}! Não foi possível consultar seus compromissos neste momento. Tente novamente em alguns minutos.",
+            ];
+        }
+
+        $compromissos = [];
+        $keywords = [
+            'audiência', 'audiencia', 'perícia', 'pericia',
+            'liminar', 'prazo', 'despacho', 'designad',
+            'intimação', 'intimacao', 'pauta', 'sessão', 'sessao',
+            'julgamento', 'sustentação', 'sustentacao',
+        ];
+
+        foreach ($processos->take(5) as $processo) {
+            $faseIds = $this->buscarFaseProcessoIds($processo->pasta);
+
+            foreach ($faseIds as $faseId) {
+                $andamentos = $this->buscarAndamentosPorFase($faseId, 30);
+
+                foreach ($andamentos as $and) {
+                    $textoCompleto = strtolower(($and['descricao'] ?? '') . ' ' . ($and['observacao'] ?? ''));
+
+                    foreach ($keywords as $kw) {
+                        if (strpos($textoCompleto, $kw) !== false) {
+                            $compromissos[] = [
+                                'processo' => $processo->pasta,
+                                'adverso' => $processo->adverso_nome ?? 'Não informado',
+                                'data' => $and['data'] ?? '',
+                                'data_raw' => $and['data_raw'] ?? '1970-01-01',
+                                'hora' => $and['hora'] ?? '',
+                                'descricao' => $and['descricao'] ?? '',
+                                'tipo_detectado' => $kw,
+                            ];
+                            break; // Uma keyword por andamento basta
+                        }
+                    }
+                }
+            }
+        }
+
+        if (empty($compromissos)) {
+            return [
+                'encontrado' => false,
+                'total' => 0,
+                'mensagem' => "Olá {$cliente->nome}! Consultei seus processos ativos e não identifiquei audiências, perícias ou prazos futuros registrados no momento. Se tiver dúvidas sobre datas específicas, nossa equipe pode verificar.",
+            ];
+        }
+
+        // Ordenar por data (mais recentes primeiro — podem ser futuros)
+        usort($compromissos, function ($a, $b) {
+            return strcmp($b['data_raw'], $a['data_raw']);
+        });
+
+        $compromissos = array_slice($compromissos, 0, 5);
+
+        // Montar resposta flat para SendPulse
+        $resultado = [
+            'encontrado' => true,
+            'total' => count($compromissos),
+            'mensagem' => "Olá {$cliente->nome}! Encontrei " . count($compromissos) . " compromisso(s) relevante(s):",
+        ];
+
+        foreach ($compromissos as $i => $c) {
+            $n = $i + 1;
+            $resultado["comp{$n}_processo"] = $c['processo'];
+            $resultado["comp{$n}_data"] = $c['data'];
+            $resultado["comp{$n}_hora"] = $c['hora'];
+            $resultado["comp{$n}_desc"] = mb_substr($c['descricao'], 0, 200);
+            $resultado["comp{$n}_tipo"] = ucfirst($c['tipo_detectado']);
+        }
+
+        return $resultado;
+    }
+
+    // =====================================================
+    // 4. TICKETS DE RETORNO
+    // =====================================================
+
+    public function abrirTicket(string $telefone, string $assunto, ?string $mensagem = null): array
+    {
+        $telefoneNormalizado = $this->normalizarTelefone($telefone);
+
+        $cliente = $this->obterClienteAutenticado($telefoneNormalizado);
+
+        // Ticket pode ser aberto mesmo sem auth completo (pré-triagem)
+        $clienteId = null;
+        $datajuriId = null;
+        $nomeCliente = null;
+
+        if (!isset($cliente['erro'])) {
+            $clienteId = $cliente->id;
+            $datajuriId = $cliente->datajuri_id;
+            $nomeCliente = $cliente->nome;
+        }
+
+        // Rate limit: máximo 3 tickets abertos por telefone
+        $ticketsAbertos = NexoTicket::where('telefone', $telefoneNormalizado)
+            ->where('status', 'aberto')
+            ->count();
+
+        if ($ticketsAbertos >= 3) {
+            return [
+                'sucesso' => false,
+                'mensagem' => 'Você já possui 3 solicitações em aberto. Aguarde o retorno da nossa equipe.',
+            ];
+        }
+
+        $ticket = NexoTicket::create([
+            'cliente_id' => $clienteId,
+            'datajuri_id' => $datajuriId,
+            'telefone' => $telefoneNormalizado,
+            'nome_cliente' => $nomeCliente,
+            'assunto' => mb_substr($assunto, 0, 255),
+            'mensagem' => $mensagem ? mb_substr($mensagem, 0, 2000) : null,
+            'status' => 'aberto',
+        ]);
+
+        $this->logarAcao($telefoneNormalizado, 'ticket_aberto', [
+            'ticket_id' => $ticket->id,
+            'assunto' => $assunto,
+            'cliente_id' => $clienteId,
+        ]);
+
+        $saudacao = $nomeCliente ? "Olá {$nomeCliente}!" : "Olá!";
+
+        return [
+            'sucesso' => true,
+            'ticket_id' => $ticket->id,
+            'mensagem' => "{$saudacao} Sua solicitação #{$ticket->id} foi registrada com sucesso. Assunto: \"{$assunto}\". Nossa equipe entrará em contato em breve.",
+        ];
+    }
+
+    public function listarTickets(?string $telefone = null, ?string $status = null, int $limit = 20): array
+    {
+        $query = NexoTicket::query()->orderBy('created_at', 'desc');
+
+        if ($telefone) {
+            $query->where('telefone', $this->normalizarTelefone($telefone));
+        }
+
+        if ($status) {
+            $query->where('status', $status);
+        }
+
+        $tickets = $query->limit($limit)->get();
+
+        return [
+            'total' => $tickets->count(),
+            'tickets' => $tickets->map(function ($t) {
+                return [
+                    'id' => $t->id,
+                    'nome_cliente' => $t->nome_cliente ?? '(Sem identificação)',
+                    'telefone' => $t->telefone,
+                    'assunto' => $t->assunto,
+                    'mensagem' => $t->mensagem,
+                    'status' => $t->status,
+                    'data' => $t->created_at->format('d/m/Y H:i'),
+                ];
+            })->toArray(),
+        ];
+    }
+
+    // =====================================================
+    // 5. RESUMO LEIGO APRIMORADO (com guarda LGPD)
+    // =====================================================
+
+    public function resumoLeigo(string $telefone, ?string $pasta = null): array
+    {
+        $inicio = microtime(true);
+        $telefoneNormalizado = $this->normalizarTelefone($telefone);
+
+        $cliente = $this->obterClienteAutenticado($telefoneNormalizado);
+        if (isset($cliente['erro'])) {
+            return $cliente;
+        }
+
+        // Determinar processo
+        if ($pasta) {
+            $processo = Processo::where('cliente_datajuri_id', $cliente->datajuri_id)
+                ->where('pasta', $pasta)
+                ->first();
+        } else {
+            $processo = Processo::where('cliente_datajuri_id', $cliente->datajuri_id)
+                ->where('status', '!=', 'Encerrado')
+                ->orderBy('data_abertura', 'desc')
+                ->first();
+        }
+
+        if (!$processo) {
+            return ['erro' => 'Nenhum processo encontrado'];
+        }
+
+        // Cache 60s por processo
+        $cacheKey = "nexo_resumo_{$processo->id}";
+        $resultado = Cache::remember($cacheKey, 60, function () use ($cliente, $processo) {
+            return $this->gerarResumoLeigo($cliente, $processo);
+        });
+
+        $tempoMs = (int)((microtime(true) - $inicio) * 1000);
+
+        $this->logarAcao($telefoneNormalizado, 'consulta_resumo', [
+            'processo_id' => $processo->id,
+            'pasta' => $processo->pasta,
+        ], $resultado['resumo'] ?? null, $tempoMs);
+
+        return $resultado;
+    }
+
+    private function gerarResumoLeigo(Cliente $cliente, Processo $processo): array
+    {
+        $this->autenticarDataJuri();
+        if (!$this->dataJuriToken) {
+            return [
+                'erro' => 'Não foi possível consultar dados neste momento. Tente novamente em alguns minutos.',
+            ];
+        }
+
+        $faseIds = $this->buscarFaseProcessoIds($processo->pasta);
+        $andamentos = [];
+
+        foreach ($faseIds as $faseId) {
+            $and = $this->buscarAndamentosPorFase($faseId, 10);
+            $andamentos = array_merge($andamentos, $and);
+        }
+
+        // Ordenar e pegar 5 mais recentes
+        usort($andamentos, function ($a, $b) {
+            return strcmp($b['data_raw'] ?? '1970-01-01', $a['data_raw'] ?? '1970-01-01');
+        });
+        $andamentos = array_slice($andamentos, 0, 5);
+
+        if (empty($andamentos)) {
+            return [
+                'resumo' => "Olá {$cliente->nome}! Seu processo {$processo->pasta} está ativo, mas não há movimentações recentes registradas.",
+                'processo_pasta' => $processo->pasta,
+            ];
+        }
+
+        // Chamar OpenAI com guarda LGPD
+        $resumo = $this->openAIService->gerarResumoLeigo(
+            $andamentos,
+            $processo->pasta . ' x ' . ($processo->adverso_nome ?? ''),
+            $cliente->nome
+        );
+
+        return [
+            'resumo' => $resumo,
+            'processo_pasta' => $processo->pasta,
+            'processo_adverso' => $processo->adverso_nome ?? '',
+        ];
+    }
+
+    // =====================================================
+    // DATAJURI API — reutilização do padrão existente
+    // =====================================================
+
+    private function autenticarDataJuri(): void
+    {
+        $this->dataJuriToken = Cache::remember('datajuri_token_nexo', 3500, function () {
+            $clientId = config('services.datajuri.client_id');
+            $secretId = config('services.datajuri.secret_id');
+            $email    = config('services.datajuri.email');
+            $password = config('services.datajuri.password');
+
+            if (!$clientId || !$secretId || !$email || !$password) {
+                Log::error('NEXO-Autoatendimento: Credenciais DataJuri incompletas');
+                return null;
+            }
+
+            $credentials = base64_encode("{$clientId}:{$secretId}");
+
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL => "{$this->dataJuriBaseUrl}/oauth/token",
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => http_build_query([
+                    'grant_type' => 'password',
+                    'username'   => $email,
+                    'password'   => $password,
+                ]),
+                CURLOPT_HTTPHEADER => [
+                    "Authorization: Basic {$credentials}",
+                    'Content-Type: application/x-www-form-urlencoded',
+                    'Accept: application/json',
+                ],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 30,
+            ]);
+
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($httpCode === 200 && $response) {
+                $data = json_decode($response, true);
+                return $data['access_token'] ?? null;
+            }
+
+            Log::error('NEXO-Autoatendimento: Falha token DataJuri', ['http_code' => $httpCode]);
+            return null;
+        });
+    }
+
+    private function dataJuriRequest(string $url): ?array
+    {
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_HTTPHEADER => [
+                "Authorization: Bearer {$this->dataJuriToken}",
+                'Content-Type: application/json',
+                'Accept: application/json',
+            ],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 30,
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlError) {
+            Log::error('NEXO-Autoatendimento: cURL error', ['erro' => $curlError]);
+            return null;
+        }
+
+        if ($httpCode === 401) {
+            Cache::forget('datajuri_token_nexo');
+            $this->autenticarDataJuri();
+            if ($this->dataJuriToken) {
+                return $this->dataJuriRequestRetry($url);
+            }
+            return null;
+        }
+
+        if ($httpCode !== 200) {
+            Log::error('NEXO-Autoatendimento: HTTP error DataJuri', ['http_code' => $httpCode]);
+            return null;
+        }
+
+        $data = json_decode($response, true);
+        return json_last_error() === JSON_ERROR_NONE ? $data : null;
+    }
+
+    private function dataJuriRequestRetry(string $url): ?array
+    {
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_HTTPHEADER => [
+                "Authorization: Bearer {$this->dataJuriToken}",
+                'Content-Type: application/json',
+                'Accept: application/json',
+            ],
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 30,
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200 || !$response) {
+            return null;
+        }
+
+        return json_decode($response, true);
+    }
+
+    private function buscarFaseProcessoIds(string $numeroPasta): array
+    {
+        $url = $this->dataJuriBaseUrl . '/v1/entidades/FaseProcesso?' . http_build_query([
+            'offset' => 0,
+            'limit' => 20,
+            'campos' => 'id,processo.pasta',
+            'criterio' => 'processo.pasta | igual a | ' . $numeroPasta,
+        ]);
+
+        $response = $this->dataJuriRequest($url);
+
+        if (!$response || empty($response['rows'])) {
+            return [];
+        }
+
+        return array_map(function ($row) {
+            return (string)intval($row['id']);
+        }, $response['rows']);
+    }
+
+    private function buscarAndamentosPorFase(string $faseProcessoId, int $limit = 20): array
+    {
+        $url = $this->dataJuriBaseUrl . '/v1/entidades/AndamentoFase?' . http_build_query([
+            'offset' => 0,
+            'limit' => $limit,
+            'campos' => 'id,descricao,data,hora,observacao,descricaoOriginal,faseProcesso.processo.pasta,faseProcesso.processo.cliente.nome,faseProcesso.processo.adverso.nome,faseProcesso.processo.proprietario.nome',
+            'criterio' => 'faseProcessoId | igual a | ' . $faseProcessoId,
+        ]);
+
+        $response = $this->dataJuriRequest($url);
+
+        if (!$response || empty($response['rows'])) {
+            return [];
+        }
+
+        return array_map(function ($row) {
+            $dataRaw = $this->converterDataBR($row['data'] ?? '');
+
+            return [
+                'data' => $row['data'] ?? '',
+                'data_raw' => $dataRaw,
+                'hora' => $row['hora'] ?? '',
+                'descricao' => $this->limparHtml($row['descricao'] ?? ''),
+                'observacao' => $this->limparHtml($row['observacao'] ?? ''),
+                'descricao_original' => $row['descricaoOriginal'] ?? '',
+                'pasta' => $row['faseProcesso.processo.pasta'] ?? '',
+                'cliente' => $row['faseProcesso.processo.cliente.nome'] ?? '',
+                'adverso' => $row['faseProcesso.processo.adverso.nome'] ?? '',
+                'responsavel' => $row['faseProcesso.processo.proprietario.nome'] ?? '',
+            ];
+        }, $response['rows']);
+    }
+
+    // =====================================================
+    // UTILITÁRIOS
+    // =====================================================
+
+    private function obterClienteAutenticado(string $telefoneNormalizado)
+    {
+        $validacao = NexoClienteValidacao::where('telefone', $telefoneNormalizado)->first();
+
+        if (!$validacao || !$validacao->cliente_id) {
+            return ['erro' => 'Cliente não autenticado. Por favor, faça a verificação de identidade primeiro.'];
+        }
+
+        if ($validacao->estaBloqueado()) {
+            return ['erro' => 'Acesso temporariamente bloqueado. Tente novamente após ' . $validacao->bloqueado_ate->format('H:i') . '.'];
+        }
+
+        $cliente = Cliente::find($validacao->cliente_id);
+
+        if (!$cliente) {
+            return ['erro' => 'Cliente não encontrado no sistema.'];
+        }
+
+        return $cliente;
+    }
+
+    private function normalizarTelefone(string $telefone): string
+    {
+        return preg_replace('/\D/', '', $telefone);
+    }
+
+    private function converterDataBR(string $dataBR): string
+    {
+        if (empty($dataBR)) {
+            return '1970-01-01';
+        }
+
+        $partes = explode('/', $dataBR);
+        if (count($partes) === 3) {
+            return "{$partes[2]}-{$partes[1]}-{$partes[0]}";
+        }
+
+        return '1970-01-01';
+    }
+
+    private function limparHtml(string $texto): string
+    {
+        if (empty($texto)) {
+            return '';
+        }
+
+        $texto = preg_replace('/<br\s*\/?>/', "\n", $texto);
+        $texto = strip_tags($texto);
+        $texto = html_entity_decode($texto, ENT_QUOTES, 'UTF-8');
+        $texto = preg_replace('/&nbsp;/', ' ', $texto);
+        $texto = preg_replace('/\n{3,}/', "\n\n", $texto);
+
+        return trim($texto);
+    }
+
+    private function parseValorBR(string $valor): float
+    {
+        $valor = str_replace('.', '', $valor);
+        $valor = str_replace(',', '.', $valor);
+        return (float)$valor;
+    }
+
+    private function formatarDataBRparaExibicao(string $dataBR): string
+    {
+        // Data pode vir DD/MM/YYYY ou YYYY-MM-DD
+        if (strpos($dataBR, '/') !== false) {
+            return $dataBR; // Já está em formato BR
+        }
+
+        try {
+            return \Carbon\Carbon::parse($dataBR)->format('d/m/Y');
+        } catch (\Exception $e) {
+            return $dataBR;
+        }
+    }
+
+    private function dataPassada(string $dataBR): bool
+    {
+        $dataISO = $this->converterDataBR($dataBR);
+        if ($dataISO === '1970-01-01') {
+            return false;
+        }
+
+        try {
+            return \Carbon\Carbon::parse($dataISO)->isPast();
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    private function logarAcao(string $telefone, string $acao, array $dados = [], ?string $respostaIA = null, ?int $tempoMs = null): void
+    {
+        NexoAutomationLog::create([
+            'telefone' => $telefone,
+            'acao' => $acao,
+            'dados' => $dados,
+            'resposta_ia' => $respostaIA,
+            'tempo_resposta_ms' => $tempoMs,
+        ]);
+    }
+}

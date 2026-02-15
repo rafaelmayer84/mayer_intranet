@@ -42,3 +42,5 @@ storage/logs/*
 !storage/framework/views/.gitkeep
 !storage/framework/cache/.gitkeep
 !storage/logs/.gitkeep
+*.bak_*
+patches/

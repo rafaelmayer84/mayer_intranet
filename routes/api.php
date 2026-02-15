@@ -5,6 +5,7 @@ use App\Http\Controllers\SyncController;
 use App\Http\Controllers\ClientesMercadoController;
 use App\Http\Controllers\IntegracaoController;
 use App\Http\Controllers\Api\NexoWebhookController;
+use App\Http\Controllers\Api\NexoAutoatendimentoController;
 
 Route::prefix('sync')->group(function () {
     Route::get('/test-connection', [SyncController::class, 'testConnection']);
@@ -96,3 +97,13 @@ Route::post('nexo/api/pre-track-whatsapp-lead', [
 ])
 ->middleware('throttle:60,1') // Máximo 60 requests por minuto
 ->name('nexo.pre-track-whatsapp');
+
+// FASE 1 — AUTOATENDIMENTO WHATSAPP (15/02/2026)
+Route::prefix('nexo/autoatendimento')->group(function () {
+    Route::post('/financeiro/titulos-abertos', [NexoAutoatendimentoController::class, 'titulosAbertos']);
+    Route::post('/financeiro/segunda-via', [NexoAutoatendimentoController::class, 'segundaVia']);
+    Route::post('/compromissos/proximos', [NexoAutoatendimentoController::class, 'proximosCompromissos']);
+    Route::post('/tickets/abrir', [NexoAutoatendimentoController::class, 'abrirTicket']);
+    Route::post('/tickets/listar', [NexoAutoatendimentoController::class, 'listarTickets']);
+    Route::post('/resumo', [NexoAutoatendimentoController::class, 'resumoLeigo']);
+});

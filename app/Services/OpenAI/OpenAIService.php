@@ -122,4 +122,47 @@ PROMPT;
             $ultimoAndamento['descricao'] ?? 'Movimentação processual'
         );
     }
+
+    public function gerarResumoLeigo(array $andamentos, string $numeroProcesso, string $nomeCliente): string
+    {
+        $andamentosTexto = '';
+        foreach ($andamentos as $index => $andamento) {
+            $andamentosTexto .= sprintf(
+                "%d. Data: %s - %s\n",
+                $index + 1,
+                $andamento['data'] ?? 'Sem data',
+                $andamento['descricao'] ?? 'Sem descricao'
+            );
+        }
+
+        $prompt = "O cliente {$nomeCliente} solicitou um resumo simples do processo {$numeroProcesso}.\n\nUltimos andamentos:\n{$andamentosTexto}\n\nINSTRUCOES:\n1. Cumprimente pelo primeiro nome\n2. Linguagem leiga\n3. Maximo 5 linhas\n4. NUNCA prometa resultado\n5. NUNCA sugira estrategia\n6. NUNCA mencione valores\n7. NUNCA exponha CPF/RG de terceiros\n8. Finalize com Se tiver duvidas estamos a disposicao";
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::withHeaders([
+                'Authorization' => 'Bearer ' . $this->apiKey,
+                'Content-Type' => 'application/json',
+            ])->timeout(30)->post($this->baseUrl . '/chat/completions', [
+                'model' => $this->model,
+                'messages' => [
+                    ['role' => 'system', 'content' => 'Voce e uma secretaria experiente do escritorio Mayer Albanez. Explique andamentos para clientes leigos. NUNCA exponha dados pessoais. NUNCA faca promessas.'],
+                    ['role' => 'user', 'content' => $prompt]
+                ],
+                'temperature' => 0.6,
+                'max_tokens' => 400
+            ]);
+
+            if ($response->successful()) {
+                return trim($response->json()['choices'][0]['message']['content'] ?? '');
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('OpenAI resumo leigo erro', ['erro' => $e->getMessage()]);
+        }
+
+        $ultimo = $andamentos[0] ?? null;
+        if (!$ultimo) {
+            return "Ola {$nomeCliente}! Seu processo {$numeroProcesso} esta ativo, mas nao encontrei movimentacoes recentes.";
+        }
+        return sprintf("Ola %s! Resumo do processo %s:\n\nUltima movimentacao em %s:\n%s\n\nSe tiver duvidas, estamos a disposicao.", $nomeCliente, $numeroProcesso, $ultimo['data'] ?? 'data nao informada', $ultimo['descricao'] ?? 'Movimentacao processual');
+    }
+
 }
