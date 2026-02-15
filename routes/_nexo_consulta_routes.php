@@ -23,6 +23,7 @@
 use App\Http\Controllers\NexoConsultaController;
 
 Route::prefix('nexo')->group(function () {
+    Route::post('/verificar-sessao', [NexoConsultaController::class, 'verificarSessao']);
     Route::post('/identificar-cliente', [NexoConsultaController::class, 'identificarCliente']);
     Route::post('/perguntas-auth', [NexoConsultaController::class, 'perguntasAuth']);
     Route::post('/validar-auth', [NexoConsultaController::class, 'validarAuth']);

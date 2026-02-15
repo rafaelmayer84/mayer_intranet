@@ -28,6 +28,31 @@ class NexoConsultaController extends Controller
         return $token === $esperado;
     }
 
+
+    /**
+     * POST /api/nexo/verificar-sessao
+     */
+    public function verificarSessao(Request $request): JsonResponse
+    {
+        if (!$this->validarToken($request)) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $telefone = $request->input('telefone', '');
+
+        if (empty($telefone)) {
+            return response()->json(['error' => 'Telefone obrigatório'], 400);
+        }
+
+        try {
+            $resultado = $this->service->verificarSessao($telefone);
+            return response()->json($resultado);
+        } catch (\Exception $e) {
+            Log::error('[NEXO-CONSULTA] Erro verificar-sessao: ' . $e->getMessage());
+            return response()->json(['sessao_ativa' => 'nao', 'nome' => ''], 200);
+        }
+    }
+
     /**
      * POST /api/nexo/identificar-cliente
      */

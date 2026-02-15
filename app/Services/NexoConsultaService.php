@@ -19,6 +19,44 @@ class NexoConsultaService
     const BLOQUEIO_MINUTOS = 30;
     const CAMPOS_AUTH = ['email', 'cpf_cnpj', 'data_nascimento', 'nome'];
 
+
+    // ================================================================
+    // 0. VERIFICAR SESSÃO AUTENTICADA
+    // ================================================================
+
+    /**
+     * Verifica se o cliente já está autenticado (sessão ativa de 30min).
+     * Retorna: sessao_ativa (sim/nao), nome
+     */
+    public function verificarSessao(string $telefone): array
+    {
+        $telefoneNorm = $this->normalizarTelefone($telefone);
+
+        $attempt = NexoAuthAttempt::where('telefone', $telefoneNorm)->first();
+
+        if (!$attempt || !$attempt->autenticado_ate) {
+            return ['sessao_ativa' => 'nao', 'nome' => ''];
+        }
+
+        if (Carbon::now()->lt(Carbon::parse($attempt->autenticado_ate))) {
+            // Sessão ainda válida — buscar nome do cliente
+            $cliente = $this->buscarClientePorTelefone($telefoneNorm);
+            $nome = $cliente ? ($cliente->nome ?? '') : '';
+
+            Log::info('[NEXO-CONSULTA] Sessão ativa', [
+                'telefone' => $telefoneNorm,
+                'expira' => $attempt->autenticado_ate,
+            ]);
+
+            return ['sessao_ativa' => 'sim', 'nome' => $nome];
+        }
+
+        // Sessão expirada — limpar
+        $attempt->update(['autenticado_ate' => null]);
+
+        return ['sessao_ativa' => 'nao', 'nome' => ''];
+    }
+
     // ================================================================
     // 1. IDENTIFICAR CLIENTE
     // ================================================================
@@ -169,14 +207,15 @@ class NexoConsultaService
         $valido = ($totalPerguntas > 0 && $acertos === $totalPerguntas);
 
         if ($valido) {
-            // Reset tentativas
+            // Reset tentativas e gravar sessão autenticada (30 min)
             $attempt->update([
                 'tentativas' => 0,
                 'bloqueado' => false,
                 'bloqueado_ate' => null,
+                'autenticado_ate' => Carbon::now()->addMinutes(30),
             ]);
 
-            Log::info('[NEXO-CONSULTA] Auth OK', ['cliente_id' => $cliente->id]);
+            Log::info('[NEXO-CONSULTA] Auth OK - sessão 30min', ['cliente_id' => $cliente->id]);
 
             return ['valido' => 'sim', 'tentativas_restantes' => (string) self::MAX_TENTATIVAS, 'bloqueado' => 'nao'];
         }
