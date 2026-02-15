@@ -84,16 +84,16 @@ class NexoConsultaService
         // Selecionar 2 campos disponíveis (que tenham dado preenchido)
         $camposDisponiveis = $this->getCamposDisponiveis($cliente);
 
-        if (count($camposDisponiveis) < 2) {
-            Log::warning('[NEXO-CONSULTA] Menos de 2 campos disponíveis para auth', [
+        if (count($camposDisponiveis) < 4) {
+            Log::warning('[NEXO-CONSULTA] Menos de 4 campos disponíveis para auth', [
                 'cliente_id' => $cliente->id,
                 'campos' => $camposDisponiveis,
             ]);
-            return ['erro' => 'Dados insuficientes para autenticação'];
+            return ['erro' => 'Dados insuficientes para autenticação. Entre em contato com o escritório.'];
         }
 
-        // Sortear 2 campos
-        $camposSorteados = collect($camposDisponiveis)->shuffle()->take(2)->values()->all();
+        // Sortear 4 campos aleatórios do pool disponível
+        $camposSorteados = collect($camposDisponiveis)->shuffle()->take(4)->values()->all();
 
         $resultado = [];
         foreach ($camposSorteados as $i => $campo) {
@@ -144,19 +144,29 @@ class NexoConsultaService
             return ['valido' => 'nao', 'tentativas_restantes' => '0', 'bloqueado' => 'sim'];
         }
 
-        // Validar cada pergunta
+        // Validar cada pergunta (4 perguntas)
         $acertos = 0;
-        foreach ([1, 2] as $n) {
+        $totalPerguntas = 0;
+        foreach ([1, 2, 3, 4] as $n) {
             $campo = $respostas["pergunta{$n}_campo"] ?? '';
             $valor = $respostas["pergunta{$n}_valor"] ?? '';
+
+            if (empty($campo)) continue;
+            $totalPerguntas++;
 
             if ($this->validarResposta($cliente, $campo, $valor)) {
                 $acertos++;
             }
         }
 
-        Log::info('[NEXO-AUTH-DEBUG]', ['respostas' => $respostas, 'cliente_nome' => $cliente->nome, 'cliente_email' => $cliente->email, 'acertos' => $acertos]);
-        $valido = ($acertos === 2);
+        Log::info('[NEXO-AUTH-DEBUG]', [
+            'respostas' => $respostas,
+            'cliente_nome' => $cliente->nome,
+            'acertos' => $acertos,
+            'total_perguntas' => $totalPerguntas,
+        ]);
+        // Exige acerto em TODAS as perguntas enviadas
+        $valido = ($totalPerguntas > 0 && $acertos === $totalPerguntas);
 
         if ($valido) {
             // Reset tentativas
@@ -337,8 +347,17 @@ class NexoConsultaService
         if (!empty($cliente->data_nascimento)) {
             $campos[] = 'data_nascimento';
         }
-        // Nome sempre disponível como fallback
-        if (!empty($cliente->nome) && count($campos) < 4) {
+        if (!empty($cliente->endereco_bairro)) {
+            $campos[] = 'bairro';
+        }
+        if (!empty($cliente->endereco_cep) && strlen(preg_replace('/\D/', '', $cliente->endereco_cep)) >= 5) {
+            $campos[] = 'cep';
+        }
+        if (!empty($cliente->profissao) && !in_array(strtolower(trim($cliente->profissao)), ['-', 'n/a', 'nao informado', 'não informado', ''])) {
+            $campos[] = 'profissao';
+        }
+        // Nome como fallback se ainda não tem campos suficientes
+        if (!empty($cliente->nome) && count($campos) < 7) {
             $campos[] = 'nome';
         }
 
@@ -356,6 +375,12 @@ class NexoConsultaService
                 return $this->perguntaAnoNascimento($cliente);
             case 'nome':
                 return $this->perguntaNome($cliente);
+            case 'bairro':
+                return $this->perguntaBairro($cliente);
+            case 'cep':
+                return $this->perguntaCep($cliente);
+            case 'profissao':
+                return $this->perguntaProfissao($cliente);
             default:
                 return ['texto' => 'Erro', 'opcoes' => ['A', 'B', 'C']];
         }
@@ -364,24 +389,43 @@ class NexoConsultaService
     private function perguntaEmail(object $cliente): array
     {
         $email = strtolower(trim($cliente->email));
-        $mascarado = $this->mascararEmail($email);
-
-        // Gerar 2 emails falsos plausíveis
         $parts = explode('@', $email);
+        $usuario = $parts[0];
         $dominio = $parts[1] ?? 'gmail.com';
-        $dominiosFake = ['gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com.br', 'terra.com.br'];
-        $dominiosFake = array_diff($dominiosFake, [$dominio]);
-        $dominiosFake = array_values($dominiosFake);
 
-        $nomeParte = substr($parts[0], 0, 2);
-        $falso1 = $nomeParte . str_pad(rand(10, 99), 2, '0') . '@' . $dominiosFake[0];
-        $falso2 = $nomeParte . str_pad(rand(10, 99), 2, '0') . '@' . ($dominiosFake[1] ?? $dominiosFake[0]);
+        // Gerar alternativas realistas baseadas no padrão do email real
+        $dominiosFake = ['gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com.br', 'terra.com.br', 'live.com', 'icloud.com'];
+        $dominiosFake = array_values(array_diff($dominiosFake, [$dominio]));
+        shuffle($dominiosFake);
 
-        $opcoes = [$email, $falso1, $falso2];
+        // Estratégias de falsificação realista:
+        $estrategias = [];
+        // 1. Mesmo usuário, domínio diferente
+        $estrategias[] = $usuario . '@' . $dominiosFake[0];
+        // 2. Usuário similar (troca de caracteres)
+        if (strlen($usuario) > 3) {
+            $pos = rand(1, strlen($usuario) - 2);
+            $charSwap = $usuario;
+            $charSwap[$pos] = chr(ord($charSwap[$pos]) === ord('9') ? ord('0') : ord($charSwap[$pos]) + 1);
+            $estrategias[] = $charSwap . '@' . $dominio;
+        }
+        // 3. Usuário com ponto/underscore inserido
+        if (strlen($usuario) > 4) {
+            $mid = (int)(strlen($usuario) / 2);
+            $estrategias[] = substr($usuario, 0, $mid) . '.' . substr($usuario, $mid) . '@' . $dominio;
+        }
+        // 4. Usuário com número adicionado
+        $estrategias[] = $usuario . rand(1, 99) . '@' . $dominio;
+
+        // Garantir unicidade e diferença do real
+        $estrategias = array_values(array_filter(array_unique($estrategias), fn($e) => $e !== $email));
+        shuffle($estrategias);
+
+        $opcoes = [$email, $estrategias[0] ?? ($usuario . '1@' . $dominio), $estrategias[1] ?? ($usuario . '@' . $dominiosFake[1])];
         shuffle($opcoes);
 
         return [
-            'texto' => "Qual é o seu e-mail cadastrado?",
+            'texto' => 'Qual é o seu e-mail cadastrado?',
             'opcoes' => $opcoes,
         ];
     }
@@ -425,14 +469,21 @@ class NexoConsultaService
         }
 
         $anoReal = (int) $dataNasc->format('Y');
-        $falso1 = $anoReal + rand(1, 4);
-        $falso2 = $anoReal - rand(1, 4);
+        // Anos falsos mais próximos (1-2 anos) para dificultar
+        $offsets = [1, -1, 2, -2];
+        shuffle($offsets);
+        $falso1 = $anoReal + $offsets[0];
+        $falso2 = $anoReal + $offsets[1];
+        // Garantir que falsos são diferentes entre si e do real
+        while ($falso2 === $falso1 || $falso2 === $anoReal) {
+            $falso2 = $anoReal + $offsets[2];
+        }
 
         $opcoes = [(string) $anoReal, (string) $falso1, (string) $falso2];
         shuffle($opcoes);
 
         return [
-            'texto' => "Qual é o seu ano de nascimento?",
+            'texto' => 'Qual é o seu ano de nascimento?',
             'opcoes' => $opcoes,
         ];
     }
@@ -442,19 +493,39 @@ class NexoConsultaService
         $nomeReal = trim($cliente->nome);
         $partes = explode(' ', $nomeReal);
         $primeiroNome = $partes[0];
+        $ultimoSobrenome = end($partes);
 
-        // Gerar nomes falsos com mesmo primeiro nome
-        $sobrenomesFake = ['Santos', 'Oliveira', 'Silva', 'Souza', 'Pereira', 'Costa', 'Ferreira', 'Almeida', 'Rodrigues', 'Lima'];
+        // Gerar nomes falsos mais realistas: mesmo primeiro nome + sobrenome similar
+        $sobrenomesFake = [
+            'Santos', 'Oliveira', 'Silva', 'Souza', 'Pereira', 'Costa',
+            'Ferreira', 'Almeida', 'Rodrigues', 'Lima', 'Nascimento',
+            'Carvalho', 'Ribeiro', 'Martins', 'Gomes', 'Barbosa',
+            'Araújo', 'Moreira', 'Cardoso', 'Mendes', 'Vieira',
+        ];
+
+        // Manter o último sobrenome real e trocar o(s) do meio
+        // para gerar alternativas mais confusas
+        $sobrenomesFake = array_values(array_filter($sobrenomesFake, fn($s) =>
+            strtolower($s) !== strtolower($ultimoSobrenome)
+        ));
         shuffle($sobrenomesFake);
 
-        $falso1 = $primeiroNome . ' ' . $sobrenomesFake[0];
-        $falso2 = $primeiroNome . ' ' . $sobrenomesFake[1];
+        if (count($partes) >= 3) {
+            // Nome composto: manter primeiro + último, trocar meio
+            $falso1 = $primeiroNome . ' ' . $sobrenomesFake[0] . ' ' . $ultimoSobrenome;
+            $falso2 = $primeiroNome . ' ' . $sobrenomesFake[1] . ' ' . $ultimoSobrenome;
+        } else {
+            $falso1 = $primeiroNome . ' ' . $sobrenomesFake[0];
+            $falso2 = $primeiroNome . ' ' . $sobrenomesFake[1];
+        }
 
         // Garantir que falsos são diferentes do real
-        while (strtolower($falso1) === strtolower($nomeReal)) {
-            $falso1 = $primeiroNome . ' ' . array_shift($sobrenomesFake);
+        $nomeRealLower = strtolower($nomeReal);
+        while (strtolower($falso1) === $nomeRealLower) {
+            array_shift($sobrenomesFake);
+            $falso1 = $primeiroNome . ' ' . ($sobrenomesFake[0] ?? 'Santos');
         }
-        while (strtolower($falso2) === strtolower($nomeReal) || $falso2 === $falso1) {
+        while (strtolower($falso2) === $nomeRealLower || strtolower($falso2) === strtolower($falso1)) {
             $falso2 = $primeiroNome . ' ' . array_pop($sobrenomesFake);
         }
 
@@ -462,7 +533,127 @@ class NexoConsultaService
         shuffle($opcoes);
 
         return [
-            'texto' => "Qual é o seu nome completo cadastrado?",
+            'texto' => 'Qual é o seu nome completo cadastrado?',
+            'opcoes' => $opcoes,
+        ];
+    }
+
+
+    private function perguntaBairro(object $cliente): array
+    {
+        $bairroReal = trim($cliente->endereco_bairro);
+
+        // Pool de bairros reais de SC e região para gerar alternativas realistas
+        $poolBairros = [
+            'Centro', 'Fazenda', 'Cordeiros', 'São Vicente', 'Dom Bosco',
+            'Vila Nova', 'Ressacada', 'São João', 'Itaipava', 'Espinheiros',
+            'Cabeçudas', 'Praia Brava', 'Municípios', 'Cidade Nova', 'Barra do Rio',
+            'Costa e Silva', 'Vila Operária', 'Jardim Vitória', 'Tabuleiro',
+            'Pioneiros', 'Nações', 'Das Nações', 'Campinas', 'Kobrasol',
+            'Barreiros', 'Estreito', 'Coqueiros', 'Trindade', 'Ingleses',
+            'Canasvieiras', 'Jurerê', 'Campeche', 'Rio Tavares', 'Saco dos Limões',
+            'Bom Retiro', 'Garcia', 'Velha', 'Itoupava Norte', 'Vorstadt',
+            'Glória', 'Boa Vista', 'América', 'Bucarein', 'Anita Garibaldi',
+            'Saguaçu', 'Iririú', 'Aventureiro', 'Comasa', 'Floresta',
+        ];
+
+        // Remover o bairro real do pool
+        $poolBairros = array_values(array_filter($poolBairros, function($b) use ($bairroReal) {
+            return strtolower($b) !== strtolower($bairroReal);
+        }));
+        shuffle($poolBairros);
+
+        $opcoes = [$bairroReal, $poolBairros[0] ?? 'Vila Nova', $poolBairros[1] ?? 'Centro'];
+        shuffle($opcoes);
+
+        return [
+            'texto' => 'Qual bairro consta no seu cadastro?',
+            'opcoes' => $opcoes,
+        ];
+    }
+
+    private function perguntaCep(object $cliente): array
+    {
+        $cepReal = preg_replace('/\D/', '', $cliente->endereco_cep ?? '');
+        $prefixo5Real = substr($cepReal, 0, 5);
+
+        // Pool de prefixos CEP reais de SC e região para alternativas realistas
+        $poolPrefixos = [
+            '88301', '88302', '88303', '88304', '88305', // Itajaí
+            '88330', '88331', '88332', '88333', '88334', // Balneário Camboriú
+            '88340', '88341', '88342',                   // Camboriú
+            '88310', '88311', '88312',                   // Penha
+            '88350', '88351', '88352',                   // Brusque
+            '89010', '89012', '89015',                   // Blumenau
+            '89201', '89202', '89204',                   // Joinville
+            '88015', '88020', '88035',                   // Florianópolis
+            '88101', '88102', '88103',                   // São José
+            '89560', '89564',                            // Videira
+            '88501', '88502',                            // Lages
+            '88701', '88702',                            // Tubarão
+            '88801', '88802',                            // Criciúma
+            '88201', '88202',                            // Tijucas
+        ];
+
+        // Remover prefixo real e os muito próximos (mesmo grupo)
+        $grupoReal = substr($prefixo5Real, 0, 3);
+        $poolFiltrado = array_values(array_filter($poolPrefixos, function($p) use ($prefixo5Real, $grupoReal) {
+            return $p !== $prefixo5Real && substr($p, 0, 3) !== $grupoReal;
+        }));
+        shuffle($poolFiltrado);
+
+        // Se não sobrou alternativas suficientes (CEP fora de SC), usar genéricos
+        if (count($poolFiltrado) < 2) {
+            $poolFiltrado = ['88301', '89012', '88020', '89201'];
+            $poolFiltrado = array_values(array_filter($poolFiltrado, fn($p) => $p !== $prefixo5Real));
+            shuffle($poolFiltrado);
+        }
+
+        $mascaraReal = substr($prefixo5Real, 0, 5) . '-***';
+        $mascaraFalsa1 = substr($poolFiltrado[0], 0, 5) . '-***';
+        $mascaraFalsa2 = substr($poolFiltrado[1] ?? $poolFiltrado[0], 0, 5) . '-***';
+
+        $opcoes = [$mascaraReal, $mascaraFalsa1, $mascaraFalsa2];
+        shuffle($opcoes);
+
+        return [
+            'texto' => 'Qual o início do seu CEP cadastrado?',
+            'opcoes' => $opcoes,
+        ];
+    }
+
+    private function perguntaProfissao(object $cliente): array
+    {
+        $profReal = trim($cliente->profissao);
+
+        // Pool de profissões reais extraídas do banco para alternativas realistas
+        $poolProfissoes = [
+            'Empresário(a)', 'Vendedor(a)', 'Advogado(a)', 'Secretário(a)',
+            'Médico(a)', 'Engenheiro(a)', 'Professor(a)', 'Autônomo(a)',
+            'Aposentado(a)', 'Auxiliar Administrativo', 'Operador de Máquinas',
+            'Analista de Logística', 'Operador(a) de Caixa', 'Gerente',
+            'Funcionário(a) Público(a)', 'Motorista', 'Técnico(a) em Enfermagem',
+            'Pedreiro', 'Eletricista', 'Mecânico(a)', 'Cozinheiro(a)',
+            'Atendente', 'Contador(a)', 'Designer', 'Programador(a)',
+            'Enfermeiro(a)', 'Dentista', 'Farmacêutico(a)', 'Vigilante',
+            'Soldador', 'Pintor(a)', 'Repositor(a)', 'Entregador(a)',
+            'Recepcionista', 'Almoxarife', 'Caldeireiro', 'Armador',
+            'Estoquista', 'Zelador(a)', 'Porteiro(a)', 'Frentista',
+        ];
+
+        // Remover a profissão real do pool (case-insensitive)
+        $profRealLower = strtolower($profReal);
+        $poolFiltrado = array_values(array_filter($poolProfissoes, function($p) use ($profRealLower) {
+            return strtolower($p) !== $profRealLower
+                && strtolower(str_replace(['(a)', '(o)'], '', $p)) !== strtolower(str_replace(['(a)', '(o)'], '', $profRealLower));
+        }));
+        shuffle($poolFiltrado);
+
+        $opcoes = [$profReal, $poolFiltrado[0] ?? 'Autônomo(a)', $poolFiltrado[1] ?? 'Empresário(a)'];
+        shuffle($opcoes);
+
+        return [
+            'texto' => 'Qual a sua profissão cadastrada?',
             'opcoes' => $opcoes,
         ];
     }
@@ -479,7 +670,6 @@ class NexoConsultaService
                 $doc = $cliente->cpf_cnpj ?: $cliente->cpf ?: $cliente->cnpj ?: '';
                 $docLimpo = preg_replace('/\D/', '', $doc);
                 $ultimos4 = substr($docLimpo, -4);
-                // Valor vem como "***1234", extrair últimos 4
                 $valorLimpo = preg_replace('/\D/', '', $valor);
                 $valorLimpo = substr($valorLimpo, -4);
                 return $valorLimpo === $ultimos4;
@@ -493,6 +683,19 @@ class NexoConsultaService
 
             case 'nome':
                 return strtolower($valor) === strtolower(trim($cliente->nome ?? ''));
+
+            case 'bairro':
+                return strtolower($valor) === strtolower(trim($cliente->endereco_bairro ?? ''));
+
+            case 'cep':
+                $cepReal = preg_replace('/\D/', '', $cliente->endereco_cep ?? '');
+                $prefixoReal = substr($cepReal, 0, 5);
+                $valorLimpo = preg_replace('/\D/', '', $valor);
+                $prefixoValor = substr($valorLimpo, 0, 5);
+                return $prefixoReal === $prefixoValor;
+
+            case 'profissao':
+                return strtolower($valor) === strtolower(trim($cliente->profissao ?? ''));
 
             default:
                 return false;

@@ -102,6 +102,10 @@ class NexoConsultaController extends Controller
             'pergunta1_valor' => $request->input('pergunta1_valor', ''),
             'pergunta2_campo' => $request->input('pergunta2_campo', ''),
             'pergunta2_valor' => $request->input('pergunta2_valor', ''),
+            'pergunta3_campo' => $request->input('pergunta3_campo', ''),
+            'pergunta3_valor' => $request->input('pergunta3_valor', ''),
+            'pergunta4_campo' => $request->input('pergunta4_campo', ''),
+            'pergunta4_valor' => $request->input('pergunta4_valor', ''),
         ];
 
         try {
