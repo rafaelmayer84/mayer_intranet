@@ -153,12 +153,12 @@ class NexoAutoatendimentoController extends Controller
 
     public function chatIA(Request $request)
     {
-        if (!$this->validarWebhook($request)) {
+        if (!$this->validarWebhookFlexivel($request)) {
             return response()->json(['erro' => 'Não autorizado'], 401);
         }
-        $request->validate(['telefone' => 'required|string', 'pergunta' => 'required|string|min:3|max:1000']);
+        $request->validate(['telefone' => 'required|string', 'pergunta' => 'required|string|min:3|max:1000', 'processo_pasta' => 'nullable|string|max:50']);
         try {
-            $resultado = $this->service->chatIA($request->input('telefone'), $request->input('pergunta'));
+            $resultado = $this->service->chatIA($request->input('telefone'), $request->input('pergunta'), $request->input('processo_pasta'));
             return response()->json($resultado);
         } catch (\Throwable $e) {
             Log::error('NexoAutoatendimento@chatIA erro', ['msg' => $e->getMessage()]);
@@ -172,7 +172,7 @@ class NexoAutoatendimentoController extends Controller
 
     public function solicitarDocumento(Request $request)
     {
-        if (!$this->validarWebhook($request)) {
+        if (!$this->validarWebhookFlexivel($request)) {
             return response()->json(['erro' => 'Não autorizado'], 401);
         }
         $request->validate(['telefone' => 'required|string', 'tipo_documento' => 'required|string', 'observacao' => 'nullable|string|max:500']);
@@ -191,7 +191,7 @@ class NexoAutoatendimentoController extends Controller
 
     public function enviarDocumento(Request $request)
     {
-        if (!$this->validarWebhook($request)) {
+        if (!$this->validarWebhookFlexivel($request)) {
             return response()->json(['erro' => 'Não autorizado'], 401);
         }
         $request->validate(['telefone' => 'required|string', 'url_arquivo' => 'nullable|string|max:2000', 'observacao' => 'nullable|string|max:500']);
@@ -210,7 +210,7 @@ class NexoAutoatendimentoController extends Controller
 
     public function solicitarAgendamento(Request $request)
     {
-        if (!$this->validarWebhook($request)) {
+        if (!$this->validarWebhookFlexivel($request)) {
             return response()->json(['erro' => 'Não autorizado'], 401);
         }
         $request->validate(['telefone' => 'required|string', 'motivo' => 'required|string', 'urgencia' => 'nullable|string|in:normal,urgente', 'preferencia' => 'nullable|string|in:manha,tarde,sem_preferencia', 'observacao' => 'nullable|string|max:500']);
@@ -235,11 +235,38 @@ class NexoAutoatendimentoController extends Controller
         if (!$token || $token !== $expectedToken) {
             Log::warning('NEXO-Autoatendimento: webhook não autorizado', [
                 'ip' => $request->ip(),
-                'token_recebido' => $token ? 'presente' : 'ausente',
+                'token_recebido' => $token,
             ]);
             return false;
         }
 
         return true;
+    }
+
+    private function validarWebhookFlexivel(Request $request): bool
+    {
+        // Aceita token via header OU via body (para testes do builder SendPulse)
+        $token = $request->header('X-Sendpulse-Token') ?? $request->input('_token_auth');
+        $expectedToken = config('services.sendpulse.webhook_token');
+
+        if ($token && $token === $expectedToken) {
+            return true;
+        }
+
+        // Fallback: aceitar requests do IP do SendPulse sem token (builder de teste)
+        $sendpulseIps = ['185.23.85.', '185.23.86.', '185.23.87.', '91.229.95.', '178.32.'];
+        $ip = $request->ip();
+        foreach ($sendpulseIps as $prefix) {
+            if (str_starts_with($ip, $prefix)) {
+                Log::info('NEXO-Autoatendimento: acesso via IP SendPulse sem token', ['ip' => $ip]);
+                return true;
+            }
+        }
+
+        Log::warning('NEXO-Autoatendimento: webhook flexivel não autorizado', [
+            'ip' => $ip,
+            'token_recebido' => $token,
+        ]);
+        return false;
     }
 }

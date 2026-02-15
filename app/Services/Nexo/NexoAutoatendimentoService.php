@@ -531,7 +531,7 @@ class NexoAutoatendimentoService
     // 7. CHAT IA — CONVERSA LIVRE SOBRE O CASO (FASE 2)
     // =====================================================
 
-    public function chatIA(string $telefone, string $pergunta): array
+    public function chatIA(string $telefone, string $pergunta, ?string $processoPasta = null): array
     {
         $inicio = microtime(true);
         $telefoneNormalizado = $this->normalizarTelefone($telefone);
@@ -546,9 +546,10 @@ class NexoAutoatendimentoService
             $perguntaLimpa = mb_substr($perguntaLimpa, 0, 1000);
         }
 
-        $cacheKey = "nexo_chatia_{$cliente->id}_" . md5($perguntaLimpa);
-        $resultado = Cache::remember($cacheKey, 30, function () use ($cliente, $perguntaLimpa) {
-            return $this->executarChatIA($cliente, $perguntaLimpa);
+        $pastaFiltro = $processoPasta ? trim($processoPasta) : null;
+        $cacheKey = "nexo_chatia_{$cliente->id}_" . md5($perguntaLimpa . ($pastaFiltro ?? ''));
+        $resultado = Cache::remember($cacheKey, 30, function () use ($cliente, $perguntaLimpa, $pastaFiltro) {
+            return $this->executarChatIA($cliente, $perguntaLimpa, $pastaFiltro);
         });
 
         $tempoMs = (int)((microtime(true) - $inicio) * 1000);
@@ -558,14 +559,17 @@ class NexoAutoatendimentoService
         return $resultado;
     }
 
-    private function executarChatIA(Cliente $cliente, string $pergunta): array
+    private function executarChatIA(Cliente $cliente, string $pergunta, ?string $processoPasta = null): array
     {
         $djId = $cliente->datajuri_id;
         $nomeCliente = $cliente->nome;
 
-        $processos = DB::table('processos')
-            ->where('cliente_datajuri_id', $djId)
-            ->select('pasta', 'titulo', 'status', 'tipo_acao', 'area_atuacao',
+        // Se processo_pasta fornecido, filtrar snapshot para aquele processo apenas
+        $qProcessos = DB::table('processos')->where('cliente_datajuri_id', $djId);
+        if ($processoPasta) {
+            $qProcessos->where('pasta', $processoPasta);
+        }
+        $processos = $qProcessos->select('pasta', 'titulo', 'status', 'tipo_acao', 'area_atuacao',
                      'data_abertura', 'adverso_nome', 'fase_atual_instancia',
                      'fase_atual_vara', 'advogado_responsavel', 'valor_causa', 'possibilidade')
             ->orderByDesc('data_abertura')->limit(10)->get()->toArray();
@@ -581,10 +585,13 @@ class NexoAutoatendimentoService
             ->orderByDesc('data_assinatura')->limit(5)->get()->toArray();
 
         $andamentosRecentes = [];
-        $processosAtivos = DB::table('processos')
+        $qAtivos = DB::table('processos')
             ->where('cliente_datajuri_id', $djId)
-            ->where('status', '!=', 'Encerrado')
-            ->pluck('pasta')->toArray();
+            ->where('status', '!=', 'Encerrado');
+        if ($processoPasta) {
+            $qAtivos->where('pasta', $processoPasta);
+        }
+        $processosAtivos = $qAtivos->pluck('pasta')->toArray();
 
         $this->autenticarDataJuri();
         if ($this->dataJuriToken) {
@@ -629,7 +636,7 @@ class NexoAutoatendimentoService
             $snapshotJson = mb_substr($snapshotJson, 0, 12000) . "\n... (dados truncados)";
         }
 
-        $systemPrompt = "Você é MAIA, assistente digital do escritório Mayer Albanez Advogados Associados.\n\n"
+        $systemPrompt = "Você é LEXUS, assistente digital do escritório Mayer Advogados.\n\n"
             . "REGRAS OBRIGATÓRIAS:\n"
             . "1. Responda EXCLUSIVAMENTE com base nos dados do CONTEXTO JSON abaixo\n"
             . "2. Use linguagem simples e acessível — o cliente NÃO é jurista\n"
@@ -640,7 +647,7 @@ class NexoAutoatendimentoService
             . "7. Traduza termos jurídicos para linguagem leiga\n"
             . "8. Formate limpo, sem markdown pesado (é WhatsApp)\n"
             . "9. Máximo 400 palavras\n"
-            . "10. Se múltiplos processos, identifique qual. Se não for claro, liste e peça para especificar\n"
+            . "10. " . ($processoPasta ? "O cliente selecionou o processo pasta {$processoPasta}. Foque APENAS neste processo.\n" : "Se múltiplos processos, identifique qual. Se não for claro, liste e peça para especificar\n")
             . "11. NUNCA exponha IDs internos, datajuri_id ou campos técnicos\n"
             . "12. Cumprimente pelo nome e finalize oferecendo ajuda\n\n"
             . "CONTEXTO DO CLIENTE:\n" . $snapshotJson;
@@ -667,6 +674,7 @@ class NexoAutoatendimentoService
                         'resposta' => trim($resposta),
                         'processos_count' => count($processos),
                         'nome_cliente' => $nomeCliente,
+                        'pasta_selecionada' => $processoPasta,
                     ];
                 }
             }
