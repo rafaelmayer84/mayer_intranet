@@ -106,4 +106,10 @@ Route::prefix('nexo/autoatendimento')->group(function () {
     Route::post('/tickets/abrir', [NexoAutoatendimentoController::class, 'abrirTicket']);
     Route::post('/tickets/listar', [NexoAutoatendimentoController::class, 'listarTickets']);
     Route::post('/resumo', [NexoAutoatendimentoController::class, 'resumoLeigo']);
+
+    // FASE 2 — AUTOATENDIMENTO ROBUSTO (15/02/2026)
+    Route::post('/chat-ia', [NexoAutoatendimentoController::class, 'chatIA']);
+    Route::post('/documentos/solicitar', [NexoAutoatendimentoController::class, 'solicitarDocumento']);
+    Route::post('/documentos/enviar', [NexoAutoatendimentoController::class, 'enviarDocumento']);
+    Route::post('/agendamento/solicitar', [NexoAutoatendimentoController::class, 'solicitarAgendamento']);
 });

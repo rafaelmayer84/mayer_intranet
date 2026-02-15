@@ -148,6 +148,82 @@ class NexoAutoatendimentoController extends Controller
     }
 
     // =====================================================
+    // CHAT IA (FASE 2)
+    // =====================================================
+
+    public function chatIA(Request $request)
+    {
+        if (!$this->validarWebhook($request)) {
+            return response()->json(['erro' => 'Não autorizado'], 401);
+        }
+        $request->validate(['telefone' => 'required|string', 'pergunta' => 'required|string|min:3|max:1000']);
+        try {
+            $resultado = $this->service->chatIA($request->input('telefone'), $request->input('pergunta'));
+            return response()->json($resultado);
+        } catch (\Throwable $e) {
+            Log::error('NexoAutoatendimento@chatIA erro', ['msg' => $e->getMessage()]);
+            return response()->json(['encontrado' => false, 'resposta' => 'Não foi possível processar sua pergunta neste momento.'], 500);
+        }
+    }
+
+    // =====================================================
+    // SOLICITAR DOCUMENTO (FASE 2)
+    // =====================================================
+
+    public function solicitarDocumento(Request $request)
+    {
+        if (!$this->validarWebhook($request)) {
+            return response()->json(['erro' => 'Não autorizado'], 401);
+        }
+        $request->validate(['telefone' => 'required|string', 'tipo_documento' => 'required|string', 'observacao' => 'nullable|string|max:500']);
+        try {
+            $resultado = $this->service->solicitarDocumento($request->input('telefone'), $request->input('tipo_documento'), $request->input('observacao'));
+            return response()->json($resultado);
+        } catch (\Throwable $e) {
+            Log::error('NexoAutoatendimento@solicitarDocumento erro', ['msg' => $e->getMessage()]);
+            return response()->json(['erro' => 'Erro ao registrar solicitação.'], 500);
+        }
+    }
+
+    // =====================================================
+    // ENVIAR DOCUMENTO (FASE 2)
+    // =====================================================
+
+    public function enviarDocumento(Request $request)
+    {
+        if (!$this->validarWebhook($request)) {
+            return response()->json(['erro' => 'Não autorizado'], 401);
+        }
+        $request->validate(['telefone' => 'required|string', 'url_arquivo' => 'nullable|string|max:2000', 'observacao' => 'nullable|string|max:500']);
+        try {
+            $resultado = $this->service->enviarDocumento($request->input('telefone'), $request->input('url_arquivo'), $request->input('observacao'));
+            return response()->json($resultado);
+        } catch (\Throwable $e) {
+            Log::error('NexoAutoatendimento@enviarDocumento erro', ['msg' => $e->getMessage()]);
+            return response()->json(['erro' => 'Erro ao registrar documento.'], 500);
+        }
+    }
+
+    // =====================================================
+    // SOLICITAR AGENDAMENTO (FASE 2)
+    // =====================================================
+
+    public function solicitarAgendamento(Request $request)
+    {
+        if (!$this->validarWebhook($request)) {
+            return response()->json(['erro' => 'Não autorizado'], 401);
+        }
+        $request->validate(['telefone' => 'required|string', 'motivo' => 'required|string', 'urgencia' => 'nullable|string|in:normal,urgente', 'preferencia' => 'nullable|string|in:manha,tarde,sem_preferencia', 'observacao' => 'nullable|string|max:500']);
+        try {
+            $resultado = $this->service->solicitarAgendamento($request->input('telefone'), $request->input('motivo'), $request->input('urgencia', 'normal'), $request->input('preferencia', 'sem_preferencia'), $request->input('observacao'));
+            return response()->json($resultado);
+        } catch (\Throwable $e) {
+            Log::error('NexoAutoatendimento@solicitarAgendamento erro', ['msg' => $e->getMessage()]);
+            return response()->json(['erro' => 'Erro ao registrar agendamento.'], 500);
+        }
+    }
+
+    // =====================================================
     // VALIDAÇÃO (mesmo padrão do NexoWebhookController)
     // =====================================================
 

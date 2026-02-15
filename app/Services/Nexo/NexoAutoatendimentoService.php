@@ -528,6 +528,295 @@ class NexoAutoatendimentoService
     }
 
     // =====================================================
+    // 7. CHAT IA — CONVERSA LIVRE SOBRE O CASO (FASE 2)
+    // =====================================================
+
+    public function chatIA(string $telefone, string $pergunta): array
+    {
+        $inicio = microtime(true);
+        $telefoneNormalizado = $this->normalizarTelefone($telefone);
+        $cliente = $this->obterClienteAutenticado($telefoneNormalizado);
+        if (isset($cliente['erro'])) { return $cliente; }
+
+        $perguntaLimpa = trim(strip_tags($pergunta));
+        if (empty($perguntaLimpa) || mb_strlen($perguntaLimpa) < 3) {
+            return ['erro' => 'Por favor, digite uma pergunta válida.'];
+        }
+        if (mb_strlen($perguntaLimpa) > 1000) {
+            $perguntaLimpa = mb_substr($perguntaLimpa, 0, 1000);
+        }
+
+        $cacheKey = "nexo_chatia_{$cliente->id}_" . md5($perguntaLimpa);
+        $resultado = Cache::remember($cacheKey, 30, function () use ($cliente, $perguntaLimpa) {
+            return $this->executarChatIA($cliente, $perguntaLimpa);
+        });
+
+        $tempoMs = (int)((microtime(true) - $inicio) * 1000);
+        $this->logarAcao($telefoneNormalizado, 'chat_ia', [
+            'cliente_id' => $cliente->id, 'pergunta' => $perguntaLimpa,
+        ], $resultado['resposta'] ?? null, $tempoMs);
+        return $resultado;
+    }
+
+    private function executarChatIA(Cliente $cliente, string $pergunta): array
+    {
+        $djId = $cliente->datajuri_id;
+        $nomeCliente = $cliente->nome;
+
+        $processos = DB::table('processos')
+            ->where('cliente_datajuri_id', $djId)
+            ->select('pasta', 'titulo', 'status', 'tipo_acao', 'area_atuacao',
+                     'data_abertura', 'adverso_nome', 'fase_atual_instancia',
+                     'fase_atual_vara', 'advogado_responsavel', 'valor_causa', 'possibilidade')
+            ->orderByDesc('data_abertura')->limit(10)->get()->toArray();
+
+        $contas = DB::table('contas_receber')
+            ->where('cliente_datajuri_id', $djId)
+            ->select('descricao', 'valor', 'data_vencimento', 'data_pagamento', 'status')
+            ->orderByDesc('data_vencimento')->limit(10)->get()->toArray();
+
+        $contratos = DB::table('contratos')
+            ->where('contratante_id_datajuri', $djId)
+            ->select('numero', 'valor', 'data_assinatura')
+            ->orderByDesc('data_assinatura')->limit(5)->get()->toArray();
+
+        $andamentosRecentes = [];
+        $processosAtivos = DB::table('processos')
+            ->where('cliente_datajuri_id', $djId)
+            ->where('status', '!=', 'Encerrado')
+            ->pluck('pasta')->toArray();
+
+        $this->autenticarDataJuri();
+        if ($this->dataJuriToken) {
+            foreach (array_slice($processosAtivos, 0, 3) as $pasta) {
+                $faseIds = $this->buscarFaseProcessoIds($pasta);
+                foreach ($faseIds as $faseId) {
+                    $ands = $this->buscarAndamentosPorFase($faseId, 5);
+                    foreach ($ands as &$a) { $a['processo_pasta'] = $pasta; }
+                    $andamentosRecentes = array_merge($andamentosRecentes, $ands);
+                }
+            }
+            usort($andamentosRecentes, function ($a, $b) {
+                return strcmp($b['data_raw'] ?? '1970-01-01', $a['data_raw'] ?? '1970-01-01');
+            });
+            $andamentosRecentes = array_slice($andamentosRecentes, 0, 15);
+        }
+
+        $compromissos = [];
+        try {
+            $compResult = $this->buscarCompromissosCliente($cliente);
+            if (!empty($compResult['compromissos'])) {
+                $compromissos = array_slice($compResult['compromissos'], 0, 5);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('ChatIA: erro compromissos', ['erro' => $e->getMessage()]);
+        }
+
+        $snapshot = [
+            'cliente' => [
+                'nome' => $nomeCliente,
+                'cpf_cnpj' => $cliente->cpf_cnpj ?? $cliente->cpf ?? $cliente->cnpj ?? 'N/I',
+            ],
+            'processos' => array_map(fn($p) => (array)$p, $processos),
+            'andamentos_recentes' => $andamentosRecentes,
+            'compromissos_futuros' => $compromissos,
+            'contas_receber' => array_map(fn($c) => (array)$c, $contas),
+            'contratos' => array_map(fn($c) => (array)$c, $contratos),
+        ];
+
+        $snapshotJson = json_encode($snapshot, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        if (mb_strlen($snapshotJson) > 12000) {
+            $snapshotJson = mb_substr($snapshotJson, 0, 12000) . "\n... (dados truncados)";
+        }
+
+        $systemPrompt = "Você é MAIA, assistente digital do escritório Mayer Albanez Advogados Associados.\n\n"
+            . "REGRAS OBRIGATÓRIAS:\n"
+            . "1. Responda EXCLUSIVAMENTE com base nos dados do CONTEXTO JSON abaixo\n"
+            . "2. Use linguagem simples e acessível — o cliente NÃO é jurista\n"
+            . "3. NUNCA invente informações, números de processo, datas ou valores\n"
+            . "4. Se o dado não estiver no contexto, diga: \"Essa informação não está disponível no momento. Posso encaminhar sua dúvida para o advogado responsável.\"\n"
+            . "5. Seja empático, profissional e direto\n"
+            . "6. NÃO dê conselhos jurídicos — apenas informe o status e explique termos\n"
+            . "7. Traduza termos jurídicos para linguagem leiga\n"
+            . "8. Formate limpo, sem markdown pesado (é WhatsApp)\n"
+            . "9. Máximo 400 palavras\n"
+            . "10. Se múltiplos processos, identifique qual. Se não for claro, liste e peça para especificar\n"
+            . "11. NUNCA exponha IDs internos, datajuri_id ou campos técnicos\n"
+            . "12. Cumprimente pelo nome e finalize oferecendo ajuda\n\n"
+            . "CONTEXTO DO CLIENTE:\n" . $snapshotJson;
+
+        try {
+            $response = \Illuminate\Support\Facades\Http::withHeaders([
+                'Authorization' => 'Bearer ' . config('services.openai.api_key'),
+                'Content-Type' => 'application/json',
+            ])->timeout(30)->post('https://api.openai.com/v1/chat/completions', [
+                'model' => config('services.openai.model', 'gpt-4o-mini'),
+                'messages' => [
+                    ['role' => 'system', 'content' => $systemPrompt],
+                    ['role' => 'user', 'content' => $pergunta],
+                ],
+                'max_tokens' => 800,
+                'temperature' => 0.4,
+            ]);
+
+            if ($response->successful()) {
+                $resposta = $response->json('choices.0.message.content', '');
+                if (!empty($resposta)) {
+                    return [
+                        'encontrado' => true,
+                        'resposta' => trim($resposta),
+                        'processos_count' => count($processos),
+                        'nome_cliente' => $nomeCliente,
+                    ];
+                }
+            }
+            Log::error('ChatIA: OpenAI resposta inválida', ['status' => $response->status()]);
+        } catch (\Throwable $e) {
+            Log::error('ChatIA: erro OpenAI', ['erro' => $e->getMessage()]);
+        }
+
+        return [
+            'encontrado' => false,
+            'resposta' => "Desculpe, {$nomeCliente}, não consegui processar sua pergunta neste momento. Vou encaminhar para o advogado responsável.",
+            'processos_count' => count($processos),
+            'nome_cliente' => $nomeCliente,
+        ];
+    }
+
+    // =====================================================
+    // 8. SOLICITAR DOCUMENTO (FASE 2)
+    // =====================================================
+
+    public function solicitarDocumento(string $telefone, string $tipoDocumento, ?string $observacao = null): array
+    {
+        $inicio = microtime(true);
+        $telefoneNormalizado = $this->normalizarTelefone($telefone);
+        $cliente = $this->obterClienteAutenticado($telefoneNormalizado);
+        if (isset($cliente['erro'])) { return $cliente; }
+
+        $tiposValidos = ['contrato', 'procuracao', 'certidao', 'declaracao', 'outro'];
+        $tipoLimpo = strtolower(trim($tipoDocumento));
+        if (!in_array($tipoLimpo, $tiposValidos)) { $tipoLimpo = 'outro'; }
+
+        $tipoLabels = [
+            'contrato' => 'Contrato', 'procuracao' => 'Procuração',
+            'certidao' => 'Certidão / Declaração', 'declaracao' => 'Certidão / Declaração',
+            'outro' => 'Outro documento',
+        ];
+        $tipoLabel = $tipoLabels[$tipoLimpo];
+
+        $protocolo = 'DOC-' . date('Ymd') . '-' . str_pad(
+            NexoTicket::whereDate('created_at', today())->count() + 1, 3, '0', STR_PAD_LEFT
+        );
+
+        NexoTicket::create([
+            'cliente_id' => $cliente->id, 'datajuri_id' => $cliente->datajuri_id,
+            'telefone' => $telefoneNormalizado, 'nome_cliente' => $cliente->nome,
+            'assunto' => "📄 Solicitação de documento: {$tipoLabel}",
+            'mensagem' => "Tipo: {$tipoLabel}\nObservação: " . ($observacao ?? 'Nenhuma') . "\nProtocolo: {$protocolo}",
+            'status' => 'aberto',
+        ]);
+
+        $tempoMs = (int)((microtime(true) - $inicio) * 1000);
+        $this->logarAcao($telefoneNormalizado, 'solicitar_documento', ['tipo' => $tipoLimpo, 'protocolo' => $protocolo], null, $tempoMs);
+
+        return [
+            'sucesso' => true, 'protocolo' => $protocolo,
+            'mensagem' => "Solicitação registrada com sucesso!\n\n📋 Protocolo: {$protocolo}\n📄 Documento: {$tipoLabel}\n\nNossa equipe providenciará o documento e entrará em contato em até 24 horas úteis.",
+            'nome_cliente' => $cliente->nome,
+        ];
+    }
+
+    // =====================================================
+    // 9. ENVIAR DOCUMENTO AO ESCRITÓRIO (FASE 2)
+    // =====================================================
+
+    public function enviarDocumento(string $telefone, ?string $urlArquivo = null, ?string $observacao = null): array
+    {
+        $inicio = microtime(true);
+        $telefoneNormalizado = $this->normalizarTelefone($telefone);
+        $cliente = $this->obterClienteAutenticado($telefoneNormalizado);
+        if (isset($cliente['erro'])) { return $cliente; }
+
+        $protocolo = 'ENV-' . date('Ymd') . '-' . str_pad(
+            NexoTicket::whereDate('created_at', today())->count() + 1, 3, '0', STR_PAD_LEFT
+        );
+
+        $msg = "📥 Documento enviado pelo cliente via WhatsApp";
+        if ($urlArquivo) { $msg .= "\nArquivo: {$urlArquivo}"; }
+        if ($observacao) { $msg .= "\nObservação: {$observacao}"; }
+        $msg .= "\nProtocolo: {$protocolo}";
+
+        NexoTicket::create([
+            'cliente_id' => $cliente->id, 'datajuri_id' => $cliente->datajuri_id,
+            'telefone' => $telefoneNormalizado, 'nome_cliente' => $cliente->nome,
+            'assunto' => "📥 Documento recebido do cliente",
+            'mensagem' => $msg, 'status' => 'aberto',
+        ]);
+
+        $tempoMs = (int)((microtime(true) - $inicio) * 1000);
+        $this->logarAcao($telefoneNormalizado, 'enviar_documento', ['protocolo' => $protocolo, 'tem_arquivo' => !empty($urlArquivo)], null, $tempoMs);
+
+        return [
+            'sucesso' => true, 'protocolo' => $protocolo,
+            'mensagem' => "Documento recebido com sucesso!\n\n📋 Protocolo: {$protocolo}\n\nNossa equipe analisará o documento e entrará em contato caso necessite de informações adicionais.",
+            'nome_cliente' => $cliente->nome,
+        ];
+    }
+
+    // =====================================================
+    // 10. SOLICITAR AGENDAMENTO (FASE 2)
+    // =====================================================
+
+    public function solicitarAgendamento(string $telefone, string $motivo, string $urgencia = 'normal', string $preferencia = 'sem_preferencia', ?string $observacao = null): array
+    {
+        $inicio = microtime(true);
+        $telefoneNormalizado = $this->normalizarTelefone($telefone);
+        $cliente = $this->obterClienteAutenticado($telefoneNormalizado);
+        if (isset($cliente['erro'])) { return $cliente; }
+
+        $motivosValidos = [
+            'reuniao_advogado' => 'Reunião com advogado', 'assinatura' => 'Assinatura de documento',
+            'esclarecimento' => 'Esclarecimento sobre processo', 'outro' => 'Outro assunto',
+        ];
+        $motivoLimpo = strtolower(trim($motivo));
+        $motivoLabel = $motivosValidos[$motivoLimpo] ?? $motivosValidos['outro'];
+
+        $urgenciaLabel = ($urgencia === 'urgente') ? '🔴 Urgente (até 48h)' : '🟢 Normal (até 5 dias úteis)';
+
+        $prefLabels = ['manha' => '🌅 Manhã (8h-12h)', 'tarde' => '🌆 Tarde (13h-18h)', 'sem_preferencia' => '🕐 Sem preferência'];
+        $preferenciaLabel = $prefLabels[$preferencia] ?? $prefLabels['sem_preferencia'];
+
+        $protocolo = 'AGD-' . date('Ymd') . '-' . str_pad(
+            NexoTicket::whereDate('created_at', today())->count() + 1, 3, '0', STR_PAD_LEFT
+        );
+
+        $msg = "Motivo: {$motivoLabel}\nUrgência: {$urgenciaLabel}\nPreferência: {$preferenciaLabel}";
+        if ($observacao && !in_array(strtolower(trim($observacao)), ['não', 'nao', ''])) {
+            $msg .= "\nObservação: {$observacao}";
+        }
+        $msg .= "\nProtocolo: {$protocolo}";
+
+        NexoTicket::create([
+            'cliente_id' => $cliente->id, 'datajuri_id' => $cliente->datajuri_id,
+            'telefone' => $telefoneNormalizado, 'nome_cliente' => $cliente->nome,
+            'assunto' => "📅 Agendamento: {$motivoLabel}",
+            'mensagem' => $msg, 'status' => 'aberto',
+        ]);
+
+        $tempoMs = (int)((microtime(true) - $inicio) * 1000);
+        $this->logarAcao($telefoneNormalizado, 'solicitar_agendamento', [
+            'motivo' => $motivoLimpo, 'urgencia' => $urgencia, 'protocolo' => $protocolo,
+        ], null, $tempoMs);
+
+        return [
+            'sucesso' => true, 'protocolo' => $protocolo,
+            'mensagem' => "Solicitação de agendamento registrada!\n\n📋 Protocolo: {$protocolo}\n📌 Motivo: {$motivoLabel}\n⏰ Urgência: {$urgenciaLabel}\n🕐 Preferência: {$preferenciaLabel}\n\nNossa equipe entrará em contato para confirmar a melhor data e horário.",
+            'nome_cliente' => $cliente->nome,
+        ];
+    }
+
+    // =====================================================
     // DATAJURI API — reutilização do padrão existente
     // =====================================================
 
