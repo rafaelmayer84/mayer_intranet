@@ -136,34 +136,24 @@ class SendPulseWhatsAppService
     {
         $text = data_get($msg, 'data.text.body');
         if (!empty($text) && is_string($text)) return $text;
-
         $dt = data_get($msg, 'data.text');
         if (!empty($dt) && is_string($dt)) return $dt;
-
         $db = data_get($msg, 'data.body');
         if (!empty($db) && is_string($db)) return $db;
-
         $tb = data_get($msg, 'text.body');
         if (!empty($tb) && is_string($tb)) return $tb;
-
         $b = data_get($msg, 'body');
         if (!empty($b) && is_string($b)) return $b;
-
-        $m = data_get($msg, 'message');
-        if (!empty($m) && is_string($m)) return $m;
-
-        // Button reply (ex: "Sim" de botao rapido)
-        $btn = data_get($msg, 'info.message.channel_data.message.button.text');
-        if (!empty($btn) && is_string($btn)) return $btn;
-
-        // Interactive button_reply (ex: "Meus processos")
-        $ibr = data_get($msg, 'info.message.channel_data.message.interactive.button_reply.title');
-        if (!empty($ibr) && is_string($ibr)) return $ibr;
-
-        // Interactive list_reply
-        $ilr = data_get($msg, 'info.message.channel_data.message.interactive.list_reply.title');
-        if (!empty($ilr) && is_string($ilr)) return $ilr;
-
+        $m2 = data_get($msg, 'message');
+        if (!empty($m2) && is_string($m2)) return $m2;
+        $btnTitle = data_get($msg, 'info.message.channel_data.message.interactive.button_reply.title')
+                 ?? data_get($msg, 'data.interactive.button_reply.title');
+        if (!empty($btnTitle) && is_string($btnTitle)) return $btnTitle;
+        $listTitle = data_get($msg, 'info.message.channel_data.message.interactive.list_reply.title')
+                  ?? data_get($msg, 'data.interactive.list_reply.title');
+        if (!empty($listTitle) && is_string($listTitle)) return $listTitle;
+        $cdText = data_get($msg, 'info.message.channel_data.message.text.body');
+        if (!empty($cdText) && is_string($cdText)) return $cdText;
         return '';
     }
 
@@ -175,12 +165,19 @@ class SendPulseWhatsAppService
     public static function extractDirection(array $msg): int
     {
         $dir = data_get($msg, 'direction');
-        // Aceitar int ou string numérica
         if (is_int($dir) || is_string($dir)) {
             $intDir = (int) $dir;
             if (in_array($intDir, [1, 2], true)) {
                 return $intDir;
             }
+        }
+        $title = data_get($msg, 'title') ?? data_get($msg, 'info.title');
+        if (is_string($title)) {
+            if (str_contains($title, 'outgoing')) return 2;
+            if (str_contains($title, 'incoming')) return 1;
+        }
+        if (!empty(data_get($msg, 'info.message.channel_data.sent_by'))) {
+            return 2;
         }
         return 1;
     }
@@ -389,6 +386,17 @@ class SendPulseWhatsAppService
             'bot_id' => $this->botId,
             'offset' => $offset,
             'limit'  => $limit,
+        ]);
+    }
+
+    /**
+     * Lista apenas chats com live chat aberto (operador assumiu).
+     */
+    public function getOpenChats(): ?array
+    {
+        return $this->apiGet('/whatsapp/chats', [
+            'bot_id'          => $this->botId,
+            'is_chat_opened'  => 'true',
         ]);
     }
 

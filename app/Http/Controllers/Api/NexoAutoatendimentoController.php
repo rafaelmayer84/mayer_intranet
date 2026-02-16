@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\Nexo\NexoAutoatendimentoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use App\Jobs\ProcessChatIAJob;
 
 class NexoAutoatendimentoController extends Controller
 {
@@ -81,7 +82,7 @@ class NexoAutoatendimentoController extends Controller
 
     public function abrirTicket(Request $request)
     {
-        if (!$this->validarWebhook($request)) {
+        if (!$this->validarWebhookFlexivel($request)) {
             return response()->json(['erro' => 'Não autorizado'], 401);
         }
 
@@ -156,14 +157,25 @@ class NexoAutoatendimentoController extends Controller
         if (!$this->validarWebhookFlexivel($request)) {
             return response()->json(['erro' => 'Não autorizado'], 401);
         }
-        $request->validate(['telefone' => 'required|string', 'pergunta' => 'required|string|min:3|max:1000', 'processo_pasta' => 'nullable|string|max:50']);
-        try {
-            $resultado = $this->service->chatIA($request->input('telefone'), $request->input('pergunta'), $request->input('processo_pasta'));
-            return response()->json($resultado);
-        } catch (\Throwable $e) {
-            Log::error('NexoAutoatendimento@chatIA erro', ['msg' => $e->getMessage()]);
-            return response()->json(['encontrado' => false, 'resposta' => 'Não foi possível processar sua pergunta neste momento.'], 500);
-        }
+        $request->validate([
+            'telefone' => 'required|string',
+            'pergunta' => 'required|string|min:3|max:1000',
+            'processo_pasta' => 'nullable|string|max:50',
+        ]);
+
+        $telefone = $request->input('telefone');
+        $pergunta = $request->input('pergunta');
+        $pasta = $request->input('processo_pasta');
+
+        // Despachar para fila — processamento assíncrono
+        Log::info('ChatIA payload recebido', ['body' => $request->all(), 'telefone' => $telefone, 'pergunta' => $pergunta]);
+        ProcessChatIAJob::dispatch($telefone, $pergunta, $pasta);
+
+        return response()->json([
+            'encontrado' => true,
+            'resposta' => 'Estou analisando sua pergunta, um momento por favor...',
+            'async' => true,
+        ]);
     }
 
     // =====================================================
@@ -227,6 +239,31 @@ class NexoAutoatendimentoController extends Controller
     // VALIDAÇÃO (mesmo padrão do NexoWebhookController)
     // =====================================================
 
+    // =====================================================
+    // TICKETS - RESUMIR CONTEXTO (IA)
+    // =====================================================
+
+    public function resumirContexto(Request $request)
+    {
+        if (!$this->validarWebhookFlexivel($request)) {
+            return response()->json(['erro' => 'Nao autorizado'], 401);
+        }
+
+        $request->validate(['telefone' => 'required|string']);
+
+        try {
+            $resultado = $this->service->resumirContexto($request->input('telefone'));
+            return response()->json($resultado);
+        } catch (\Throwable $e) {
+            Log::error('NexoAutoatendimento@resumirContexto erro', ['msg' => $e->getMessage()]);
+            return response()->json([
+                'sucesso' => true,
+                'ticket_resumo' => 'Cliente entrou em contato via WhatsApp.',
+                'fonte' => 'erro',
+            ]);
+        }
+    }
+
     private function validarWebhook(Request $request): bool
     {
         $token = $request->header('X-Sendpulse-Token');
@@ -254,11 +291,18 @@ class NexoAutoatendimentoController extends Controller
         }
 
         // Fallback: aceitar requests do IP do SendPulse sem token (builder de teste)
-        $sendpulseIps = ['185.23.85.', '185.23.86.', '185.23.87.', '91.229.95.', '178.32.'];
+        $sendpulseIps = ['185.23.85.', '185.23.86.', '185.23.87.', '91.229.95.', '178.32.', '188.40.', '46.4.'];
+        $sendpulseIpv6 = ['2a02:4780:'];
         $ip = $request->ip();
         foreach ($sendpulseIps as $prefix) {
             if (str_starts_with($ip, $prefix)) {
-                Log::info('NEXO-Autoatendimento: acesso via IP SendPulse sem token', ['ip' => $ip]);
+                Log::info('NEXO-Autoatendimento: acesso via IP SendPulse (v4)', ['ip' => $ip]);
+                return true;
+            }
+        }
+        foreach ($sendpulseIpv6 as $prefix) {
+            if (str_starts_with($ip, $prefix)) {
+                Log::info('NEXO-Autoatendimento: acesso via IP SendPulse (v6)', ['ip' => $ip]);
                 return true;
             }
         }

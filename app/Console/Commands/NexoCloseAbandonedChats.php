@@ -40,8 +40,8 @@ class NexoCloseAbandonedChats extends Command
         $errors = 0;
         $processed = [];
 
-        // API SendPulse /whatsapp/chats retorna max 100 (paginação não funciona)
-        $response = $this->sp->getChatsPage(0);
+        // Busca apenas chats com live chat aberto (filtro server-side)
+        $response = $this->sp->getOpenChats();
 
         if (!$response || !isset($response['data'])) {
             $this->error("Falha ao buscar chats");

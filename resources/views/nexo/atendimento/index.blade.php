@@ -6,7 +6,7 @@
     {{-- ═══════════════════════════════════════════════════════ --}}
     {{-- COLUNA 1 — INBOX (360px) --}}
     {{-- ═══════════════════════════════════════════════════════ --}}
-    <div id="inbox-panel" class="w-full lg:w-[320px] flex-shrink-0 bg-white border-r border-gray-200/80 flex flex-col">
+    <div id="inbox-panel" class="w-full lg:w-[290px] flex-shrink-0 bg-white border-r border-gray-200/80 flex flex-col">
         {{-- Header Inbox --}}
         <div class="flex-shrink-0 px-4 py-3.5 bg-white border-b border-gray-200">
             <div class="flex items-center justify-between mb-2.5">
@@ -107,7 +107,7 @@
     {{-- ═══════════════════════════════════════════════════════ --}}
     {{-- COLUNA 3 — PAINEL DIREITO (380px, 4 ABAS) --}}
     {{-- ═══════════════════════════════════════════════════════ --}}
-    <div id="contexto-panel" class="hidden xl:flex w-[340px] min-w-[300px] flex-shrink flex-col bg-white border-l border-gray-200/80 overflow-hidden">
+    <div id="contexto-panel" class="hidden xl:flex w-[310px] min-w-[280px] flex-shrink flex-col bg-white border-l border-gray-200/80 overflow-hidden">
         <div class="flex-shrink-0">
             {{-- Header painel --}}
             <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">

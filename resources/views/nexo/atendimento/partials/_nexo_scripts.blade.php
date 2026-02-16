@@ -62,15 +62,16 @@ const NexoApp = {
         const ini=(c.name||'??').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
         const time=c.last_message_at?this.timeAgo(c.last_message_at):'';
         const unread=c.unread_count||0;
+        const isUnread=unread>0||c.marked_unread;
         let lb='';
         if(c.linked_cliente_id)lb='<span class="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded font-medium">CLI</span>';
         else if(c.linked_lead_id)lb='<span class="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium">LEAD</span>';
         else lb='<span class="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded">?</span>';
         const pr=c.priority||'normal';
         const pb=pr!=='normal'?`<span class="w-2 h-2 rounded-full inline-block priority-${pr}"></span>`:'';
-        return `<div class="inbox-item ${active?'active':''} flex items-center gap-3 px-4 py-3.5 cursor-pointer border-b border-gray-100/60" onclick="NexoApp.selectConversa(${c.id})">
-            <div class="relative flex-shrink-0"><div class="w-11 h-11 rounded-full bg-gradient-to-br from-[#dfe5e7] to-[#c8d1d6] text-[#4a5568] flex items-center justify-center text-[13px] font-bold shadow-sm">${ini}</div>${unread>0?`<span class="absolute -top-1 -right-1 w-5 h-5 bg-[#1e3a5f] text-white text-[10px] font-bold rounded-full flex items-center justify-center unread-badge shadow-sm">${unread}</span>`:''}</div>
-            <div class="flex-1 min-w-0"><div class="flex items-center justify-between"><span class="text-[13px] font-semibold text-[#111b21] truncate">${this.esc(c.name||'Sem nome')}</span><span class="text-[10px] text-[#8696a0] flex-shrink-0 ml-2">${time}</span></div><div class="flex items-center justify-between mt-0.5"><span class="text-xs text-[#667781] truncate">${this.fmtPhone(c.phone||'')}</span><div class="flex items-center gap-1 flex-shrink-0 ml-2">${pb} ${lb}</div></div></div></div>`;
+        return `<div class="inbox-item ${active?'active':''} ${isUnread?'unread':''} flex items-center gap-3 px-4 py-3.5 cursor-pointer border-b border-gray-100/60" data-conv-id="${c.id}" onclick="NexoApp.selectConversa(${c.id})" oncontextmenu="NexoApp.showContextMenu(event,${c.id},${isUnread})">
+            <div class="relative flex-shrink-0"><div class="w-11 h-11 rounded-full bg-[#1e3a5f] text-white flex items-center justify-center text-[13px] font-bold shadow-sm">${ini}</div>${isUnread?`<span class="absolute -top-1 -right-1 unread-badge">${unread||'!'}</span>`:''}</div>
+            <div class="flex-1 min-w-0"><div class="flex items-center justify-between"><span class="inbox-contact-name text-[13px] ${isUnread?'font-bold':'font-semibold'} text-[#111b21] truncate">${this.esc(c.name||'Sem nome')}</span><span class="text-[10px] ${isUnread?'text-[#25d366] font-semibold':'text-[#8696a0]'} flex-shrink-0 ml-2">${time}</span></div><div class="flex items-center justify-between mt-0.5"><span class="text-[11px] text-[#3b4a54] truncate">${this.fmtPhone(c.phone||'')}</span><div class="flex items-center gap-1 flex-shrink-0 ml-2">${pb} ${lb}</div></div></div></div>`;
     },
 
     setFilter(k,v){
@@ -162,6 +163,9 @@ const NexoApp = {
                 if(url)return `<a href="${eu}" target="_blank" class="msg-media-doc"><svg class="w-8 h-8 text-[#667781] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg><div class="min-w-0"><p class="text-xs font-medium text-[#111b21] truncate">${dn}</p><p class="text-[10px] text-[#667781]">Abrir</p></div></a>`+(cap?txtP(cap):'');
                 return `<div class="msg-media-doc"><span class="text-xs text-[#667781]">📄 ${dn}</span></div>`;
 
+            case 'interactive':
+                return body?txtP(body):'<p class="text-[13px] text-[#8696a0] italic">Resposta de botão</p>';
+
             default:
                 return body?txtP(body):'<p class="text-[13px] text-[#8696a0] italic">Mensagem sem conteúdo</p>';
         }
@@ -243,7 +247,7 @@ const NexoApp = {
             ls.classList.remove('hidden');
             ls.innerHTML=this.flowsCache.map(f=>{
                 const nm=this.esc(f.name||f.title||'Flow');const st=f.status==='active'?'🟢':'⚪';const fid=f.id||f.flow_id||'';
-                return `<div class="border border-gray-200 rounded-lg p-3"><div class="flex items-center justify-between"><div class="flex items-center gap-2"><span>${st}</span><span class="text-xs font-medium text-gray-800">${nm}</span></div><button onclick="NexoApp.triggerFlow('${fid}','${nm}')" class="text-[10px] px-2.5 py-1 bg-[#1e3a5f] text-white rounded hover:bg-[#162d4a] font-medium">Executar</button></div></div>`;
+                return `<div class="border border-gray-200 rounded-xl p-3.5 hover:border-[#1e3a5f]/30 transition-colors"><div class="flex items-center justify-between gap-3"><div class="flex items-center gap-2.5 min-w-0"><span class="text-base">${st}</span><span class="text-[13px] font-semibold text-gray-800 truncate">${nm}</span></div><button onclick="NexoApp.triggerFlow('${fid}','${nm}')" class="text-[12px] px-4 py-2 bg-white text-[#1e3a5f] border-2 border-[#1e3a5f] rounded-lg hover:bg-[#1e3a5f] hover:text-white font-semibold shadow-sm flex-shrink-0 transition-colors">Executar</button></div></div>`;
             }).join('');
         }catch(e){ld.classList.add('hidden');ls.classList.remove('hidden');ls.innerHTML='<p class="text-xs text-red-500 text-center py-4">Erro ao carregar flows</p>'}
     },
@@ -378,6 +382,41 @@ const NexoApp = {
     unlinkLead(){if(!this.conversaAtual)return;if(!confirm('Remover vinculação com este Lead?'))return;this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/unlink-lead`,{method:'DELETE'}).then(()=>{this.loadContexto(this.conversaAtual.id);this.loadConversas(true)}).catch(e=>console.error(e))},
     unlinkCliente(){if(!this.conversaAtual)return;if(!confirm('Remover vinculação com este Cliente? O processo vinculado também será removido.'))return;this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/unlink-cliente`,{method:'DELETE'}).then(()=>{this.loadContexto(this.conversaAtual.id);this.loadConversas(true);if(typeof NexoDJ!=='undefined')NexoDJ.init(this.conversaAtual.id,null,null)}).catch(e=>console.error(e))},
     updateUnlinkButtons(ctx){const ua=document.getElementById('unlink-actions');const bl=document.getElementById('btn-unlink-lead');const bc=document.getElementById('btn-unlink-cliente');if(!ua)return;let show=false;if(bl){if(ctx&&ctx.lead){bl.classList.remove('hidden');show=true}else{bl.classList.add('hidden')}}if(bc){if(ctx&&ctx.cliente){bc.classList.remove('hidden');show=true}else{bc.classList.add('hidden')}}if(show){ua.classList.remove('hidden')}else{ua.classList.add('hidden')}},
+
+
+    // ═══ CONTEXT MENU ═══
+    showContextMenu(e,convId,isUnread){
+        e.preventDefault();
+        this.hideContextMenu();
+        const menu=document.createElement('div');
+        menu.id='nexo-context-menu';
+        menu.className='nexo-context-menu';
+        menu.innerHTML=`
+            <div class="nexo-context-menu-item" onclick="NexoApp.toggleMarkedUnread(${convId},${isUnread})">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${isUnread?'M5 13l4 4L19 7':'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z'}"/></svg>
+                <span>${isUnread?'Marcar como lida':'Marcar como não lida'}</span>
+            </div>
+        `;
+        menu.style.left=e.clientX+'px';
+        menu.style.top=e.clientY+'px';
+        document.body.appendChild(menu);
+        // Ajustar se sair da tela
+        const rect=menu.getBoundingClientRect();
+        if(rect.right>window.innerWidth)menu.style.left=(window.innerWidth-rect.width-10)+'px';
+        if(rect.bottom>window.innerHeight)menu.style.top=(window.innerHeight-rect.height-10)+'px';
+        setTimeout(()=>document.addEventListener('click',this.hideContextMenu,{once:true}),10);
+    },
+    hideContextMenu(){
+        const m=document.getElementById('nexo-context-menu');
+        if(m)m.remove();
+    },
+    async toggleMarkedUnread(convId,currentlyUnread){
+        this.hideContextMenu();
+        try{
+            await this.api(`/nexo/atendimento/conversas/${convId}/marked-unread`,{method:'PATCH'});
+            this.loadConversas(true);
+        }catch(e){console.error('toggleMarkedUnread error:',e)}
+    },
 
     voltarInbox(){document.getElementById('inbox-panel').classList.remove('hidden');document.getElementById('chat-panel').classList.add('hidden');document.getElementById('chat-panel').classList.remove('flex')},
     toggleContexto(){

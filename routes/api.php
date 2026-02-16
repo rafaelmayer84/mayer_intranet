@@ -104,6 +104,7 @@ Route::prefix('nexo/autoatendimento')->group(function () {
     Route::post('/financeiro/segunda-via', [NexoAutoatendimentoController::class, 'segundaVia']);
     Route::post('/compromissos/proximos', [NexoAutoatendimentoController::class, 'proximosCompromissos']);
     Route::post('/tickets/abrir', [NexoAutoatendimentoController::class, 'abrirTicket']);
+    Route::post('/tickets/resumir-contexto', [NexoAutoatendimentoController::class, 'resumirContexto']);
     Route::post('/tickets/listar', [NexoAutoatendimentoController::class, 'listarTickets']);
     Route::post('/resumo', [NexoAutoatendimentoController::class, 'resumoLeigo']);
 

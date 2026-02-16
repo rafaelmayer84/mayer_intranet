@@ -264,7 +264,7 @@ class NexoConsultaService
 
         // Buscar processos ativos
         $processos = DB::table('processos')
-            ->where('cliente_id', $cliente->id)
+            ->where('cliente_datajuri_id', $cliente->datajuri_id)
             ->where('status', 'Ativo')
             ->select('id', 'pasta', 'titulo', 'adverso_nome', 'numero')
             ->orderBy('pasta')
@@ -341,7 +341,7 @@ class NexoConsultaService
         // Aceita numero sequencial (1,2,3...) ou pasta direta
         if (is_numeric($pasta) && (int)$pasta <= 50) {
             $processos = DB::table('processos')
-                ->where('cliente_id', $cliente->id)
+                ->where('cliente_datajuri_id', $cliente->datajuri_id)
                 ->where('status', 'Ativo')
                 ->orderBy('pasta')
                 ->get();
@@ -349,7 +349,7 @@ class NexoConsultaService
             $processo = $processos[$idx] ?? null;
         } else {
             $processo = DB::table('processos')
-                ->where('cliente_id', $cliente->id)
+                ->where('cliente_datajuri_id', $cliente->datajuri_id)
                 ->where('pasta', $pasta)
                 ->first();
         }

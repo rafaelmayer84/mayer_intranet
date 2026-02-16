@@ -28,6 +28,7 @@ Route::middleware(['auth', 'user.active'])->group(function () {
         Route::get('/processo/{processoId}/detalhe', [NexoDataJuriController::class, 'processoDetalhe'])->name('nexo.atendimento.processo-detalhe')->whereNumber('processoId');
         // -- Rotas NEXO v2.0 (Prioridade, Notas, Flows) ---------------
         Route::patch('/conversas/{id}/priority', [NexoAtendimentoController::class, 'updatePriority'])->name('nexo.atendimento.priority')->whereNumber('id');
+        Route::patch('/conversas/{id}/marked-unread', [NexoAtendimentoController::class, 'toggleMarkedUnread'])->name('nexo.atendimento.marked-unread')->whereNumber('id');
         Route::get('/conversas/{id}/notes', [NexoAtendimentoController::class, 'notes'])->name('nexo.atendimento.notes')->whereNumber('id');
         Route::post('/conversas/{id}/notes', [NexoAtendimentoController::class, 'storeNote'])->name('nexo.atendimento.notes.store')->whereNumber('id');
         Route::delete('/conversas/{id}/notes/{noteId}', [NexoAtendimentoController::class, 'deleteNote'])->name('nexo.atendimento.notes.delete');

@@ -14,12 +14,14 @@ class NexoAuthAttempt extends Model
         'bloqueado',
         'bloqueado_ate',
         'ultimo_tentativa',
+        'autenticado_ate',
     ];
 
     protected $casts = [
         'bloqueado' => 'boolean',
         'bloqueado_ate' => 'datetime',
         'ultimo_tentativa' => 'datetime',
+        'autenticado_ate' => 'datetime',
     ];
 
     /**

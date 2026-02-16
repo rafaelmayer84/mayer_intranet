@@ -564,7 +564,19 @@ class NexoAutoatendimentoService
         $djId = $cliente->datajuri_id;
         $nomeCliente = $cliente->nome;
 
-        // Se processo_pasta fornecido, filtrar snapshot para aquele processo apenas
+        // Se processo_pasta fornecido, resolver número da opção para pasta real
+        if ($processoPasta && is_numeric($processoPasta)) {
+            $idx = (int)$processoPasta - 1;
+            $todasPastas = DB::table('processos')
+                ->where('cliente_datajuri_id', $djId)
+                ->orderByDesc('data_abertura')
+                ->pluck('pasta')->toArray();
+            if (isset($todasPastas[$idx])) {
+                $processoPasta = $todasPastas[$idx];
+                Log::info('ChatIA: pasta resolvida', ['indice' => $idx + 1, 'pasta' => $processoPasta]);
+            }
+        }
+
         $qProcessos = DB::table('processos')->where('cliente_datajuri_id', $djId);
         if ($processoPasta) {
             $qProcessos->where('pasta', $processoPasta);
@@ -1001,18 +1013,31 @@ class NexoAutoatendimentoService
 
     private function obterClienteAutenticado(string $telefoneNormalizado)
     {
-        $validacao = NexoClienteValidacao::where('telefone', $telefoneNormalizado)->first();
+        // Verificar sessão ativa em nexo_auth_attempts (tabela do fluxo de auth)
+        $auth = DB::table('nexo_auth_attempts')
+            ->where('telefone', $telefoneNormalizado)
+            ->first();
 
-        if (!$validacao || !$validacao->cliente_id) {
+        if (!$auth) {
             return ['erro' => 'Cliente não autenticado. Por favor, faça a verificação de identidade primeiro.'];
         }
 
-        if ($validacao->estaBloqueado()) {
-            return ['erro' => 'Acesso temporariamente bloqueado. Tente novamente após ' . $validacao->bloqueado_ate->format('H:i') . '.'];
+        // Verificar bloqueio
+        if ($auth->bloqueado && $auth->bloqueado_ate && \Carbon\Carbon::parse($auth->bloqueado_ate)->isFuture()) {
+            return ['erro' => 'Acesso temporariamente bloqueado. Tente novamente em alguns minutos.'];
         }
 
-        $cliente = Cliente::find($validacao->cliente_id);
+        // Verificar se sessão está ativa (autenticado_ate no futuro)
+        if (!$auth->autenticado_ate || \Carbon\Carbon::parse($auth->autenticado_ate)->isPast()) {
+            return ['erro' => 'Sua sessão expirou. Por favor, faça a verificação de identidade novamente.'];
+        }
 
+        // Buscar cliente por telefone na tabela clientes
+        $cliente = Cliente::where('telefone_normalizado', $telefoneNormalizado)->first();
+        if (!$cliente) {
+            $ultimos10 = substr($telefoneNormalizado, -10);
+            $cliente = Cliente::where('telefone_normalizado', 'LIKE', '%' . $ultimos10)->first();
+        }
         if (!$cliente) {
             return ['erro' => 'Cliente não encontrado no sistema.'];
         }
@@ -1099,4 +1124,120 @@ class NexoAutoatendimentoService
             'tempo_resposta_ms' => $tempoMs,
         ]);
     }
+    // =====================================================
+    // RESUMIR CONTEXTO PARA TICKET (IA)
+    // =====================================================
+
+    public function resumirContexto(string $telefone): array
+    {
+        $telefoneNormalizado = $this->normalizarTelefone($telefone);
+
+        $conversa = \App\Models\WaConversation::where('phone', $telefoneNormalizado)->first();
+        if (!$conversa) {
+            $conversa = \App\Models\WaConversation::where('phone', '+' . $telefoneNormalizado)->first();
+        }
+
+        if (!$conversa) {
+            return [
+                'sucesso' => true,
+                'ticket_resumo' => 'Cliente entrou em contato via WhatsApp.',
+                'fonte' => 'padrao',
+            ];
+        }
+
+        $mensagens = \App\Models\WaMessage::where('conversation_id', $conversa->id)
+            ->where('direction', 1)
+            ->whereNotNull('body')
+            ->where('body', '!=', '')
+            ->where('body', 'NOT LIKE', '/start%')
+            ->where('body', 'NOT LIKE', '/stop%')
+            ->orderByDesc('sent_at')
+            ->limit(10)
+            ->get(['body', 'sent_at']);
+
+        if ($mensagens->isEmpty()) {
+            return [
+                'sucesso' => true,
+                'ticket_resumo' => 'Cliente entrou em contato via WhatsApp.',
+                'fonte' => 'padrao',
+            ];
+        }
+
+        $contexto = $mensagens->reverse()->map(function ($m) {
+            return '[' . $m->sent_at->format('H:i') . '] ' . mb_substr($m->body, 0, 300);
+        })->implode("\n");
+
+        try {
+            $apiKey = config('services.openai.api_key');
+            $model = config('services.openai.model', 'gpt-5-mini');
+
+            $ch = curl_init('https://api.openai.com/v1/chat/completions');
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_TIMEOUT => 10,
+                CURLOPT_HTTPHEADER => [
+                    'Content-Type: application/json',
+                    'Authorization: Bearer ' . $apiKey,
+                ],
+                CURLOPT_POSTFIELDS => json_encode([
+                    'model' => $model,
+                    'max_tokens' => 150,
+                    'temperature' => 0.3,
+                    'messages' => [
+                        [
+                            'role' => 'system',
+                            'content' => 'Voce e assistente de um escritorio de advocacia. Resuma em NO MAXIMO 1 frase curta (ate 150 caracteres) qual e o assunto/problema do cliente baseado nas mensagens abaixo. Seja direto e objetivo. Use terceira pessoa. Exemplo: "Duvida sobre andamento do processo trabalhista contra empresa X"'
+                        ],
+                        [
+                            'role' => 'user',
+                            'content' => "Mensagens recentes do cliente:\n" . $contexto
+                        ],
+                    ],
+                ]),
+            ]);
+
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($httpCode === 200) {
+                $data = json_decode($response, true);
+                $resumo = trim($data['choices'][0]['message']['content'] ?? '');
+                $resumo = trim($resumo, '"\'');
+                $resumo = mb_substr($resumo, 0, 200);
+
+                \Illuminate\Support\Facades\Log::info('NEXO-TICKET: contexto resumido', [
+                    'telefone' => $telefoneNormalizado,
+                    'msgs' => $mensagens->count(),
+                    'resumo' => $resumo,
+                ]);
+
+                return [
+                    'sucesso' => true,
+                    'ticket_resumo' => $resumo,
+                    'fonte' => 'ia',
+                ];
+            }
+
+            \Illuminate\Support\Facades\Log::warning('NEXO-TICKET: OpenAI falhou', [
+                'http_code' => $httpCode,
+            ]);
+
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('NEXO-TICKET: erro ao resumir', [
+                'msg' => $e->getMessage(),
+            ]);
+        }
+
+        $ultimaMsg = $mensagens->first();
+        $fallback = mb_substr($ultimaMsg->body, 0, 200);
+
+        return [
+            'sucesso' => true,
+            'ticket_resumo' => $fallback,
+            'fonte' => 'fallback',
+        ];
+    }
+
 }

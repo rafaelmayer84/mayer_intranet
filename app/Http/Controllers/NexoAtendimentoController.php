@@ -255,6 +255,17 @@ class NexoAtendimentoController extends Controller
         WaEvent::log('priority_changed', $id, ['priority' => $request->priority]);
         return response()->json(['success' => true, 'priority' => $c->priority]);
     }
+    /**
+     * Toggle marked_unread (marcar como não lida)
+     */
+    public function toggleMarkedUnread(int $id)
+    {
+        $conv = WaConversation::findOrFail($id);
+        $conv->marked_unread = !$conv->marked_unread;
+        $conv->save();
+        return response()->json(['success' => true, 'marked_unread' => $conv->marked_unread]);
+    }
+
 
     // ═══════════════════════════════════════════════════════════════
     // v2.0: NOTAS INTERNAS
