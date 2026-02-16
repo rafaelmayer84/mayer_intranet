@@ -364,6 +364,35 @@ class SendPulseWhatsAppService
     }
 
     // ═══════════════════════════════════════════════════════
+    // FECHAR CHAT (REATIVAR BOT)
+    // ═══════════════════════════════════════════════════════
+
+    /**
+     * Fecha o chat (desativa live chat / reativa bot) para um contato.
+     * POST /whatsapp/contacts/closeChat
+     */
+    public function closeChat(string $contactId): array
+    {
+        return $this->apiPost('/whatsapp/contacts/closeChat', [
+            'bot_id'     => $this->botId,
+            'contact_id' => $contactId,
+        ]);
+    }
+
+    /**
+     * Lista chats com paginação.
+     * GET /whatsapp/chats?bot_id=...&offset=N
+     */
+    public function getChatsPage(int $offset = 0, int $limit = 100): ?array
+    {
+        return $this->apiGet('/whatsapp/chats', [
+            'bot_id' => $this->botId,
+            'offset' => $offset,
+            'limit'  => $limit,
+        ]);
+    }
+
+        // ═══════════════════════════════════════════════════════
     // CONTATO: INFO + TAGS
     // ═══════════════════════════════════════════════════════
     public function getContactInfo(string $contactId): ?array

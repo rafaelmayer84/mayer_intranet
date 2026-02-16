@@ -44,3 +44,10 @@ Schedule::command('sync:contas-receber-rapido')
     ->timezone('America/Sao_Paulo')
     ->appendOutputTo(storage_path('logs/cron-contas-receber.log'));
 
+// ===== NEXO: Fechamento automático de chats abandonados =====
+// A cada hora, fecha chats com >6h de inatividade e notifica cliente
+Schedule::command('nexo:close-abandoned-chats --notify')
+    ->hourly()
+    ->timezone('America/Sao_Paulo')
+    ->appendOutputTo(storage_path('logs/cron-nexo-close-chats.log'));
+
