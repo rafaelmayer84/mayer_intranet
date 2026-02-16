@@ -589,7 +589,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('btn-test-espocrm').addEventListener('click', async () => {
         addLog('Testando conexão com ESPO CRM...', 'info', 'espo-log-output');
         try {
-            const r = await fetch('{{ route("admin.sincronizacao-unificada.espocrm-test") }}', {
+            const r = await fetch('#espocrm-removido', {
                 method: 'POST',
                 headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
             });
@@ -619,7 +619,7 @@ document.addEventListener('DOMContentLoaded', function() {
         showToast('Sincronizando ESPO CRM...', 'info');
 
         try {
-            const r = await fetch('{{ route("admin.sincronizacao-unificada.espocrm-sync") }}', {
+            const r = await fetch('#espocrm-removido', {
                 method: 'POST',
                 headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
             });

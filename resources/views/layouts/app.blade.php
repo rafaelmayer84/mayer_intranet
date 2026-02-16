@@ -325,6 +325,12 @@
                             <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"/></svg>
                             <span class="menu-text">Atendimento</span>
                         </a>
+                        <a href="{{ route('nexo.tickets') }}"
+                           class="nav-sublink flex items-center px-4 py-2 rounded-lg text-sm transition-colors {{ request()->routeIs('nexo.tickets*') ? 'nav-link-active' : '' }}"
+                           data-tooltip="WhatsApp Tickets">
+                            <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                            <span class="menu-text">WhatsApp Tickets</span>
+                        </a>
                     {{-- CRM (sub-itens) --}}
                     <div x-data="{ crmOpen: {{ request()->is('crm/*') ? 'true' : 'false' }} }" class="relative">
                         <button @click="crmOpen = !crmOpen" class="flex items-center justify-between w-full px-3 py-1.5 text-sm rounded-lg hover:bg-gray-100 transition

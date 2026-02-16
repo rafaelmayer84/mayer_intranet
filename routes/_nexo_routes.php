@@ -3,6 +3,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\NexoAtendimentoController;
 use App\Http\Controllers\NexoGerencialController;
 use App\Http\Controllers\NexoDataJuriController;
+use App\Http\Controllers\NexoTicketController;
 Route::middleware(['auth', 'user.active'])->group(function () {
     Route::prefix('nexo/atendimento')->middleware('modulo:operacional.nexo,visualizar')->group(function () {
         // -- Rotas existentes (INTOCADAS) ------------------------------
@@ -41,6 +42,20 @@ Route::middleware(['auth', 'user.active'])->group(function () {
     Route::patch('/nexo/atendimento/conversas/{id}/category', [NexoAtendimentoController::class, 'updateCategory'])->name('nexo.atendimento.category');
     Route::get('/nexo/atendimento/conversas/{id}/tags', [NexoAtendimentoController::class, 'getTags'])->name('nexo.atendimento.tags');
     Route::patch('/nexo/atendimento/conversas/{id}/tags', [NexoAtendimentoController::class, 'updateTags'])->name('nexo.atendimento.tags.update');
+
+    // =========================================================
+    // WHATSAPP TICKETS (16/02/2026)
+    // =========================================================
+    Route::prefix('nexo/tickets')->middleware('modulo:operacional.nexo,visualizar')->group(function () {
+        Route::get('/', [NexoTicketController::class, 'index'])->name('nexo.tickets');
+        Route::post('/', [NexoTicketController::class, 'store'])->name('nexo.tickets.store');
+        Route::get('/{id}', [NexoTicketController::class, 'show'])->name('nexo.tickets.show')->whereNumber('id');
+        Route::put('/{id}/atribuir', [NexoTicketController::class, 'atribuir'])->name('nexo.tickets.atribuir')->whereNumber('id');
+        Route::put('/{id}/status', [NexoTicketController::class, 'mudarStatus'])->name('nexo.tickets.status')->whereNumber('id');
+        Route::post('/{id}/nota', [NexoTicketController::class, 'adicionarNota'])->name('nexo.tickets.nota')->whereNumber('id');
+        Route::put('/{id}/resolver', [NexoTicketController::class, 'resolver'])->name('nexo.tickets.resolver')->whereNumber('id');
+        Route::delete('/{id}', [NexoTicketController::class, 'destroy'])->name('nexo.tickets.destroy')->whereNumber('id');
+    });
 
     Route::prefix('nexo/gerencial')->middleware('modulo:operacional.nexo-gerencial,visualizar')->group(function () {
         Route::get('/', [NexoGerencialController::class, 'index'])->name('nexo.gerencial');

@@ -265,7 +265,7 @@ class NexoAutoatendimentoService
 
         if ($processos->isEmpty()) {
             return [
-                'encontrado' => false,
+                'encontrado' => 'nao',
                 'total' => 0,
                 'mensagem' => "Olá {$cliente->nome}! Não encontrei processos ativos para buscar compromissos.",
             ];
@@ -274,7 +274,7 @@ class NexoAutoatendimentoService
         $this->autenticarDataJuri();
         if (!$this->dataJuriToken) {
             return [
-                'encontrado' => false,
+                'encontrado' => 'nao',
                 'total' => 0,
                 'mensagem' => "Olá {$cliente->nome}! Não foi possível consultar seus compromissos neste momento. Tente novamente em alguns minutos.",
             ];
@@ -317,7 +317,7 @@ class NexoAutoatendimentoService
 
         if (empty($compromissos)) {
             return [
-                'encontrado' => false,
+                'encontrado' => 'nao',
                 'total' => 0,
                 'mensagem' => "Olá {$cliente->nome}! Consultei seus processos ativos e não identifiquei audiências, perícias ou prazos futuros registrados no momento. Se tiver dúvidas sobre datas específicas, nossa equipe pode verificar.",
             ];
@@ -332,7 +332,7 @@ class NexoAutoatendimentoService
 
         // Montar resposta flat para SendPulse
         $resultado = [
-            'encontrado' => true,
+            'encontrado' => 'sim',
             'total' => count($compromissos),
             'mensagem' => "Olá {$cliente->nome}! Encontrei " . count($compromissos) . " compromisso(s) relevante(s):",
         ];
