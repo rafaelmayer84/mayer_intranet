@@ -176,7 +176,7 @@ class GdpDataAdapter
     {
         try {
             $conversas = DB::table('wa_conversations')
-                ->where('assigned_to', $userId)
+                ->where('assigned_user_id', $userId)
                 ->whereBetween('created_at', [$inicio, $fim])
                 ->pluck('id');
         } catch (\Throwable $e) {
@@ -220,7 +220,7 @@ class GdpDataAdapter
     {
         try {
             $total = DB::table('wa_conversations')
-                ->where('assigned_to', $userId)
+                ->where('assigned_user_id', $userId)
                 ->whereBetween('created_at', [$inicio, $fim])
                 ->count();
         } catch (\Throwable $e) {
@@ -232,7 +232,7 @@ class GdpDataAdapter
         }
 
         $comResposta = DB::table('wa_conversations')
-            ->where('assigned_to', $userId)
+            ->where('assigned_user_id', $userId)
             ->whereBetween('created_at', [$inicio, $fim])
             ->whereExists(function ($q) {
                 $q->select(DB::raw(1))
@@ -249,7 +249,7 @@ class GdpDataAdapter
     {
         try {
             return (float) DB::table('wa_conversations')
-                ->where('assigned_to', $userId)
+                ->where('assigned_user_id', $userId)
                 ->whereBetween('created_at', [$inicio, $fim])
                 ->whereNotExists(function ($q) {
                     $q->select(DB::raw(1))

@@ -11,7 +11,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <!-- Inter removida - Montserrat e a font oficial da marca -->
     <!-- CSS auxiliar (transições, tema claro/escuro, pequenos fixes) -->
-    <link rel="stylesheet" href="{{ asset('css/intranet-ui.css') }}?v=242">
+    <link rel="stylesheet" href="{{ asset('css/intranet-ui.css') }}?v=300">
     <!-- Hotfix legado (mantido) -->
     <link rel="stylesheet" href="{{ asset('css/theme.css') }}">
     <!-- Identidade Visual Unificada Mayer Advogados -->

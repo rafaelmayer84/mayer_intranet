@@ -23,25 +23,25 @@
             <div class="text-2xl font-bold text-red-400">{{ $kpis['abertos'] }}</div>
             <div class="text-xs text-gray-500 mt-1">Abertos</div>
         </div>
-        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
             <div class="text-2xl font-bold text-yellow-400">{{ $kpis['em_andamento'] }}</div>
-            <div class="text-xs text-gray-400 mt-1">Em andamento</div>
+            <div class="text-xs text-gray-500 mt-1">Em andamento</div>
         </div>
-        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
             <div class="text-2xl font-bold text-green-400">{{ $kpis['concluidos_30d'] }}</div>
-            <div class="text-xs text-gray-400 mt-1">Concluídos (30d)</div>
+            <div class="text-xs text-gray-500 mt-1">Concluídos (30d)</div>
         </div>
-        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
             <div class="text-2xl font-bold {{ $kpis['urgentes'] > 0 ? 'text-red-500 animate-pulse' : 'text-gray-500' }}">{{ $kpis['urgentes'] }}</div>
-            <div class="text-xs text-gray-400 mt-1">Urgentes</div>
+            <div class="text-xs text-gray-500 mt-1">Urgentes</div>
         </div>
-        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
             <div class="text-2xl font-bold {{ $kpis['sla_violados'] > 0 ? 'text-orange-400' : 'text-gray-500' }}">{{ $kpis['sla_violados'] }}</div>
-            <div class="text-xs text-gray-400 mt-1">SLA > 24h</div>
+            <div class="text-xs text-gray-500 mt-1">SLA > 24h</div>
         </div>
-        <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+        <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
             <div class="text-2xl font-bold text-blue-400">{{ $kpis['tempo_medio_horas'] ?? '—' }}h</div>
-            <div class="text-xs text-gray-400 mt-1">Tempo médio resolução</div>
+            <div class="text-xs text-gray-500 mt-1">Tempo médio resolução</div>
         </div>
     </div>
 
@@ -61,7 +61,7 @@
             </div>
             <div>
                 <label class="text-xs text-gray-600">Tipo</label>
-                <select name="tipo" class="w-full mt-1 bg-gray-700 border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                <select name="tipo" class="w-full mt-1 bg-white border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
                     <option value="">Todos</option>
                     <option value="documento" {{ ($filtros['tipo'] ?? '') === 'documento' ? 'selected' : '' }}>Documento</option>
                     <option value="agendamento" {{ ($filtros['tipo'] ?? '') === 'agendamento' ? 'selected' : '' }}>Agendamento</option>
@@ -72,7 +72,7 @@
             </div>
             <div>
                 <label class="text-xs text-gray-600">Prioridade</label>
-                <select name="prioridade" class="w-full mt-1 bg-gray-700 border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                <select name="prioridade" class="w-full mt-1 bg-white border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
                     <option value="">Todas</option>
                     <option value="urgente" {{ ($filtros['prioridade'] ?? '') === 'urgente' ? 'selected' : '' }}>Urgente</option>
                     <option value="normal" {{ ($filtros['prioridade'] ?? '') === 'normal' ? 'selected' : '' }}>Normal</option>
@@ -80,7 +80,7 @@
             </div>
             <div>
                 <label class="text-xs text-gray-600">Responsável</label>
-                <select name="responsavel_id" class="w-full mt-1 bg-gray-700 border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                <select name="responsavel_id" class="w-full mt-1 bg-white border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
                     <option value="">Todos</option>
                     <option value="sem" {{ ($filtros['responsavel_id'] ?? '') === 'sem' ? 'selected' : '' }}>Sem responsável</option>
                     @foreach($usuarios as $u)
@@ -94,12 +94,12 @@
             </div>
             <div>
                 <label class="text-xs text-gray-600">De</label>
-                <input type="date" name="data_inicio" value="{{ $filtros['data_inicio'] ?? '' }}" class="w-full mt-1 bg-gray-700 border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                <input type="date" name="data_inicio" value="{{ $filtros['data_inicio'] ?? '' }}" class="w-full mt-1 bg-white border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
             </div>
             <div class="flex items-end gap-2">
                 <div class="flex-1">
                     <label class="text-xs text-gray-600">Até</label>
-                    <input type="date" name="data_fim" value="{{ $filtros['data_fim'] ?? '' }}" class="w-full mt-1 bg-gray-700 border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    <input type="date" name="data_fim" value="{{ $filtros['data_fim'] ?? '' }}" class="w-full mt-1 bg-white border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
                 </div>
                 <button type="submit" class="px-3 py-2 bg-[#385776] hover:bg-[#1B334A] text-white text-sm rounded-lg transition-colors">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
@@ -156,7 +156,7 @@
                             </span>
                         </td>
                         <td class="px-4 py-3">
-                            <select onchange="atribuirResponsavel({{ $ticket->id }}, this.value)" class="bg-gray-700 border-gray-600 text-xs rounded px-2 py-1 text-gray-200 focus:ring-blue-500">
+                            <select onchange="atribuirResponsavel({{ $ticket->id }}, this.value)" class="bg-white border-gray-300 text-xs rounded px-2 py-1 text-gray-800 focus:ring-blue-500">
                                 <option value="">Ninguém</option>
                                 @foreach($usuarios as $u)
                                     <option value="{{ $u->id }}" {{ $ticket->responsavel_id == $u->id ? 'selected' : '' }}>{{ $u->name }}</option>
@@ -307,12 +307,12 @@
             <div class="space-y-3">
                 <div>
                     <label class="text-xs text-gray-600">Assunto *</label>
-                    <input type="text" id="criar-assunto" class="w-full mt-1 bg-gray-700 border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="Descreva o assunto">
+                    <input type="text" id="criar-assunto" class="w-full mt-1 bg-white border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="Descreva o assunto">
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="text-xs text-gray-600">Tipo *</label>
-                        <select id="criar-tipo" class="w-full mt-1 bg-gray-700 border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <select id="criar-tipo" class="w-full mt-1 bg-white border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
                             <option value="geral">Geral</option>
                             <option value="documento">Documento</option>
                             <option value="agendamento">Agendamento</option>
@@ -322,7 +322,7 @@
                     </div>
                     <div>
                         <label class="text-xs text-gray-600">Prioridade *</label>
-                        <select id="criar-prioridade" class="w-full mt-1 bg-gray-700 border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <select id="criar-prioridade" class="w-full mt-1 bg-white border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
                             <option value="normal">Normal</option>
                             <option value="urgente">Urgente</option>
                         </select>
@@ -331,16 +331,16 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="text-xs text-gray-600">Nome do cliente</label>
-                        <input type="text" id="criar-nome" class="w-full mt-1 bg-gray-700 border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <input type="text" id="criar-nome" class="w-full mt-1 bg-white border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
                     </div>
                     <div>
                         <label class="text-xs text-gray-600">Telefone</label>
-                        <input type="text" id="criar-telefone" class="w-full mt-1 bg-gray-700 border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <input type="text" id="criar-telefone" class="w-full mt-1 bg-white border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
                     </div>
                 </div>
                 <div>
                     <label class="text-xs text-gray-600">Responsável</label>
-                    <select id="criar-responsavel" class="w-full mt-1 bg-gray-700 border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    <select id="criar-responsavel" class="w-full mt-1 bg-white border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
                         <option value="">Ninguém</option>
                         @foreach($usuarios as $u)
                             <option value="{{ $u->id }}">{{ $u->name }}</option>
@@ -349,7 +349,7 @@
                 </div>
                 <div>
                     <label class="text-xs text-gray-600">Mensagem</label>
-                    <textarea id="criar-mensagem" rows="3" placeholder="Detalhes adicionais..." class="w-full mt-1 bg-gray-700 border-gray-600 text-gray-200 text-sm rounded-lg placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500"></textarea>
+                    <textarea id="criar-mensagem" rows="3" placeholder="Detalhes adicionais..." class="w-full mt-1 bg-white border-gray-300 text-gray-800 text-sm rounded-lg placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500"></textarea>
                 </div>
                 <div class="flex justify-end pt-2">
                     <button onclick="criarTicket()" id="btn-criar" class="px-4 py-2 bg-[#385776] hover:bg-[#1B334A] text-white text-sm font-medium rounded-lg transition-colors">

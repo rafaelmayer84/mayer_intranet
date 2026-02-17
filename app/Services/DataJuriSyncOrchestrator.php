@@ -524,6 +524,14 @@ class DataJuriSyncOrchestrator
                 $value = $this->parseDecimal($value);
             }
 
+            // FIX: campos integer nao aceitam string vazia - converter para null
+            if ($value === '' && (
+                str_ends_with($dbField, '_datajuri_id') ||
+                str_ends_with($dbField, '_id_datajuri') ||
+                in_array($dbField, ['proprietario_id', 'advogado_id', 'contratante_id_datajuri'])
+            )) {
+                $value = null;
+            }
             $data[$dbField] = $value;
         }
 

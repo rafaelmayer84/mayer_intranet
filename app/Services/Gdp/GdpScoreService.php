@@ -47,7 +47,7 @@ class GdpScoreService
           ->get();
 
         $users = DB::table('users')
-            ->where('datajuri_ativo', true)
+            ->where('datajuri_ativo', true)->where('ativo', true)
             ->whereNotNull('datajuri_proprietario_id')
             ->select('id', 'name', 'datajuri_proprietario_id')
             ->get();

@@ -213,7 +213,7 @@ class GdpController extends Controller
 
         $userId = $request->input('user_id');
 
-        $usuarios = \App\Models\User::whereNotIn('id', [2, 5, 6])
+        $usuarios = \App\Models\User::where('ativo', true)
             ->whereIn('role', ['admin', 'coordenador', 'advogado', 'socio'])
             ->orderBy('name')
             ->get(['id', 'name', 'role', 'cargo']);
@@ -232,6 +232,32 @@ class GdpController extends Controller
         $metas = collect();
         $acordoAceito = false;
         if ($targetUser) {
+            // Auto-inclusao: se advogado nao tem metas, criar malha automaticamente
+            $temMetas = DB::table('gdp_metas_individuais')
+                ->where('ciclo_id', $ciclo->id)
+                ->where('user_id', $targetUser->id)
+                ->exists();
+
+            if (!$temMetas) {
+                $indicadores = \App\Models\GdpIndicador::where('ativo', true)
+                    ->where('status_v1', 'score')->get();
+                $agora = now();
+                foreach ($indicadores as $ind) {
+                    for ($m = $mesInicio; $m <= $mesFim; $m++) {
+                        DB::table('gdp_metas_individuais')->insert([
+                            'ciclo_id'     => $ciclo->id,
+                            'indicador_id' => $ind->id,
+                            'user_id'      => $targetUser->id,
+                            'mes'          => $m,
+                            'ano'          => $ano,
+                            'valor_meta'   => 0,
+                            'created_at'   => $agora,
+                            'updated_at'   => $agora,
+                        ]);
+                    }
+                }
+            }
+
             $metas = DB::table('gdp_metas_individuais')
                 ->where('ciclo_id', $ciclo->id)
                 ->where('user_id', $targetUser->id)

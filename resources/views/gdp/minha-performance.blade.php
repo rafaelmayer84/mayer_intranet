@@ -253,9 +253,17 @@ function apurarMes() {
 @endif
 
 @php
-    $histLabels = $historico->map(function($s) { return str_pad($s->mes, 2, "0", STR_PAD_LEFT) . "/" . $s->ano; })->values();
+    $histLabels = isset($historico) && $historico->isNotEmpty()
+        ? $historico->map(fn($s) => str_pad($s->mes, 2, '0', STR_PAD_LEFT) . '/' . $s->ano)->values()
+        : collect([]);
+    $histShow = isset($historico) && $historico->isNotEmpty();
+    $histScoreTotal = $histShow ? $historico->pluck('score_total') : collect([]);
+    $histScoreJur = $histShow ? $historico->pluck('score_juridico') : collect([]);
+    $histScoreFin = $histShow ? $historico->pluck('score_financeiro') : collect([]);
+    $histScoreDev = $histShow ? $historico->pluck('score_desenvolvimento') : collect([]);
+    $histScoreAte = $histShow ? $historico->pluck('score_atendimento') : collect([]);
 @endphp
-@if(isset($historico) && $historico->isNotEmpty())
+@if($histShow)
 document.addEventListener('DOMContentLoaded', function() {
     const ctx = document.getElementById('gdpHistoricoChart');
     if (!ctx) return;
@@ -265,11 +273,11 @@ document.addEventListener('DOMContentLoaded', function() {
         data: {
             labels: labels,
             datasets: [
-                { label: 'Score Total', data: @json($historico->pluck('score_total')), borderColor: '#385776', backgroundColor: 'rgba(56,87,118,0.1)', fill: true, tension: 0.3, borderWidth: 2.5, pointRadius: 4 },
-                { label: 'Jurídico', data: @json($historico->pluck('score_juridico')), borderColor: '#2563eb', borderWidth: 1.5, pointRadius: 2, borderDash: [4,4] },
-                { label: 'Financeiro', data: @json($historico->pluck('score_financeiro')), borderColor: '#16a34a', borderWidth: 1.5, pointRadius: 2, borderDash: [4,4] },
-                { label: 'Desenvolvimento', data: @json($historico->pluck('score_desenvolvimento')), borderColor: '#9333ea', borderWidth: 1.5, pointRadius: 2, borderDash: [4,4] },
-                { label: 'Atendimento', data: @json($historico->pluck('score_atendimento')), borderColor: '#ea580c', borderWidth: 1.5, pointRadius: 2, borderDash: [4,4] },
+                { label: 'Score Total', data: @json($histScoreTotal), borderColor: '#385776', backgroundColor: 'rgba(56,87,118,0.1)', fill: true, tension: 0.3, borderWidth: 2.5, pointRadius: 4 },
+                { label: 'Jurídico', data: @json($histScoreJur), borderColor: '#2563eb', borderWidth: 1.5, pointRadius: 2, borderDash: [4,4] },
+                { label: 'Financeiro', data: @json($histScoreFin), borderColor: '#16a34a', borderWidth: 1.5, pointRadius: 2, borderDash: [4,4] },
+                { label: 'Desenvolvimento', data: @json($histScoreDev), borderColor: '#9333ea', borderWidth: 1.5, pointRadius: 2, borderDash: [4,4] },
+                { label: 'Atendimento', data: @json($histScoreAte), borderColor: '#ea580c', borderWidth: 1.5, pointRadius: 2, borderDash: [4,4] },
             ]
         },
         options: {
