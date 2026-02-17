@@ -11,7 +11,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <!-- Inter removida - Montserrat e a font oficial da marca -->
     <!-- CSS auxiliar (transições, tema claro/escuro, pequenos fixes) -->
-    <link rel="stylesheet" href="{{ asset('css/intranet-ui.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/intranet-ui.css') }}?v=242">
     <!-- Hotfix legado (mantido) -->
     <link rel="stylesheet" href="{{ asset('css/theme.css') }}">
     <!-- Identidade Visual Unificada Mayer Advogados -->
@@ -290,17 +290,37 @@
                             <span class="w-4 h-4 mr-3" role="img" aria-label="Equipe">👥</span>
                             <span class="menu-text">Times &amp; Evolução</span>
                         </a>
+                        <a href="{{ route('gdp.minha-performance') }}" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->is('gdp*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700' }}">
+                            <span class="mr-2">ð</span>
+                            <span class="menu-text">GDP</span>
+                        </a>
                     </div>
                 </div>
                 <!-- GPD -->
                 <div class="menu-group">
-                    <button class="nav-link w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors opacity-60 cursor-default" data-tooltip="GPD">
+                    <button onclick="toggleSubmenu('gdp')" class="nav-link w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors {{ request()->is('gdp*') ? 'nav-link-active' : '' }}" data-tooltip="GDP">
                         <div class="flex items-center">
                             <svg class="w-5 h-5 mr-3 flex-shrink-0 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                            <span class="font-medium menu-text">GPD</span>
+                            <span class="font-medium menu-text">GDP</span>
                         </div>
-                        <span class="text-xs ml-auto bg-yellow-600 px-2 py-0.5 rounded menu-text">Em breve</span>
+                        <svg id="arrow-gdp" class="w-4 h-4 menu-arrow {{ request()->is('gdp*') ? 'rotated' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
+                    <div id="submenu-gdp" class="submenu {{ request()->is('gdp*') ? 'open' : '' }} ml-4 mt-1 space-y-1">
+                        <a href="{{ route('gdp.minha-performance') }}" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('gdp.minha-performance') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
+                            <span class="mr-2">📈</span>
+                            <span class="menu-text">Minha Performance</span>
+                        </a>
+                        <a href="{{ route('gdp.equipe') }}" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('gdp.equipe') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
+                            <span class="mr-2">🏆</span>
+                            <span class="menu-text">Ranking Equipe</span>
+                        </a>
+                        @if(in_array(Auth::user()->role, ['admin', 'socio']))
+                        <a href="{{ route('gdp.acordo') }}" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('gdp.acordo*') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
+                            <span class="mr-2">📋</span>
+                            <span class="menu-text">Acordo Desempenho</span>
+                        </a>
+                        @endif
+                    </div>
                 </div>
 
                 <!-- NEXO -->
@@ -324,6 +344,12 @@
                            data-tooltip="Atendimento">
                             <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"/></svg>
                             <span class="menu-text">Atendimento</span>
+                        </a>
+                        <a href="{{ route('nexo.gerencial') }}"
+                           class="nav-sublink flex items-center px-4 py-2 rounded-lg text-sm transition-colors {{ request()->routeIs('nexo.gerencial*') ? 'nav-link-active' : '' }}"
+                           data-tooltip="Gerencial">
+                            <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                            <span class="menu-text">Gerencial</span>
                         </a>
                         <a href="{{ route('nexo.tickets') }}"
                            class="nav-sublink flex items-center px-4 py-2 rounded-lg text-sm transition-colors {{ request()->routeIs('nexo.tickets*') ? 'nav-link-active' : '' }}"

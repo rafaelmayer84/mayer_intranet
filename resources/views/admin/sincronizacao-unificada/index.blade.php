@@ -88,6 +88,22 @@
                     </button>
                     @endforeach
                 </div>
+
+                <!-- Sync Usuários DataJuri (ISOLADO dos módulos de negócio) -->
+                <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-3">Sincronizar Usuários DataJuri → Intranet (GDP):</p>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="syncUsuarios()"
+                                id="btn-sync-usuarios"
+                                class="rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs text-blue-700 hover:bg-blue-100 dark:border-blue-600 dark:bg-blue-900 dark:text-blue-300 dark:hover:bg-blue-800 flex items-center gap-1">
+                            <span>👤</span> Sync Usuários DJ
+                        </button>
+                    </div>
+                    <div id="sync-usuarios-result" class="mt-2 hidden">
+                        <div id="sync-usuarios-msg" class="text-xs p-2 rounded"></div>
+                    </div>
+                </div>
+
             </div>
 
             {{-- BARRA DE PROGRESSO --}}
@@ -845,7 +861,50 @@ async function reclassificar() {
         showToast('Erro ao reclassificar', 'error');
     }
 }
-</script>
+
+    async function syncUsuarios() {
+        const btn = document.getElementById('btn-sync-usuarios');
+        const resultDiv = document.getElementById('sync-usuarios-result');
+        const msgDiv = document.getElementById('sync-usuarios-msg');
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="animate-spin">⏳</span> Sincronizando...';
+        resultDiv.classList.remove('hidden');
+        msgDiv.className = 'text-xs p-2 rounded bg-gray-100 text-gray-600';
+        msgDiv.textContent = 'Processando...';
+
+        try {
+            const response = await fetch('{{ route("admin.sincronizacao-unificada.sync-usuarios") }}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    'Accept': 'application/json',
+                },
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                msgDiv.className = 'text-xs p-2 rounded bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300';
+            } else {
+                msgDiv.className = 'text-xs p-2 rounded bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300';
+            }
+            msgDiv.textContent = data.message || 'Concluído';
+
+            if (data.stats && data.stats.detalhes && data.stats.detalhes.length > 0) {
+                msgDiv.innerHTML += '<br><br><strong>Detalhes:</strong><br>' +
+                    data.stats.detalhes.map(d => '• ' + d).join('<br>');
+            }
+        } catch (err) {
+            msgDiv.className = 'text-xs p-2 rounded bg-red-100 text-red-700';
+            msgDiv.textContent = 'Erro: ' + err.message;
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<span>👤</span> Sync Usuários DJ';
+        }
+    }
+
+    </script>
 
 <style>
 @keyframes fade-in {

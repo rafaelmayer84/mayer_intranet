@@ -81,14 +81,15 @@ html:not(.dark) .nav-sublink-active { color: #2563eb; background-color: rgba(37,
 html:not(.dark) hr.border-gray-700\/70 { border-color: #e5e7eb !important; }
 
 /* Conteúdo principal: "clarear" as superfícies mais comuns */
-html:not(.dark) main .bg-gray-900 { background-color: #f9fafb !important; }
-html:not(.dark) main .bg-gray-800 { background-color: #ffffff !important; }
-html:not(.dark) main .bg-gray-700 { background-color: #f3f4f6 !important; }
+/* DESATIVADO BUG-041: theme.css controla backgrounds */
+/* html:not(.dark) main .bg-gray-900 { background-color: #f9fafb !important; } */
+/* html:not(.dark) main .bg-gray-800 { background-color: #ffffff !important; } */
+/* html:not(.dark) main .bg-gray-700 { background-color: #f3f4f6 !important; } */
 html:not(.dark) main .border-gray-700 { border-color: #e5e7eb !important; }
 html:not(.dark) main .border-gray-800 { border-color: #e5e7eb !important; }
 
 /* Textos no conteúdo */
-html:not(.dark) main .text-white { color: #111827 !important; }
+html:not(.dark) main .text-white:not(button):not(a):not(input):not([role="button"]) { color: #111827 !important; }
 html:not(.dark) main .text-gray-100 { color: #111827 !important; }
 html:not(.dark) main .text-gray-200 { color: #1f2937 !important; }
 html:not(.dark) main .text-gray-300 { color: #374151 !important; }
@@ -124,4 +125,14 @@ input, select, textarea, button {
 /* Evita pseudo-elementos “por cima” de campos em alguns temas */
 form *::before, form *::after {
   pointer-events: none !important;
+}
+
+/* === FIX BUG-041: Restaurar texto branco em botoes/links com fundo colorido === */
+/* Especificidade tag+class (0,0,2,3) vence class-only (0,0,2,2) da linha 91 === */
+html:not(.dark) main button.text-white,
+html:not(.dark) main a.text-white,
+html:not(.dark) main input[type="submit"].text-white,
+html:not(.dark) main input[type="button"].text-white,
+html:not(.dark) main [role="button"].text-white {
+    color: #FFFFFF !important;
 }

@@ -214,6 +214,7 @@ require __DIR__.'/_siric_routes.php';
 
 // CRM V2
 require __DIR__ . '/_crm_routes.php';
+require __DIR__.'/_gdp_routes.php';
 
 // BSC Times & Evolução
 require __DIR__.'/times-evolucao.php';

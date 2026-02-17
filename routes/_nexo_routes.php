@@ -60,5 +60,12 @@ Route::middleware(['auth', 'user.active'])->group(function () {
     Route::prefix('nexo/gerencial')->middleware('modulo:operacional.nexo-gerencial,visualizar')->group(function () {
         Route::get('/', [NexoGerencialController::class, 'index'])->name('nexo.gerencial');
         Route::get('/data', [NexoGerencialController::class, 'data'])->name('nexo.gerencial.data');
+
+    // === NEXO GERENCIAL: Escala + Drill-down ===
+    Route::get('/drill/{tipo}', [NexoGerencialController::class, 'drillDown'])->name('nexo.gerencial.drill');
+    Route::get('/escala', [NexoGerencialController::class, 'escala'])->name('nexo.gerencial.escala');
+    Route::post('/escala', [NexoGerencialController::class, 'escalaStore'])->name('nexo.gerencial.escala.store');
+    Route::delete('/escala/{id}', [NexoGerencialController::class, 'escalaDestroy'])->name('nexo.gerencial.escala.destroy');
+    // === FIM NEXO GERENCIAL ===
     });
 });

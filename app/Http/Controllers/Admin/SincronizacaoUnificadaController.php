@@ -8,6 +8,7 @@ use App\Services\DataJuriSyncOrchestrator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Services\DataJuriUserSyncService;
 
 class SincronizacaoUnificadaController extends Controller
 {
@@ -680,4 +681,62 @@ class SincronizacaoUnificadaController extends Controller
             return response()->json(['success' => false, 'message' => 'Erro ao reclassificar: ' . $e->getMessage()], 500);
         }
     }
+
+
+    /**
+     * Retorna contagens das tabelas sincronizadas (chamado via AJAX)
+     */
+    public function getCounts()
+    {
+        $config = config('datajuri.modulos', []);
+        $counts = [];
+
+        foreach ($config as $key => $mod) {
+            if (!($mod['enabled'] ?? false)) continue;
+            $table = $mod['table'] ?? null;
+            if ($table) {
+                try {
+                    $counts[$key] = \Illuminate\Support\Facades\DB::table($table)->count();
+                } catch (\Throwable $e) {
+                    $counts[$key] = 0;
+                }
+            }
+        }
+
+        // Adicionar users
+        $counts['Users'] = \Illuminate\Support\Facades\DB::table('users')->count();
+
+        return response()->json($counts);
+    }
+
+    /**
+     * Sincronizar Usuários do DataJuri → tabela users
+     * ISOLADO: não interage com syncAll/syncModule/Orchestrator
+     */
+    public function syncUsuarios(Request $request)
+    {
+        try {
+            $service = new DataJuriUserSyncService();
+            $result = $service->sincronizar();
+
+            return response()->json([
+                'success' => $result['erros'] === 0,
+                'message' => sprintf(
+                    'Sync Usuários: %d no DJ, %d vinculados, %d criados, %d ignorados, %d erros',
+                    $result['total_dj'],
+                    $result['vinculados'],
+                    $result['criados'],
+                    $result['ignorados'],
+                    $result['erros']
+                ),
+                'stats' => $result,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
 }

@@ -212,7 +212,7 @@ return [
             'enabled' => true,
             'label' => 'Atividades',
             'icon' => '📅',
-            'table' => 'atividades_datajuri',
+            'table' => 'atividades',
             'campos' => 'id,status,dataHora,dataConclusao,dataPrazoFatal,processo.pasta,proprietario.id,particular,dataCadastro',
             'criterio' => null,
             'mapping' => [

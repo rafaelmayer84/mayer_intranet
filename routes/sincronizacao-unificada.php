@@ -20,5 +20,6 @@ Route::middleware(['auth', 'admin'])->prefix('admin/sincronizacao-unificada')->n
     Route::delete('/classificacao/{id}', [SincronizacaoUnificadaController::class, 'classificacaoDestroy'])->name('classificacao.destroy');
     Route::post('/classificacao/importar', [SincronizacaoUnificadaController::class, 'classificacaoImportar'])->name('classificacao.importar');
     Route::post('/classificacao/reclassificar', [SincronizacaoUnificadaController::class, 'classificacaoReclassificar'])->name('classificacao.reclassificar');
+    Route::post('/sync-usuarios', [SincronizacaoUnificadaController::class, 'syncUsuarios'])->name('sync-usuarios');
     // ESPO CRM rotas removidas em 13/02/2026 - substituído por CRM Nativo
 });
