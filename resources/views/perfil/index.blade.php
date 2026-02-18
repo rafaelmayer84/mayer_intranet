@@ -101,11 +101,11 @@
                 <div class="grid grid-cols-2 gap-4 pt-2 border-t border-gray-100 dark:border-gray-700">
                     <div>
                         <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Último Acesso</label>
-                        <p class="text-gray-900 dark:text-gray-100 text-sm">{{ $usuario->ultimo_acesso ? $usuario->ultimo_acesso->format('d/m/Y H:i') : 'Nunca' }}</p>
+                        <p class="text-gray-900 dark:text-gray-100 text-sm">{{ $usuario->ultimo_acesso ? ($usuario->ultimo_acesso ? \Carbon\Carbon::parse($usuario->ultimo_acesso)->format('d/m/Y H:i') : 'Nunca acessou') : 'Nunca' }}</p>
                     </div>
                     <div>
                         <label class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Senha Alterada em</label>
-                        <p class="text-gray-900 dark:text-gray-100 text-sm">{{ $usuario->password_changed_at ? $usuario->password_changed_at->format('d/m/Y H:i') : 'Nunca' }}</p>
+                        <p class="text-gray-900 dark:text-gray-100 text-sm">{{ $usuario->password_changed_at ? \Carbon\Carbon::parse($usuario->password_changed_at)->format('d/m/Y H:i') : 'Nunca alterada' }}</p>
                     </div>
                 </div>
             </div>
