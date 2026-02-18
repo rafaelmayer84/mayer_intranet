@@ -165,7 +165,7 @@
         <div class="bg-white rounded-xl shadow-sm border overflow-hidden mb-8">
             <div class="px-5 py-4 border-b bg-gray-50 flex items-center justify-between">
                 <h2 class="text-sm font-semibold text-gray-700">Escala de Atendimento</h2>
-                @if(in_array(auth()->user()->role, ['admin']))
+                @if(in_array(auth()->user()->role, ['admin', 'coordenador', 'socio']))
                 <a href="{{ route('nexo.gerencial.escala') }}" class="text-xs text-[#385776] hover:underline font-medium">Gerenciar Escala</a>
                 @endif
             </div>
