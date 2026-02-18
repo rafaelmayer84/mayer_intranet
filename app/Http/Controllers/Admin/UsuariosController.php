@@ -166,12 +166,25 @@ class UsuariosController extends Controller
     public function resetarSenha(User $usuario)
     {
         $novaSenha = Str::random(12);
-        $usuario->update(['password' => Hash::make($novaSenha)]);
+        $usuario->update([
+            'password' => Hash::make($novaSenha),
+            'password_changed_at' => null,
+        ]);
+
+        // Enviar email com nova senha
+        try {
+            \Illuminate\Support\Facades\Mail::to($usuario->email)
+                ->send(new \App\Mail\BoasVindasUsuario($usuario, $novaSenha));
+
+            $mensagem = "Senha resetada! Email enviado para {$usuario->email}. O usuário será obrigado a trocar no próximo login.";
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Erro ao enviar email de reset: ' . $e->getMessage());
+            $mensagem = "Senha resetada! Houve erro ao enviar email. Nova senha temporária: {$novaSenha}";
+        }
 
         return redirect()
             ->route('admin.usuarios.show', $usuario)
-            ->with('success', "Senha resetada com sucesso! Nova senha: {$novaSenha}")
-            ->with('senha_temporaria', $novaSenha);
+            ->with('success', $mensagem);
     }
 
     /**

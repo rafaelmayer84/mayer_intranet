@@ -210,7 +210,7 @@
 
                         <div class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
                             <button type="submit" 
-                                    class="w-full px-4 py-2 bg-brand hover-bg-brand-dark text-white font-medium rounded-lg transition-colors">
+                                    class="w-full px-4 py-2 bg-[#385776] hover:bg-[#1B334A] text-white font-medium rounded-lg transition-colors">
                                 Salvar Permissões
                             </button>
                         </div>
