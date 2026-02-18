@@ -73,9 +73,14 @@ class SendPulseWhatsAppService
         return $this->apiGet("/whatsapp/chats", ['bot_id' => $this->botId]);
     }
 
-    public function getChatMessages(string $chatId, int $limit = 100, ?string $since = null): ?array
+    public function getChatMessages(string $contactId, int $limit = 100, ?string $since = null): ?array
     {
-        $params = ['bot_id' => $this->botId, 'chat_id' => $chatId, 'limit' => $limit];
+        // SendPulse API exige contact_id valido (hex 24 chars), nao chat_id
+        if (str_starts_with($contactId, 'whatsapp_') || str_starts_with($contactId, 'backup_')) {
+            \Log::warning("NexoSync: contact_id legado ignorado no polling", ['contact_id' => $contactId]);
+            return null;
+        }
+        $params = ['bot_id' => $this->botId, 'contact_id' => $contactId, 'limit' => $limit];
         if ($since) $params['since'] = $since;
         return $this->apiGet("/whatsapp/chats/messages", $params);
     }
@@ -442,4 +447,26 @@ class SendPulseWhatsAppService
         if (!$contact || !isset($contact['id'])) return false;
         return $this->setContactTags($contact['id'], $tagNames);
     }
+
+    // == Templates WhatsApp (17/02/2026) ==
+
+    public function getWhatsAppTemplates(): ?array
+    {
+        return $this->apiGet("/whatsapp/templates", ['bot_id' => $this->botId]);
+    }
+
+    public function sendTemplateByPhone(string $phone, array $template): array
+    {
+        \Log::info('SendPulse sendTemplateByPhone', [
+            'phone' => $phone,
+            'template_name' => $template['name'] ?? 'N/A',
+        ]);
+
+        return $this->apiPost("/whatsapp/contacts/sendTemplateByPhone", [
+            'bot_id'   => $this->botId,
+            'phone'    => $phone,
+            'template' => $template,
+        ]);
+    }
+
 }

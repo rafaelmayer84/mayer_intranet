@@ -43,6 +43,7 @@ class NexoConversationSyncService
     public function syncConversationFromWebhook(array $rawPayload): bool
     {
         $parsed = SendPulseWhatsAppService::parseWebhookIncomingMessage($rawPayload);
+        \Log::info('NEXO-AUDIT: parsed webhook', ['phone' => $parsed['phone'] ?? 'VAZIO', 'contact_id' => $parsed['contact_id'] ?? 'VAZIO', 'text' => substr($parsed['text'] ?? '', 0, 50), 'msg_id' => $parsed['message_id'] ?? 'VAZIO']);
         if (!$parsed) return false;
 
         try {
@@ -171,9 +172,10 @@ class NexoConversationSyncService
 
     private function doSyncMessages(WaConversation $conversation, int $limit, string $failKey, int $failCount): int
     {
-        $chatId = $conversation->chat_id;
-        if (empty($chatId) && !empty($conversation->contact_id)) {
-            $chatId = $conversation->contact_id;
+        $contactId = $conversation->contact_id;
+        if (empty($contactId)) {
+            Log::warning("NexoSync: conversa {$conversation->id} sem contact_id, polling ignorado");
+            return 0;
         }
 
         $since = null;
@@ -182,7 +184,7 @@ class NexoConversationSyncService
             $since = $lastMsg->sent_at->toISOString();
         }
 
-        $messages = $this->sendpulse->getChatMessages($chatId, $limit, $since);
+        $messages = $this->sendpulse->getChatMessages($contactId, $limit, $since);
 
         if ($messages === null) {
             $newFailCount = $failCount + 1;
