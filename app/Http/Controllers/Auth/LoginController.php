@@ -26,7 +26,7 @@ class LoginController extends Controller
             // Registrar último acesso
             Auth::user()->update(['ultimo_acesso' => now()]);
 
-            return redirect()->intended('/');
+            return redirect()->intended('/avisos');
         }
 
         return back()->withErrors([
