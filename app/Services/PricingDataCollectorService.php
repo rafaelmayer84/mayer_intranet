@@ -470,7 +470,7 @@ class PricingDataCollectorService
                 ->where('mes', $mesAtual)
                 ->where('ano', $anoAtual)
                 ->where('kpi_key', 'receita_total')
-                ->value('valor_meta');
+                ->value('meta_valor');
 
             // Processos ativos
             $processosAtivos = DB::table('processos')
@@ -505,6 +505,13 @@ class PricingDataCollectorService
         $historico = $this->getHistoricoAgregado($areaDireito);
         $macro = $this->getDadosMacroEscritorio();
 
+        try {
+            $historicoCRM = $this->getHistoricoCRM($areaDireito);
+        } catch (\Exception $e) {
+            \Log::warning('PricingDataCollector: Erro histórico CRM', ['erro' => $e->getMessage()]);
+            $historicoCRM = [];
+        }
+
         return [
             'proponente' => $dadosProponente['proponente'] ?? [],
             'demanda' => $dadosProponente['demanda'] ?? [],
@@ -516,7 +523,62 @@ class PricingDataCollectorService
             'macro_escritorio' => $macro,
             'calibracao_estrategica' => $calibracao,
             'contexto_adicional' => $contextoAdicional,
+            'referencia_oab_sc' => $this->getHonorariosOAB($areaDireito),
             'data_geracao' => now()->format('d/m/Y H:i'),
         ];
     }
+
+    /**
+     * Retorna piso mínimo OAB/SC por área do direito (Resolução CP 04/2025, IPCA 12/2024)
+     */
+    public function getHonorariosOAB(?string $areaDireito): array
+    {
+        $tabela = [
+            'Atuação Avulsa/Extrajudicial' => ['piso_min' => 130.22, 'piso_padrao' => 1302.25, 'piso_max' => 6511.22, 'referencia' => 'Itens 1-14: consultas R$455-781, pareceres R$3.255-6.511, contratos R$1.562-6.511, diligências R$117-390'],
+            'Juizados Especiais' => ['piso_min' => 651.12, 'piso_padrao' => 3906.73, 'piso_max' => 3906.73, 'referencia' => 'Itens 15-16: atuação até sentença R$3.906, recurso +R$1.302, sustentação oral R$1.302'],
+            'Direito Administrativo/Público' => ['piso_min' => 2604.48, 'piso_padrao' => 5208.98, 'piso_max' => 58601.01, 'referencia' => 'Itens 17-20: defesa sindicância R$2.604, processo admin R$5.208, mandado segurança R$6.511, improbidade R$10.417'],
+            'Direito Civil e Empresarial' => ['piso_min' => 2604.48, 'piso_padrao' => 5208.98, 'piso_max' => 7813.47, 'referencia' => 'Itens 21-45: rito sumário R$3.906, ordinário R$5.208, mandado segurança R$6.511, dissolução sociedade R$7.813, indenizatória R$3.906'],
+            'Direito Falimentar' => ['piso_min' => 3906.73, 'piso_padrao' => 6511.22, 'piso_max' => 10417.96, 'referencia' => 'Itens 46-55: falência credor R$10.417, recuperação judicial R$10.417, habilitação crédito R$5.208'],
+            'Direito de Família' => ['piso_min' => 1562.70, 'piso_padrao' => 5208.98, 'piso_max' => 11720.20, 'referencia' => 'Itens 56-94: divórcio consensual R$5.208, litigioso R$6.511-8.464, alimentos R$5.208, guarda R$5.208, investigação paternidade R$10.417, adoção R$9.115-11.720'],
+            'Direito das Sucessões' => ['piso_min' => 3906.73, 'piso_padrao' => 5208.98, 'piso_max' => 10417.96, 'referencia' => 'Itens 95-112: inventário sem litígio R$5.208, com litígio R$7.813, sobrepartilha R$5.208, nulidade testamento R$7.813'],
+            'Direito Eleitoral' => ['piso_min' => 6511.22, 'piso_padrao' => 9115.71, 'piso_max' => 26044.89, 'referencia' => 'Itens 113-117: queixa/representação R$9.115, defesa prisão R$26.044, defesa multa R$6.511, TRE R$13.022'],
+            'Direito Militar' => ['piso_min' => 781.35, 'piso_padrao' => 6511.22, 'piso_max' => 13022.45, 'referencia' => 'Itens 118-138: defesa 1ª instância R$9.897-11.069, recurso apelação R$7.813, recurso especial R$13.022'],
+            'Direito Penal' => ['piso_min' => 2344.04, 'piso_padrao' => 5208.98, 'piso_max' => 33207.24, 'referencia' => 'Itens 138-171: defesa comum R$9.766, rito especial R$10.417, júri pronúncia R$19.533, júri plenário R$33.207, habeas corpus R$11.720'],
+            'Direito do Trabalho' => ['piso_min' => 976.69, 'piso_padrao' => 3255.61, 'piso_max' => 13803.80, 'referencia' => 'Itens 172-183: reclamação reclamante 20% mín R$1.953, defesa reclamado 20% mín R$3.255, dissídio coletivo R$4.948-13.803, rescisória R$2.344'],
+            'Direito Previdenciário' => ['piso_min' => 2604.48, 'piso_padrao' => 3255.61, 'piso_max' => 5208.98, 'referencia' => 'Itens 184-213: ação concessão 20-30% mín R$3.906, requerimento admin R$3.646, planejamento R$3.255, mandado segurança R$5.208'],
+            'Direito Tributário' => ['piso_min' => 3646.28, 'piso_padrao' => 5860.10, 'piso_max' => 6511.22, 'referencia' => 'Itens 214-224: defesa admin R$5.208, anulatória R$5.860, embargos execução R$6.511, mandado segurança R$6.511, repetição indébito R$4.557'],
+            'Direito do Consumidor' => ['piso_min' => 2604.48, 'piso_padrao' => 3906.73, 'piso_max' => 6511.22, 'referencia' => 'Itens 225-229: ação consumidor R$3.906, defesa fornecedor R$5.860, nulidade cláusula R$5.208'],
+            'Tribunais e Conselhos' => ['piso_min' => 1953.37, 'piso_padrao' => 5208.98, 'piso_max' => 13022.45, 'referencia' => 'Itens 230-271: apelação cível R$4.557, agravo instrumento R$4.557, recurso especial R$7.813, revisão criminal R$13.022, ação rescisória R$7.813'],
+            'Direito Desportivo' => ['piso_min' => 651.12, 'piso_padrao' => 6511.22, 'piso_max' => 19533.66, 'referencia' => 'Itens 272-281: 1º grau R$1.302, TJD R$1.562, STJD R$2.344, CAS/TAS R$19.533, consultoria R$6.511-13.022'],
+            'Direito Marítimo/Portuário/Aduaneiro' => ['piso_min' => 2604.48, 'piso_padrao' => 6511.22, 'piso_max' => 65112.23, 'referencia' => 'Itens 282-304: contratos transporte R$3.906-10.417, tribunal marítimo R$26.044, ANTAQ R$13.022-65.112, ações aduaneiras R$5.208-7.813'],
+            'Direito de Partido' => ['piso_min' => 1953.37, 'piso_padrao' => 4557.86, 'piso_max' => 5208.98, 'referencia' => 'Itens 305-307: consultivo R$1.953, assistência total R$4.557, vínculo 4h R$2.864, vínculo 8h R$5.208'],
+            'Propriedade Intelectual' => ['piso_min' => 520.90, 'piso_padrao' => 3255.61, 'piso_max' => 16929.18, 'referencia' => 'Itens 308-330: registro marca R$3.255, recurso INPI R$3.776, ação contrafação R$10.417, nulidade INPI R$16.929'],
+            'Direito Ambiental' => ['piso_min' => 651.12, 'piso_padrao' => 6511.22, 'piso_max' => 13022.45, 'referencia' => 'Itens 331-338: defesa admin R$4.167, licenciamento R$6.511, inquérito civil R$6.511, ação civil pública R$13.022'],
+            'Direito da Criança e Adolescente' => ['piso_min' => 1953.37, 'piso_padrao' => 5208.98, 'piso_max' => 14324.69, 'referencia' => 'Itens 339-358: ato infracional R$9.115, habeas corpus R$11.720-14.324, execução medida R$9.115, destituição poder familiar R$9.766'],
+            'Direito Digital' => ['piso_min' => 1041.80, 'piso_padrao' => 3906.73, 'piso_max' => 15626.93, 'referencia' => 'Itens 359-367: remoção conteúdo R$3.906, termos uso R$3.906, contrato software R$2.604, ação negatória R$15.626'],
+            'Assistência Social' => ['piso_min' => 1562.70, 'piso_padrao' => 1562.70, 'piso_max' => 1562.70, 'referencia' => 'Itens 368-369: ação judicial R$1.562, ação extrajudicial R$1.562'],
+            'Direito Imobiliário' => ['piso_min' => 1302.25, 'piso_padrao' => 5208.98, 'piso_max' => 7813.47, 'referencia' => 'Itens 370-392: despejo R$3.906, usucapião R$5.860-7.813, reivindicatória R$7.813, incorporação R$7.813, extinção condomínio R$7.813'],
+            'Mediação e Conciliação' => ['piso_min' => 586.01, 'piso_padrao' => 2344.04, 'piso_max' => 2344.04, 'referencia' => 'Itens 393-394: mediação R$2.344 ou R$781/hora, conciliação R$1.823 ou R$586/hora'],
+        ];
+
+        if (!$areaDireito || !isset($tabela[$areaDireito])) {
+            return [
+                'fonte' => 'Tabela OAB/SC - Resolução CP 04/2025 (IPCA 12/2024)',
+                'area_encontrada' => false,
+                'nota' => 'Área não mapeada na tabela OAB/SC. Usar valores de mercado como referência.',
+            ];
+        }
+
+        $dados = $tabela[$areaDireito];
+        return [
+            'fonte' => 'Tabela OAB/SC - Resolução CP 04/2025 (IPCA 12/2024)',
+            'area' => $areaDireito,
+            'area_encontrada' => true,
+            'piso_minimo' => $dados['piso_min'],
+            'piso_padrao' => $dados['piso_padrao'],
+            'piso_maximo' => $dados['piso_max'],
+            'detalhamento' => $dados['referencia'],
+        ];
+    }
+
 }

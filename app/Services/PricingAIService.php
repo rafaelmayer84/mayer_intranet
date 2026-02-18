@@ -114,6 +114,13 @@ Produza 3 propostas calibradas pelos dados reais:
 - PREMIUM: valor que maximiza receita, para clientes que valorizam exclusividade e qualidade
 Recomende a mais adequada para ESTE contexto específico
 
+ETAPA 4 - PISO OAB/SC (REGRA ABSOLUTA):
+O campo "referencia_oab_sc" contém os pisos mínimos de honorários da OAB/SC (Resolução CP 04/2025, atualizada IPCA 12/2024).
+NENHUMA das 3 propostas pode ter valor_honorarios ABAIXO do "piso_padrao" da área.
+A proposta RÁPIDA deve ser >= piso_padrao. A EQUILIBRADA deve ser significativamente acima. A PREMIUM mais ainda.
+Se "area_encontrada" for false, use o bom senso e valores de mercado, mas nunca abaixo de R$ 2.000.
+Inclua no JSON de resposta o campo "piso_oab_aplicado" com o valor do piso que você usou como referência.
+
 Responda APENAS com o JSON, sem nenhum texto adicional.
 PROMPT;
     }
