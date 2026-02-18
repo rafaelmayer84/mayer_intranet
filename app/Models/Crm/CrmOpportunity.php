@@ -17,6 +17,7 @@ class CrmOpportunity extends Model
         'lost_reason', 'tipo_demanda', 'lead_source', 'espo_id',
         'amount', 'currency', 'probability', 'close_date',
         'won_at', 'lost_at',
+        'value_closed', 'sipex_proposal_id',
         'datajuri_contrato_id', 'datajuri_processo_id',
     ];
 
@@ -107,4 +108,10 @@ class CrmOpportunity extends Model
         if (!$this->isOverdue()) return 0;
         return (int) $this->next_action_at->diffInDays(now());
     }
+
+    public function sipexProposal()
+    {
+        return $this->belongsTo(\App\Models\PricingProposal::class, 'sipex_proposal_id');
+    }
+
 }

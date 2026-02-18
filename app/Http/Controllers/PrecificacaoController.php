@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\PricingCalibration;
 use App\Models\PricingProposal;
+use App\Models\Crm\CrmOpportunity;
+use App\Models\Crm\CrmAccount;
 use App\Services\PricingDataCollectorService;
 use App\Services\PricingAIService;
 use Illuminate\Http\Request;
@@ -156,9 +158,64 @@ class PrecificacaoController extends Controller
 
         Log::info('Precificação: Proposta gerada', ['id' => $proposal->id, 'user' => Auth::id()]);
 
+        // === INTEGRAÇÃO SIPEX → CRM: criar oportunidade automaticamente ===
+        try {
+            $valorEquilibrada = $resultado['proposta_equilibrada']['valor_honorarios'] ?? null;
+            $nomeProponente = $dadosProponente['proponente']['nome'] ?? 'Proposta SIPEX';
+            $documento = $dadosProponente['proponente']['documento'] ?? null;
+            $telefone = $dadosProponente['proponente']['telefone'] ?? null;
+
+            // Tentar localizar account no CRM por documento ou telefone
+            $accountId = null;
+            if ($documento) {
+                $digits = preg_replace('/\D/', '', $documento);
+                $account = CrmAccount::where('doc_digits', $digits)->first();
+                if ($account) $accountId = $account->id;
+            }
+            if (!$accountId && $telefone) {
+                $phoneClean = preg_replace('/\D/', '', $telefone);
+                if (strlen($phoneClean) >= 10) {
+                    $account = CrmAccount::where('phone_e164', 'like', "%{$phoneClean}%")->first();
+                    if ($account) $accountId = $account->id;
+                }
+            }
+            // Se não encontrou, criar prospect
+            if (!$accountId) {
+                $newAccount = CrmAccount::create([
+                    'name' => $nomeProponente,
+                    'kind' => 'prospect',
+                    'doc_digits' => $documento ? preg_replace('/\D/', '', $documento) : null,
+                    'phone_e164' => $telefone ? preg_replace('/\D/', '', $telefone) : null,
+                    'owner_user_id' => Auth::id(),
+                ]);
+                $accountId = $newAccount->id;
+            }
+
+            $opp = CrmOpportunity::create([
+                'account_id' => $accountId,
+                'stage_id' => 3, // Proposta
+                'type' => 'aquisicao',
+                'title' => ($areaDireito ?? 'Demanda') . ' - ' . $nomeProponente,
+                'area' => $areaDireito,
+                'tipo_demanda' => $areaDireito,
+                'source' => 'sipex',
+                'value_estimated' => $valorEquilibrada,
+                'owner_user_id' => Auth::id(),
+                'status' => 'open',
+                'sipex_proposal_id' => $proposal->id,
+            ]);
+
+            $proposal->update(['crm_opportunity_id' => $opp->id]);
+            Log::info('SIPEX->CRM: Oportunidade criada', ['opp_id' => $opp->id, 'proposal_id' => $proposal->id]);
+        } catch (\Exception $e) {
+            Log::warning('SIPEX->CRM: Falha ao criar oportunidade', ['erro' => $e->getMessage()]);
+            // Não bloqueia o retorno da proposta
+        }
+
         return response()->json([
             'success' => true,
             'proposal_id' => $proposal->id,
+            'crm_opportunity_id' => $opp->id ?? null,
             'resultado' => $resultado,
         ]);
     }
@@ -191,7 +248,11 @@ class PrecificacaoController extends Controller
      */
     public function show(int $id)
     {
-        $proposta = PricingProposal::where('user_id', Auth::id())->findOrFail($id);
+        $query = PricingProposal::query();
+        if (Auth::user()->role !== 'admin') {
+            $query->where('user_id', Auth::id());
+        }
+        $proposta = $query->findOrFail($id);
         return view('precificacao.show', compact('proposta'));
     }
 
@@ -239,6 +300,59 @@ class PrecificacaoController extends Controller
     /**
      * Tela de calibração estratégica (admin/sócios)
      */
+    /**
+     * Gera texto persuasivo da proposta via IA e salva no registro.
+     */
+    public function gerarPropostaCliente(Request $request, int $id)
+    {
+        $proposal = PricingProposal::where('user_id', Auth::id())->findOrFail($id);
+
+        if (!$proposal->proposta_escolhida || $proposal->proposta_escolhida === 'nenhuma') {
+            return response()->json(['error' => 'Escolha uma proposta antes de gerar o documento.'], 422);
+        }
+
+        try {
+            $textoGerado = $this->ai->gerarTextoPropostaCliente($proposal, $proposal->proposta_escolhida);
+
+            if (isset($textoGerado['error'])) {
+                return response()->json(['error' => $textoGerado['error']], 500);
+            }
+
+            $proposal->update(['texto_proposta_cliente' => json_encode($textoGerado, JSON_UNESCAPED_UNICODE)]);
+
+            return response()->json([
+                'success' => true,
+                'redirect' => route('precificacao.proposta.print', $id),
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('SIPEX gerarPropostaCliente erro', ['id' => $id, 'msg' => $e->getMessage()]);
+            return response()->json(['error' => 'Erro ao gerar proposta: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Renderiza a proposta de honorários para impressão/PDF.
+     */
+    public function imprimirProposta(int $id)
+    {
+        $proposal = PricingProposal::where('user_id', Auth::id())->findOrFail($id);
+
+        if (!$proposal->texto_proposta_cliente) {
+            return redirect()->route('precificacao.show', $id)
+                ->with('error', 'Gere a proposta para o cliente antes de imprimir.');
+        }
+
+        $meses = [1=>'janeiro',2=>'fevereiro',3=>'março',4=>'abril',5=>'maio',6=>'junho',
+                   7=>'julho',8=>'agosto',9=>'setembro',10=>'outubro',11=>'novembro',12=>'dezembro'];
+        $hoje = now();
+        $dataFormatada = "Itajaí, {$hoje->day} de {$meses[(int)$hoje->month]} de {$hoje->year}.";
+
+        return view('precificacao.proposta-print', [
+            'proposta' => $proposal,
+            'dataFormatada' => $dataFormatada,
+        ]);
+    }
+
     public function calibracao()
     {
         $userRole = Auth::user()->role ?? '';

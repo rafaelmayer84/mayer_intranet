@@ -121,6 +121,71 @@
             <p class="text-sm text-green-700 dark:text-green-300 mt-2">{{ $proposta->observacao_advogado }}</p>
         @endif
     </div>
+
+    {{-- Botão: Gerar Proposta para Cliente --}}
+    <div class="mt-4 flex items-center gap-3">
+        <button id="btn-gerar-proposta"
+            onclick="gerarPropostaCliente({{ $proposta->id }})"
+            class="px-5 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition flex items-center gap-2" style="background-color:#1B334A;color:#ffffff;">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            <span id="btn-gerar-texto">Gerar Proposta para Cliente</span>
+        </button>
+
+        @if($proposta->texto_proposta_cliente)
+            <a href="{{ route('precificacao.proposta.print', $proposta->id) }}" target="_blank"
+                class="px-5 py-2.5 bg-gray-600 text-white rounded-xl text-sm font-medium hover:bg-gray-700 transition flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                Ver Proposta Gerada
+            </a>
+        @endif
+    </div>
+
+    <div id="proposta-status" class="mt-2 text-sm hidden"></div>
     @endif
 </div>
+@push('scripts')
+<script>
+function gerarPropostaCliente(id) {
+    const btn = document.getElementById('btn-gerar-proposta');
+    const btnTexto = document.getElementById('btn-gerar-texto');
+    const status = document.getElementById('proposta-status');
+
+    btn.disabled = true;
+    btnTexto.textContent = 'Gerando proposta...';
+    btn.classList.add('opacity-60');
+    status.classList.remove('hidden', 'text-red-600', 'text-green-600');
+    status.textContent = 'A IA está redigindo a proposta persuasiva. Aguarde ~15-30 segundos...';
+    status.classList.add('text-gray-500');
+
+    fetch(`/precificacao/${id}/gerar-proposta-cliente`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+            'Accept': 'application/json',
+        },
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            status.textContent = 'Proposta gerada com sucesso! Abrindo...';
+            status.classList.remove('text-gray-500');
+            status.classList.add('text-green-600');
+            window.open(data.redirect, '_blank');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            throw new Error(data.error || 'Erro desconhecido');
+        }
+    })
+    .catch(err => {
+        status.textContent = 'Erro: ' + err.message;
+        status.classList.remove('text-gray-500');
+        status.classList.add('text-red-600');
+        btn.disabled = false;
+        btnTexto.textContent = 'Gerar Proposta para Cliente';
+        btn.classList.remove('opacity-60');
+    });
+}
+</script>
+@endpush
 @endsection

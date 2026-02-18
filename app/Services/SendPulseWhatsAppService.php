@@ -133,6 +133,54 @@ class SendPulseWhatsAppService
         ]);
     }
 
+    /**
+     * Enviar mensagem com reply/quote (context.message_id) via contact_id.
+     */
+    public function sendMessageWithReply(string $contactId, string $text, string $replyToMessageId): array
+    {
+        return $this->apiPost("/whatsapp/contacts/send", [
+            'contact_id' => $contactId,
+            'bot_id'     => $this->botId,
+            'message'    => [
+                'type' => 'text',
+                'text' => ['body' => $text],
+                'context' => ['message_id' => $replyToMessageId],
+            ],
+        ]);
+    }
+
+    /**
+     * Enviar mensagem com reply/quote via telefone.
+     */
+    public function sendMessageByPhoneWithReply(string $phone, string $text, string $replyToMessageId): array
+    {
+        return $this->apiPost("/whatsapp/contacts/sendByPhone", [
+            'bot_id' => $this->botId,
+            'phone'  => $phone,
+            'message' => [
+                'type' => 'text',
+                'text' => ['body' => $text],
+                'context' => ['message_id' => $replyToMessageId],
+            ],
+        ]);
+    }
+
+    /**
+     * Enviar reação emoji a uma mensagem.
+     */
+    public function sendReaction(string $contactId, string $messageId, string $emoji): array
+    {
+        return $this->apiPost("/whatsapp/contacts/send", [
+            'contact_id' => $contactId,
+            'bot_id'     => $this->botId,
+            'message'    => [
+                'type'      => 'reaction',
+                'reaction'  => ['emoji' => $emoji],
+                'messageId' => $messageId,
+            ],
+        ]);
+    }
+
     // ═══════════════════════════════════════════════════════
     // PARSING DE MENSAGENS (ESTÁTICO)
     // ═══════════════════════════════════════════════════════

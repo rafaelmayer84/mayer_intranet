@@ -152,8 +152,21 @@
         {{-- Mensagens --}}
         <div id="chat-messages" class="hidden flex-1 overflow-y-auto px-5 py-4 space-y-1 nexo-chat-bg"></div>
 
+        {{-- Reply Bar (citação) --}}
+        <div id="reply-bar" class="hidden px-4 pt-3 pb-0 bg-white border-t border-gray-200/80">
+            <div class="flex items-start gap-2 bg-[#f0f2f5] rounded-xl px-3 py-2 border-l-4 border-[#1e3a5f]">
+                <div class="flex-1 min-w-0">
+                    <p id="reply-bar-author" class="text-[11px] font-semibold text-[#1e3a5f] truncate"></p>
+                    <p id="reply-bar-text" class="text-[12px] text-[#667781] truncate max-h-[36px] overflow-hidden"></p>
+                </div>
+                <button onclick="NexoApp.cancelReply()" class="flex-shrink-0 text-[#8696a0] hover:text-[#3b4a54] p-0.5 transition-colors" title="Cancelar resposta">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+        </div>
+
         {{-- Input --}}
-        <div id="chat-input-bar" class="hidden px-4 py-3 bg-white border-t border-gray-200/80">
+        <div id="chat-input-bar" class="hidden px-4 py-3 bg-white border-t-0">
             <div class="flex items-end gap-3">
                 <textarea id="chat-input" rows="1" placeholder="Digite uma mensagem..."
                     class="flex-1 resize-none px-4 py-3 text-[14px] bg-[#f8f9fb] border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/15 focus:border-[#1e3a5f]/30 focus:bg-white max-h-32 leading-relaxed transition-all"

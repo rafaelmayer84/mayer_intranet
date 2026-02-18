@@ -20,6 +20,7 @@ class WaMessage extends Model
         'media_mime_type',
         'media_filename',
         'media_caption',
+        'reply_to_message_id',
         'raw_payload',
         'sent_at',
     ];

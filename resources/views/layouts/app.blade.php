@@ -215,16 +215,6 @@
     <div class="flex min-h-screen">
         <!-- Sidebar -->
         <aside id="sidebar" class="sidebar w-64 bg-gray-800 border-r border-gray-700 flex flex-col">
-            <!-- Botão Toggle Sidebar (Desktop only) -->
-            <button id="sidebar-toggle-btn" 
-                    type="button"
-                    class="hidden md:block"
-                    aria-label="Retrair/Expandir menu lateral"
-                    title="Retrair menu">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path>
-                </svg>
-            </button>
 
             <!-- Logo/Nome do Sistema -->
             <div class="sidebar-logo p-5 border-b border-white/10 flex items-center justify-center">
@@ -368,7 +358,7 @@
                             </span>
                             <svg class="w-3 h-3 transition-transform" :class="crmOpen ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                         </button>
-                        <div x-show="crmOpen" x-collapse class="ml-4 mt-1 space-y-0.5">
+                        <div x-show="crmOpen" x-transition class="ml-4 mt-1 space-y-0.5">
                             <a href="{{ route('crm.leads') }}" class="block px-3 py-1 text-xs rounded-lg hover:bg-gray-100 {{ request()->routeIs('crm.leads') ? 'text-[#385776] font-medium' : 'text-gray-400' }}">Leads</a>
                             <a href="{{ route('crm.pipeline') }}" class="block px-3 py-1 text-xs rounded-lg hover:bg-gray-100 {{ request()->routeIs('crm.pipeline') ? 'text-[#385776] font-medium' : 'text-gray-400' }}">Oportunidades</a>
                             <a href="{{ route('crm.carteira') }}" class="block px-3 py-1 text-xs rounded-lg hover:bg-gray-100 {{ request()->routeIs('crm.carteira') ? 'text-[#385776] font-medium' : 'text-gray-400' }}">Carteira</a>
@@ -443,27 +433,6 @@
                 </svg>
             </button>
 
-            <!-- Usuário -->
-            <div class="p-4 border-t border-white/10">
-                <div class="flex items-center">
-                    <div class="w-10 h-10 rounded-full bg-brand flex items-center justify-center text-white font-semibold">
-                        {{ substr(auth()->user()->name, 0, 1) }}
-                    </div>
-                    <div class="ml-3 flex-1">
-                        <p class="text-sm font-medium text-white menu-text">{{ auth()->user()->name }}</p>
-                        <p class="text-xs text-gray-400 menu-text">{{ ucfirst(auth()->user()->role) }}</p>
-                    </div>
-                </div>
-                <form action="{{ route('logout') }}" method="POST" class="mt-3">
-                    @csrf
-                    <button type="submit" class="nav-link w-full flex items-center justify-center px-4 py-2 text-sm rounded-lg transition-colors" data-tooltip="Sair">
-                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
-                        </svg>
-                        <span class="menu-text">Sair</span>
-                    </button>
-                </form>
-            </div>
         </aside>
 
         <!-- Overlay para menu mobile -->
@@ -471,6 +440,54 @@
 
         <!-- Main Content -->
         <main id="main-content" class="flex-1 overflow-auto w-full">
+            <!-- Notification Bar Desktop -->
+            @auth
+            <div id="notification-bar" class="hidden md:flex items-center justify-end px-6 py-2 bg-white border-b border-gray-200">
+                <div class="relative" id="notif-wrapper">
+                    <button id="notif-bell" onclick="toggleNotifDropdown()" class="relative p-2 text-gray-500 hover:text-blue-600 transition-colors rounded-lg hover:bg-gray-100">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                        </svg>
+                        <span id="notif-badge" class="hidden absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">0</span>
+                    </button>
+                    <div id="notif-dropdown" class="hidden absolute right-0 top-full mt-1 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 max-h-96 overflow-y-auto">
+                        <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                            <span class="font-semibold text-sm text-gray-700">Notificacoes</span>
+                            <button onclick="markAllRead()" class="text-xs text-blue-600 hover:underline">Marcar todas como lidas</button>
+                        </div>
+                        <div id="notif-list" class="divide-y divide-gray-100">
+                            <p class="text-sm text-gray-400 text-center py-6">Nenhuma notificacao</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="relative ml-3" id="profile-wrapper">
+                    <button onclick="toggleProfileDropdown()" class="flex items-center gap-2 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+                        <div class="w-8 h-8 rounded-full bg-blue-700 flex items-center justify-center text-white font-semibold text-sm">
+                            {{ substr(auth()->user()->name, 0, 1) }}
+                        </div>
+                        <span class="text-sm text-gray-700 font-medium">{{ auth()->user()->name }}</span>
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div id="profile-dropdown" class="hidden absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+                        <div class="px-4 py-3 border-b border-gray-100">
+                            <p class="text-sm font-medium text-gray-800">{{ auth()->user()->name }}</p>
+                            <p class="text-xs text-gray-500">{{ ucfirst(auth()->user()->role) }}</p>
+                        </div>
+                        <form action="{{ route('logout') }}" method="POST">
+                            @csrf
+                            <button type="submit" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                                </svg>
+                                Sair
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            @endauth
             <!-- Header Mobile -->
             <header class="mobile-header">
                 <div class="flex items-center gap-2">
@@ -547,5 +564,66 @@
     <script src="{{ asset('mobile-menu.js') }}"></script>
 
     @stack('scripts')
+<script>
+// === Notification Polling ===
+let notifOpen = false;
+let profileOpen = false;
+function toggleProfileDropdown() {
+    const dd = document.getElementById("profile-dropdown");
+    profileOpen = !profileOpen;
+    dd.classList.toggle("hidden", !profileOpen);
+}
+document.addEventListener("click", function(e) {
+    if (!document.getElementById("profile-wrapper")?.contains(e.target)) {
+        document.getElementById("profile-dropdown")?.classList.add("hidden");
+        profileOpen = false;
+    }
+});
+function toggleNotifDropdown() {
+    const dd = document.getElementById("notif-dropdown");
+    notifOpen = !notifOpen;
+    dd.classList.toggle("hidden", !notifOpen);
+}
+document.addEventListener("click", function(e) {
+    if (!document.getElementById("notif-bell")?.closest(".relative")?.contains(e.target)) {
+        document.getElementById("notif-dropdown")?.classList.add("hidden");
+        notifOpen = false;
+    }
+});
+function markAllRead() {
+    fetch("/api/notifications/mark-read", {
+        method: "POST",
+        headers: {"Content-Type": "application/json", "X-CSRF-TOKEN": document.querySelector("meta[name=csrf-token]").content}
+    }).then(() => fetchNotifications());
+}
+function fetchNotifications() {
+    fetch('/api/notifications/unread')
+        .then(r => r.json())
+        .then(data => {
+            const badge = document.getElementById('notif-badge');
+            const list = document.getElementById('notif-list');
+            if (data.count > 0) {
+                badge.textContent = data.count > 9 ? '9+' : data.count;
+                badge.classList.remove('hidden');
+                list.innerHTML = data.items.map(n => {
+                    const link = n.link || '#';
+                    const msg = n.mensagem || '';
+                    const dt = new Date(n.created_at).toLocaleString('pt-BR');
+                    return '<a href="' + link + '" class="block px-4 py-3 hover:bg-gray-50 transition-colors">'
+                        + '<p class="text-sm font-medium text-gray-800">' + n.titulo + '</p>'
+                        + '<p class="text-xs text-gray-500 mt-1">' + msg + '</p>'
+                        + '<p class="text-xs text-gray-400 mt-1">' + dt + '</p>'
+                        + '</a>';
+                }).join('');
+            } else {
+                badge.classList.add('hidden');
+                list.innerHTML = '<p class="text-sm text-gray-400 text-center py-6">Nenhuma notificacao</p>';
+            }
+        }).catch(() => {});
+}
+setInterval(fetchNotifications, 30000);
+document.addEventListener("DOMContentLoaded", fetchNotifications);
+</script>
+
 </body>
 </html>

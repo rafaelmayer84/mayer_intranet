@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use App\Models\PricingProposal;
 
 class PricingAIService
 {
@@ -39,10 +40,17 @@ DIFERENCIAL: Você tem acesso a dados REAIS de oportunidades ganhas e perdidas d
 Esses dados mostram em quais faixas de preço e tipos de demanda o escritório efetivamente FECHA contratos.
 USE ESSES DADOS como âncora principal. O objetivo é encontrar o MELHOR PREÇO para o escritório que seja VIÁVEL para o cliente pagar.
 
+PROPORCIONALIDADE OBRIGATÓRIA: O valor dos honorários deve ser PROPORCIONAL ao valor econômico da demanda e ao perfil do cliente.
+- PF inadimplente com causa de R$40k NÃO pode ter mesma precificação que PJ capitalizada com causa de R$500k.
+- Use como referência: honorários entre 5% a 20% do valor econômico, ajustando conforme complexidade e perfil.
+- Para PF com dificuldade financeira: tenda para 5-10%. Para PJ ou causas complexas: tenda para 10-20%.
+- Os dados de conversão do CRM são a âncora de REALIDADE, mas devem ser ponderados pelo caso específico, não aplicados como média genérica.
+- NUNCA aplique o ticket médio geral como valor base sem considerar o valor econômico e perfil do caso concreto.
+
 Regras absolutas:
 1. Sempre produza EXATAMENTE 3 propostas: "rapida", "equilibrada" e "premium"
 2. Sempre indique qual das 3 você RECOMENDA e por quê
-3. Valores em Reais (BRL), sem centavos para honorários acima de R$ 1.000
+3. Valores em Reais (BRL). NUNCA valores redondos/cheios (ex: 5000, 8000, 10000). SEMPRE valores quebrados com números ímpares que transmitam cálculo preciso (ex: 3.847, 5.173, 7.291, 2.637). Isso passa credibilidade de que o valor foi calculado, não arbitrado
 4. Para cada proposta, informe: valor_honorarios, tipo_cobranca (fixo/mensal/percentual/misto), parcelas_sugeridas, e uma justificativa_estrategica
 5. A justificativa deve ser profissional e utilizável em proposta ao cliente
 6. Responda EXCLUSIVAMENTE em JSON válido, sem markdown, sem texto fora do JSON
@@ -50,21 +58,21 @@ Regras absolutas:
 Formato de resposta obrigatório:
 {
   "proposta_rapida": {
-    "valor_honorarios": 5000,
+    "valor_honorarios": 2.847,
     "tipo_cobranca": "fixo",
     "parcelas_sugeridas": 3,
     "justificativa_estrategica": "..."
   },
   "proposta_equilibrada": {
-    "valor_honorarios": 8000,
+    "valor_honorarios": 4.173,
     "tipo_cobranca": "fixo",
-    "parcelas_sugeridas": 4,
+    "parcelas_sugeridas": 5,
     "justificativa_estrategica": "..."
   },
   "proposta_premium": {
-    "valor_honorarios": 12000,
+    "valor_honorarios": 6.391,
     "tipo_cobranca": "misto",
-    "parcelas_sugeridas": 6,
+    "parcelas_sugeridas": 7,
     "justificativa_estrategica": "..."
   },
   "recomendacao": "equilibrada",
@@ -97,8 +105,12 @@ Use esses dados como ÂNCORA PRINCIPAL de precificação:
 - "faixas_preco_conversao": em qual faixa de valor o escritório tem MAIOR taxa de conversão
 - "insight_preco": ticket médio das propostas perdidas especificamente por preço
 
-REGRA CRÍTICA: Se existirem dados de propostas perdidas por preço, a proposta RÁPIDA deve ficar
-ABAIXO desse ticket médio. A proposta EQUILIBRADA deve ficar na faixa de maior conversão.
+REGRA CRÍTICA DE CALIBRAÇÃO:
+- Se existirem dados de propostas perdidas por preço, use o ticket médio dessas perdas como SINAL DE ALERTA (não como teto absoluto).
+- A proposta RÁPIDA deve ser competitiva para o perfil específico deste cliente, considerando proporcionalidade ao valor econômico.
+- A proposta EQUILIBRADA deve maximizar probabilidade de fechamento PARA ESTE PERFIL, usando a faixa de maior conversão como referência.
+- A proposta PREMIUM pode ultrapassar médias quando a complexidade justificar, mas deve ter justificativa sólida.
+- NÃO aplique médias gerais de forma mecânica. Um caso cível de R$40k para PF é DIFERENTE de um cível de R$200k para PJ.
 
 ETAPA 2 - ANÁLISE COMPLEMENTAR:
 1. Perfil do proponente (PF/PJ, histórico, capacidade de pagamento via SIRIC se disponível)
@@ -107,19 +119,47 @@ ETAPA 2 - ANÁLISE COMPLEMENTAR:
 4. Parâmetros de calibração estratégica da administração (cada eixo vai de 0 a 100)
 5. Momento do escritório (meta vs realizado, pipeline, capacidade)
 
-ETAPA 3 - GERAÇÃO DAS PROPOSTAS:
-Produza 3 propostas calibradas pelos dados reais:
-- RÁPIDA: valor que facilita fechamento imediato, baseado no piso da faixa de maior conversão
-- EQUILIBRADA: melhor relação valor/probabilidade, baseado no ticket médio de propostas ganhas na área
-- PREMIUM: valor que maximiza receita, para clientes que valorizam exclusividade e qualidade
-Recomende a mais adequada para ESTE contexto específico
+ETAPA 3 - GERAÇÃO DAS PROPOSTAS (PROPORCIONALIDADE OBRIGATÓRIA):
 
-ETAPA 4 - PISO OAB/SC (REGRA ABSOLUTA):
-O campo "referencia_oab_sc" contém os pisos mínimos de honorários da OAB/SC (Resolução CP 04/2025, atualizada IPCA 12/2024).
-NENHUMA das 3 propostas pode ter valor_honorarios ABAIXO do "piso_padrao" da área.
-A proposta RÁPIDA deve ser >= piso_padrao. A EQUILIBRADA deve ser significativamente acima. A PREMIUM mais ainda.
-Se "area_encontrada" for false, use o bom senso e valores de mercado, mas nunca abaixo de R$ 2.000.
-Inclua no JSON de resposta o campo "piso_oab_aplicado" com o valor do piso que você usou como referência.
+REGRA DE FASE PROCESSUAL (CRÍTICA):
+Analise o tipo_acao e descricao_demanda para identificar se é:
+- AÇÃO COMPLETA (distribuição até sentença): usar faixa 8-20% do valor econômico
+- RECURSO/CONTRARAZÕES (2ª instância): usar faixa 3-8% do valor econômico — escopo pontual e limitado
+- CUMPRIMENTO DE SENTENÇA: usar faixa 3-6% do valor econômico — execução de decisão já obtida
+- CAUTELAR/TUTELA AVULSA: usar faixa 3-8% do valor econômico
+- FASE ESPECÍFICA (audiência avulsa, parecer, petição intercorrente): usar faixa 2-5% do valor econômico
+
+O piso OAB/SC informado é para AÇÃO COMPLETA. Para fases pontuais (recurso, cumprimento, cautelar), 
+o piso real é 30-50% do piso informado. NÃO use o piso de ação completa para trabalhos pontuais.
+
+Calcule a FAIXA DE REFERÊNCIA baseada no valor econômico da demanda E na fase processual:
+- Piso: percentual mínimo da fase (veja acima), respeitando no mínimo R$ 1.500
+- Centro: percentual médio da fase, ajustado por complexidade
+- Teto: percentual máximo da fase, para alta complexidade
+
+Depois cruze com os dados de conversão do CRM para calibrar:
+- RÁPIDA: piso da faixa proporcional, ajustado para baixo se o perfil indicar sensibilidade a preço (PF inadimplente, histórico de perda por preço)
+- EQUILIBRADA: centro da faixa proporcional, validado pela faixa de maior conversão do CRM
+- PREMIUM: teto da faixa proporcional, justificado por escopo expandido e valor agregado diferenciado
+
+VALORES: Sempre quebrados e ímpares (ex: 2.847, 4.173, 6.391). NUNCA redondos.
+Recomende a mais adequada para ESTE contexto específico, explicando o raciocínio de proporcionalidade.
+
+ETAPA 4 - PISO OAB/SC (REFERÊNCIA, NÃO ABSOLUTA):
+O campo "referencia_oab_sc" contém os pisos de honorários da OAB/SC para AÇÕES COMPLETAS.
+Para FASES PONTUAIS (recurso, cumprimento, cautelar, petição avulsa), aplique 30-50% do piso_padrao como referência.
+
+REGRA DE CALIBRAÇÃO COM DADOS REAIS:
+Os dados de "historico_crm_conversao" → "faixas_preco_conversao" mostram em qual faixa de valor o escritório 
+TEM MAIOR TAXA DE CONVERSÃO. Esta informação é MAIS IMPORTANTE que o piso OAB para definir a proposta RÁPIDA.
+Se a faixa com maior win_rate é "ate_2000" ou "2001_a_5000", a proposta RÁPIDA DEVE estar nessa faixa 
+(ou próxima dela), especialmente para PF com sensibilidade a preço.
+
+A proposta RÁPIDA deve priorizar CONVERSÃO: ficar na faixa de maior win rate do histórico real.
+A proposta EQUILIBRADA deve equilibrar MARGEM e CONVERSÃO: entre a faixa de maior win rate e o ticket médio won.
+A proposta PREMIUM pode ultrapassar o ticket médio won quando a complexidade justificar.
+
+Inclua no JSON o campo "piso_oab_aplicado" com o valor do piso ajustado que você usou (já considerando fase processual).
 
 Responda APENAS com o JSON, sem nenhum texto adicional.
 PROMPT;
@@ -198,6 +238,97 @@ PROMPT;
         }
 
         $parsed['model_used'] = $response['model'] ?? 'unknown';
+
+        return $parsed;
+    }
+
+    /**
+     * Gera texto persuasivo da proposta de honorários para envio ao cliente.
+     * Retorna JSON estruturado com seções do documento.
+     */
+    public function gerarTextoPropostaCliente(PricingProposal $proposta, string $tipoEscolhido): array
+    {
+        $propostaData = $proposta->{'proposta_' . $tipoEscolhido} ?? [];
+        $valor = $propostaData['valor_honorarios'] ?? 0;
+        $parcelas = $propostaData['parcelas_sugeridas'] ?? 1;
+        $tipoCobranca = $propostaData['tipo_cobranca'] ?? 'fixo';
+        $justificativa = $propostaData['justificativa_estrategica'] ?? '';
+
+        $systemPrompt = <<<'SYSTEM'
+Você é um redator jurídico sênior do escritório Mayer Sociedade de Advogados (OAB/SC 2097), especializado em redigir propostas de honorários que convertem leads em clientes. Seu objetivo é produzir um documento persuasivo, profissional e coercitivo (no sentido positivo) que faça o destinatário desejar contratar imediatamente.
+
+REGRAS DE ESTILO:
+1. Tom: confiante, técnico mas acessível, empático com a dor do cliente, transmitindo autoridade e segurança.
+2. NUNCA use bullet points, listas numeradas ou markdown. Redija em prosa fluida, em parágrafos completos.
+3. Escrita em 3ª pessoa ("O Escritório", "A equipe jurídica"). Nunca "nós" ou "eu".
+4. Use gatilhos de persuasão: escassez de tempo (prazos legais), autoridade (experiência do escritório), prova social (resultados anteriores na área), reciprocidade (diagnóstico gratuito já entregue), urgência (consequências da inação).
+5. O diagnóstico deve demonstrar que o escritório JÁ entendeu profundamente o caso, gerando confiança.
+6. A seção de diferenciais deve ser sutil e integrada, não uma lista de autoelogio.
+7. O valor dos honorários deve ser apresentado com naturalidade e justificado pelo valor que entrega, não pelo custo.
+8. Inclua uma seção sobre consequências de NÃO agir (sem ser alarmista, mas realista).
+
+FORMATO DE RESPOSTA - JSON com estas chaves:
+{
+  "saudacao": "Parágrafo de abertura cordial e personalizado",
+  "contexto_demanda": "Parágrafo(s) mostrando que o escritório entendeu a situação do cliente",
+  "diagnostico": "Análise técnica preliminar demonstrando domínio da matéria",
+  "escopo_servicos": "Descrição detalhada do que está incluído na prestação de serviços",
+  "fases": [
+    {"nome": "Fase 1 — Título", "descricao": "O que será feito nesta fase"},
+    {"nome": "Fase 2 — Título", "descricao": "..."}
+  ],
+  "estrategia": "Abordagem jurídica que será adotada (transmitir competência)",
+  "honorarios": {
+    "descricao_valor": "Pró-labore: R$ X.XXX,XX",
+    "forma_pagamento": "Condições de pagamento",
+    "observacao": "Nota sobre o que está incluso no valor"
+  },
+  "honorarios_exito": "Parágrafo sobre honorários de êxito, se aplicável (ou null)",
+  "despesas": "Parágrafo sobre custas e despesas processuais",
+  "diferenciais": "Por que este escritório é a melhor escolha (sutil, integrado ao contexto)",
+  "vigencia": "Condições de vigência, confidencialidade e próximos passos",
+  "encerramento": "Parágrafo final cordial com call-to-action sutil"
+}
+
+Responda APENAS com o JSON, sem texto adicional, sem backticks, sem markdown.
+SYSTEM;
+
+        $dadosCaso = [
+            'destinatario' => $proposta->nome_proponente,
+            'tipo_pessoa' => $proposta->tipo_pessoa,
+            'documento' => $proposta->documento_proponente,
+            'area_direito' => $proposta->area_direito,
+            'tipo_acao' => $proposta->tipo_acao,
+            'descricao_demanda' => $proposta->descricao_demanda,
+            'valor_causa' => $proposta->valor_causa,
+            'valor_economico' => $proposta->valor_economico,
+            'contexto_adicional' => $proposta->contexto_adicional,
+            'siric_rating' => $proposta->siric_rating,
+            'proposta_tipo' => $tipoEscolhido,
+            'valor_honorarios' => $valor,
+            'parcelas' => $parcelas,
+            'tipo_cobranca' => $tipoCobranca,
+            'justificativa_estrategica' => $justificativa,
+            'valor_final_advogado' => $proposta->valor_final,
+            'observacao_advogado' => $proposta->observacao_advogado,
+        ];
+
+        $userPrompt = "Gere a proposta de honorários para o seguinte caso:\n\n" .
+            json_encode($dadosCaso, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+
+        $response = $this->callOpenAI($systemPrompt, $userPrompt);
+
+        $content = $response['choices'][0]['message']['content'] ?? '{}';
+        $content = trim($content);
+        $content = preg_replace('/^```json\s*/', '', $content);
+        $content = preg_replace('/\s*```$/', '', $content);
+
+        $parsed = json_decode($content, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            \Log::error('SIPEX PropostaCliente: JSON inválido da IA', ['raw' => $content]);
+            return ['error' => 'Resposta inválida da IA. Tente novamente.'];
+        }
 
         return $parsed;
     }

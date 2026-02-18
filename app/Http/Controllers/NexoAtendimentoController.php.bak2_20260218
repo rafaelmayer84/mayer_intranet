@@ -99,7 +99,6 @@ class NexoAtendimentoController extends Controller
                 'message_type' => 'text',
                 'body' => $request->text,
                 'reply_to_message_id' => $replyTo,
-                'user_id' => auth()->id(),
                 'sent_at' => now(),
             ]);
 
@@ -192,42 +191,7 @@ class NexoAtendimentoController extends Controller
         $newUserId = $request->input('user_id') ?: null;
 
         $c->assigned_user_id = $newUserId;
-        $c->assigned_at = now();
         $c->save();
-
-        // Notificar novo responsavel
-        if ($newUserId) {
-            $newUser = User::find($newUserId);
-            $contactName = $c->name ?? $c->phone;
-            $authorName2 = auth()->user()->name ?? 'Sistema';
-
-            \App\Models\NotificationIntranet::enviar(
-                $newUserId,
-                'Nova conversa atribuida',
-                "{$authorName2} transferiu a conversa de {$contactName} para voce.",
-                route('nexo.atendimento') . '?conversa=' . $c->id,
-                'transferencia',
-                'chat'
-            );
-
-            if ($newUser && $newUser->email) {
-                try {
-                    \Illuminate\Support\Facades\Mail::raw(
-                        "Ola {$newUser->name},\n\n"
-                        . "{$authorName2} transferiu a conversa WhatsApp de {$contactName} para voce.\n"
-                        . "Acesse o NEXO Atendimento para dar continuidade.\n\n"
-                        . url(route('nexo.atendimento', [], false) . '?conversa=' . $c->id) . "\n\n"
-                        . "Intranet Mayer Advogados",
-                        function ($msg) use ($newUser, $contactName) {
-                            $msg->to($newUser->email)
-                                ->subject("NEXO: Conversa de {$contactName} transferida para voce");
-                        }
-                    );
-                } catch (\Throwable $emailErr) {
-                    \Illuminate\Support\Facades\Log::warning('Falha email transferencia', ['error' => $emailErr->getMessage()]);
-                }
-            }
-        }
 
         // Bug 5: nota automática de transferência
         $oldName = $oldUserId ? (User::find($oldUserId)?->name ?? 'ID ' . $oldUserId) : 'Ninguém';

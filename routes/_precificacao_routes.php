@@ -27,6 +27,12 @@ Route::middleware(['auth', 'user.active', 'modulo:operacional.precificacao,visua
     // Escolher proposta
     Route::post('/{id}/escolher', [PrecificacaoController::class, 'escolher'])->name('precificacao.escolher')->whereNumber('id');
 
+    // Gerar proposta persuasiva para cliente (IA)
+    Route::post('/{id}/gerar-proposta-cliente', [PrecificacaoController::class, 'gerarPropostaCliente'])->name('precificacao.gerar-proposta-cliente')->whereNumber('id');
+
+    // Imprimir proposta para cliente (HTML → PDF via browser)
+    Route::get('/{id}/proposta-print', [PrecificacaoController::class, 'imprimirProposta'])->name('precificacao.proposta.print')->whereNumber('id');
+
     // Excluir proposta (admin only)
     Route::delete('/{id}/excluir', [PrecificacaoController::class, 'excluir'])->name('precificacao.excluir')->whereNumber('id');
 

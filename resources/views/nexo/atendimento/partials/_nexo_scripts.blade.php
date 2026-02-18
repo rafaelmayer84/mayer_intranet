@@ -129,9 +129,13 @@ const NexoApp = {
             const bc=isIn?'msg-bubble-in':'msg-bubble-out';
             const al=isIn?'justify-start':'justify-end';
             const content=this.renderMsgContent(m);
-            html+=`<div class="flex ${al} mb-1"><div class="${bc} px-3 py-2 max-w-[75%] lg:max-w-[60%]">${content}<p class="text-[10px] text-[#8696a0] text-right mt-1 leading-none select-none">${time}${hb}</p></div></div>`;
+            const pid=m.provider_message_id||'';
+            const quoteHtml=this.renderQuote(m);
+            const actionsHtml=pid?`<div class="nexo-msg-actions opacity-0 group-hover/msg:opacity-100 absolute ${isIn?'-right-2':'-left-2'} -top-1 flex gap-0.5 z-10 transition-opacity"><button onclick="NexoApp.startReply(${m.id},'${pid}')" class="w-6 h-6 flex items-center justify-center rounded-full bg-white shadow-md hover:bg-gray-100 text-[#8696a0] hover:text-[#3b4a54] transition-colors" title="Responder"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a5 5 0 015 5v4M3 10l6 6M3 10l6-6"/></svg></button><button onclick="NexoApp.showEmojiPicker(event,${m.id},'${pid}')" class="w-6 h-6 flex items-center justify-center rounded-full bg-white shadow-md hover:bg-gray-100 text-[#8696a0] hover:text-[#3b4a54] transition-colors" title="Reagir"><svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke-width="2"/><path d="M8 14s1.5 2 4 2 4-2 4-2" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="9" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1" fill="currentColor" stroke="none"/></svg></button></div>`:'';
+            html+=`<div class="flex ${al} mb-1" data-pmid="${pid}"><div class="relative group/msg max-w-[75%] lg:max-w-[60%]">${actionsHtml}<div class="${bc} px-3 py-2">${quoteHtml}${content}<p class="text-[10px] text-[#8696a0] text-right mt-1 leading-none select-none">${time}${hb}</p></div></div></div>`;
         });
         c.innerHTML=html;
+        this._lastMsgs=msgs;
         this.lastMsgId=msgs[msgs.length-1].id;
         this.lastMsgCount=msgs.length;
         c.scrollTop=c.scrollHeight;
@@ -184,6 +188,8 @@ const NexoApp = {
     },
 
     // ═══ ENVIAR MENSAGEM ═══
+    replyTo:null, // {id, provider_message_id, body, direction}
+
     async sendMessage(){
         if(!this.conversaAtual)return;
         const inp=document.getElementById('chat-input'),text=inp.value.trim();if(!text)return;
@@ -192,11 +198,85 @@ const NexoApp = {
         const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
         c.insertAdjacentHTML('beforeend',`<div class="flex justify-end mb-1"><div class="msg-bubble-out px-3 py-2 max-w-[75%] lg:max-w-[60%] opacity-70"><p class="text-[13px] text-[#111b21] whitespace-pre-wrap break-words">${this.esc(text)}</p><p class="text-[10px] text-[#667781] text-right mt-0.5">⏳ ${now}</p></div></div>`);
         c.scrollTop=c.scrollHeight;
+        const body={text};
+        if(this.replyTo&&this.replyTo.provider_message_id){body.reply_to_message_id=this.replyTo.provider_message_id}
+        this.cancelReply();
         try{
-            await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/mensagens`,{method:'POST',body:{text}});
+            await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/mensagens`,{method:'POST',body});
             const j=await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}`);
             this.renderMessages(j.messages||[]);
         }catch(e){console.error('Send error:',e);c.insertAdjacentHTML('beforeend','<p class="text-center text-red-500 text-xs py-1">Erro ao enviar</p>');c.scrollTop=c.scrollHeight}
+    },
+
+    // ═══ REPLY / QUOTE ═══
+    startReply(msgId, providerMsgId){
+        if(!this.conversaAtual)return;
+        const msgs=this._lastMsgs||[];
+        const m=msgs.find(x=>x.id===msgId);
+        if(!m)return;
+        this.replyTo={id:msgId,provider_message_id:providerMsgId,body:m.body||'[Mídia]',direction:m.direction};
+        const bar=document.getElementById('reply-bar');
+        const author=document.getElementById('reply-bar-author');
+        const txt=document.getElementById('reply-bar-text');
+        if(!bar)return;
+        author.textContent=parseInt(m.direction)===1?(this.conversaAtual.contact_name||'Cliente'):'Você';
+        txt.textContent=m.body||'[Mídia: '+( m.message_type||'arquivo')+']';
+        bar.classList.remove('hidden');
+        document.getElementById('chat-input').focus();
+    },
+
+    cancelReply(){
+        this.replyTo=null;
+        const bar=document.getElementById('reply-bar');
+        if(bar)bar.classList.add('hidden');
+    },
+
+    renderQuote(m){
+        if(!m.reply_to_message_id)return '';
+        const msgs=this._lastMsgs||[];
+        const orig=msgs.find(x=>x.provider_message_id===m.reply_to_message_id);
+        const qText=orig?(this.esc(orig.body||'[Mídia]')):'[Mensagem original]';
+        const qAuthor=orig?(parseInt(orig.direction)===1?(this.conversaAtual?.contact_name||'Cliente'):'Você'):'';
+        return `<div class="mb-1.5 px-2 py-1.5 bg-[#e2e8f0]/50 rounded-lg border-l-3 border-[#1e3a5f]/40 cursor-pointer" onclick="NexoApp.scrollToMsg('${m.reply_to_message_id}')"><p class="text-[10px] font-semibold text-[#1e3a5f]/70">${qAuthor}</p><p class="text-[11px] text-[#667781] truncate">${qText}</p></div>`;
+    },
+
+    scrollToMsg(providerMsgId){
+        const c=document.getElementById('chat-messages');
+        if(!c)return;
+        const bubbles=c.querySelectorAll('[data-pmid]');
+        for(const b of bubbles){if(b.dataset.pmid===providerMsgId){b.scrollIntoView({behavior:'smooth',block:'center'});b.style.transition='background 0.3s';b.style.background='#fef9c3';setTimeout(()=>{b.style.background=''},1500);return}}
+    },
+
+    // ═══ REACTION (EMOJI) ═══
+    showEmojiPicker(evt, msgId, providerMsgId){
+        this.closeEmojiPicker();
+        const emojis=['👍','❤️','😂','😮','😢','🙏'];
+        const el=document.createElement('div');
+        el.id='nexo-emoji-picker';
+        el.className='fixed z-50 bg-white rounded-2xl shadow-xl border border-gray-200 px-2 py-1.5 flex gap-1 animate-in';
+        el.style.left=(evt.clientX-80)+'px';el.style.top=(evt.clientY-50)+'px';
+        emojis.forEach(e=>{
+            const btn=document.createElement('button');
+            btn.textContent=e;
+            btn.className='text-xl hover:scale-125 transition-transform p-1 rounded-lg hover:bg-gray-100';
+            btn.onclick=()=>this.sendReaction(msgId,providerMsgId,e);
+            el.appendChild(btn);
+        });
+        document.body.appendChild(el);
+        setTimeout(()=>document.addEventListener('click',this._closePicker=()=>this.closeEmojiPicker(),{once:true}),50);
+    },
+
+    closeEmojiPicker(){
+        const p=document.getElementById('nexo-emoji-picker');
+        if(p)p.remove();
+    },
+
+    async sendReaction(msgId, providerMsgId, emoji){
+        this.closeEmojiPicker();
+        if(!this.conversaAtual)return;
+        try{
+            await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/reaction`,{method:'POST',body:{provider_message_id:providerMsgId,emoji}});
+        }catch(e){console.error('Reaction error:',e)}
     },
 
     // ═══ PRIORIDADE ═══

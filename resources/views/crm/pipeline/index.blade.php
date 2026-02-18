@@ -87,6 +87,15 @@
                                     Ação: {{ $opp->next_action_at->format('d/m') }}
                                 </p>
                             @endif
+                        @if(auth()->user()->role === 'admin')
+                        <div class="flex justify-end mt-2 pt-1 border-t border-gray-100">
+                            <button type="button"
+                                onclick="event.stopPropagation(); excluirOportunidade({{ $opp->id }}, '{{ addslashes($opp->title) }}')"
+                                class="text-xs text-gray-400 hover:text-red-600 transition-colors">
+                                🗑 Excluir
+                            </button>
+                        </div>
+                        @endif
                         </div>
                     @empty
                         <p class="text-xs text-gray-400 text-center py-4">Nenhuma oportunidade</p>
@@ -96,4 +105,24 @@
         @endforeach
     </div>
 </div>
+@push('scripts')
+<script>
+function excluirOportunidade(id, titulo) {
+    fetch('/crm/pipeline/' + id, {
+        method: 'DELETE',
+        headers: {
+            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+            'Accept': 'application/json'
+        }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) { location.reload(); }
+        else { alert(data.error || 'Erro ao excluir'); }
+    })
+    .catch(() => alert('Erro de conexão'));
+}
+</script>
+@endpush
+
 @endsection

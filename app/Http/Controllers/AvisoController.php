@@ -4,8 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Aviso;
 use App\Models\CategoriaAviso;
+use App\Models\NotificationIntranet;
+use App\Models\User;
 use App\Services\AvisoService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class AvisoController extends Controller
@@ -91,15 +94,38 @@ class AvisoController extends Controller
         $data['criado_por'] = auth()->id();
 
         try {
-            DB::transaction(function () use ($data) {
-                Aviso::create($data);
+            $aviso = null;
+            DB::transaction(function () use ($data, &$aviso) {
+                $aviso = Aviso::create($data);
+
+                // Notificar todos os usuarios ativos
+                $usuarios = User::where('ativo', true)->pluck('id');
+                $now = now();
+                $notificacoes = [];
+                foreach ($usuarios as $uid) {
+                    $notificacoes[] = [
+                        'user_id'    => $uid,
+                        'tipo'       => 'aviso',
+                        'titulo'     => 'Novo Aviso: ' . $aviso->titulo,
+                        'mensagem'   => \Illuminate\Support\Str::limit(strip_tags($aviso->descricao), 120),
+                        'link'       => '/avisos/' . $aviso->id,
+                        'icone'      => 'megaphone',
+                        'lida'       => false,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
+                NotificationIntranet::insert($notificacoes);
             });
         } catch (\Throwable $e) {
-            report($e);
+            \Illuminate\Support\Facades\Log::error('AVISO STORE ERRO: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'data' => $data ?? [],
+            ]);
 
             return back()
                 ->withInput()
-                ->withErrors(['store' => 'Não foi possível salvar o aviso. Verifique os campos e tente novamente.']);
+                ->withErrors(['store' => 'Não foi possível salvar o aviso. Erro: ' . $e->getMessage()]);
         }
 
         // IMPORTANTE: a listagem pública usa cache; sem isso o novo aviso pode demorar a aparecer.
@@ -159,7 +185,7 @@ class AvisoController extends Controller
             'prioridade' => 'required|in:baixa,media,alta,critica',
             'status' => 'required|in:ativo,inativo,agendado',
             'data_inicio' => 'nullable|date',
-            'data_fim' => 'nullable|date|after:data_inicio',
+            'data_fim' => 'nullable|date|after_or_equal:data_inicio',
         ]);
     }
 

@@ -9,7 +9,7 @@ class PricingProposal extends Model
     protected $table = 'pricing_proposals';
 
     protected $fillable = [
-        'user_id', 'lead_id', 'cliente_id', 'oportunidade_id',
+        'user_id', 'lead_id', 'cliente_id', 'oportunidade_id', 'crm_opportunity_id',
         'nome_proponente', 'documento_proponente', 'tipo_pessoa',
         'area_direito', 'tipo_acao', 'descricao_demanda', 'valor_causa', 'valor_economico',
         'contexto_adicional',
@@ -18,6 +18,7 @@ class PricingProposal extends Model
         'proposta_rapida', 'proposta_equilibrada', 'proposta_premium',
         'recomendacao_ia', 'justificativa_ia',
         'proposta_escolhida', 'valor_final', 'status', 'observacao_advogado',
+        'texto_proposta_cliente',
     ];
 
     protected $casts = [
@@ -30,6 +31,7 @@ class PricingProposal extends Model
         'proposta_rapida' => 'array',
         'proposta_equilibrada' => 'array',
         'proposta_premium' => 'array',
+        'texto_proposta_cliente' => 'array',
     ];
 
     public function user()
@@ -68,4 +70,10 @@ class PricingProposal extends Model
         $campo = 'proposta_' . $this->proposta_escolhida;
         return $this->$campo;
     }
+
+    public function crmOpportunity()
+    {
+        return $this->belongsTo(\App\Models\Crm\CrmOpportunity::class, 'crm_opportunity_id');
+    }
+
 }

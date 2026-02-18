@@ -60,4 +60,24 @@ class CrmPipelineController extends Controller
 
         return response()->json(['ok' => true]);
     }
+
+    /**
+     * Excluir oportunidade (admin only, AJAX).
+     */
+    public function destroy(int $id)
+    {
+        if (auth()->user()->role !== 'admin') {
+            return response()->json(['ok' => false, 'message' => 'Sem permissão'], 403);
+        }
+
+        $opp = CrmOpportunity::findOrFail($id);
+
+        // Remover relacionamentos
+        $opp->activities()->delete();
+        $opp->events()->delete();
+        $opp->delete();
+
+        return response()->json(['ok' => true]);
+    }
+
 }

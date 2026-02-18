@@ -29,6 +29,7 @@ Route::middleware(['auth'])->prefix('crm')->name('crm.')->group(function () {
     Route::post('/pipeline/{id}/move', [CrmPipelineController::class, 'moveStage'])->name('pipeline.move');
     Route::post('/pipeline/{id}/won', [CrmPipelineController::class, 'markWon'])->name('pipeline.won');
     Route::post('/pipeline/{id}/lost', [CrmPipelineController::class, 'markLost'])->name('pipeline.lost');
+    Route::delete('/pipeline/{id}', [CrmPipelineController::class, 'destroy'])->name('pipeline.destroy');
 
     // Account 360
     Route::get('/accounts/{id}', [CrmAccountController::class, 'show'])->name('accounts.show');

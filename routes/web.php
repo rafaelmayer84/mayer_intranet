@@ -234,3 +234,5 @@ require __DIR__.'/_eval180_routes.php';
 require __DIR__ . '/_perfil_routes.php';
 
 require __DIR__ . '/_perfil_routes.php';
+
+require __DIR__ . '/_notification_routes.php';
