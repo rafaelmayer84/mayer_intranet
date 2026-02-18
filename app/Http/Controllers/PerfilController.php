@@ -28,13 +28,18 @@ class PerfilController extends Controller
     {
         $request->validate([
             'senha_atual' => 'required',
-            'nova_senha' => ['required', 'confirmed', 'min:8', 'different:senha_atual'],
+            'nova_senha' => [
+                'required', 'confirmed', 'min:8', 'different:senha_atual',
+                'regex:/[A-Z]/',      // pelo menos 1 maiúscula
+                'regex:/[\W_]/',     // pelo menos 1 caractere especial
+            ],
         ], [
             'senha_atual.required' => 'Informe a senha atual.',
             'nova_senha.required' => 'Informe a nova senha.',
             'nova_senha.confirmed' => 'A confirmação da nova senha não confere.',
             'nova_senha.min' => 'A nova senha deve ter no mínimo 8 caracteres.',
             'nova_senha.different' => 'A nova senha deve ser diferente da atual.',
+            'nova_senha.regex' => 'A nova senha deve conter pelo menos 1 letra maiúscula e 1 caractere especial.',
         ]);
 
         $usuario = Auth::user();

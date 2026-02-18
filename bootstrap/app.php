@@ -13,6 +13,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->appendToGroup('web', \App\Http\Middleware\ForcePasswordChange::class);
         $middleware->alias([
             'force.json' => \App\Http\Middleware\ForceJsonResponse::class,
             'admin' => \App\Http\Middleware\CheckAdmin::class,

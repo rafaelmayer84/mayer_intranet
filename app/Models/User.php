@@ -272,4 +272,28 @@ class User extends Authenticatable
             'grupo_id'
         )->withTimestamps();
     }
+
+    /**
+     * Verifica se a senha nunca foi alterada (primeiro acesso)
+     */
+    public function senhaExpirada(): bool
+    {
+        return is_null($this->password_changed_at);
+    }
+
+    /**
+     * Dias restantes para expirar a senha (30 dias)
+     */
+    public function diasParaExpirarSenha(): ?int
+    {
+        if (is_null($this->password_changed_at)) {
+            return 0;
+        }
+
+        $expira = \Carbon\Carbon::parse($this->password_changed_at)->addDays(30);
+        $dias = (int) now()->diffInDays($expira, false);
+
+        return max($dias, 0);
+    }
+
 }
