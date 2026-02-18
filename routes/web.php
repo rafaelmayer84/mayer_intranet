@@ -104,14 +104,21 @@ require __DIR__ . "/_precificacao_routes.php";
 
 // Metas KPI Mensais
 Route::middleware(["auth"])->group(function () {
-    Route::get("/administracao/metas-kpi-mensais", [App\Http\Controllers\Admin\KpiMonthlyTargetController::class, "index"])->name("admin.metas-kpi-mensais");
-    Route::post("/administracao/metas-kpi-mensais", [App\Http\Controllers\Admin\KpiMonthlyTargetController::class, "store"])->name("admin.metas-kpi-mensais.store");
+    Route::get("/administracao/metas-kpi-mensais", [App\Http\Controllers\Admin\KpiMetasController::class, "index"])->name("admin.metas-kpi-mensais");
+    Route::post("/administracao/metas-kpi-mensais", [App\Http\Controllers\Admin\KpiMetasController::class, "store"])->name("admin.metas-kpi-mensais.store");
+
+    // Rotas adicionais Metas KPI
+    Route::get("/administracao/metas-kpi-mensais", [App\Http\Controllers\Admin\KpiMetasController::class, "index"])->name("admin.metas-kpi.index");
+    Route::get("/administracao/metas-kpi/template", [App\Http\Controllers\Admin\KpiMetasController::class, "downloadTemplate"])->name("admin.metas-kpi.template");
+    Route::post("/administracao/metas-kpi/upload", [App\Http\Controllers\Admin\KpiMetasController::class, "upload"])->name("admin.metas-kpi.upload");
+    Route::post("/administracao/metas-kpi/confirmar", [App\Http\Controllers\Admin\KpiMetasController::class, "confirmar"])->name("admin.metas-kpi.confirmar");
+    Route::delete("/administracao/metas-kpi/limpar", [App\Http\Controllers\Admin\KpiMetasController::class, "limpar"])->name("admin.metas-kpi.limpar");
 });
 
 // Metas KPI Mensais - Configurações
 Route::middleware(["auth"])->prefix("configuracoes")->name("config.")->group(function () {
-    Route::get("metas-kpi-mensais", [App\Http\Controllers\Admin\KpiMonthlyTargetController::class, "index"])->name("metas-kpi-mensais");
-    Route::post("metas-kpi-mensais", [App\Http\Controllers\Admin\KpiMonthlyTargetController::class, "store"])->name("metas-kpi-mensais.store");
+    Route::get("metas-kpi-mensais", [App\Http\Controllers\Admin\KpiMetasController::class, "index"])->name("metas-kpi-mensais");
+    Route::post("metas-kpi-mensais", [App\Http\Controllers\Admin\KpiMetasController::class, "store"])->name("metas-kpi-mensais.store");
 });
 
 // Integrações (Admin only)
@@ -198,6 +205,9 @@ require __DIR__."/_leads_routes.php";
 require __DIR__.'/_leads_routes.php';
 require __DIR__ . "/_nexo_routes.php";
 
+// Rotas NEXO Templates WhatsApp (17/02/2026)
+require __DIR__ . '/_nexo_template_routes.php';
+
 
 use App\Http\Controllers\NexoMonitorController;
 Route::middleware(['auth'])->prefix('nexo')->group(function () {
@@ -220,3 +230,7 @@ require __DIR__.'/_gdp_routes.php';
 require __DIR__.'/times-evolucao.php';
 
 require __DIR__.'/_eval180_routes.php';
+
+require __DIR__ . '/_perfil_routes.php';
+
+require __DIR__ . '/_perfil_routes.php';
