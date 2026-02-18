@@ -93,6 +93,7 @@ const NexoApp = {
             const cv=j.conversation;
             document.getElementById('chat-empty').classList.add('hidden');
             ['chat-header','chat-messages','chat-input-bar'].forEach(x=>{const el=document.getElementById(x);el.classList.remove('hidden');if(x==='chat-header')el.classList.add('flex')});
+            document.getElementById('btnReabrirConversa').classList.remove('hidden');
             if(window.innerWidth<1024){document.getElementById('inbox-panel').classList.add('hidden');const cp=document.getElementById('chat-panel');cp.classList.remove('hidden');cp.classList.add('flex')}
             const ini=(cv.name||'??').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
             document.getElementById('chat-avatar').textContent=ini;

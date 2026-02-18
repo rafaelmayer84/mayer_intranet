@@ -1,4 +1,62 @@
 @extends('layouts.app')
+<style>
+/* Template WhatsApp Modal (17/02/2026) */
+.template-btn-reabrir {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 14px; background: #f59e0b; color: #fff;
+    border: none; border-radius: 6px; font-size: 13px;
+    font-weight: 600; cursor: pointer; transition: background 0.2s;
+}
+.template-btn-reabrir:hover { background: #d97706; }
+.template-btn-reabrir.hidden { display: none; }
+.template-modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5); z-index: 9999;
+    justify-content: center; align-items: center;
+}
+.template-modal-overlay.active { display: flex; }
+.template-modal {
+    background: #fff; border-radius: 12px; width: 560px;
+    max-width: 95vw; max-height: 80vh; display: flex;
+    flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.template-modal-header {
+    padding: 16px 20px; border-bottom: 1px solid #e5e7eb;
+    display: flex; justify-content: space-between; align-items: center;
+}
+.template-modal-header h3 { margin: 0; font-size: 16px; font-weight: 700; color: #1B334A; }
+.template-modal-close { background: none; border: none; font-size: 22px; cursor: pointer; color: #6b7280; }
+.template-modal-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
+.template-modal-loading { text-align: center; padding: 40px; color: #6b7280; }
+.template-list-empty { text-align: center; padding: 30px; color: #9ca3af; }
+.template-card {
+    border: 2px solid #e5e7eb; border-radius: 8px; padding: 14px;
+    margin-bottom: 10px; cursor: pointer; transition: all 0.2s;
+}
+.template-card:hover { border-color: #385776; background: #f0f5fa; }
+.template-card.selected { border-color: #385776; background: #e8f0f8; }
+.template-card-name { font-weight: 700; font-size: 14px; color: #1B334A; margin-bottom: 4px; }
+.template-card-meta { font-size: 12px; color: #6b7280; margin-bottom: 8px; }
+.template-card-meta span {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-weight: 600; font-size: 11px; margin-right: 6px;
+}
+.template-card-meta .cat-utility { background: #dbeafe; color: #1e40af; }
+.template-card-meta .cat-marketing { background: #fef3c7; color: #92400e; }
+.template-card-meta .cat-auth { background: #ede9fe; color: #5b21b6; }
+.template-card-body {
+    font-size: 13px; color: #374151; background: #f9fafb;
+    padding: 10px 12px; border-radius: 6px; white-space: pre-line; line-height: 1.5;
+}
+.template-modal-footer {
+    padding: 14px 20px; border-top: 1px solid #e5e7eb;
+    display: flex; justify-content: flex-end; gap: 10px;
+}
+.template-btn-cancel { padding: 8px 18px; background: #e5e7eb; color: #374151; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+.template-btn-send { padding: 8px 18px; background: #385776; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+.template-btn-send:hover { background: #1B334A; }
+.template-btn-send:disabled { opacity: 0.5; cursor: not-allowed; }
+</style>
 @section('content')
 <link rel="stylesheet" href="{{ asset('css/nexo-atendimento.css') }}">
 <div id="nexo-app" class="flex h-[calc(100vh-64px)] bg-[#f0f2f5] overflow-hidden w-full">
@@ -66,6 +124,11 @@
                     <p id="chat-contact-phone" class="text-[12px] text-[#667781] mt-0.5"></p>
                 </div>
             </div>
+            <!-- Botão Reabrir Conversa via Template (17/02/2026) -->
+            <button id="btnReabrirConversa" class="template-btn-reabrir hidden" onclick="abrirTemplateModal(document.getElementById('chat-contact-phone').textContent.trim())" title="Enviar template para reabrir conversa (janela 24h expirada)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                Reabrir Conversa
+            </button>
             <div class="flex items-center gap-2">
                 <span id="chat-priority-badge" onclick="NexoApp.cyclePriority()" class="text-[10px] px-2.5 py-1 rounded-full font-medium cursor-pointer priority-normal transition-colors" title="Clique para alterar prioridade">⚪ Normal</span>
                 <span id="chat-status-badge" class="text-[11px] px-2.5 py-1 rounded-full font-medium"></span>
@@ -190,4 +253,159 @@
 
 {{-- ═══ JAVASCRIPT ═══ --}}
 @include('nexo.atendimento.partials._nexo_scripts')
+
+<!-- Modal Templates WhatsApp (17/02/2026) -->
+<div id="templateModal" class="template-modal-overlay" onclick="if(event.target===this)fecharTemplateModal()">
+    <div class="template-modal">
+        <div class="template-modal-header">
+            <h3>Enviar Template WhatsApp</h3>
+            <button class="template-modal-close" onclick="fecharTemplateModal()">&times;</button>
+        </div>
+        <div class="template-modal-body" id="templateModalBody">
+            <div class="template-modal-loading" id="templateLoading">
+                Carregando templates aprovados...
+            </div>
+            <div id="templateList"></div>
+        </div>
+        <div class="template-modal-footer">
+            <button class="template-btn-cancel" onclick="fecharTemplateModal()">Cancelar</button>
+            <button class="template-btn-send" id="templateBtnSend" disabled onclick="enviarTemplateSelecionado()">
+                Enviar Template
+            </button>
+        </div>
+    </div>
+</div>
+
+
+<script>
+let templatesSP = [];
+let tplSelecionado = null;
+let tplTelefone = '';
+
+function abrirTemplateModal(telefone) {
+    tplTelefone = telefone;
+    tplSelecionado = null;
+    document.getElementById('templateBtnSend').disabled = true;
+    document.getElementById('templateList').innerHTML = '';
+    document.getElementById('templateLoading').style.display = 'block';
+    document.getElementById('templateModal').classList.add('active');
+
+    fetch('/nexo/templates', {
+        headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+        }
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+        document.getElementById('templateLoading').style.display = 'none';
+        if (data.success && data.templates.length > 0) {
+            templatesSP = data.templates;
+            renderTemplates(data.templates);
+        } else {
+            document.getElementById('templateList').innerHTML =
+                '<div class="template-list-empty">' +
+                '<p><strong>Nenhum template aprovado encontrado.</strong></p>' +
+                '<p style="font-size:12px;margin-top:8px">Crie templates na aba Templates do SendPulse e aguarde aprovacao da Meta.</p></div>';
+        }
+    })
+    .catch(function(err) {
+        document.getElementById('templateLoading').style.display = 'none';
+        document.getElementById('templateList').innerHTML =
+            '<div class="template-list-empty" style="color:#dc2626"><p>Erro: ' + err.message + '</p></div>';
+    });
+}
+
+function renderTemplates(templates) {
+    var html = '';
+    for (var i = 0; i < templates.length; i++) {
+        var tpl = templates[i];
+        var catClass = (tpl.category||'').toLowerCase().indexOf('util') > -1 ? 'cat-utility'
+            : (tpl.category||'').toLowerCase().indexOf('market') > -1 ? 'cat-marketing' : 'cat-auth';
+        var body = (tpl.body || 'Sem conteudo').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        var hdr = tpl.header ? '<div style="font-weight:600;margin-bottom:4px;font-size:12px;color:#385776">' + tpl.header.replace(/</g,'&lt;') + '</div>' : '';
+        var ftr = tpl.footer ? '<div style="font-style:italic;margin-top:4px;font-size:11px;color:#9ca3af">' + tpl.footer.replace(/</g,'&lt;') + '</div>' : '';
+
+        html += '<div class="template-card" data-idx="' + i + '" onclick="selecionarTpl(' + i + ')">'
+            + '<div class="template-card-name">' + (tpl.name||'Sem nome').replace(/</g,'&lt;') + '</div>'
+            + '<div class="template-card-meta">'
+            + '<span class="' + catClass + '">' + (tpl.category||'N/A') + '</span>'
+            + '<span style="background:#f3f4f6;color:#6b7280">' + (tpl.language||'pt_BR') + '</span>'
+            + (tpl.has_vars ? '<span style="background:#fef3c7;color:#92400e">Variaveis</span>' : '')
+            + '</div>'
+            + '<div class="template-card-body">' + hdr + body + ftr + '</div></div>';
+    }
+    document.getElementById('templateList').innerHTML = html;
+}
+
+function selecionarTpl(idx) {
+    tplSelecionado = templatesSP[idx];
+    document.querySelectorAll('.template-card').forEach(function(el){ el.classList.remove('selected'); });
+    document.querySelector('.template-card[data-idx="' + idx + '"]').classList.add('selected');
+    document.getElementById('templateBtnSend').disabled = false;
+}
+
+function fecharTemplateModal() {
+    document.getElementById('templateModal').classList.remove('active');
+    tplSelecionado = null;
+}
+
+function enviarTemplateSelecionado() {
+    if (!tplSelecionado || !tplTelefone) return;
+    var btn = document.getElementById('templateBtnSend');
+    btn.disabled = true;
+    btn.textContent = 'Enviando...';
+
+    fetch('/nexo/templates/enviar', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+        },
+        body: JSON.stringify({
+            telefone: tplTelefone,
+            template_name: tplSelecionado.name,
+            template_data: tplSelecionado.template,
+            language: tplSelecionado.language || 'pt_BR'
+        })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            alert('Template enviado com sucesso!');
+            fecharTemplateModal();
+        } else {
+            alert('Erro: ' + (data.message || 'Falha ao enviar template'));
+        }
+    })
+    .catch(function(err) {
+        alert('Erro de conexao: ' + err.message);
+    })
+    .finally(function() {
+        btn.disabled = false;
+        btn.textContent = 'Enviar Template';
+    });
+}
+
+// Hook: mostrar botão "Reabrir Conversa" quando janela 24h expirou
+function atualizarBotaoReabrir(lastClientMsgTimestamp) {
+    var btn = document.getElementById('btnReabrirConversa');
+    if (!btn) return;
+    if (!lastClientMsgTimestamp) {
+        btn.classList.remove('hidden');
+        return;
+    }
+    var diff = Date.now() - new Date(lastClientMsgTimestamp).getTime();
+    if (diff > 24 * 60 * 60 * 1000) {
+        btn.classList.remove('hidden');
+    } else {
+        btn.classList.add('hidden');
+    }
+}
+
+</script>
+
 @endsection

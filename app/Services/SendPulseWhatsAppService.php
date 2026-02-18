@@ -272,20 +272,34 @@ class SendPulseWhatsAppService
             $textBody = data_get($event, 'contact.last_message', '');
         }
 
-        // Extrair mídia do webhook
+        // Extrair mídia do webhook (fix 18/02/2026: construir URL SendPulse)
         $mediaData = ['media_url' => null, 'media_mime' => null, 'media_filename' => null, 'media_caption' => null];
         $channelMsg = data_get($event, 'info.message.channel_data.message', []);
         if (is_array($channelMsg) && $msgType !== 'text') {
             foreach (['image', 'document', 'audio', 'video', 'voice', 'sticker'] as $mt) {
                 $block = data_get($channelMsg, $mt);
                 if (is_array($block)) {
-                    $mediaData['media_url']      = data_get($block, 'link') ?? data_get($block, 'url') ?? data_get($block, 'id');
+                    // Tentar link/url direto primeiro
+                    $mediaUrl = data_get($block, 'link') ?? data_get($block, 'url');
+                    // Se não tem URL válida, construir a partir de message_id + media_id
+                    if (empty($mediaUrl) || !filter_var($mediaUrl, FILTER_VALIDATE_URL)) {
+                        $mediaId = data_get($block, 'id');
+                        if ($mediaId && $msgId) {
+                            $mediaUrl = "https://login.sendpulse.com/api/chatbots-service/whatsapp/messages/media?message_id={$msgId}&id={$mediaId}";
+                        }
+                    }
+                    $mediaData['media_url']      = $mediaUrl;
                     $mediaData['media_mime']     = data_get($block, 'mime_type');
                     $mediaData['media_filename'] = data_get($block, 'filename');
                     $mediaData['media_caption']  = data_get($block, 'caption');
                     break;
                 }
             }
+        }
+
+        // Se body é uma URL de mídia SendPulse e temos media_url, limpar o body
+        if (!empty($mediaData['media_url']) && !empty($textBody) && str_contains($textBody, 'login.sendpulse.com/api/chatbots-service/whatsapp/messages/media')) {
+            $textBody = $mediaData['media_caption'] ?? '';
         }
 
         return array_merge([

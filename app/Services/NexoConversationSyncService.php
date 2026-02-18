@@ -207,8 +207,26 @@ class NexoConversationSyncService
             if (!is_array($msg)) continue;
 
             $providerMsgId = data_get($msg, 'id') ?? data_get($msg, 'message_id');
-            if ($providerMsgId && WaMessage::where('provider_message_id', $providerMsgId)->exists()) {
-                continue;
+            if ($providerMsgId) {
+                $existingMsg = WaMessage::where('provider_message_id', $providerMsgId)->first();
+                if ($existingMsg) {
+                    // Fix 18/02: atualizar media_url se estava NULL (webhook salvou sem URL)
+                    if (empty($existingMsg->media_url)) {
+                        $media = SendPulseWhatsAppService::extractMedia($msg);
+                        if (!empty($media['url'])) {
+                            $updateFields = ['media_url' => $media['url']];
+                            if (empty($existingMsg->media_mime_type) && !empty($media['mime_type'])) $updateFields['media_mime_type'] = $media['mime_type'];
+                            if (empty($existingMsg->media_filename) && !empty($media['filename'])) $updateFields['media_filename'] = $media['filename'];
+                            if (empty($existingMsg->media_caption) && !empty($media['caption'])) $updateFields['media_caption'] = $media['caption'];
+                            // Se body era a URL de mídia, limpar
+                            if (!empty($existingMsg->body) && str_contains($existingMsg->body, 'login.sendpulse.com/api/chatbots-service/whatsapp/messages/media')) {
+                                $updateFields['body'] = $media['caption'] ?? '';
+                            }
+                            $existingMsg->update($updateFields);
+                        }
+                    }
+                    continue;
+                }
             }
 
             $direction   = SendPulseWhatsAppService::extractDirection($msg);

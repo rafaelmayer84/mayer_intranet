@@ -30,9 +30,9 @@
 <body class="brand-gradient min-h-screen flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 sm:p-8">
         <div class="text-center mb-6">
-            <img src="/logo.png" alt="Logo Mayer Advogados" class="h-12 mx-auto mb-3">
-            <h1 class="text-xl font-bold text-gray-800">Intranet Mayer</h1>
-            <p class="text-sm text-gray-500 mt-1">Sistema RESULTADOS!</p>
+            <div class="mx-auto mb-3 w-14 h-14 rounded-full bg-[#1B334A] flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-8 h-8"><path d="M15 80V20h10l25 35 25-35h10v60h-10V38L52 68h-4L25 38v42z" fill="white"/></svg></div>
+            <h1 class="text-xl font-bold text-gray-800">Intranet Mayer</h1><p class="text-xs text-gray-500 mt-0.5">Sociedade de Advogados</p>
+            
         </div>
 
         @if($errors->any())
@@ -78,7 +78,7 @@
         </form>
 
         <p class="mt-5 text-center text-xs text-gray-400">
-            Acesso restrito aos colaboradores
+            Acesso restrito. Ambiente monitorado.
         </p>
     </div>
 </body>

@@ -16,6 +16,10 @@ class WaMessage extends Model
         'is_human',
         'message_type',
         'body',
+        'media_url',
+        'media_mime_type',
+        'media_filename',
+        'media_caption',
         'raw_payload',
         'sent_at',
     ];
