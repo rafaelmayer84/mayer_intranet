@@ -524,16 +524,59 @@ class DataJuriSyncOrchestrator
                 $value = $this->parseDecimal($value);
             }
 
-            // FIX: campos integer nao aceitam string vazia - converter para null
+            // FIX: campos que nao aceitam string vazia - converter para null
             if ($value === '' && (
                 str_ends_with($dbField, '_datajuri_id') ||
                 str_ends_with($dbField, '_id_datajuri') ||
-                in_array($dbField, ['proprietario_id', 'advogado_id', 'contratante_id_datajuri'])
+                in_array($dbField, [
+                    'proprietario_id', 'advogado_id', 'contratante_id_datajuri',
+                    'hora_inicial', 'hora_final', 'total_hora_trabalhada',
+                    'duracao_original', 'valor_total_original', 'data_faturado',
+                ])
             )) {
                 $value = null;
             }
             $data[$dbField] = $value;
         }
+
+        // =====================================================================
+        // SANITIZACAO GENERICA DE TIPOS (FIX v2.3 - 18/02/2026)
+        // =====================================================================
+
+        // 1. Campos inteiros que recebem string vazia da API -> null
+        $integerNullableFields = [
+            'pessoa_datajuri_id', 'processo_datajuri_id', 'adverso_datajuri_id',
+            'cliente_datajuri_id', 'contrato_datajuri_id', 'contratante_id_datajuri',
+            'proprietario_id', 'advogado_id',
+        ];
+        foreach ($integerNullableFields as $field) {
+            if (array_key_exists($field, $data) && $data[$field] === '') {
+                $data[$field] = null;
+            }
+        }
+
+        // 2. Campo particular: Nao/Sim -> 0/1
+        if (array_key_exists('particular', $data)) {
+            $partVal = strtolower(trim((string)($data['particular'] ?? '')));
+            $data['particular'] = in_array($partVal, ['sim', 's', '1', 'true']) ? 1 : 0;
+        }
+
+        // 3. Campos decimal NOT NULL: string vazia -> 0
+        $decimalNotNullFields = ['valor_hora'];
+        foreach ($decimalNotNullFields as $field) {
+            if (array_key_exists($field, $data) && ($data[$field] === '' || $data[$field] === null)) {
+                $data[$field] = 0;
+            }
+        }
+
+        // 4. Campos texto com limite: truncar
+        $textLimits = ['observacao' => 1000];
+        foreach ($textLimits as $field => $maxLen) {
+            if (array_key_exists($field, $data) && is_string($data[$field]) && mb_strlen($data[$field]) > $maxLen) {
+                $data[$field] = mb_substr($data[$field], 0, $maxLen);
+            }
+        }
+
 
         // =====================================================================
         // TRATAMENTO ESPECIAL: M�dulo Movimento (FIX v2.1)
