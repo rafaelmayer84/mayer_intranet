@@ -6,6 +6,7 @@ use App\Http\Controllers\ClientesMercadoController;
 use App\Http\Controllers\IntegracaoController;
 use App\Http\Controllers\Api\NexoWebhookController;
 use App\Http\Controllers\Api\NexoAutoatendimentoController;
+use App\Http\Controllers\Api\NexoInactivityController;
 
 Route::prefix('sync')->group(function () {
     Route::get('/test-connection', [SyncController::class, 'testConnection']);
@@ -113,4 +114,7 @@ Route::prefix('nexo/autoatendimento')->group(function () {
     Route::post('/documentos/solicitar', [NexoAutoatendimentoController::class, 'solicitarDocumento']);
     Route::post('/documentos/enviar', [NexoAutoatendimentoController::class, 'enviarDocumento']);
     Route::post('/agendamento/solicitar', [NexoAutoatendimentoController::class, 'solicitarAgendamento']);
+
+    // INATIVIDADE — Verificação para Resposta Padrão SendPulse (18/02/2026)
+    Route::post('/verificar-inatividade', [NexoInactivityController::class, 'verificarInatividade']);
 });
