@@ -23,6 +23,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     
     // Ações especiais
     Route::patch('/usuarios/{usuario}/toggle-status', [UsuariosController::class, 'toggleStatus'])->name('usuarios.toggle-status');
+    Route::delete('/usuarios/{usuario}', [UsuariosController::class, 'destroy'])->name('usuarios.destroy');
     Route::post('/usuarios/{usuario}/resetar-senha', [UsuariosController::class, 'resetarSenha'])->name('usuarios.resetar-senha');
     Route::post('/usuarios/{usuario}/permissoes', [UsuariosController::class, 'salvarPermissoes'])->name('usuarios.salvar-permissoes');
     Route::post('/usuarios/{usuario}/permissoes-padrao', [UsuariosController::class, 'aplicarPermissoesPadrao'])->name('usuarios.aplicar-permissoes-padrao');

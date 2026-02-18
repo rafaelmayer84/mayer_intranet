@@ -277,4 +277,45 @@ class UsuariosController extends Controller
             ->route('admin.usuarios.show', $usuario)
             ->with('success', 'Permissões padrão aplicadas com sucesso!');
     }
+
+    /**
+     * Excluir usuário (admin only, com verificação de vínculos)
+     */
+    public function destroy($id)
+    {
+        if (auth()->user()->role !== 'admin') {
+            return back()->with('error', 'Apenas administradores podem excluir usuários.');
+        }
+
+        $usuario = \App\Models\User::findOrFail($id);
+
+        if ($usuario->id === auth()->id()) {
+            return back()->with('error', 'Você não pode excluir sua própria conta.');
+        }
+
+        // Verificar vínculos críticos
+        $vinculos = [];
+        if (\DB::table('gdp_metas_individuais')->where('user_id', $id)->exists()) $vinculos[] = 'GDP Metas';
+        if (\DB::table('gdp_snapshots')->where('user_id', $id)->exists()) $vinculos[] = 'GDP Snapshots';
+        if (\DB::table('gdp_resultados_mensais')->where('user_id', $id)->exists()) $vinculos[] = 'GDP Resultados';
+        if (\DB::table('wa_conversations')->where('assigned_user_id', $id)->exists()) $vinculos[] = 'Conversas WhatsApp';
+        if (\DB::table('nexo_tickets')->where('responsavel_id', $id)->exists()) $vinculos[] = 'Tickets NEXO';
+        if (\DB::table('crm_opportunities')->where('owner_user_id', $id)->exists()) $vinculos[] = 'Oportunidades CRM';
+        if (\DB::table('pricing_proposals')->where('user_id', $id)->exists()) $vinculos[] = 'Propostas SIPEX';
+
+        if (!empty($vinculos)) {
+            return back()->with('error', 'Não é possível excluir "' . $usuario->name . '". Possui vínculos em: ' . implode(', ', $vinculos) . '. Desative o usuário em vez de excluir.');
+        }
+
+        // Limpar tabelas sem FK constraint (registros órfãos seguros)
+        \DB::table('user_permissions')->where('user_id', $id)->delete();
+        \DB::table('avisos_lidos')->where('usuario_id', $id)->delete();
+        \DB::table('manuais_grupo_user')->where('user_id', $id)->delete();
+
+        $nome = $usuario->name;
+        $usuario->delete();
+
+        return redirect()->route('admin.usuarios.index')->with('success', 'Usuário "' . $nome . '" excluído permanentemente.');
+    }
+
 }
