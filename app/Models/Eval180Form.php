@@ -61,6 +61,31 @@ class Eval180Form extends Model
         return $this->status === 'locked';
     }
 
+    public function isPendingSelf(): bool
+    {
+        return $this->status === 'pending_self';
+    }
+
+    public function isPendingManager(): bool
+    {
+        return $this->status === 'pending_manager';
+    }
+
+    public function isPendingFeedback(): bool
+    {
+        return $this->status === 'pending_feedback';
+    }
+
+    public function isReleased(): bool
+    {
+        return $this->status === 'released';
+    }
+
+    public function canAvaliadorSeeManagerNotes(): bool
+    {
+        return in_array($this->status, ['released', 'locked']);
+    }
+
     public function hasSelfResponse(): bool
     {
         return $this->responses()->where('rater_type', 'self')->whereNotNull('submitted_at')->exists();

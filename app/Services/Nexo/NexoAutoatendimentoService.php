@@ -1029,7 +1029,7 @@ class NexoAutoatendimentoService
 
         // Verificar se sessão está ativa (autenticado_ate no futuro)
         if (!$auth->autenticado_ate || \Carbon\Carbon::parse($auth->autenticado_ate)->isPast()) {
-            return ['erro' => 'Sua sessão expirou. Por favor, faça a verificação de identidade novamente.'];
+            return ['erro' => 'Sua sessão de segurança expirou (30 minutos). Para continuar, digite *oi* e faça a verificação novamente. É rápido! 🔐'];
         }
 
         // Buscar cliente por telefone na tabela clientes

@@ -13,6 +13,35 @@
                 Ciclo {{ $ciclo->nome }} — Período {{ \Carbon\Carbon::createFromFormat('Y-m', $period)->translatedFormat('F/Y') }}
             </p>
         </div>
+    {{-- Banner de status --}}
+    @if(isset($statusLabel))
+        @php
+            $statusColors = [
+                'pending_self' => 'bg-yellow-50 border-yellow-300 text-yellow-800',
+                'pending_manager' => 'bg-blue-50 border-blue-300 text-blue-800',
+                'pending_feedback' => 'bg-orange-50 border-orange-300 text-orange-800',
+                'released' => 'bg-green-50 border-green-300 text-green-800',
+                'locked' => 'bg-red-50 border-red-300 text-red-800',
+            ];
+            $statusIcons = [
+                'pending_self' => '📝',
+                'pending_manager' => '⏳',
+                'pending_feedback' => '🔒 Aguardando reunião de feedback com seu gestor',
+                'released' => '✅',
+                'locked' => '🔒',
+            ];
+        @endphp
+        <div class="mb-4 p-3 rounded-lg border {{ $statusColors[$form->status] ?? 'bg-gray-50 border-gray-300' }}">
+            <span class="font-medium">{{ $statusIcons[$form->status] ?? '' }} Status: {{ $statusLabel }}</span>
+            @if($form->status === 'pending_feedback')
+                <span class="block text-sm mt-1">As notas do gestor serão liberadas após a reunião de feedback.</span>
+            @endif
+            @if($form->status === 'released' && isset($canSeeManagerNotes) && $canSeeManagerNotes && isset($managerResponse))
+                <span class="block text-sm mt-1">Notas do gestor disponíveis abaixo. Score gestor: <strong>{{ number_format($managerResponse->total_score, 1) }}</strong></span>
+            @endif
+        </div>
+    @endif
+
         <a href="{{ route('gdp.eval180.me') }}" class="text-sm text-blue-600 hover:underline">← Voltar</a>
     </div>
 

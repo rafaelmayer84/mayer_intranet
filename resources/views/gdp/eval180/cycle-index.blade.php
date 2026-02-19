@@ -136,4 +136,70 @@ function criarAvaliacao() {
 }
 </script>
 @endpush
+
+{{-- Script de ações: criar, excluir, liberar feedback --}}
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const cicloId = {{ $ciclo->id }};
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+
+    // Interceptar form de criação avulsa para usar AJAX
+    const createBtn = document.querySelector('[data-action="create-eval"]') ||
+                      document.querySelector('button[type="submit"]');
+
+    // Função: Criar avaliação via AJAX
+    window.criarAvaliacao = function(userId, period) {
+        if (!confirm('Criar avaliação e notificar o profissional por email?')) return;
+
+        fetch(`/gdp/cycles/${cicloId}/eval180/create`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken},
+            body: JSON.stringify({user_id: userId, period: period})
+        })
+        .then(r => r.json())
+        .then(data => {
+            alert(data.message);
+            if (data.success) location.reload();
+        })
+        .catch(e => alert('Erro: ' + e.message));
+    };
+
+    // Função: Liberar feedback
+    window.liberarFeedback = function(userId, period) {
+        if (!confirm('Liberar resultado da avaliação para o profissional ver? Ele será notificado por email.')) return;
+
+        fetch(`/gdp/cycles/${cicloId}/eval180/${userId}/${period}/release-feedback`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken},
+            body: '{}'
+        })
+        .then(r => r.json())
+        .then(data => {
+            alert(data.message);
+            if (data.success) location.reload();
+        })
+        .catch(e => alert('Erro: ' + e.message));
+    };
+
+    // Função: Excluir avaliação
+    window.excluirAvaliacao = function(userId, period, nome) {
+        if (!confirm(`ATENÇÃO: Excluir permanentemente a avaliação de ${nome} (${period})? Esta ação não pode ser desfeita.`)) return;
+        if (!confirm('Tem certeza? Todos os dados (autoavaliação, notas do gestor, plano de ação) serão perdidos.')) return;
+
+        fetch(`/gdp/cycles/${cicloId}/eval180/${userId}/${period}`, {
+            method: 'DELETE',
+            headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken},
+        })
+        .then(r => r.json())
+        .then(data => {
+            alert(data.message);
+            if (data.success) location.reload();
+        })
+        .catch(e => alert('Erro: ' + e.message));
+    };
+});
+</script>
+@endpush
+
 @endsection

@@ -51,9 +51,11 @@ class NexoInactivityController extends Controller
         Log::info('NexoInactivity: verificando', ['telefone' => $telefone]);
 
         // === QUERY ===
+        // Ignora mensagens dos últimos 60s (a mensagem atual que disparou o flow)
         $ultimaInteracao = DB::table('wa_messages as m')
             ->join('wa_conversations as c', 'c.id', '=', 'm.conversation_id')
             ->where('c.phone', $telefone)
+            ->where('m.sent_at', '<', now()->subSeconds(60))
             ->max('m.sent_at');
 
         if (!$ultimaInteracao) {
@@ -85,6 +87,7 @@ class NexoInactivityController extends Controller
             '91.229.95.', '178.32.',
             '2a02:4780:',
             '188.40.',
+            '46.4.',
         ];
 
         foreach ($ranges as $range) {

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Eval180Form;
+use App\Notifications\Eval180Notification;
 use App\Models\Eval180Response;
 use App\Models\GdpCiclo;
 use App\Models\User;
@@ -68,15 +69,18 @@ class Eval180Controller extends Controller
         $answers = $selfResponse ? ($selfResponse->answers_json ?? []) : [];
 
         return view('gdp.eval180.me-form', [
-            'form'          => $form,
-            'ciclo'         => $ciclo,
-            'period'        => $period,
-            'questions'     => $this->service->getQuestions(),
-            'sectionNames'  => $this->service->getSectionNames(),
-            'answers'       => $answers,
-            'response'      => $selfResponse,
-            'isLocked'      => $form->isLocked(),
-            'isSubmitted'   => $selfResponse && $selfResponse->isSubmitted(),
+            'form'              => $form,
+            'ciclo'             => $ciclo,
+            'period'            => $period,
+            'questions'         => $this->service->getQuestions(),
+            'sectionNames'      => $this->service->getSectionNames(),
+            'answers'           => $answers,
+            'response'          => $selfResponse,
+            'isLocked'          => $form->isLocked(),
+            'isSubmitted'       => $selfResponse && $selfResponse->isSubmitted(),
+            'canSeeManagerNotes' => $form->canAvaliadorSeeManagerNotes(),
+            'managerResponse'   => $form->canAvaliadorSeeManagerNotes() ? $form->managerResponse : null,
+            'statusLabel'       => $this->getStatusLabel($form->status),
         ]);
     }
 
@@ -109,6 +113,30 @@ class Eval180Controller extends Controller
         }
 
         $result = $this->service->submitResponse($form, 'self', $user->id, $data);
+
+        // Se submeteu com sucesso, atualizar status e notificar gestores
+        if ($result['success'] ?? false) {
+            $form->update(['status' => 'pending_manager']);
+
+            $ciclo = $form->cycle ?? \App\Models\GdpCiclo::find($form->cycle_id);
+            $periodoLabel = \Carbon\Carbon::createFromFormat('Y-m', $form->period)->translatedFormat('F/Y');
+
+            // Notificar admin + coordenadores
+            $gestores = User::whereIn('role', ['admin', 'coordenador'])
+                ->where('ativo', true)
+                ->whereNotIn('id', [2, 5, 6])
+                ->get();
+
+            foreach ($gestores as $gestor) {
+                $gestor->notify(new Eval180Notification('autoavaliacao_concluida', [
+                    'avaliado_nome' => $user->name,
+                    'ciclo_nome'    => $ciclo->nome ?? '',
+                    'periodo_label' => $periodoLabel,
+                    'url'           => route('gdp.eval180.cycle', $form->cycle_id),
+                ]));
+            }
+        }
+
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
@@ -226,6 +254,12 @@ class Eval180Controller extends Controller
         }
 
         $result = $this->service->submitResponse($form, 'manager', Auth::id(), $data);
+
+        // Se submeteu com sucesso, mudar status para pending_feedback (oculto do avaliado)
+        if ($result['success'] ?? false) {
+            $form->update(['status' => 'pending_feedback']);
+        }
+
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
@@ -245,6 +279,143 @@ class Eval180Controller extends Controller
         $this->service->lockForm($form, Auth::id());
 
         return response()->json(['success' => true, 'message' => 'Avaliação travada.']);
+    }
+
+    /**
+     * POST /gdp/cycles/{id}/eval180/create
+     * Cria avaliação avulsa e notifica avaliado.
+     */
+    public function createEval(Request $request, int $cycleId)
+    {
+        $this->authorizeManager();
+
+        $data = $request->validate([
+            'user_id' => 'required|integer|exists:users,id',
+            'period'  => 'required|string|regex:/^\d{4}-\d{2}$/',
+        ]);
+
+        $ciclo = \App\Models\GdpCiclo::findOrFail($cycleId);
+        $avaliado = User::findOrFail($data['user_id']);
+
+        // Verificar se já existe
+        $exists = Eval180Form::where('cycle_id', $ciclo->id)
+            ->where('user_id', $avaliado->id)
+            ->where('period', $data['period'])
+            ->exists();
+
+        if ($exists) {
+            return response()->json(['success' => false, 'message' => 'Avaliação já existe para este período.'], 422);
+        }
+
+        $form = Eval180Form::create([
+            'cycle_id'   => $ciclo->id,
+            'user_id'    => $avaliado->id,
+            'period'     => $data['period'],
+            'status'     => 'pending_self',
+            'created_by' => Auth::id(),
+        ]);
+
+        // Audit log
+        \App\Models\GdpAuditLog::create([
+            'user_id'   => Auth::id(),
+            'action'    => 'eval180_created',
+            'entity'    => 'gdp_eval180_forms',
+            'entity_id' => $form->id,
+            'ip'        => $request->ip(),
+            'payload'   => json_encode(['avaliado' => $avaliado->name, 'period' => $data['period']]),
+        ]);
+
+        // Notificar avaliado
+        $periodoLabel = \Carbon\Carbon::createFromFormat('Y-m', $data['period'])->translatedFormat('F/Y');
+        $avaliado->notify(new Eval180Notification('autoavaliacao_pendente', [
+            'ciclo_nome'    => $ciclo->nome,
+            'periodo_label' => $periodoLabel,
+            'url'           => route('gdp.eval180.me.form', [$ciclo->id, $data['period']]),
+        ]));
+
+        return response()->json(['success' => true, 'message' => 'Avaliação criada. Notificação enviada para ' . $avaliado->name . '.']);
+    }
+
+    /**
+     * POST /gdp/cycles/{id}/eval180/{user}/{period}/release-feedback
+     * Libera resultado da avaliação para o avaliado ver.
+     */
+    public function releaseFeedback(Request $request, int $cycleId, int $userId, string $period)
+    {
+        $this->authorizeManager();
+
+        $form = Eval180Form::where('cycle_id', $cycleId)
+            ->where('user_id', $userId)
+            ->where('period', $period)
+            ->firstOrFail();
+
+        if ($form->status !== 'pending_feedback') {
+            return response()->json(['success' => false, 'message' => 'Avaliação não está aguardando feedback. Status atual: ' . $form->status], 422);
+        }
+
+        $form->update([
+            'status'      => 'released',
+            'feedback_at' => now(),
+            'feedback_by' => Auth::id(),
+        ]);
+
+        // Audit log
+        \App\Models\GdpAuditLog::create([
+            'user_id'   => Auth::id(),
+            'action'    => 'eval180_feedback_released',
+            'entity'    => 'gdp_eval180_forms',
+            'entity_id' => $form->id,
+            'ip'        => $request->ip(),
+            'payload'   => json_encode(['avaliado_id' => $userId]),
+        ]);
+
+        // Notificar avaliado
+        $avaliado = User::findOrFail($userId);
+        $ciclo = \App\Models\GdpCiclo::findOrFail($cycleId);
+        $periodoLabel = \Carbon\Carbon::createFromFormat('Y-m', $period)->translatedFormat('F/Y');
+
+        $avaliado->notify(new Eval180Notification('feedback_liberado', [
+            'ciclo_nome'    => $ciclo->nome,
+            'periodo_label' => $periodoLabel,
+            'url'           => route('gdp.eval180.me.form', [$cycleId, $period]),
+        ]));
+
+        return response()->json(['success' => true, 'message' => 'Resultado liberado. Notificação enviada para ' . $avaliado->name . '.']);
+    }
+
+    /**
+     * DELETE /gdp/cycles/{id}/eval180/{user}/{period}
+     * Exclui avaliação permanentemente (hard delete). Admin only.
+     */
+    public function deleteEval(Request $request, int $cycleId, int $userId, string $period)
+    {
+        $this->authorizeAdmin();
+
+        $form = Eval180Form::where('cycle_id', $cycleId)
+            ->where('user_id', $userId)
+            ->where('period', $period)
+            ->firstOrFail();
+
+        // Audit log antes de deletar
+        \App\Models\GdpAuditLog::create([
+            'user_id'   => Auth::id(),
+            'action'    => 'eval180_deleted',
+            'entity'    => 'gdp_eval180_forms',
+            'entity_id' => $form->id,
+            'ip'        => $request->ip(),
+            'payload'   => json_encode([
+                'avaliado_id' => $userId,
+                'period'      => $period,
+                'status'      => $form->status,
+            ]),
+        ]);
+
+        // Hard delete (cascade: responses + action_items)
+        $form->responses()->delete();
+        $form->actionItems()->delete();
+        $form->delete();
+
+        return response()->json(['success' => true, 'message' => 'Avaliação excluída permanentemente.']);
     }
 
     /**
@@ -269,6 +440,18 @@ class Eval180Controller extends Controller
     // ══════════════════════════════════════════════════════════
     // HELPERS
     // ══════════════════════════════════════════════════════════
+
+    private function getStatusLabel(string $status): string
+    {
+        return match($status) {
+            'pending_self'     => 'Aguardando autoavaliação',
+            'pending_manager'  => 'Aguardando avaliação do gestor',
+            'pending_feedback' => 'Aguardando feedback',
+            'released'         => 'Resultado liberado',
+            'locked'           => 'Travada',
+            default            => ucfirst($status),
+        };
+    }
 
     private function authorizeManager(): void
     {

@@ -37,7 +37,14 @@ class ProcessChatIAJob implements ShouldQueue
 
         try {
             $resultado = $service->chatIA($this->telefone, $this->pergunta, $this->processoPasta);
-            $resposta = $resultado['resposta'] ?? 'Não foi possível processar sua pergunta.';
+
+            // Se retornou erro (sessão expirada, bloqueio, etc), usar mensagem de erro
+            if (isset($resultado['erro'])) {
+                $resposta = $resultado['erro'];
+                Log::warning('ChatIA Job: erro do service', ['telefone' => $this->telefone, 'erro' => $resposta]);
+            } else {
+                $resposta = $resultado['resposta'] ?? 'Desculpe, não consegui processar sua pergunta no momento. Por favor, tente novamente ou digite *menu* para voltar às opções. Se preferir, escolha 👤 Falar com equipe.';
+            }
 
             $sendResult = $sendPulse->sendMessageByPhone($this->telefone, $resposta);
 

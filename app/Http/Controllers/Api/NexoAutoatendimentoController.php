@@ -172,7 +172,7 @@ class NexoAutoatendimentoController extends Controller
         ProcessChatIAJob::dispatch($telefone, $pergunta, $pasta);
 
         return response()->json([
-            'encontrado' => true,
+            'encontrado' => 'true',
             'resposta' => 'Estou analisando sua pergunta, um momento por favor...',
             'async' => true,
         ]);

@@ -8,7 +8,7 @@ use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable;
+    use HasFactory, \Illuminate\Notifications\Notifiable, Notifiable;
 
     // Constantes de papel
     const ROLE_ADMIN = 'admin';
