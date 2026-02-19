@@ -79,6 +79,7 @@
                 <button onclick="NexoApp.setFilter('status','')" class="filter-btn active text-[11px] px-3 py-1.5 rounded-full" data-filter="all">Todas</button>
                 <button onclick="NexoApp.setFilter('status','open')" class="filter-btn text-[11px] px-3 py-1.5 rounded-full" data-filter="open">Abertas</button>
                 <button onclick="NexoApp.setFilter('unread','1')" class="filter-btn text-[11px] px-3 py-1.5 rounded-full" data-filter="unread">Não lidas</button>
+                <button onclick="NexoApp.setFilter('minhas','1')" class="filter-btn text-[11px] px-3 py-1.5 rounded-full" data-filter="minhas">Minhas</button>
             </div>
             {{-- Busca --}}
             <div class="relative">
@@ -166,6 +167,19 @@
         </div>
 
         {{-- Input --}}
+        <div id="bot-ativo-banner" class="hidden px-4 py-2.5 bg-amber-50 border-t border-amber-200">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="text-amber-600 text-sm">🤖</span>
+                    <span class="text-[12px] text-amber-800 font-medium">Cliente em atendimento automático (bot)</span>
+                </div>
+                @if(in_array(Auth::user()->role, ['admin', 'coordenador', 'socio']))
+                <button onclick="NexoApp.assumirConversa()" class="text-[11px] px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium transition-colors shadow-sm">
+                    Assumir Conversa
+                </button>
+                @endif
+            </div>
+        </div>
         <div id="chat-input-bar" class="hidden px-4 py-3 bg-white border-t-0">
             <div class="flex items-end gap-3">
                 <textarea id="chat-input" rows="1" placeholder="Digite uma mensagem..."

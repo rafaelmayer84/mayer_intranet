@@ -316,13 +316,14 @@ class Eval180Controller extends Controller
         ]);
 
         // Audit log
-        \App\Models\GdpAuditLog::create([
-            'user_id'   => Auth::id(),
-            'action'    => 'eval180_created',
-            'entity'    => 'gdp_eval180_forms',
-            'entity_id' => $form->id,
-            'ip'        => $request->ip(),
-            'payload'   => json_encode(['avaliado' => $avaliado->name, 'period' => $data['period']]),
+        \Illuminate\Support\Facades\DB::table('gdp_audit_log')->insert([
+            'user_id'     => Auth::id(),
+            'entidade'    => 'gdp_eval180_forms',
+            'entidade_id' => $form->id,
+            'campo'       => 'eval180_created',
+            'valor_novo'  => json_encode(['avaliado' => $avaliado->name, 'period' => $data['period']]),
+            'ip'          => $request->ip(),
+            'created_at'  => now(),
         ]);
 
         // Notificar avaliado
@@ -360,13 +361,14 @@ class Eval180Controller extends Controller
         ]);
 
         // Audit log
-        \App\Models\GdpAuditLog::create([
-            'user_id'   => Auth::id(),
-            'action'    => 'eval180_feedback_released',
-            'entity'    => 'gdp_eval180_forms',
-            'entity_id' => $form->id,
-            'ip'        => $request->ip(),
-            'payload'   => json_encode(['avaliado_id' => $userId]),
+        \Illuminate\Support\Facades\DB::table('gdp_audit_log')->insert([
+            'user_id'     => Auth::id(),
+            'entidade'    => 'gdp_eval180_forms',
+            'entidade_id' => $form->id,
+            'campo'       => 'eval180_feedback_released',
+            'valor_novo'  => json_encode(['avaliado_id' => $userId]),
+            'ip'          => $request->ip(),
+            'created_at'  => now(),
         ]);
 
         // Notificar avaliado
@@ -397,17 +399,14 @@ class Eval180Controller extends Controller
             ->firstOrFail();
 
         // Audit log antes de deletar
-        \App\Models\GdpAuditLog::create([
-            'user_id'   => Auth::id(),
-            'action'    => 'eval180_deleted',
-            'entity'    => 'gdp_eval180_forms',
-            'entity_id' => $form->id,
-            'ip'        => $request->ip(),
-            'payload'   => json_encode([
-                'avaliado_id' => $userId,
-                'period'      => $period,
-                'status'      => $form->status,
-            ]),
+        \Illuminate\Support\Facades\DB::table('gdp_audit_log')->insert([
+            'user_id'     => Auth::id(),
+            'entidade'    => 'gdp_eval180_forms',
+            'entidade_id' => $form->id,
+            'campo'       => 'eval180_deleted',
+            'valor_novo'  => json_encode(['avaliado_id' => $userId, 'period' => $period, 'status' => $form->status]),
+            'ip'          => $request->ip(),
+            'created_at'  => now(),
         ]);
 
         // Hard delete (cascade: responses + action_items)

@@ -14,7 +14,7 @@ class WaConversation extends Model
         'provider', 'contact_id', 'chat_id', 'phone', 'name', 'status',
         'assigned_user_id', 'last_message_at', 'last_incoming_at',
         'first_response_at', 'unread_count', 'linked_lead_id', 'linked_cliente_id',
-        'linked_processo_id', 'category', 'priority',
+        'linked_processo_id', 'category', 'priority', 'bot_ativo',
     ];
 
     protected $casts = [
@@ -22,6 +22,7 @@ class WaConversation extends Model
         'last_incoming_at'  => 'datetime',
         'first_response_at' => 'datetime',
         'unread_count'      => 'integer',
+        'bot_ativo'         => 'boolean',
     ];
 
     public function messages(): HasMany { return $this->hasMany(WaMessage::class, 'conversation_id'); }

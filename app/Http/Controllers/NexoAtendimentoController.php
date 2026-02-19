@@ -33,6 +33,7 @@ class NexoAtendimentoController extends Controller
         if ($request->filled('unread') && $request->unread == '1') $query->where('unread_count', '>', 0);
         if ($request->filled('responsavel')) $query->where('assigned_user_id', $request->responsavel);
         if ($request->filled('priority') && $request->priority !== 'all') $query->where('priority', $request->priority);
+        if ($request->filled('minhas') && $request->minhas == '1') $query->where('assigned_user_id', auth()->id());
         if ($request->filled('tipo')) {
             switch ($request->tipo) {
                 case 'lead': $query->whereNotNull('linked_lead_id'); break;
@@ -55,7 +56,7 @@ class NexoAtendimentoController extends Controller
         }
 
         $messages = WaMessage::where('conversation_id', $id)->orderBy('sent_at', 'asc')->get();
-        return response()->json(['conversation' => $conversation, 'messages' => $messages]);
+        return response()->json(['conversation' => $conversation, 'messages' => $messages, 'bot_ativo' => (bool) $conversation->bot_ativo]);
     }
 
     public function enviarMensagem(Request $request, int $id)
@@ -541,6 +542,26 @@ class NexoAtendimentoController extends Controller
     }
 
     // === CATEGORY ===
+    public function assumirConversa(Request $request, int $id)
+    {
+        $user = auth()->user();
+        if (!in_array($user->role, ['admin', 'coordenador', 'socio'])) {
+            return response()->json(['error' => 'Sem permissao'], 403);
+        }
+        $conversation = WaConversation::findOrFail($id);
+        $conversation->update([
+            'bot_ativo' => false,
+            'assigned_user_id' => $user->id,
+            'assigned_at' => now(),
+        ]);
+        \Log::info('Bot control: conversa assumida manualmente', [
+            'conv_id' => $id,
+            'user_id' => $user->id,
+            'user_name' => $user->name,
+        ]);
+        return response()->json(['success' => true, 'message' => 'Conversa assumida']);
+    }
+
     public function updateCategory(Request $request, int $id)
     {
         $conv = WaConversation::findOrFail($id);

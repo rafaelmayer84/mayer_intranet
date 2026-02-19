@@ -20,7 +20,7 @@ window.refreshContexto360=function(convId){
 // ═══ NexoApp Core ═══
 const NexoApp = {
     conversas:[],conversaAtual:null,lastMsgId:null,lastMsgCount:0,
-    filters:{status:'',unread:''},searchTerm:'',pollTimer:null,inboxTimer:null,flowsCache:null,
+    filters:{status:'',unread:'',minhas:''},searchTerm:'',pollTimer:null,inboxTimer:null,flowsCache:null,
     priorityLevels:['normal','alta','urgente','critica'],
     csrf:document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')||'',
 
@@ -75,6 +75,7 @@ const NexoApp = {
     },
 
     setFilter(k,v){
+        if(k==='minhas'){this.filters={status:'',unread:'',minhas:v}}else{this.filters.minhas=''}
         this.filters={status:'',unread:''};if(k&&v)this.filters[k]=v;
         document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
         if(!v)document.querySelector('[data-filter="all"]').classList.add('active');
@@ -92,7 +93,8 @@ const NexoApp = {
             this.conversaAtual=j.conversation;
             const cv=j.conversation;
             document.getElementById('chat-empty').classList.add('hidden');
-            ['chat-header','chat-messages','chat-input-bar'].forEach(x=>{const el=document.getElementById(x);el.classList.remove('hidden');if(x==='chat-header')el.classList.add('flex')});
+            ['chat-header','chat-messages'].forEach(x=>{const el=document.getElementById(x);el.classList.remove('hidden');if(x==='chat-header')el.classList.add('flex')});
+            this.toggleBotUI(data.bot_ativo);
             document.getElementById('btnReabrirConversa').classList.remove('hidden');
             if(window.innerWidth<1024){document.getElementById('inbox-panel').classList.add('hidden');const cp=document.getElementById('chat-panel');cp.classList.remove('hidden');cp.classList.add('flex')}
             const ini=(cv.name||'??').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();
@@ -190,6 +192,17 @@ const NexoApp = {
     // ═══ ENVIAR MENSAGEM ═══
     replyTo:null, // {id, provider_message_id, body, direction}
 
+    toggleBotUI(botAtivo){
+        const banner=document.getElementById('bot-ativo-banner');
+        const input=document.getElementById('chat-input-bar');
+        if(botAtivo){if(banner)banner.classList.remove('hidden');if(input)input.classList.add('hidden')}
+        else{if(banner)banner.classList.add('hidden');if(input)input.classList.remove('hidden')}
+    },
+    async assumirConversa(){
+        if(!this.conversaAtual)return;
+        if(!confirm('Assumir esta conversa e desativar o bot?'))return;
+        try{await this.api('/nexo/atendimento/conversas/'+this.conversaAtual.id+'/assumir',{method:'POST'});this.conversaAtual.bot_ativo=false;this.toggleBotUI(false);this.loadConversas(true)}catch(e){alert('Erro: '+e.message)}
+    },
     async sendMessage(){
         if(!this.conversaAtual)return;
         const inp=document.getElementById('chat-input'),text=inp.value.trim();if(!text)return;

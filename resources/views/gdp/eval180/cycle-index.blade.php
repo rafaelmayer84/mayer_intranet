@@ -52,6 +52,8 @@
         <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-yellow-500"></span> Rascunho</span>
         <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-gray-400"></span> Pendente</span>
         <span class="inline-flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-500"></span> Travado</span>
+        <span class="inline-flex items-center gap-1">✅ Liberar feedback</span>
+        <span class="inline-flex items-center gap-1">🗑 Excluir (admin)</span>
     </div>
 
     {{-- Tabela --}}
@@ -112,6 +114,23 @@
                                             </span>
                                         @endif
                                     </a>
+                                    {{-- Botões de ação --}}
+                                    @if($form)
+                                        <div class="flex gap-1 justify-center mt-1">
+                                            @if($form->status === 'pending_feedback')
+                                                <button onclick="event.stopPropagation(); liberarFeedback({{ $user->id }}, '{{ $p }}')"
+                                                    class="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded hover:bg-green-200 transition" title="Liberar feedback">
+                                                    ✅
+                                                </button>
+                                            @endif
+                                            @if(Auth::user()->role === 'admin')
+                                                <button onclick="event.stopPropagation(); excluirAvaliacao({{ $user->id }}, '{{ $p }}', '{{ $user->name }}')"
+                                                    class="text-[10px] px-1.5 py-0.5 bg-red-100 text-red-700 rounded hover:bg-red-200 transition" title="Excluir avaliação">
+                                                    🗑
+                                                </button>
+                                            @endif
+                                        </div>
+                                    @endif
                                 </td>
                             @endforeach
                         </tr>
@@ -127,79 +146,42 @@
 function criarAvaliacao() {
     const userId = document.getElementById('newEvalUser').value;
     const period = document.getElementById('newEvalPeriod').value;
-    
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
     if (!userId) { alert('Selecione um profissional.'); return; }
     if (!period) { alert('Selecione o período.'); return; }
+    if (!confirm('Criar avaliação e notificar o profissional por email?')) return;
+    fetch(`/gdp/cycles/{{ $ciclo->id }}/eval180/create`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken},
+        body: JSON.stringify({user_id: parseInt(userId), period: period})
+    })
+    .then(r => r.json())
+    .then(data => { alert(data.message); if (data.success) location.reload(); })
+    .catch(e => alert('Erro: ' + e.message));
+}
 
-    // Redirecionar para o form do gestor — getOrCreateForm cria automaticamente
-    window.location.href = `/gdp/cycles/{{ $ciclo->id }}/eval180/${userId}/${period}`;
+function liberarFeedback(userId, period) {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+    if (!confirm('Liberar resultado para o profissional ver? Será notificado por email.')) return;
+    fetch(`/gdp/cycles/{{ $ciclo->id }}/eval180/${userId}/${period}/release-feedback`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken},
+        body: '{}'
+    }).then(r => r.json()).then(data => { alert(data.message); if (data.success) location.reload(); }).catch(e => alert('Erro: ' + e.message));
+}
+
+function excluirAvaliacao(userId, period, nome) {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+    if (!confirm(`Excluir permanentemente a avaliação de ${nome} (${period})?`)) return;
+    if (!confirm('Tem certeza? Todos os dados serão perdidos.')) return;
+    fetch(`/gdp/cycles/{{ $ciclo->id }}/eval180/${userId}/${period}`, {
+        method: 'DELETE',
+        headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken},
+    }).then(r => r.json()).then(data => { alert(data.message); if (data.success) location.reload(); }).catch(e => alert('Erro: ' + e.message));
 }
 </script>
 @endpush
 
-{{-- Script de ações: criar, excluir, liberar feedback --}}
-@push('scripts')
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const cicloId = {{ $ciclo->id }};
-    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
 
-    // Interceptar form de criação avulsa para usar AJAX
-    const createBtn = document.querySelector('[data-action="create-eval"]') ||
-                      document.querySelector('button[type="submit"]');
-
-    // Função: Criar avaliação via AJAX
-    window.criarAvaliacao = function(userId, period) {
-        if (!confirm('Criar avaliação e notificar o profissional por email?')) return;
-
-        fetch(`/gdp/cycles/${cicloId}/eval180/create`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken},
-            body: JSON.stringify({user_id: userId, period: period})
-        })
-        .then(r => r.json())
-        .then(data => {
-            alert(data.message);
-            if (data.success) location.reload();
-        })
-        .catch(e => alert('Erro: ' + e.message));
-    };
-
-    // Função: Liberar feedback
-    window.liberarFeedback = function(userId, period) {
-        if (!confirm('Liberar resultado da avaliação para o profissional ver? Ele será notificado por email.')) return;
-
-        fetch(`/gdp/cycles/${cicloId}/eval180/${userId}/${period}/release-feedback`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken},
-            body: '{}'
-        })
-        .then(r => r.json())
-        .then(data => {
-            alert(data.message);
-            if (data.success) location.reload();
-        })
-        .catch(e => alert('Erro: ' + e.message));
-    };
-
-    // Função: Excluir avaliação
-    window.excluirAvaliacao = function(userId, period, nome) {
-        if (!confirm(`ATENÇÃO: Excluir permanentemente a avaliação de ${nome} (${period})? Esta ação não pode ser desfeita.`)) return;
-        if (!confirm('Tem certeza? Todos os dados (autoavaliação, notas do gestor, plano de ação) serão perdidos.')) return;
-
-        fetch(`/gdp/cycles/${cicloId}/eval180/${userId}/${period}`, {
-            method: 'DELETE',
-            headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken},
-        })
-        .then(r => r.json())
-        .then(data => {
-            alert(data.message);
-            if (data.success) location.reload();
-        })
-        .catch(e => alert('Erro: ' + e.message));
-    };
-});
-</script>
-@endpush
 
 @endsection

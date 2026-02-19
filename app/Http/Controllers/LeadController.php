@@ -226,6 +226,24 @@ class LeadController extends Controller
         $rawPayload = $request->all();
         $event = is_array($rawPayload) && isset($rawPayload[0]) ? $rawPayload[0] : $rawPayload;
 
+        // ---- BLOCO BOT CONTROL v1.0 (19/02/2026) ----
+        if (data_get($event, 'title') === 'chat_opened') {
+            try {
+                $contactId = data_get($event, 'contact.id');
+                if ($contactId) {
+                    $conv = \App\Models\WaConversation::where('contact_id', $contactId)->first();
+                    if ($conv && $conv->bot_ativo) {
+                        $conv->update(['bot_ativo' => false]);
+                        \Log::info('Bot control: bot_ativo=false via Chat aberto', ['conv_id' => $conv->id, 'contact_id' => $contactId]);
+                    }
+                }
+            } catch (\Throwable $e) {
+                \Log::error('Bot control error', ['error' => $e->getMessage()]);
+            }
+            return response()->json(['ok' => true]);
+        }
+        // ---- FIM BLOCO BOT CONTROL ----
+
         if (data_get($event, 'title') === 'incoming_message') {
             // Validar por IP do SendPulse (SendPulse nao envia X-Webhook-Secret)
             $allowedIps = ["188.40.60.215", "188.40.60.216", "188.40.60.217"];
