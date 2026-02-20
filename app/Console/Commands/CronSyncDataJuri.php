@@ -21,9 +21,12 @@ class CronSyncDataJuri extends Command
             
             $runId = $orchestrator->startRun('cron_full');
             
-            // Remover FaseProcesso pois não está configurado
-            $modulos = ['Pessoa', 'Processo', 'Movimento', 
-                        'Lancamento', 'Contrato', 'AtividadeCampo', 'HoraTrabalhada'];
+            // Iterar modulos habilitados do config (FIX 20/02/2026)
+            $allModulos = config('datajuri.modulos', []);
+            $modulos = [];
+            foreach ($allModulos as $nome => $cfg) {
+                if (!empty($cfg['enabled'])) $modulos[] = $nome;
+            }
             
             $totais = ['processados' => 0, 'criados' => 0, 'atualizados' => 0, 'erros' => 0];
             
