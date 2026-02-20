@@ -390,6 +390,27 @@ const NexoApp = {
                 if(l.palavras_chave)html+=`<div class="mt-2 pt-2 border-t border-gray-100"><p class="text-[10px] text-gray-500 font-medium mb-1">Tags</p><div class="flex flex-wrap gap-1">${l.palavras_chave.split(',').map(k=>`<span class="text-[10px] px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded">${this.esc(k.trim())}</span>`).join('')}</div></div>`;
                 if(l.intencao_justificativa)html+=`<div class="mt-2 pt-2 border-t border-gray-100"><p class="text-[10px] text-gray-500 font-medium mb-1">IA</p><p class="text-xs text-gray-600 italic">${this.esc(l.intencao_justificativa)}</p></div>`;
                 html+=`</div></div>`;
+                // CRM Account + Oportunidades
+                if(l.crm_account){
+                    const a=l.crm_account;
+                    html+=`<div class="ctx-section"><div class="ctx-section-header" onclick="this.nextElementSibling.classList.toggle('hidden')"><span class="text-xs font-semibold text-gray-700">\xf0\x9f\x8f\xa2 CRM \u2014 ${this.esc(a.name)}</span><span class="text-gray-400 text-xs">\u25bc</span></div><div class="ctx-section-body">`;
+                    html+=`<div class="ctx-row"><span class="ctx-label">Status</span><span class="ctx-value">${this.esc(a.lifecycle||'N/A')}</span></div>`;
+                    if(a.opportunities&&a.opportunities.length){
+                        html+=`<p class="text-[10px] text-gray-500 font-medium mt-2 mb-1">Oportunidades (${a.opportunities.length})</p>`;
+                        a.opportunities.forEach(o=>{
+                            const sc={open:'bg-blue-100 text-blue-700',won:'bg-green-100 text-green-700',lost:'bg-red-100 text-red-700'};
+                            const badge=sc[o.status]||'bg-gray-100 text-gray-600';
+                            html+=`<div class="flex items-center justify-between py-1"><span class="text-xs text-gray-700 truncate flex-1">${this.esc(o.title||'Oportunidade')}</span><span class="text-[10px] px-1.5 py-0.5 rounded-full ${badge} ml-1">${o.status}</span></div>`;
+                            if(o.value_estimated)html+=`<div class="text-[10px] text-gray-400 ml-2">R$ ${Number(o.value_estimated).toLocaleString('pt-BR')}</div>`;
+                        });
+                    }
+                    html+=`</div></div>`;
+                } else if(l.id && !l.crm_account_id){
+                    html+=`<div class="mt-3 pt-2 border-t border-gray-100"><button onclick="NexoApp.promoverLeadCrm(${l.id})" class="w-full text-xs px-3 py-2 bg-[#385776] text-white rounded-lg hover:bg-[#1B334A] transition font-medium">Promover para CRM</button></div>`;
+                }
+                if(l.id){
+                    html+=`<div class="mt-2 pt-2 border-t border-gray-100"><button onclick="NexoApp.abrirSipex(${l.id})" class="w-full text-xs px-3 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition font-medium">💰 Cotar no SIPEX</button></div>`;
+                }
             }
 
             if(j.cliente){const cl=j.cliente;
@@ -409,6 +430,22 @@ const NexoApp = {
     },
 
     // ═══ AÇÕES ═══
+    abrirSipex(leadId){
+        window.open('/precificacao?lead_id=' + leadId, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+    },
+
+    async promoverLeadCrm(leadId){
+        if(!confirm('Promover este lead para o CRM? Sera criada uma conta prospect + oportunidade.'))return;
+        try{
+            const r=await this.api(`/nexo/atendimento/leads/${leadId}/promover-crm`,{method:'POST',body:{}});
+            if(r.success){
+                alert('Lead promovido! Account #'+r.account_id+', Oportunidade #'+r.opportunity_id);
+                this.loadContexto(this.conversaAtual.id);
+            }else{
+                alert('Erro: '+(r.error||'Falha ao promover'));
+            }
+        }catch(e){console.error(e);alert('Erro ao promover lead')}
+    },
     async assignResponsavel(uid){if(!this.conversaAtual)return;try{await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/assign`,{method:'PATCH',body:{user_id:uid||null}});this.loadConversas(true)}catch(e){console.error(e)}},
     async toggleStatus(){if(!this.conversaAtual)return;const ns=this.conversaAtual.status==='open'?'closed':'open';try{await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/status`,{method:'PATCH',body:{status:ns}});this.selectConversa(this.conversaAtual.id)}catch(e){console.error(e)}},
 
@@ -471,6 +508,29 @@ const NexoApp = {
             await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/tags`,{method:'PATCH',body:{tag_ids:currentIds}});
             this.loadTags();
         }catch(e){console.error('removeTag error:',e)}
+    },
+    _searchTimer:null,
+    searchLink(type, q){
+        clearTimeout(this._searchTimer);
+        const res=document.getElementById(`link-${type}-results`);
+        const btn=document.getElementById(`btn-link-${type}`);
+        if(q.length<2){res.classList.add('hidden');btn.classList.add('opacity-50','pointer-events-none');return}
+        this._searchTimer=setTimeout(async()=>{
+            try{
+                const j=await this.api(`/nexo/atendimento/search-contacts?q=${encodeURIComponent(q)}`);
+                const items=type==='lead'?j.leads:j.clientes;
+                if(!items||items.length===0){res.innerHTML='<div class="px-3 py-2 text-[11px] text-gray-400">Nenhum resultado</div>';res.classList.remove('hidden');return}
+                res.innerHTML=items.map(i=>`<div class="px-3 py-2 hover:bg-gray-50 cursor-pointer text-[12px] border-b border-gray-50" onclick="NexoApp.selectLink('${type}',${i.id},'${this.esc(i.nome||i.name||"")}')"><span class="font-medium">${this.esc(i.nome||i.name||'')}</span> <span class="text-gray-400">#${i.id}</span>${i.telefone?' <span class="text-gray-400">'+this.esc(i.telefone)+'</span>':''}</div>`).join('');
+                res.classList.remove('hidden');
+            }catch(e){console.error(e)}
+        },300);
+    },
+    selectLink(type,id,nome){
+        document.getElementById(`link-${type}-id-hidden`).value=id;
+        document.getElementById(`link-${type}-search`).value=nome+' #'+id;
+        document.getElementById(`link-${type}-results`).classList.add('hidden');
+        const btn=document.getElementById(`btn-link-${type}`);
+        btn.classList.remove('opacity-50','pointer-events-none');
     },
     linkLead(id){if(!id||!this.conversaAtual)return;this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/link-lead`,{method:'POST',body:{lead_id:parseInt(id)}}).then(()=>{this.loadContexto(this.conversaAtual.id);this.loadConversas(true)}).catch(e=>console.error(e))},
     linkCliente(id){if(!id||!this.conversaAtual)return;this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/link-cliente`,{method:'POST',body:{cliente_id:parseInt(id)}}).then(()=>{this.loadContexto(this.conversaAtual.id);this.loadConversas(true)}).catch(e=>console.error(e))},

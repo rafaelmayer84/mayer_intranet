@@ -117,4 +117,7 @@ Route::prefix('nexo/autoatendimento')->group(function () {
 
     // INATIVIDADE — Verificação para Resposta Padrão SendPulse (18/02/2026)
     Route::post('/verificar-inatividade', [NexoInactivityController::class, 'verificarInatividade']);
+
+    // BOT CONTROL — Endpoint chamado pelo flow SendPulse ao "Falar com equipe" (20/02/2026)
+    Route::post('/desativar-bot', [NexoAutoatendimentoController::class, 'desativarBot']);
 });

@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Services\Crm\CrmCarteiraService;
+use App\Services\Crm\CrmProactiveService;
 use Illuminate\Console\Command;
 
 class CrmRecalcularCarteira extends Command
@@ -21,6 +22,12 @@ class CrmRecalcularCarteira extends Command
         $this->info("Owners atualizados: {$stats['owner_updated']}");
         $this->info("Lifecycle: ativo={$stats['lifecycle']['ativo']}, adormecido={$stats['lifecycle']['adormecido']}, arquivado={$stats['lifecycle']['arquivado']}, onboarding={$stats['lifecycle']['onboarding']}");
         $this->info("Last touch atualizados: {$stats['touch_updated']}");
+
+        // Frente C: Alertas e tasks proativas
+        $this->info('Executando alertas proativos...');
+        $proactive = new CrmProactiveService();
+        $pStats = $proactive->executar($stats['lifecycle_changes'] ?? []);
+        $this->info("Alertas: {$pStats['alertas_criados']} | Tasks: {$pStats['tasks_criadas']} | Cooldown skip: {$pStats['skipped_cooldown']}");
 
         return self::SUCCESS;
     }

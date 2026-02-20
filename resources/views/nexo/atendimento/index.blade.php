@@ -245,12 +245,20 @@
                 <p class="text-[11px] text-gray-500 mb-2.5 font-semibold uppercase tracking-wide">Vincular manualmente</p>
                 <div class="space-y-2.5">
                     <div class="flex gap-1.5">
-                        <input type="number" id="link-lead-id" placeholder="ID do Lead" class="flex-1 text-[12px] border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/15 transition">
-                        <button onclick="NexoApp.linkLead(document.getElementById('link-lead-id').value)" class="text-[12px] px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 border border-blue-200/60 font-medium transition">Lead</button>
+                        <div class="flex-1 relative">
+                            <input type="text" id="link-lead-search" placeholder="Buscar lead por nome..." class="w-full text-[12px] border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/15 transition" oninput="NexoApp.searchLink('lead',this.value)" autocomplete="off">
+                            <div id="link-lead-results" class="hidden absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto"></div>
+                        </div>
+                        <button id="btn-link-lead" onclick="NexoApp.linkLead(document.getElementById('link-lead-id-hidden').value)" class="text-[12px] px-3 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 border border-blue-200/60 font-medium transition opacity-50 pointer-events-none">Lead</button>
+                        <input type="hidden" id="link-lead-id-hidden">
                     </div>
                     <div class="flex gap-1.5">
-                        <input type="number" id="link-cliente-id" placeholder="ID do Cliente" class="flex-1 text-[12px] border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/15 transition">
-                        <button onclick="NexoApp.linkCliente(document.getElementById('link-cliente-id').value)" class="text-[12px] px-3 py-2 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 border border-purple-200/60 font-medium transition">Cliente</button>
+                        <div class="flex-1 relative">
+                            <input type="text" id="link-cliente-search" placeholder="Buscar cliente por nome..." class="w-full text-[12px] border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/15 transition" oninput="NexoApp.searchLink('cliente',this.value)" autocomplete="off">
+                            <div id="link-cliente-results" class="hidden absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-y-auto"></div>
+                        </div>
+                        <button id="btn-link-cliente" onclick="NexoApp.linkCliente(document.getElementById('link-cliente-id-hidden').value)" class="text-[12px] px-3 py-2 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 border border-purple-200/60 font-medium transition opacity-50 pointer-events-none">Cliente</button>
+                        <input type="hidden" id="link-cliente-id-hidden">
                     </div>
                 </div>
                 {{-- Botões de desvinculação --}}

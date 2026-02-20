@@ -30,6 +30,7 @@ class CrmCarteiraService
             'lifecycle' => ['ativo' => 0, 'adormecido' => 0, 'arquivado' => 0, 'onboarding' => 0],
             'touch_updated' => 0,
             'total' => 0,
+            'lifecycle_changes' => [],
         ];
 
         $accounts = DB::table('crm_accounts')->get();
@@ -71,6 +72,13 @@ class CrmCarteiraService
             }
             if ($newLifecycle !== $acc->lifecycle) {
                 $updates['lifecycle'] = $newLifecycle;
+                $stats['lifecycle_changes'][] = [
+                    'account_id'    => $acc->id,
+                    'name'          => $acc->name,
+                    'from'          => $acc->lifecycle,
+                    'to'            => $newLifecycle,
+                    'owner_user_id' => $newOwner ?? $acc->owner_user_id,
+                ];
             }
             if ($newLastTouch && $newLastTouch !== $acc->last_touch_at) {
                 $updates['last_touch_at'] = $newLastTouch;

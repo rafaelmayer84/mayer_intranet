@@ -4,14 +4,27 @@ namespace App\Services\BscInsights;
 
 use App\Models\BscInsightCard;
 use App\Models\AiRun;
+use App\Models\BscInsightSnapshot;
 use Illuminate\Support\Facades\Log;
 
 class DemoCardGenerator
 {
-    public function generate(AiRun $run, array $snapshot): array
+    public function generate(BscInsightSnapshot $snapshot, ?int $userId = null): array
     {
+        $run = AiRun::create([
+            'feature'            => 'bsc_insights',
+            'snapshot_id'        => $snapshot->id,
+            'model'              => 'demo-mode',
+            'status'             => 'processing',
+            'input_tokens'       => 0,
+            'output_tokens'      => 0,
+            'total_tokens'       => 0,
+            'estimated_cost_usd' => 0,
+        ]);
+
+        $payload = is_array($snapshot->payload) ? $snapshot->payload : json_decode($snapshot->payload, true);
         $cards = [];
-        $cardDefs = $this->buildCards($snapshot);
+        $cardDefs = $this->buildCards($payload);
 
         foreach ($cardDefs as $def) {
             $cards[] = BscInsightCard::create([
@@ -33,7 +46,7 @@ class DemoCardGenerator
             ]);
         }
 
-        $summary = $this->buildSummary($snapshot);
+        $summary = $this->buildSummary($payload);
 
         $run->update([
             'status'             => 'success',

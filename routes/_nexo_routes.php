@@ -17,6 +17,7 @@ Route::middleware(['auth', 'user.active'])->group(function () {
         Route::post('/conversas/{id}/link-lead', [NexoAtendimentoController::class, 'linkLead'])->name('nexo.atendimento.link-lead')->whereNumber('id');
         Route::post('/conversas/{id}/link-cliente', [NexoAtendimentoController::class, 'linkCliente'])->name('nexo.atendimento.link-cliente')->whereNumber('id');
         Route::delete('/conversas/{id}/unlink-lead', [NexoAtendimentoController::class, 'unlinkLead'])->name('nexo.atendimento.unlink-lead')->whereNumber('id');
+        Route::post('/leads/{leadId}/promover-crm', [NexoAtendimentoController::class, 'promoverLeadCrm'])->name('nexo.atendimento.promover-crm')->whereNumber('leadId');
         Route::delete('/conversas/{id}/unlink-cliente', [NexoAtendimentoController::class, 'unlinkCliente'])->name('nexo.atendimento.unlink-cliente')->whereNumber('id');
         Route::get('/conversas/{id}/contexto', [NexoAtendimentoController::class, 'contexto360'])->name('nexo.atendimento.contexto')->whereNumber('id');
         // -- Rotas DataJuri (v2026.02.07) ------------------------------

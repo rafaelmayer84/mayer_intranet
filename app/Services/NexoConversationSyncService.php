@@ -57,7 +57,7 @@ class NexoConversationSyncService
             }
 
             $now = now();
-            $sentAt = \Carbon\Carbon::createFromTimestamp($parsed['timestamp'], 'UTC')->setTimezone(config('app.timezone'));
+            $sentAt = \Carbon\Carbon::createFromTimestamp($parsed['timestamp']);
 
             if (!$conversation) {
                 $conversation = WaConversation::create([

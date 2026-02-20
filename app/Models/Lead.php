@@ -62,6 +62,11 @@ class Lead extends Model
         return $this->belongsTo(Cliente::class);
     }
 
+    public function crmAccount()
+    {
+        return $this->belongsTo(\App\Models\Crm\CrmAccount::class, 'crm_account_id');
+    }
+
     /**
      * Relacionamento com oportunidades
      */

@@ -202,6 +202,31 @@ const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
 let proponenteSelecionado = null;
 let proposalId = null;
 
+// ===== AUTO-LOAD VIA URL (chamado pelo NEXO 360) =====
+(function(){
+    const params = new URLSearchParams(window.location.search);
+    const leadId = params.get('lead_id');
+    if (!leadId) return;
+    fetch('/precificacao/lead/' + leadId, { headers: { 'Accept': 'application/json' } })
+    .then(r => r.json())
+    .then(dados => {
+        if (!dados || !dados.proponente) return;
+        proponenteSelecionado = {
+            tipo: 'lead',
+            id: parseInt(leadId),
+            nome: dados.proponente.nome || 'Lead #' + leadId,
+            info: dados.proponente.telefone || '',
+            documento: dados.proponente.documento || ''
+        };
+        document.getElementById('sel-nome').textContent = proponenteSelecionado.nome;
+        document.getElementById('sel-info').textContent = proponenteSelecionado.info + (proponenteSelecionado.documento ? ' | ' + proponenteSelecionado.documento : '');
+        document.getElementById('proponente-selecionado').classList.remove('hidden');
+        document.getElementById('etapa-demanda').classList.remove('hidden');
+        preencherFormulario(dados, 'lead');
+    })
+    .catch(e => console.error('Auto-load lead falhou:', e));
+})();
+
 // ===== BUSCA DE PROPONENTE =====
 let debounceTimer;
 document.getElementById('busca-proponente').addEventListener('input', function() {

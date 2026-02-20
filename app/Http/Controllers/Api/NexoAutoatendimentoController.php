@@ -313,4 +313,27 @@ class NexoAutoatendimentoController extends Controller
         ]);
         return false;
     }
+
+    /**
+     * Desativar bot para conversa (chamado pelo flow SendPulse ao "Falar com equipe")
+     * POST /api/nexo/autoatendimento/desativar-bot
+     */
+    public function desativarBot(Request $request)
+    {
+        $telefone = preg_replace('/\D/', '', $request->input('telefone', ''));
+        if (empty($telefone)) {
+            return response()->json(['success' => false, 'erro' => 'Telefone obrigatorio'], 400);
+        }
+
+        $conv = \App\Models\WaConversation::where('phone', $telefone)->first();
+        if ($conv) {
+            $conv->update(['bot_ativo' => false, 'status' => 'open']);
+            \Log::info('Bot control: bot_ativo=false via endpoint desativar-bot', [
+                'conv_id' => $conv->id, 'phone' => $telefone
+            ]);
+            return response()->json(['success' => true, 'bot_desativado' => 'sim']);
+        }
+
+        return response()->json(['success' => true, 'bot_desativado' => 'nao', 'motivo' => 'conversa nao encontrada']);
+    }
 }

@@ -7,6 +7,7 @@ use App\Models\Crm\CrmEvent;
 use App\Models\Crm\CrmOpportunity;
 use App\Models\Crm\CrmStage;
 use Illuminate\Support\Facades\DB;
+use App\Services\Crm\CrmProactiveService;
 use Illuminate\Support\Facades\Log;
 
 class CrmOpportunityService
@@ -58,6 +59,16 @@ class CrmOpportunityService
         ]);
 
         Log::info("[CRM] Opp #{$opp->id} criada para account #{$accountId} (source={$source})");
+
+        // Frente C: task automática ao criar oportunidade
+        try {
+            (new CrmProactiveService())->criarTaskAgendarReuniao(
+                $accountId, $opp->id, $opp->title, $ownerUserId
+            );
+        } catch (\Throwable $e) {
+            Log::warning('[CrmProactive] Falha task agendar reunião: ' . $e->getMessage());
+        }
+
         return $opp;
     }
 

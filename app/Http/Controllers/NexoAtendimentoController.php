@@ -110,6 +110,13 @@ class NexoAtendimentoController extends Controller
             $conversation->unread_count = 0;
             $conversation->save();
 
+            // Auto-update: lead vinculado -> contatado
+            if ($conversation->linked_lead_id) {
+                \App\Models\Lead::where('id', $conversation->linked_lead_id)
+                    ->where('status', 'novo')
+                    ->update(['status' => 'contatado', 'updated_at' => now()]);
+            }
+
             WaEvent::log('send_message', $id, ['text_length' => strlen($request->text), 'delivered' => true]);
             return response()->json(['success' => true, 'message' => $message]);
         } catch (\Throwable $e) {
@@ -303,7 +310,19 @@ class NexoAtendimentoController extends Controller
         $ctx = ['link_type' => $conv->link_type, 'lead' => null, 'cliente' => null];
 
         try {
-            if ($conv->linked_lead_id && $conv->lead) $ctx['lead'] = $conv->lead->toArray();
+            if ($conv->linked_lead_id && $conv->lead) {
+                $leadData = $conv->lead->toArray();
+                // CRM integration: buscar account e oportunidades vinculadas
+                if ($conv->lead->crm_account_id) {
+                    $account = \App\Models\Crm\CrmAccount::with(['opportunities' => function($q) {
+                        $q->orderByDesc('created_at')->limit(10);
+                    }, 'opportunities.stage'])->find($conv->lead->crm_account_id);
+                    if ($account) {
+                        $leadData['crm_account'] = $account->toArray();
+                    }
+                }
+                $ctx['lead'] = $leadData;
+            }
         } catch (\Throwable $e) { $ctx['lead'] = ['_error' => $e->getMessage()]; }
 
         try {
@@ -629,5 +648,86 @@ class NexoAtendimentoController extends Controller
         }
 
         return response()->json(['ok' => true, 'tags' => $conv->tags()->get(['wa_tags.id', 'wa_tags.name', 'wa_tags.color'])]);
+    }
+
+    /**
+     * POST /nexo/atendimento/leads/{leadId}/promover-crm
+     * Promove lead para CRM: cria crm_account (prospect) + oportunidade (open).
+     */
+    public function promoverLeadCrm(Request $request, int $leadId)
+    {
+        $lead = \App\Models\Lead::findOrFail($leadId);
+
+        if ($lead->crm_account_id) {
+            return response()->json(['success' => false, 'error' => 'Lead ja promovido ao CRM'], 422);
+        }
+
+        \Illuminate\Support\Facades\DB::beginTransaction();
+        try {
+            // Criar crm_account como prospect
+            $account = \App\Models\Crm\CrmAccount::create([
+                'kind'          => 'prospect',
+                'name'          => $lead->nome ?: 'Lead #'.$lead->id,
+                'email'         => $lead->email,
+                'phone_e164'    => $lead->telefone ? preg_replace('/\D/', '', $lead->telefone) : null,
+                'lifecycle'     => 'onboarding',
+                'owner_user_id' => auth()->id(),
+                'last_touch_at' => now(),
+                'notes'         => 'Promovido da Central de Leads. Area: '.($lead->area_interesse ?: 'N/A').'. Demanda: '.\Illuminate\Support\Str::limit($lead->resumo_demanda ?: '', 200),
+            ]);
+
+            // Buscar primeiro stage open
+            $firstStage = \App\Models\Crm\CrmStage::orderBy('order')->first();
+
+            // Criar oportunidade
+            $opp = \App\Models\Crm\CrmOpportunity::create([
+                'account_id'      => $account->id,
+                'stage_id'        => $firstStage ? $firstStage->id : null,
+                'title'           => $lead->area_interesse ? $lead->area_interesse.' - '.$lead->nome : 'Oportunidade - '.$lead->nome,
+                'area'            => $lead->area_interesse,
+                'type'            => 'new_business',
+                'source'          => $lead->origem_canal ?: 'whatsapp',
+                'lead_source'     => 'central_leads',
+                'status'          => 'open',
+                'owner_user_id'   => auth()->id(),
+                'tipo_demanda'    => $lead->sub_area,
+            ]);
+
+            // Vincular lead ao account
+            $lead->update([
+                'crm_account_id' => $account->id,
+                'status'         => 'convertido',
+            ]);
+
+            // Registrar evento CRM
+            \App\Models\Crm\CrmEvent::create([
+                'account_id'         => $account->id,
+                'type'               => 'lead_promoted',
+                'payload'            => ['lead_id' => $lead->id, 'opportunity_id' => $opp->id],
+                'happened_at'        => now(),
+                'created_by_user_id' => auth()->id(),
+            ]);
+
+            // Frente C: task primeiro contato
+            try {
+                (new \App\Services\Crm\CrmProactiveService())->criarTaskPrimeiroContato(
+                    $account->id, $account->name, auth()->id()
+                );
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('[CrmProactive] Falha task primeiro contato: ' . $e->getMessage());
+            }
+            \Illuminate\Support\Facades\DB::commit();
+
+            return response()->json([
+                'success'        => true,
+                'account_id'     => $account->id,
+                'opportunity_id' => $opp->id,
+                'message'        => 'Lead promovido para CRM com sucesso',
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\DB::rollBack();
+            \Illuminate\Support\Facades\Log::error('Erro ao promover lead para CRM', ['lead_id' => $leadId, 'error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'error' => 'Erro interno: '.$e->getMessage()], 500);
+        }
     }
 }

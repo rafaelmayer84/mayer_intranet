@@ -238,3 +238,6 @@ require __DIR__ . '/_perfil_routes.php';
 require __DIR__ . '/_notification_routes.php';
 
 require __DIR__ . '/_bsc_insights_routes.php';
+
+// NEXO Notificações WhatsApp (20/02/2026)
+require __DIR__ . '/_nexo_notificacao_routes.php';
