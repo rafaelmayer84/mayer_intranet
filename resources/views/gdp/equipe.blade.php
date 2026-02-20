@@ -82,6 +82,7 @@
                         <th class="px-4 py-2 text-center text-xs font-medium text-gray-500">💰 Financeiro</th>
                         <th class="px-4 py-2 text-center text-xs font-medium text-gray-500">📚 Desenv.</th>
                         <th class="px-4 py-2 text-center text-xs font-medium text-gray-500">💬 Atend.</th>
+                        <th class="px-4 py-2 text-center text-xs font-medium text-gray-500">📋 180°</th>
                         <th class="px-4 py-2 text-center text-xs font-medium text-gray-500">Score Total</th>
                         <th class="px-4 py-2 text-center text-xs font-medium text-gray-500">Ações</th>
                     </tr>
@@ -104,10 +105,18 @@
                         <td class="px-4 py-2.5 text-center font-medium" style="color:#16a34a;">{{ number_format($snap->score_financeiro, 1, ',', '.') }}</td>
                         <td class="px-4 py-2.5 text-center font-medium" style="color:#9333ea;">{{ number_format($snap->score_desenvolvimento, 1, ',', '.') }}</td>
                         <td class="px-4 py-2.5 text-center font-medium" style="color:#ea580c;">{{ number_format($snap->score_atendimento, 1, ',', '.') }}</td>
+                        <td class="px-4 py-2.5 text-center font-medium {{ $snap->score_eval180 !== null ? ($snap->score_eval180 >= 3.0 ? 'text-green-600' : 'text-red-600') : 'text-gray-400' }}">
+                            {{ $snap->score_eval180 !== null ? number_format($snap->score_eval180, 1, ',', '.') : '—' }}
+                        </td>
                         <td class="px-4 py-2.5 text-center">
                             <span class="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-bold text-white" style="background-color:#385776;">
                                 {{ number_format($snap->score_total, 1, ',', '.') }}
                             </span>
+                            @if($snap->score_total_original && $snap->score_total_original != $snap->score_total)
+                                <span class="block text-[10px] text-red-500 mt-0.5" title="Score original antes do guardrail 180°">
+                                    ({{ number_format($snap->score_total_original, 1, ',', '.') }})
+                                </span>
+                            @endif
                         </td>
                         <td class="px-4 py-2.5 text-center">
                             <a href="{{ route('gdp.minha-performance', ['user_id' => $snap->user_id, 'month' => $mes, 'year' => $ano]) }}"

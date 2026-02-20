@@ -72,7 +72,7 @@
     @else
 
     {{-- SCORE CARD PRINCIPAL --}}
-    <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
+    <div class="grid grid-cols-1 lg:grid-cols-6 gap-4">
         {{-- Score Total --}}
         <div class="lg:col-span-1 rounded-xl border border-gray-200 bg-white p-5 shadow-sm text-center">
             <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Score Total</p>
@@ -106,6 +106,22 @@
             </p>
         </div>
         @endforeach
+
+        {{-- Card Eval 180° --}}
+        <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm text-center">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">📋 Eval 180°</p>
+            <p class="mt-2 text-2xl font-bold {{ $snapshot && $snapshot->score_eval180 !== null ? ($snapshot->score_eval180 >= 3.0 ? 'text-green-600' : 'text-red-600') : 'text-gray-400' }}">
+                {{ $snapshot && $snapshot->score_eval180 !== null ? number_format($snapshot->score_eval180, 1, ',', '.') : '—' }}
+            </p>
+            @if($snapshot && $snapshot->score_eval180 !== null)
+                <p class="mt-1 text-[10px] text-gray-400">Nota gestor (1-5)</p>
+            @else
+                <p class="mt-1 text-[10px] text-gray-400">Sem avaliação</p>
+            @endif
+            @if($snapshot && $snapshot->score_total_original && $snapshot->score_total_original != $snapshot->score_total)
+                <p class="mt-1 text-[10px] text-red-500" title="Guardrail ativo: score penalizado">⚠️ Guardrail ativo</p>
+            @endif
+        </div>
     </div>
 
     {{-- DETALHAMENTO POR EIXO --}}

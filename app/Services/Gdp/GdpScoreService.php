@@ -6,6 +6,8 @@ use App\Models\GdpCiclo;
 use App\Models\GdpIndicador;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Models\Eval180Response;
+use App\Models\Eval180Form;
 
 class GdpScoreService
 {
@@ -155,6 +157,26 @@ class GdpScoreService
             $scoreTotal += ($scoreEixo / 100) * $pesoEixo;
         }
 
+        // Buscar nota Eval180 do período (nota do gestor, se submetida)
+        $eval180Score = $this->getEval180Score($ciclo->id, $user->id, $mes, $ano);
+
+        // Guardrail: se ativo e nota < piso, penalizar score_total
+        $scoreTotalOriginal = $scoreTotal;
+        $guardrailAtivo = DB::table('configuracoes')
+            ->where('chave', 'gdp_eval180_guardrail_ativo')
+            ->value('valor') === 'true';
+
+        if ($guardrailAtivo && $eval180Score !== null) {
+            $pisoQualidade = 3.0; // nota 1-5
+            if ($eval180Score < $pisoQualidade) {
+                $fator = (float) (DB::table('configuracoes')
+                    ->where('chave', 'gdp_eval180_guardrail_fator')
+                    ->value('valor') ?? '0.90');
+                $scoreTotal = round($scoreTotal * $fator, 2);
+                Log::info("[GDP-Score] Guardrail Eval180: user={$user->id} eval180={$eval180Score} < piso={$pisoQualidade}, fator={$fator}, score {$scoreTotalOriginal} -> {$scoreTotal}");
+            }
+        }
+
         DB::table('gdp_snapshots')->updateOrInsert(
             [
                 'ciclo_id' => $ciclo->id,
@@ -167,13 +189,52 @@ class GdpScoreService
                 'score_financeiro'      => round($scoresPorEixo['FINANCEIRO'], 2),
                 'score_desenvolvimento' => round($scoresPorEixo['DESENVOLVIMENTO'], 2),
                 'score_atendimento'     => round($scoresPorEixo['ATENDIMENTO'], 2),
+                'score_eval180'         => $eval180Score,
+                'score_total_original'  => round($scoreTotalOriginal, 2),
                 'score_total'           => round($scoreTotal, 2),
                 'updated_at'            => now(),
             ]
         );
 
         $stats['snapshots']++;
-        $stats['detalhes'][] = "{$user->name}: score={$scoreTotal}";
+        $stats['detalhes'][] = "{$user->name}: score={$scoreTotal}" . ($eval180Score !== null ? " eval180={$eval180Score}" : '');
+    }
+
+    /**
+     * Busca a nota do gestor na Eval180 para o usuário/período.
+     * Retorna nota 1-5 ou null se não houver avaliação submetida.
+     */
+    private function getEval180Score(int $cicloId, int $userId, int $mes, int $ano): ?float
+    {
+        // Tentar período mensal (YYYY-MM)
+        $period = sprintf('%04d-%02d', $ano, $mes);
+
+        $form = Eval180Form::where('cycle_id', $cicloId)
+            ->where('user_id', $userId)
+            ->where('period', $period)
+            ->first();
+
+        // Se não encontrou mensal, tentar trimestral (YYYY-Q1, Q2, etc.)
+        if (!$form) {
+            $quarter = (int) ceil($mes / 3);
+            $periodQ = sprintf('%04d-Q%d', $ano, $quarter);
+            $form = Eval180Form::where('cycle_id', $cicloId)
+                ->where('user_id', $userId)
+                ->where('period', $periodQ)
+                ->first();
+        }
+
+        if (!$form) {
+            return null;
+        }
+
+        // Buscar resposta do gestor submetida
+        $managerResponse = Eval180Response::where('form_id', $form->id)
+            ->where('rater_type', 'manager')
+            ->whereNotNull('submitted_at')
+            ->first();
+
+        return $managerResponse ? (float) $managerResponse->total_score : null;
     }
 
     private function gerarRanking(int $cicloId, int $mes, int $ano): void
