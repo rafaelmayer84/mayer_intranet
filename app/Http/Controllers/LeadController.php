@@ -36,7 +36,8 @@ class LeadController extends Controller
             ->area($filtroArea)
             ->cidade($filtroCidade)
             ->periodo($filtroPeriodo)
-            ->intencao($filtroIntencao);
+            ->intencao($filtroIntencao)
+            ->where("status", "!=", "arquivado");
 
         // Filtros adicionais
         if ($filtroOrigem !== 'todos') {
@@ -173,7 +174,11 @@ class LeadController extends Controller
             ->get();
 
         // Leads recentes (últimos 20)
-        $leads = (clone $query)->orderByDesc('data_entrada')->paginate(25)->appends($request->query());
+        // Ordenacao dinamica
+        $sortField = $request->get('sort', 'data_entrada');
+        $sortOrder = $request->get('order', 'desc');
+        $allowedSorts = ['id','nome','area_interesse','cidade','intencao_contratar','potencial_honorarios','urgencia','origem_canal','data_entrada'];
+        $leads = (clone $query)->orderBy($sortField, $sortOrder)->paginate(25)->appends($request->query());
 
         // Opções para filtros
         $areas = Lead::whereNotNull('area_interesse')
@@ -203,7 +208,8 @@ class LeadController extends Controller
             'dadosSubArea', 'dadosGatilho', 'dadosPerfil',
             'leads', 'areas', 'cidades', 'origens',
             'filtroArea', 'filtroCidade', 'filtroPeriodo',
-            'filtroIntencao', 'filtroOrigem', 'filtroPotencial'
+            'filtroIntencao', 'filtroOrigem', 'filtroPotencial',
+            'sortField', 'sortOrder'
         ));
     }
 

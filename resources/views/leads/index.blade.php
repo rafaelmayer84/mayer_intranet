@@ -3,6 +3,10 @@
 @section('title', 'Central de Leads — Marketing Jurídico')
 
 @section('content')
+<style>
+.chart-card { position: relative; }
+.chart-card .chart-wrap { position: relative; height: 260px; }
+</style>
 <div class="space-y-4">
 
     {{-- HEADER --}}
@@ -19,7 +23,7 @@
     </div>
 
     {{-- FILTROS --}}
-    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" style="max-height:320px;overflow:hidden;">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" >
         <form method="GET" action="{{ route('leads.index') }}" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             <select name="periodo" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm" onchange="this.form.submit()">
                 <option value="todos" {{ $filtroPeriodo == 'todos' ? 'selected' : '' }}>Todo período</option>
@@ -110,15 +114,15 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {{-- Timeline 30 dias --}}
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" style="max-height:320px;overflow:hidden;">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" >
             <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">📈 Leads por Dia (30 dias)</h3>
-            <canvas id="chartTimeline" height="220"></canvas>
+            <div class="chart-wrap"><canvas id="chartTimeline"></canvas></div>
         </div>
 
         {{-- Funil de Intenção --}}
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" style="max-height:320px;overflow:hidden;">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" >
             <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">🎯 Funil de Intenção de Contratar</h3>
-            <canvas id="chartIntencao" height="220"></canvas>
+            <div class="chart-wrap"><canvas id="chartIntencao"></canvas></div>
         </div>
     </div>
 
@@ -126,15 +130,15 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {{-- Por Área Jurídica --}}
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" style="max-height:320px;overflow:hidden;">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" >
             <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">⚖️ Leads por Área Jurídica</h3>
-            <canvas id="chartArea" height="220"></canvas>
+            <div class="chart-wrap"><canvas id="chartArea"></canvas></div>
         </div>
 
         {{-- Por Origem/Canal --}}
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" style="max-height:320px;overflow:hidden;">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" >
             <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">📡 Origem dos Leads</h3>
-            <canvas id="chartOrigem" height="220"></canvas>
+            <div class="chart-wrap"><canvas id="chartOrigem"></canvas></div>
         </div>
     </div>
 
@@ -142,21 +146,21 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 
         {{-- Potencial de Honorários --}}
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" style="max-height:320px;overflow:hidden;">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" >
             <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">💰 Potencial Honorários</h3>
-            <canvas id="chartPotencial" height="180"></canvas>
+            <div class="chart-wrap"><canvas id="chartPotencial"></canvas></div>
         </div>
 
         {{-- Urgência --}}
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" style="max-height:320px;overflow:hidden;">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" >
             <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">🚨 Nível de Urgência</h3>
-            <canvas id="chartUrgencia" height="180"></canvas>
+            <div class="chart-wrap"><canvas id="chartUrgencia"></canvas></div>
         </div>
 
         {{-- Perfil Socioeconômico --}}
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" style="max-height:320px;overflow:hidden;">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" >
             <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">👤 Perfil Socioeconômico</h3>
-            <canvas id="chartPerfil" height="180"></canvas>
+            <div class="chart-wrap"><canvas id="chartPerfil"></canvas></div>
         </div>
     </div>
 
@@ -164,21 +168,21 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {{-- Sub-áreas --}}
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" style="max-height:320px;overflow:hidden;">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" >
             <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">📋 Top Sub-áreas Jurídicas</h3>
-            <canvas id="chartSubArea" height="220"></canvas>
+            <div class="chart-wrap"><canvas id="chartSubArea"></canvas></div>
         </div>
 
         {{-- Gatilho Emocional --}}
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" style="max-height:320px;overflow:hidden;">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" >
             <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">💡 Gatilhos Emocionais</h3>
-            <canvas id="chartGatilho" height="220"></canvas>
+            <div class="chart-wrap"><canvas id="chartGatilho"></canvas></div>
         </div>
     </div>
 
     {{-- NUVEM DE PALAVRAS-CHAVE --}}
     @if(count($topPalavras) > 0)
-    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" style="max-height:320px;overflow:hidden;">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" >
         <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">🔑 Palavras-chave para Google Ads (Top 25)</h3>
         <div class="flex flex-wrap gap-2">
             @php $maxCount = max($topPalavras); @endphp
@@ -200,9 +204,9 @@
 
     {{-- POR CIDADE --}}
     @if($dadosCidade->count() > 0)
-    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" style="max-height:320px;overflow:hidden;">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" >
         <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-2">📍 Leads por Cidade</h3>
-        <canvas id="chartCidade" height="100"></canvas>
+        <div class="chart-wrap"><canvas id="chartCidade"></canvas></div>
     </div>
     @endif
 
@@ -231,15 +235,34 @@
             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead class="bg-gray-50 dark:bg-gray-900">
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">#</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Nome</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Área</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Cidade</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Intenção</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Potencial</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Urgência</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Origem</th>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Data</th>
+                        @php
+                            $cols = [
+                                'id' => '#',
+                                'nome' => 'Nome',
+                                'area_interesse' => 'Área',
+                                'cidade' => 'Cidade',
+                                'intencao_contratar' => 'Intenção',
+                                'potencial_honorarios' => 'Potencial',
+                                'urgencia' => 'Urgência',
+                                'origem_canal' => 'Origem',
+                                'status' => 'Status',
+                                'data_entrada' => 'Data',
+                            ];
+                        @endphp
+                        @foreach($cols as $col => $label)
+                            @php
+                                $isSorted = ($sortField === $col);
+                                $nextOrder = ($isSorted && $sortOrder === 'asc') ? 'desc' : 'asc';
+                                $arrow = $isSorted ? ($sortOrder === 'asc' ? '▲' : '▼') : '';
+                                $qp = array_merge(request()->query(), ['sort' => $col, 'order' => $nextOrder, 'page' => 1]);
+                            @endphp
+                            <th class="px-4 py-3 text-left text-xs font-medium uppercase">
+                                <a href="{{ route('leads.index', $qp) }}" class="inline-flex items-center gap-1 {{ $isSorted ? 'text-[#385776] font-bold' : 'text-gray-500 dark:text-gray-400' }} hover:text-[#385776] transition">
+                                    {{ $label }}
+                                    @if($arrow)<span class="text-[10px]">{{ $arrow }}</span>@endif
+                                </a>
+                            </th>
+                        @endforeach
                         <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Ações</th>
                     </tr>
                 </thead>
@@ -287,6 +310,19 @@
                             @endif
                         </td>
                         <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{{ $lead->origem_label ?? '-' }}</td>
+                        <td class="px-4 py-3">
+                            @if($lead->status === 'novo')
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Novo</span>
+                            @elseif($lead->status === 'contatado')
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Contatado</span>
+                            @elseif($lead->status === 'convertido')
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Convertido</span>
+                            @elseif($lead->status === 'descartado')
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Descartado</span>
+                            @else
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">{{ ucfirst($lead->status ?? '-') }}</span>
+                            @endif
+                        </td>
                         <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ $lead->data_entrada ? $lead->data_entrada->format('d/m H:i') : '-' }}</td>
                         <td class="px-4 py-3">
                             <a href="{{ route('leads.show', $lead) }}" class="text-blue-600 dark:text-blue-400 hover:underline text-sm">Ver</a>
