@@ -383,6 +383,10 @@ class Eval180Service
 
     public function lockForm(Eval180Form $form, int $adminId, ?string $motivo = null): bool
     {
+        if (!in_array($form->status, ['released', 'pending_feedback'])) {
+            throw new \RuntimeException('Só é possível travar avaliação com status released ou pending_feedback. Status atual: ' . $form->status);
+        }
+
         $form->update(['status' => 'locked']);
 
         $this->audit('lock', $form->id, [

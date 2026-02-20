@@ -203,11 +203,18 @@
             </div>
         @endif
 
-        @if(!$isLocked && Auth::user()->role === 'admin')
-            <div class="flex justify-end mt-2">
-                <button type="button" onclick="lockForm()" class="px-4 py-1.5 text-xs text-red-600 border border-red-300 rounded hover:bg-red-50 transition">
-                    🔒 Travar avaliação
-                </button>
+        @if(Auth::user()->role === 'admin')
+            <div class="flex justify-end mt-2 gap-2">
+                @if($form->status === 'pending_feedback')
+                    <button type="button" onclick="liberarFeedback()" class="px-4 py-1.5 text-xs text-green-600 border border-green-300 rounded hover:bg-green-50 transition">
+                        ✅ Liberar Feedback
+                    </button>
+                @endif
+                @if(in_array($form->status, ['released']))
+                    <button type="button" onclick="lockForm()" class="px-4 py-1.5 text-xs text-red-600 border border-red-300 rounded hover:bg-red-50 transition">
+                        🔒 Travar avaliação
+                    </button>
+                @endif
             </div>
         @endif
     </form>
@@ -315,7 +322,30 @@ function lockForm() {
         },
     })
     .then(r => r.json())
-    .then(res => { if (res.success) location.reload(); })
+    .then(res => {
+        if (res.success) location.reload();
+        else alert(res.message || 'Erro ao travar.');
+    })
+    .catch(err => alert('Erro: ' + err.message));
+}
+
+function liberarFeedback() {
+    if (!confirm('Liberar resultado para o profissional ver? Será notificado por email.')) return;
+
+    fetch('{{ route("gdp.eval180.release-feedback", [$ciclo->id, $avaliado->id, $period]) }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+            'Accept': 'application/json',
+        },
+        body: '{}'
+    })
+    .then(r => r.json())
+    .then(res => {
+        alert(res.message);
+        if (res.success) location.reload();
+    })
     .catch(err => alert('Erro: ' + err.message));
 }
 </script>
