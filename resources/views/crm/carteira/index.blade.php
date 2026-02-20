@@ -15,26 +15,30 @@
     </div>
 
     {{-- Cards KPI --}}
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+    <div class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
         <div class="bg-white rounded-lg shadow-sm border p-4">
             <p class="text-xs text-gray-500 uppercase">Total</p>
             <p class="text-2xl font-bold text-[#1B334A]">{{ number_format($totals['total']) }}</p>
         </div>
-        <div class="bg-white rounded-lg shadow-sm border p-4">
-            <p class="text-xs text-gray-500 uppercase">Clientes</p>
-            <p class="text-2xl font-bold text-green-600">{{ number_format($totals['clients']) }}</p>
+        <div class="bg-white rounded-lg shadow-sm border p-4 cursor-pointer hover:ring-2 hover:ring-green-300" onclick="window.location='{{ route('crm.carteira', ['lifecycle' => 'ativo']) }}'">
+            <p class="text-xs text-gray-500 uppercase">Ativos</p>
+            <p class="text-2xl font-bold text-green-600">{{ number_format($totals['ativos']) }}</p>
         </div>
-        <div class="bg-white rounded-lg shadow-sm border p-4">
-            <p class="text-xs text-gray-500 uppercase">Prospects</p>
-            <p class="text-2xl font-bold text-blue-600">{{ number_format($totals['prospects']) }}</p>
-        </div>
-        <div class="bg-white rounded-lg shadow-sm border p-4">
-            <p class="text-xs text-gray-500 uppercase">Risco</p>
-            <p class="text-2xl font-bold text-red-600">{{ number_format($totals['risco']) }}</p>
-        </div>
-        <div class="bg-white rounded-lg shadow-sm border p-4">
+        <div class="bg-white rounded-lg shadow-sm border p-4 cursor-pointer hover:ring-2 hover:ring-yellow-300" onclick="window.location='{{ route('crm.carteira', ['lifecycle' => 'adormecido']) }}'">
             <p class="text-xs text-gray-500 uppercase">Adormecidos</p>
             <p class="text-2xl font-bold text-yellow-600">{{ number_format($totals['adormecido']) }}</p>
+        </div>
+        <div class="bg-white rounded-lg shadow-sm border p-4 cursor-pointer hover:ring-2 hover:ring-gray-300" onclick="window.location='{{ route('crm.carteira', ['lifecycle' => 'arquivado']) }}'">
+            <p class="text-xs text-gray-500 uppercase">Arquivados</p>
+            <p class="text-2xl font-bold text-gray-500">{{ number_format($totals['arquivado']) }}</p>
+        </div>
+        <div class="bg-white rounded-lg shadow-sm border p-4 cursor-pointer hover:ring-2 hover:ring-blue-300" onclick="window.location='{{ route('crm.carteira', ['lifecycle' => 'onboarding']) }}'">
+            <p class="text-xs text-gray-500 uppercase">Onboarding</p>
+            <p class="text-2xl font-bold text-blue-600">{{ number_format($totals['onboarding']) }}</p>
+        </div>
+        <div class="bg-white rounded-lg shadow-sm border p-4 border-red-200 cursor-pointer hover:ring-2 hover:ring-red-300" onclick="window.location='{{ route('crm.carteira', ['lifecycle' => 'ativo', 'sem_contato_dias' => 30]) }}'">
+            <p class="text-xs text-red-500 uppercase">Sem Contato 30d</p>
+            <p class="text-2xl font-bold text-red-600">{{ number_format($totals['sem_contato_30d']) }}</p>
         </div>
     </div>
 
@@ -50,7 +54,7 @@
             </select>
             <select name="lifecycle" class="border rounded-lg px-3 py-2 text-sm">
                 <option value="">Todos os ciclos</option>
-                @foreach(['onboarding','ativo','adormecido','risco'] as $lc)
+                @foreach(['onboarding','ativo','adormecido','arquivado','risco'] as $lc)
                     <option value="{{ $lc }}" {{ request('lifecycle') === $lc ? 'selected' : '' }}>{{ ucfirst($lc) }}</option>
                 @endforeach
             </select>
@@ -146,7 +150,7 @@
                     </td>
                     <td class="px-4 py-3">
                         @php
-                            $lcColors = ['onboarding' => 'bg-blue-100 text-blue-700', 'ativo' => 'bg-green-100 text-green-700', 'adormecido' => 'bg-yellow-100 text-yellow-700', 'risco' => 'bg-red-100 text-red-700'];
+                            $lcColors = ['onboarding' => 'bg-blue-100 text-blue-700', 'ativo' => 'bg-green-100 text-green-700', 'adormecido' => 'bg-yellow-100 text-yellow-700', 'risco' => 'bg-red-100 text-red-700', 'arquivado' => 'bg-gray-200 text-gray-600'];
                         @endphp
                         <span class="px-2 py-0.5 rounded text-xs {{ $lcColors[$acc->lifecycle] ?? 'bg-gray-100 text-gray-600' }}">
                             {{ ucfirst($acc->lifecycle) }}

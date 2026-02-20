@@ -14,6 +14,12 @@ class CrmCarteiraController extends Controller
         $query = CrmAccount::with('owner')
             ->withCount(['opportunities as open_opps_count' => fn($q) => $q->where('status', 'open')]);
 
+        // Filtro automatico: advogado ve apenas sua carteira (admin/coord/socio veem todos)
+        $user = auth()->user();
+        if ($user->role === 'advogado') {
+            $query->where('owner_user_id', $user->id);
+        }
+
         // Filtros
         if ($request->filled('kind')) {
             $query->where('kind', $request->kind);
@@ -56,12 +62,18 @@ class CrmCarteiraController extends Controller
         $users = User::orderBy('name')->get(['id', 'name']);
 
         // Contadores rápidos
+        // Se advogado, contadores filtrados pela carteira dele
+        $baseQuery = ($user->role === 'advogado')
+            ? CrmAccount::where('owner_user_id', $user->id)
+            : new CrmAccount;
+
         $totals = [
-            'total'      => CrmAccount::count(),
-            'clients'    => CrmAccount::clients()->count(),
-            'prospects'  => CrmAccount::prospects()->count(),
-            'risco'      => CrmAccount::byLifecycle('risco')->count(),
-            'adormecido' => CrmAccount::byLifecycle('adormecido')->count(),
+            'total'      => (clone $baseQuery)->count(),
+            'ativos'     => (clone $baseQuery)->byLifecycle('ativo')->count(),
+            'adormecido' => (clone $baseQuery)->byLifecycle('adormecido')->count(),
+            'arquivado'  => (clone $baseQuery)->byLifecycle('arquivado')->count(),
+            'onboarding' => (clone $baseQuery)->byLifecycle('onboarding')->count(),
+            'sem_contato_30d' => (clone $baseQuery)->byLifecycle('ativo')->withoutContactSince(30)->count(),
         ];
 
         return view('crm.carteira.index', compact('accounts', 'users', 'totals'));
