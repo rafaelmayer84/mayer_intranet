@@ -71,7 +71,7 @@
 </style>
 @section('content')
 <link rel="stylesheet" href="{{ asset('css/nexo-atendimento.css') }}">
-<div id="nexo-app" class="flex h-[calc(100vh-64px)] bg-[#f0f2f5] overflow-hidden w-full">
+<div class="nexo-fullscreen-wrapper"><div id="nexo-app" class="flex bg-[#f0f2f5] overflow-hidden w-full" style="height:calc(100vh - 64px)">
 
     {{-- ═══════════════════════════════════════════════════════ --}}
     {{-- COLUNA 1 — INBOX (360px) --}}
@@ -570,4 +570,36 @@ function atualizarBotaoReabrir(lastClientMsgTimestamp) {
 
 </script>
 
+<!-- Modal Nova Conversa (20/02/2026) -->
+<div id="novaConversaModal" class="nova-conversa-overlay" onclick="if(event.target===this)fecharNovaConversaModal()">
+    <div class="nova-conversa-modal">
+        <div class="nova-conversa-header">
+            <h3>Nova Conversa</h3>
+            <button style="background:none;border:none;font-size:22px;cursor:pointer;color:#6b7280" onclick="fecharNovaConversaModal()">&times;</button>
+        </div>
+        <div class="nova-conversa-body">
+            <div class="nova-conversa-section">
+                <label class="nova-conversa-label">Telefone (com DDD)</label>
+                <input type="text" id="ncTelefone" class="nova-conversa-input" placeholder="(47) 99999-8888 ou 5547999998888" oninput="validarNcForm()" style="width:100%">
+            </div>
+            <div class="nova-conversa-section">
+                <label class="nova-conversa-label">Nome do contato (opcional)</label>
+                <input type="text" id="ncNomeContato" class="nova-conversa-input" placeholder="Ex: Joao da Silva" style="width:100%">
+            </div>
+            <div class="nova-conversa-section">
+                <label class="nova-conversa-label">Selecione um Template</label>
+                <div class="nova-conversa-templates">
+                    <div class="template-modal-loading" id="ncTemplateLoading">Carregando templates...</div>
+                    <div id="ncTemplateList"></div>
+                </div>
+            </div>
+        </div>
+        <div class="nova-conversa-footer">
+            <button class="template-btn-cancel" onclick="fecharNovaConversaModal()">Cancelar</button>
+            <button class="template-btn-send" id="ncBtnEnviar" disabled onclick="enviarNovaConversa()">Iniciar Conversa</button>
+        </div>
+    </div>
+</div>
+
+</div>
 @endsection

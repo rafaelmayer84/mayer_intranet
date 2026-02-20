@@ -3,6 +3,20 @@
    Apenas CSS. Zero lógica. Zero JS novo.
    ═══════════════════════════════════════════════════════ */
 
+/* ── Fullscreen override (anula padding do layout) ── */
+@media (min-width: 768px) {
+    .nexo-fullscreen-wrapper {
+        margin: -2rem;
+        width: calc(100% + 4rem);
+    }
+}
+@media (max-width: 767px) {
+    .nexo-fullscreen-wrapper {
+        margin: -1rem;
+        width: calc(100% + 2rem);
+    }
+}
+
 /* ── Scrollbars globais (thin, discreras) ── */
 #nexo-app ::-webkit-scrollbar { width: 5px; height: 5px; }
 #nexo-app ::-webkit-scrollbar-track { background: transparent; }
