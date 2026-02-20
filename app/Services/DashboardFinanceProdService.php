@@ -29,15 +29,7 @@ class DashboardFinanceProdService
  *
  * Observação: usamos "contém" (substring) para funcionar mesmo quando a rubrica vem com código.
  */
-public const RUBRICAS_EXCLUIDAS = [
-    'distribuição',
-    'distribuicao',
-    'retirada',
-    'dividendo',
-    'dividendos',
-    'lucro',
-    'lucros',
-];
+// REMOVIDO: RUBRICAS_EXCLUIDAS - classificacao 100% pela UI
 
     /**
      * Cache (curto) de valores distintos do campo "classificacao" em movimentos.
@@ -182,7 +174,7 @@ public const RUBRICAS_EXCLUIDAS = [
 
     private function sumReceitaTipo(int $ano, int $mes, string $tipo): float
     {
-        $q = Movimento::query()->where('ano', $ano)->where('mes', $mes);
+        $q = Movimento::query()->where('ano', $ano)->where('mes', $mes)->where('valor', '>', 0);
         $this->applyReceitaTipoFilter($q, $tipo);
         return (float) $q->sum('valor');
     }
@@ -440,13 +432,13 @@ public function getLucratividadeByMonth(int $ano): array
         $q = Movimento::select(
                 'codigo_plano',
                 'plano_contas',
-                DB::raw('SUM(valor) as total')
+                DB::raw('SUM(ABS(valor)) as total')
             )
             ->where('ano', $ano)
             ->where('mes', $mes)
-            ->whereIn('classificacao', $this->getClassificacoesPorTipo('DESPESA'));
+            ->where('classificacao', 'DESPESA');
 
-        $this->applyRubricasExcluidas($q);
+        $q->where('valor', '<', 0);
 
         $rows = $q->groupBy('codigo_plano', 'plano_contas')
             ->orderByDesc('total')
@@ -454,12 +446,12 @@ public function getLucratividadeByMonth(int $ano): array
             ->get();
 
         // Totais do mês anterior por rubrica (para tendência)
-        $qPrev = Movimento::select('codigo_plano', DB::raw('SUM(valor) as total'))
+        $qPrev = Movimento::select('codigo_plano', DB::raw('SUM(ABS(valor)) as total'))
             ->where('ano', $pAno)
             ->where('mes', $pMes)
-            ->whereIn('classificacao', $this->getClassificacoesPorTipo('DESPESA'));
+            ->where('classificacao', 'DESPESA');
 
-        $this->applyRubricasExcluidas($qPrev);
+        $qPrev->where('valor', '<', 0);
 
         $prev = $qPrev->groupBy('codigo_plano')
             ->pluck('total', 'codigo_plano')
@@ -472,9 +464,6 @@ public function getLucratividadeByMonth(int $ano): array
             $planoContas = (string) ($r->plano_contas ?? '');
             $rubrica = $this->normalizarRubrica($planoContas !== '' ? $planoContas : $codigo);
 
-            if (!$this->isDespesaOperacional($rubrica)) {
-                continue;
-            }
 
             $valor = (float) $r->total;
             $meta = (float) Configuracao::get("meta_despesa_rubrica_{$ano}_{$mes}_{$codigo}", 0);
@@ -963,29 +952,7 @@ public function getLucratividadeByMonth(int $ano): array
     /**
      * Aplica filtro de exclusão de rubricas não operacionais a uma query de Movimento.
      */
-    private function applyRubricasExcluidas($query)
-    {
-        foreach (self::RUBRICAS_EXCLUIDAS as $kw) {
-            $like = '%' . $kw . '%';
-            // Filtra por plano_contas e descricao (quando houver)
-            $query->whereRaw(
-                "LOWER(CONCAT(COALESCE(plano_contas,''), ' ', COALESCE(descricao,''))) NOT LIKE ?",
-                [$like]
-            );
-        }
-        return $query;
-    }
 
-    private function isDespesaOperacional(string $rubrica): bool
-    {
-        $r = mb_strtolower($rubrica);
-        foreach (self::RUBRICAS_EXCLUIDAS as $kw) {
-            if (str_contains($r, $kw)) {
-                return false;
-            }
-        }
-        return true;
-    }
 
     /**
      * Soma deducoes da receita do mes (classificacao = DEDUCAO).
@@ -1033,14 +1000,13 @@ public function getLucratividadeByMonth(int $ano): array
      */
     private function despesasOperacionaisTotal(int $ano, int $mes): float
     {
-        $q = Movimento::where('ano', $ano)
+        // Classificacao 100% pela UI. Apenas valores negativos = despesa real.
+        return (float) Movimento::where('ano', $ano)
             ->where('mes', $mes)
-            ->whereIn('classificacao', $this->getClassificacoesPorTipo('DESPESA'));
-
-        $this->applyRubricasExcluidas($q);
-
-        // ✅ CORREÇÃO: Despesas retornam como valores POSITIVOS usando abs()
-        return (float) abs($q->sum('valor'));
+            ->where('classificacao', 'DESPESA')
+            ->where('valor', '<', 0)
+            ->selectRaw('COALESCE(SUM(ABS(valor)), 0) as total')
+            ->value('total');
     }
 
     /**
@@ -1052,17 +1018,18 @@ public function getLucratividadeByMonth(int $ano): array
     {
         $out = array_fill(0, 12, 0.0);
 
-        $q = Movimento::select(DB::raw('mes'), DB::raw('SUM(valor) as total'))
+        // Classificacao 100% pela UI. Apenas valores negativos = despesa real.
+        $rows = Movimento::select(DB::raw('mes'), DB::raw('SUM(ABS(valor)) as total'))
             ->where('ano', $ano)
-            ->whereIn('classificacao', $this->getClassificacoesPorTipo('DESPESA'));
-        $this->applyRubricasExcluidas($q);
-
-        $rows = $q->groupBy('mes')->pluck('total', 'mes')->toArray();
+            ->where('classificacao', 'DESPESA')
+            ->where('valor', '<', 0)
+            ->groupBy('mes')
+            ->pluck('total', 'mes')
+            ->toArray();
 
         foreach ($rows as $m => $t) {
             $idx = ((int) $m) - 1;
-            // ✅ CORREÇÃO: Despesas retornam como valores POSITIVOS usando abs()
-            if ($idx >= 0 && $idx < 12) $out[$idx] = (float) abs($t);
+            if ($idx >= 0 && $idx < 12) $out[$idx] = (float) $t;
         }
 
         return array_map('floatval', $out);
