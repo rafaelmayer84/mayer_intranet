@@ -39,6 +39,7 @@ const NexoApp = {
         const p=new URLSearchParams();
         if(this.filters.status)p.set('status',this.filters.status);
         if(this.filters.unread)p.set('unread',this.filters.unread);
+        if(this.filters.minhas)p.set('minhas',this.filters.minhas);
         try{
             const j=await this.api(`/nexo/atendimento/conversas?${p}`);
             this.conversas=j.data||[];this.renderInbox();
@@ -75,11 +76,11 @@ const NexoApp = {
     },
 
     setFilter(k,v){
-        if(k==='minhas'){this.filters={status:'',unread:'',minhas:v}}else{this.filters.minhas=''}
-        this.filters={status:'',unread:''};if(k&&v)this.filters[k]=v;
+        this.filters={status:'',unread:'',minhas:''};
+        if(k&&v)this.filters[k]=v;
         document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
-        if(!v)document.querySelector('[data-filter="all"]').classList.add('active');
-        else{const t=document.querySelector(`[data-filter="${v==='1'?'unread':v}"]`);if(t)t.classList.add('active')}
+        if(!k||!v){document.querySelector('[data-filter="all"]').classList.add('active')}
+        else{const fk=k==='minhas'?'minhas':(k==='unread'?'unread':v);const t=document.querySelector(`[data-filter="${fk}"]`);if(t)t.classList.add('active')}
         this.loadConversas();
     },
     filterLocal(t){this.searchTerm=t;this.renderInbox()},
@@ -94,7 +95,7 @@ const NexoApp = {
             const cv=j.conversation;
             document.getElementById('chat-empty').classList.add('hidden');
             ['chat-header','chat-messages'].forEach(x=>{const el=document.getElementById(x);el.classList.remove('hidden');if(x==='chat-header')el.classList.add('flex')});
-            this.toggleBotUI(data.bot_ativo);
+            this.toggleBotUI(cv.bot_ativo);
             document.getElementById('btnReabrirConversa').classList.remove('hidden');
             if(window.innerWidth<1024){document.getElementById('inbox-panel').classList.add('hidden');const cp=document.getElementById('chat-panel');cp.classList.remove('hidden');cp.classList.add('flex')}
             const ini=(cv.name||'??').split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase();

@@ -1,6 +1,18 @@
 @extends('layouts.app')
 <style>
 /* Template WhatsApp Modal (17/02/2026) */
+.nova-conversa-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:200; align-items:center; justify-content:center; }
+.nova-conversa-overlay.active { display:flex; }
+.nova-conversa-modal { background:#fff; border-radius:16px; width:460px; max-width:95vw; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,.2); }
+.nova-conversa-header { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #e5e7eb; }
+.nova-conversa-header h3 { margin:0; font-size:16px; font-weight:700; color:#1B334A; }
+.nova-conversa-body { padding:16px 20px; overflow-y:auto; flex:1; }
+.nova-conversa-footer { padding:12px 20px; border-top:1px solid #e5e7eb; display:flex; justify-content:flex-end; gap:10px; }
+.nova-conversa-input { width:100; padding:10px 14px; font-size:14px; border:1px solid #d1d5db; border-radius:10px; outline:none; transition:border-color .2s; }
+.nova-conversa-input:focus { border-color:#385776; box-shadow:0 0 0 3px rgba(56,87,118,.1); }
+.nova-conversa-label { display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:6px; }
+.nova-conversa-section { margin-bottom:16px; }
+.nova-conversa-templates { max-height:280px; overflow-y:auto; }
 .template-btn-reabrir {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 6px 14px; background: #f59e0b; color: #fff;
@@ -72,7 +84,12 @@
                     <svg class="w-5 h-5 text-[#1e3a5f]" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.832-1.438A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18a8 8 0 01-4.243-1.214l-.252-.149-2.868.852.852-2.868-.149-.252A8 8 0 1112 20z"/></svg>
                     <h2 class="text-[15px] font-semibold text-[#1e3a5f] tracking-wide">NEXO</h2>
                 </div>
-                <span id="inbox-total" class="text-[11px] text-gray-500 font-medium">0 conversas</span>
+                <div class="flex items-center gap-2">
+                    <span id="inbox-total" class="text-[11px] text-gray-500 font-medium">0 conversas</span>
+                    <button onclick="abrirNovaConversaModal()" class="w-7 h-7 flex items-center justify-center rounded-full bg-[#1e3a5f] hover:bg-[#162d4a] text-white transition-all shadow-sm hover:shadow-md active:scale-95" title="Nova Conversa">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                    </button>
+                </div>
             </div>
             {{-- Filtros --}}
             <div class="flex gap-1.5 mb-2.5">
@@ -414,6 +431,124 @@ function enviarTemplateSelecionado() {
     .finally(function() {
         btn.disabled = false;
         btn.textContent = 'Enviar Template';
+    });
+}
+
+// ═══ NOVA CONVERSA ═══
+let ncTemplates = [];
+let ncTplSelecionado = null;
+
+function abrirNovaConversaModal() {
+    ncTplSelecionado = null;
+    document.getElementById('ncTelefone').value = '';
+    document.getElementById('ncNomeContato').value = '';
+    document.getElementById('ncBtnEnviar').disabled = true;
+    document.getElementById('ncTemplateList').innerHTML = '';
+    document.getElementById('ncTemplateLoading').style.display = 'block';
+    document.getElementById('novaConversaModal').classList.add('active');
+
+    fetch('/nexo/templates', {
+        headers: {
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+        }
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+        document.getElementById('ncTemplateLoading').style.display = 'none';
+        if (data.success && data.templates.length > 0) {
+            ncTemplates = data.templates;
+            renderNcTemplates(data.templates);
+        } else {
+            document.getElementById('ncTemplateList').innerHTML =
+                '<div class="template-list-empty"><p>Nenhum template aprovado.</p></div>';
+        }
+    })
+    .catch(function(err) {
+        document.getElementById('ncTemplateLoading').style.display = 'none';
+        document.getElementById('ncTemplateList').innerHTML =
+            '<div class="template-list-empty" style="color:#dc2626"><p>Erro: ' + err.message + '</p></div>';
+    });
+}
+
+function renderNcTemplates(templates) {
+    var html = '';
+    for (var i = 0; i < templates.length; i++) {
+        var tpl = templates[i];
+        var catClass = (tpl.category||'').toLowerCase().indexOf('util') > -1 ? 'cat-utility'
+            : (tpl.category||'').toLowerCase().indexOf('market') > -1 ? 'cat-marketing' : 'cat-auth';
+        var body = (tpl.body || 'Sem conteudo').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        html += '<div class="template-card" data-nc-idx="' + i + '" onclick="selecionarNcTpl(' + i + ')">'
+            + '<div class="template-card-name">' + (tpl.name||'').replace(/</g,'&lt;') + '</div>'
+            + '<div class="template-card-meta"><span class="' + catClass + '">' + (tpl.category||'N/A') + '</span></div>'
+            + '<div class="template-card-body">' + body + '</div></div>';
+    }
+    document.getElementById('ncTemplateList').innerHTML = html;
+}
+
+function selecionarNcTpl(idx) {
+    ncTplSelecionado = ncTemplates[idx];
+    document.querySelectorAll('[data-nc-idx]').forEach(function(el){ el.classList.remove('selected'); });
+    document.querySelector('[data-nc-idx="' + idx + '"]').classList.add('selected');
+    validarNcForm();
+}
+
+function validarNcForm() {
+    var tel = (document.getElementById('ncTelefone').value || '').replace(/\D/g, '');
+    var ok = tel.length >= 10 && ncTplSelecionado;
+    document.getElementById('ncBtnEnviar').disabled = !ok;
+}
+
+function fecharNovaConversaModal() {
+    document.getElementById('novaConversaModal').classList.remove('active');
+    ncTplSelecionado = null;
+}
+
+function enviarNovaConversa() {
+    if (!ncTplSelecionado) return;
+    var tel = document.getElementById('ncTelefone').value.trim();
+    var nome = document.getElementById('ncNomeContato').value.trim();
+    var btn = document.getElementById('ncBtnEnviar');
+    btn.disabled = true;
+    btn.textContent = 'Enviando...';
+
+    fetch('/nexo/templates/nova-conversa', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+        },
+        body: JSON.stringify({
+            telefone: tel,
+            template_name: ncTplSelecionado.name,
+            template_data: ncTplSelecionado.template,
+            language: ncTplSelecionado.language || 'pt_BR',
+            nome_contato: nome
+        })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            fecharNovaConversaModal();
+            // Recarregar inbox e abrir a conversa criada
+            NexoApp.loadConversas(true);
+            if (data.conversation_id) {
+                setTimeout(function(){ NexoApp.openConversa(data.conversation_id); }, 800);
+            }
+        } else {
+            alert('Erro: ' + (data.message || 'Falha ao iniciar conversa'));
+        }
+    })
+    .catch(function(err) {
+        alert('Erro de conexao: ' + err.message);
+    })
+    .finally(function() {
+        btn.disabled = false;
+        btn.textContent = 'Iniciar Conversa';
+        validarNcForm();
     });
 }
 

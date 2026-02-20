@@ -140,7 +140,7 @@ class GdpDataAdapter
         $registros = DB::table('horas_trabalhadas_datajuri')
             ->where('proprietario_id', $djPropId)
             ->whereBetween('data', [$inicio->toDateString(), $fim->toDateString()])
-            ->pluck('total_hora_trabalhada');
+            ->pluck('duracao_original');
 
         $totalMinutos = 0;
         foreach ($registros as $hhmm) {

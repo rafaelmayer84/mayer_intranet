@@ -236,3 +236,5 @@ require __DIR__ . '/_perfil_routes.php';
 require __DIR__ . '/_perfil_routes.php';
 
 require __DIR__ . '/_notification_routes.php';
+
+require __DIR__ . '/_bsc_insights_routes.php';

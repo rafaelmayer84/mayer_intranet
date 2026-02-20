@@ -125,9 +125,96 @@
                       {{ ($isLocked || $isSubmitted) ? 'disabled' : '' }}>{{ $response->evidence_text ?? '' }}</textarea>
         </div>
 
+        {{-- Notas do Gestor (visível após liberação do feedback) --}}
+        @if(isset($canSeeManagerNotes) && $canSeeManagerNotes && isset($managerResponse) && $managerResponse)
+            @php
+                $mgrAnswers = $managerResponse->answers_json ?? [];
+                $mgrSectionScores = $managerResponse->section_scores_json ?? [];
+            @endphp
+            <div class="mt-8 mb-4">
+                <h2 class="text-xl font-bold text-gray-800 mb-4">📋 Avaliação do Gestor</h2>
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-800">
+                    Score total do gestor: <strong>{{ number_format($managerResponse->total_score, 2, ',', '.') }}</strong>
+                    @if($managerResponse->submitted_at)
+                        — Avaliado em {{ $managerResponse->submitted_at->format('d/m/Y H:i') }}
+                    @endif
+                </div>
+
+                @php $mgrSection = 0; @endphp
+                @foreach($questions as $q)
+                    @if($q['section'] !== $mgrSection)
+                        @php $mgrSection = $q['section']; @endphp
+                        <div class="bg-white rounded-xl shadow-sm border overflow-hidden mb-4">
+                            <div class="bg-gradient-to-r from-[#2c6e49] to-[#1b4332] px-5 py-3">
+                                <h3 class="text-white font-semibold">
+                                    {{ $mgrSection }}. {{ $sectionNames[$mgrSection] ?? '' }}
+                                    @if(isset($mgrSectionScores[$mgrSection]))
+                                        <span class="float-right font-normal text-green-200">Média: {{ number_format($mgrSectionScores[$mgrSection], 2, ',', '.') }}</span>
+                                    @endif
+                                </h3>
+                            </div>
+                            <div class="p-5">
+                                <table class="w-full text-sm">
+                                    <thead>
+                                        <tr class="text-xs text-gray-500 border-b">
+                                            <th class="text-left pb-2 w-1/2">Pergunta</th>
+                                            <th class="text-center pb-2">Sua Nota</th>
+                                            <th class="text-center pb-2">Nota Gestor</th>
+                                            <th class="text-center pb-2">Diferença</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                    @endif
+
+                    @php
+                        $selfNote = $answers[$q['number']] ?? null;
+                        $mgrNote = $mgrAnswers[$q['number']] ?? null;
+                        $diff = ($selfNote && $mgrNote) ? $mgrNote - $selfNote : null;
+                    @endphp
+                    <tr class="border-b border-gray-50">
+                        <td class="py-2 text-gray-700">{{ $q['number'] }}. {{ $q['text'] }}</td>
+                        <td class="py-2 text-center font-medium">{{ $selfNote ?? '—' }}</td>
+                        <td class="py-2 text-center font-bold text-[#2c6e49]">{{ $mgrNote ?? '—' }}</td>
+                        <td class="py-2 text-center">
+                            @if($diff !== null)
+                                <span class="{{ $diff > 0 ? 'text-green-600' : ($diff < 0 ? 'text-red-600' : 'text-gray-400') }}">
+                                    {{ $diff > 0 ? '+' : '' }}{{ $diff }}
+                                </span>
+                            @else
+                                —
+                            @endif
+                        </td>
+                    </tr>
+
+                    @if($loop->last || $questions[$loop->index + 1]['section'] !== $mgrSection)
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    @endif
+                @endforeach
+
+                {{-- Comentário do gestor --}}
+                @if($managerResponse->comment_text)
+                    <div class="bg-white rounded-xl shadow-sm border p-5 mb-4">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-2">💬 Comentário do Gestor</h3>
+                        <p class="text-sm text-gray-600">{{ $managerResponse->comment_text }}</p>
+                    </div>
+                @endif
+
+                {{-- Evidências do gestor --}}
+                @if($managerResponse->evidence_text)
+                    <div class="bg-white rounded-xl shadow-sm border p-5 mb-4">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-2">📎 Evidências/Justificativas</h3>
+                        <p class="text-sm text-gray-600">{{ $managerResponse->evidence_text }}</p>
+                    </div>
+                @endif
+            </div>
+        @endif
+
         {{-- Score total --}}
         <div class="bg-white rounded-xl shadow-sm border p-5 text-center">
-            <p class="text-sm text-gray-500">Pontuação Final</p>
+            <p class="text-sm text-gray-500">Pontuação Final (Autoavaliação)</p>
             <p id="totalScore" class="text-3xl font-bold text-[#385776] mt-1">—</p>
         </div>
 

@@ -276,6 +276,10 @@ class Eval180Controller extends Controller
             ->where('period', $period)
             ->firstOrFail();
 
+        if (!in_array($form->status, ['released', 'pending_feedback'])) {
+            return response()->json(['success' => false, 'message' => 'Só é possível travar após liberar o feedback. Status atual: ' . $form->status], 422);
+        }
+
         $this->service->lockForm($form, Auth::id());
 
         return response()->json(['success' => true, 'message' => 'Avaliação travada.']);
@@ -350,8 +354,8 @@ class Eval180Controller extends Controller
             ->where('period', $period)
             ->firstOrFail();
 
-        if ($form->status !== 'pending_feedback') {
-            return response()->json(['success' => false, 'message' => 'Avaliação não está aguardando feedback. Status atual: ' . $form->status], 422);
+        if (!in_array($form->status, ['pending_feedback', 'locked'])) {
+            return response()->json(['success' => false, 'message' => 'Avaliação não pode ser liberada. Status atual: ' . $form->status], 422);
         }
 
         $form->update([

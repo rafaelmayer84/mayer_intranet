@@ -106,7 +106,11 @@
                                             @endif
                                         </div>
                                         @if($form && $form->status === 'locked')
-                                            <span class="text-[10px] text-red-500 font-medium">🔒</span>
+                                            <span class="text-[10px] text-red-500 font-medium" title="Travado">🔒</span>
+                                        @elseif($form && $form->status === 'released')
+                                            <span class="text-[10px] text-green-500 font-medium" title="Liberado para o avaliado">👁</span>
+                                        @elseif($form && $form->status === 'pending_feedback')
+                                            <span class="text-[10px] text-orange-500 font-medium" title="Aguardando feedback">⏳</span>
                                         @endif
                                         @if($mgrResp && $mgrResp->total_score)
                                             <span class="text-xs font-bold {{ $mgrResp->total_score >= 3.0 ? 'text-green-600' : 'text-red-600' }}">
@@ -117,10 +121,10 @@
                                     {{-- Botões de ação --}}
                                     @if($form)
                                         <div class="flex gap-1 justify-center mt-1">
-                                            @if($form->status === 'pending_feedback')
+                                            @if(in_array($form->status, ['pending_feedback', 'locked']))
                                                 <button onclick="event.stopPropagation(); liberarFeedback({{ $user->id }}, '{{ $p }}')"
-                                                    class="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded hover:bg-green-200 transition" title="Liberar feedback">
-                                                    ✅
+                                                    class="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded hover:bg-green-200 transition" title="Liberar feedback para o avaliado ver">
+                                                    ✅ Liberar
                                                 </button>
                                             @endif
                                             @if(Auth::user()->role === 'admin')

@@ -250,16 +250,16 @@
 
                 <!-- 2) RESULTADOS! (colapsável) -->
                 <div class="menu-group">
-                    <button onclick="toggleSubmenu('resultados')" class="nav-link w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors {{ request()->is('visao-gerencial*') || request()->is('clientes-mercado*') || request()->is('processos-internos*') || request()->is('resultados/bsc/processos-internos*') || request()->is('times-evolucao*') ? 'nav-link-active' : '' }}" data-tooltip="RESULTADOS!">
+                    <button onclick="toggleSubmenu('resultados')" class="nav-link w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors {{ request()->is('visao-gerencial*') || request()->is('clientes-mercado*') || request()->is('processos-internos*') || request()->is('resultados/bsc/processos-internos*') || request()->is('times-evolucao*') || request()->is('bsc-insights*') ? 'nav-link-active' : '' }}" data-tooltip="RESULTADOS!">
                         <div class="flex items-center">
                             <span class="w-5 h-5 mr-3" role="img" aria-label="Metas">🎯</span>
                             <span class="font-medium menu-text">RESULTADOS!</span>
                         </div>
-                        <svg id="arrow-resultados" class="w-4 h-4 menu-arrow {{ request()->is('visao-gerencial*') || request()->is('clientes-mercado*') || request()->is('processos-internos*') || request()->is('resultados/bsc/processos-internos*') || request()->is('times-evolucao*') ? 'rotated' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg id="arrow-resultados" class="w-4 h-4 menu-arrow {{ request()->is('visao-gerencial*') || request()->is('clientes-mercado*') || request()->is('processos-internos*') || request()->is('resultados/bsc/processos-internos*') || request()->is('times-evolucao*') || request()->is('bsc-insights*') ? 'rotated' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                         </svg>
                     </button>
-                    <div id="submenu-resultados" class="submenu {{ request()->is('visao-gerencial*') || request()->is('clientes-mercado*') || request()->is('processos-internos*') || request()->is('resultados/bsc/processos-internos*') || request()->is('times-evolucao*') ? 'open' : '' }} ml-4 mt-1 space-y-1">
+                    <div id="submenu-resultados" class="submenu {{ request()->is('visao-gerencial*') || request()->is('clientes-mercado*') || request()->is('processos-internos*') || request()->is('resultados/bsc/processos-internos*') || request()->is('times-evolucao*') || request()->is('bsc-insights*') ? 'open' : '' }} ml-4 mt-1 space-y-1">
                         <a href="{{ route('visao-gerencial') }}"
                            class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('visao-gerencial') ? 'nav-sublink-active' : '' }}"
                            data-tooltip="Finanças">
@@ -279,6 +279,12 @@
                         <a href="{{ route('times-evolucao.index') }}" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('times-evolucao.*') ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700' }}">
                             <span class="w-4 h-4 mr-3" role="img" aria-label="Equipe">👥</span>
                             <span class="menu-text">Times &amp; Evolução</span>
+                        </a>
+                        <a href="{{ route('bsc-insights.index') }}"
+                           class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('bsc-insights.*') ? 'nav-sublink-active' : '' }}"
+                           data-tooltip="BSC Insights">
+                            <span class="w-4 h-4 mr-3" role="img" aria-label="Insights">🧠</span>
+                            <span class="menu-text">BSC Insights (IA)</span>
                         </a>
                     </div>
                 </div>
