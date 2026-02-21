@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use Closure;
+use App\Models\AuditLog;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -61,6 +62,7 @@ class CheckModulePermission
                 ], 403);
             }
 
+            AuditLog::register("access_denied", "modulo", "Sem permissao: " . $request->path());
             abort(403, 'Você não tem permissão para acessar este recurso.');
         }
 

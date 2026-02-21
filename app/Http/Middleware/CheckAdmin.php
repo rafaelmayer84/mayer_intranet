@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use Closure;
+use App\Models\AuditLog;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -44,6 +45,7 @@ class CheckAdmin
                 ], 403);
             }
 
+            AuditLog::register("access_denied", "admin", "Tentou acessar: " . $request->path());
             abort(403);
         }
 

@@ -4,9 +4,9 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SyncController;
 use App\Http\Controllers\ClientesMercadoController;
 use App\Http\Controllers\IntegracaoController;
-use App\Http\Controllers\Api\NexoWebhookController;
 use App\Http\Controllers\Api\NexoAutoatendimentoController;
 use App\Http\Controllers\Api\NexoInactivityController;
+use App\Http\Controllers\Nexo\NexoTrackingController;
 
 Route::prefix('sync')->group(function () {
     Route::get('/test-connection', [SyncController::class, 'testConnection']);
@@ -34,72 +34,23 @@ Route::prefix('clientes-mercado')->group(function () {
 Route::prefix('integracao')->group(function () {
     Route::get('/dados', [IntegracaoController::class, 'dados']);
     Route::post('/sincronizar-datajuri', [IntegracaoController::class, 'sincronizarDataJuri']);
-    // ESPO CRM rota removida em 13/02/2026
     Route::get('/detalhes/{id}', [IntegracaoController::class, 'detalhes']);
-});
-
-Route::prefix('nexo')->group(function () {
-    Route::post('/identificar-cliente', [NexoWebhookController::class, 'identificarCliente']);
-    Route::post('/perguntas-auth', [NexoWebhookController::class, 'perguntasAuth']);
-    Route::post('/validar-auth', [NexoWebhookController::class, 'validarAuth']);
-    Route::post('/consulta-status', [NexoWebhookController::class, 'consultaStatus']);
 });
 
 Route::get('/user', function (Request $request) {
     return $request->user();
-})->middleware('auth:sanctum');// NEXO Consulta — Automação SendPulse
+})->middleware('auth:sanctum');
+
+// NEXO Consulta — Automacao SendPulse
 require __DIR__ . '/_nexo_consulta_routes.php';
 
-// NEXO Consulta — Automação SendPulse
-require __DIR__ . '/_nexo_consulta_routes.php';
-
-
-/**
- * ═══════════════════════════════════════════════════════════════
- * ROTAS PARA TRACKING DE WHATSAPP
- * ═══════════════════════════════════════════════════════════════
- * 
- * ADICIONAR em: routes/api.php
- * 
- * LOCALIZAÇÃO: Dentro do grupo 'nexo/api' ou criar novo grupo
- */
-
-use App\Http\Controllers\Nexo\NexoTrackingController;
-
-// ────────────────────────────────────────────────────────────────
-// Endpoint público (sem autenticação) para receber tracking
-// ────────────────────────────────────────────────────────────────
-
+// Tracking WhatsApp Lead (publico com rate limit)
 Route::post('nexo/api/pre-track-whatsapp-lead', [
-    NexoTrackingController::class, 
+    NexoTrackingController::class,
     'preTrackWhatsAppLead'
-])->name('nexo.pre-track-whatsapp');
+])->middleware('throttle:60,1')->name('nexo.pre-track-whatsapp');
 
-// ────────────────────────────────────────────────────────────────
-// NOTA DE SEGURANÇA:
-// ────────────────────────────────────────────────────────────────
-// 
-// Este endpoint é público porque precisa ser chamado do JavaScript
-// no site. Para evitar spam:
-// 
-// 1. Adicione rate limiting:
-//    ->middleware('throttle:60,1')
-// 
-// 2. Adicione validação de origem (CORS):
-//    ->middleware('cors:mayeradvogados.adv.br')
-// 
-// 3. Adicione verificação de CSRF se necessário
-// 
-// Exemplo com rate limit:
-
-Route::post('nexo/api/pre-track-whatsapp-lead', [
-    NexoTrackingController::class, 
-    'preTrackWhatsAppLead'
-])
-->middleware('throttle:60,1') // Máximo 60 requests por minuto
-->name('nexo.pre-track-whatsapp');
-
-// FASE 1 — AUTOATENDIMENTO WHATSAPP (15/02/2026)
+// NEXO Autoatendimento — Endpoints chamados pelo SendPulse
 Route::prefix('nexo/autoatendimento')->group(function () {
     Route::post('/financeiro/titulos-abertos', [NexoAutoatendimentoController::class, 'titulosAbertos']);
     Route::post('/financeiro/segunda-via', [NexoAutoatendimentoController::class, 'segundaVia']);
@@ -108,16 +59,10 @@ Route::prefix('nexo/autoatendimento')->group(function () {
     Route::post('/tickets/resumir-contexto', [NexoAutoatendimentoController::class, 'resumirContexto']);
     Route::post('/tickets/listar', [NexoAutoatendimentoController::class, 'listarTickets']);
     Route::post('/resumo', [NexoAutoatendimentoController::class, 'resumoLeigo']);
-
-    // FASE 2 — AUTOATENDIMENTO ROBUSTO (15/02/2026)
     Route::post('/chat-ia', [NexoAutoatendimentoController::class, 'chatIA']);
     Route::post('/documentos/solicitar', [NexoAutoatendimentoController::class, 'solicitarDocumento']);
     Route::post('/documentos/enviar', [NexoAutoatendimentoController::class, 'enviarDocumento']);
     Route::post('/agendamento/solicitar', [NexoAutoatendimentoController::class, 'solicitarAgendamento']);
-
-    // INATIVIDADE — Verificação para Resposta Padrão SendPulse (18/02/2026)
     Route::post('/verificar-inatividade', [NexoInactivityController::class, 'verificarInatividade']);
-
-    // BOT CONTROL — Endpoint chamado pelo flow SendPulse ao "Falar com equipe" (20/02/2026)
     Route::post('/desativar-bot', [NexoAutoatendimentoController::class, 'desativarBot']);
 });

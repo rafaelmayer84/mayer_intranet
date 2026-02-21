@@ -11,7 +11,7 @@
 use App\Http\Controllers\Admin\UsuariosController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth','admin'])->prefix('admin')->name('admin.')->group(function () {
     
     // Listagem e CRUD de usuários
     Route::get('/usuarios', [UsuariosController::class, 'index'])->name('usuarios.index');
@@ -32,4 +32,9 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::get('/usuarios/sync/datajuri', [UsuariosController::class, 'sincronizacao'])->name('usuarios.sincronizacao');
     Route::post('/usuarios/sync/datajuri/ativar', [UsuariosController::class, 'ativarDataJuri'])->name('usuarios.ativar-datajuri');
     
+
+    // Audit Log (admin only)
+    Route::get('/audit-log', [\App\Http\Controllers\Admin\AuditLogController::class, 'index'])->name('audit-log');
+    Route::get('/audit-log/data', [\App\Http\Controllers\Admin\AuditLogController::class, 'data'])->name('audit-log.data');
+
 });

@@ -96,3 +96,14 @@ Schedule::command('nexo:verificar-os')
     ->dailyAt('10:15')
     ->timezone('America/Sao_Paulo')
     ->appendOutputTo(storage_path('logs/cron-nexo-os.log'));
+
+// GDP Apuracao diaria (scores + penalizacoes)
+Schedule::command('gdp:apurar')->dailyAt('06:00');
+
+
+
+// Limpeza audit_logs > 90 dias (diario as 03:00)
+use App\Models\AuditLog;
+Schedule::call(function () {
+    AuditLog::olderThan(90)->delete();
+})->dailyAt('03:00')->name('audit-log-cleanup');

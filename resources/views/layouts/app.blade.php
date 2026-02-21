@@ -309,6 +309,9 @@
                         <a href="{{ route('gdp.acordo') }}" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('gdp.acordo*') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
                             <span class="ml-2 menu-text">Acordo de Desempenho</span>
                         </a>
+                        <a href="{{ route('gdp.penalizacoes') }}" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('gdp.penalizacoes*') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
+                            <span class="ml-2 menu-text">Penalizações</span>
+                        </a>
                         <a href="{{ route('gdp.eval180.me') }}" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('gdp.eval180*') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
                             <span class="ml-2 menu-text">Avaliações</span>
                         </a>
@@ -428,6 +431,15 @@
                    data-tooltip="Config. Usuários">
                     <span class="w-5 h-5 mr-3" role="img" aria-label="Usuarios">👤</span>
                     <span class="menu-text">Config. Usuários</span>
+                </a>
+
+                <a href="/admin/audit-log"
+                   class="nav-link flex items-center px-4 py-3 rounded-lg transition-colors {{ request()->is('admin/audit-log*') ? 'nav-link-active' : '' }}"
+                   title="Audit Log">
+                    <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    <span class="nav-text">Audit Log</span>
                 </a>
 
                 @endif
