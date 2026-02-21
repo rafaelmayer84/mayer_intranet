@@ -44,9 +44,7 @@ class CheckAdmin
                 ], 403);
             }
 
-            return redirect()
-                ->route('dashboard')
-                ->with('error', 'Esta área é restrita a administradores.');
+            abort(403);
         }
 
         return $next($request);

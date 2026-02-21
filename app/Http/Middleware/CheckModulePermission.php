@@ -61,9 +61,7 @@ class CheckModulePermission
                 ], 403);
             }
 
-            return redirect()
-                ->route('dashboard')
-                ->with('error', 'Você não tem permissão para acessar este recurso.');
+            abort(403, 'Você não tem permissão para acessar este recurso.');
         }
 
         return $next($request);

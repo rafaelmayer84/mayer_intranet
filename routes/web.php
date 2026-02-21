@@ -19,7 +19,7 @@ Route::get("/", function () {    return redirect()->route("visao-gerencial");
 
 Route::middleware(["auth"])->group(function () {
     // Dashboard
-    Route::get("/dashboard", [DashboardController::class, "index"])->name("dashboard");
+    Route::get("/dashboard", function(){ return redirect("/avisos"); })->name("dashboard");
     Route::get("/api/kpis/financeiros", [DashboardController::class, "getKpisFinanceiros"]);
     Route::get("/api/kpis/processos", [DashboardController::class, "getKpisProcessos"]);
     Route::get("/api/kpis/atividades", [DashboardController::class, "getKpisAtividades"]);
@@ -33,8 +33,8 @@ Route::middleware(["auth"])->group(function () {
     
     // Configurar Metas
     Route::get("/configurar-metas", [DashboardController::class, "configurarMetas"])->name("configurar-metas")->middleware("admin");
-    Route::put("/configurar-metas", [DashboardController::class, "updateMetas"])->name("configurar-metas.update");
-    Route::post("/api/metas/salvar", [DashboardController::class, "salvarMetas"])->name("metas.salvar");
+    Route::put("/configurar-metas", [DashboardController::class, "updateMetas"])->name("configurar-metas.update")->middleware("admin");
+    Route::post("/api/metas/salvar", [DashboardController::class, "salvarMetas"])->name("metas.salvar")->middleware("admin");
     
     // Minha Performance
     Route::get("/minha-performance", [DashboardController::class, "minhaPerformance"])->name("minha-performance");
@@ -53,8 +53,8 @@ Route::middleware(["auth"])->group(function () {
     Route::post("/processos", [DashboardController::class, "processos"])->name("processos.update");
     
     // Sincronização - AMBAS as rotas necessárias
-    Route::get("/sync", [SyncController::class, "index"])->name("sync");
-    Route::get("/sync", [SyncController::class, "index"])->name("sync.index");
+    Route::get("/sync", [SyncController::class, "index"])->name("sync")->middleware("admin");
+    Route::get("/sync", [SyncController::class, "index"])->name("sync.index")->middleware("admin");
     Route::get("/api/sync/status", [SyncController::class, "status"]);
     Route::post("/api/sync/advogados", [SyncController::class, "syncAdvogados"]);
     Route::post("/api/sync/processos", [SyncController::class, "syncProcessos"]);
@@ -62,7 +62,7 @@ Route::middleware(["auth"])->group(function () {
     Route::post("/api/sync/contas-receber", [SyncController::class, "syncContasReceber"]);
     Route::post("/api/sync/horas-trabalhadas", [SyncController::class, "syncHorasTrabalhadas"]);
     Route::post("/api/sync/movimentos", [SyncController::class, "syncMovimentos"]);
-    Route::post("/api/sync/all", [SyncController::class, "syncAll"]);
+    Route::post("/api/sync/all", [SyncController::class, "syncAll"])->middleware("admin");
     
     // ROTAS NOVAS DO CHATGPT - Prévia API e DB
     Route::get("/api/sync/movimentos/api-preview", [SyncController::class, "apiPreviewMovimentos"]);
@@ -72,16 +72,16 @@ Route::middleware(["auth"])->group(function () {
     Route::get("/sync/debug-log", [SyncController::class, "debugLog"]);
     
     // Configurações - AMBAS as rotas necessárias
-    Route::get("/configuracoes", [ConfiguracaoController::class, "index"])->name("configuracoes");
-    Route::get("/configuracoes", [ConfiguracaoController::class, "index"])->name("configuracoes.index");
-    Route::post("/configuracoes", [ConfiguracaoController::class, "update"])->name("configuracoes.update");
+    Route::get("/configuracoes", [ConfiguracaoController::class, "index"])->name("configuracoes")->middleware("admin");
+    Route::get("/configuracoes", [ConfiguracaoController::class, "index"])->name("configuracoes.index")->middleware("admin");
+    Route::post("/configuracoes", [ConfiguracaoController::class, "update"])->name("configuracoes.update")->middleware("admin");
     Route::post("/configuracoes/metas", [ConfiguracaoController::class, "saveMetas"])->name("configuracoes.metas");
     Route::post("/configuracoes/vincular", [ConfiguracaoController::class, "vincularAdvogado"])->name("configuracoes.vincular");
     Route::get("/configuracoes/resetar-classificacoes", [ConfiguracaoController::class, "resetarClassificacoes"])->name("configuracoes.resetar-classificacoes");
     
     // Classificação Manual
-    Route::get("/classificacao", [ClassificacaoController::class, "index"])->name("classificacao");
-    Route::post("/classificacao/aplicar", [ClassificacaoController::class, "aplicar"])->name("classificacao.aplicar");
+    Route::get("/classificacao", [ClassificacaoController::class, "index"])->name("classificacao")->middleware("admin");
+    Route::post("/classificacao/aplicar", [ClassificacaoController::class, "aplicar"])->name("classificacao.aplicar")->middleware("admin");
     Route::post("/classificacao/classificar", [ClassificacaoController::class, "classificar"]);
     Route::post("/classificacao/lote", [ClassificacaoController::class, "classificarLote"]);
     Route::post("/api/configuracoes/ano", [ConfiguracaoController::class, "setAnoFiltro"]);
