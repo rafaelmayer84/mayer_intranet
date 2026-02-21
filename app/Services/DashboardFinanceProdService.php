@@ -174,7 +174,7 @@ class DashboardFinanceProdService
 
     private function sumReceitaTipo(int $ano, int $mes, string $tipo): float
     {
-        $q = Movimento::query()->where('ano', $ano)->where('mes', $mes)->where('valor', '>', 0);
+        $q = Movimento::query()->where('ano', $ano)->where('mes', $mes);
         $this->applyReceitaTipoFilter($q, $tipo);
         return (float) $q->sum('valor');
     }
@@ -398,7 +398,8 @@ public function getReceitaPJByMonth(int $ano): array
 public function getLucratividadeByMonth(int $ano): array
 {
     $receitas = $this->getReceitaByMonth($ano);
-    // DEDUCAO removido - agora e DESPESA
+    // FIN-001: Deducoes ativas
+    $deducoes = $this->deducoesByMonth($ano);
     $despesas = $this->despesasOperacionaisByMonth($ano);
 
     $receitaTotal = [];
@@ -406,7 +407,7 @@ public function getLucratividadeByMonth(int $ano): array
 
     for ($i = 0; $i < 12; $i++) {
         $rt = (float) ($receitas['pf'][$i] ?? 0) + (float) ($receitas['pj'][$i] ?? 0);
-        $dd = 0.0;
+        $dd = (float) ($deducoes[$i] ?? 0);
         $dt = (float) ($despesas[$i] ?? 0);
         $receitaTotal[$i] = round($rt, 2);
         $lucro[$i] = round($rt - $dd - $dt, 2);
@@ -438,7 +439,7 @@ public function getLucratividadeByMonth(int $ano): array
             ->where('mes', $mes)
             ->where('classificacao', 'DESPESA');
 
-        $q->where('valor', '<', 0);
+        // FIN-001: sem filtro de sinal
 
         $rows = $q->groupBy('codigo_plano', 'plano_contas')
             ->orderByDesc('total')
@@ -451,7 +452,7 @@ public function getLucratividadeByMonth(int $ano): array
             ->where('mes', $pMes)
             ->where('classificacao', 'DESPESA');
 
-        $qPrev->where('valor', '<', 0);
+        // FIN-001: sem filtro de sinal
 
         $prev = $qPrev->groupBy('codigo_plano')
             ->pluck('total', 'codigo_plano')
@@ -731,20 +732,20 @@ public function getLucratividadeByMonth(int $ano): array
         $receitaPj = $this->sumReceitaTipo($ano, $mes, 'pj');
         $receitaTotal = $receitaPf + $receitaPj;
 
-        // FIX v3.0: Incluir deducoes (Simples Nacional, INSS, etc.)
-        $deducoesTotal = 0.0;
+        // FIN-001: Deducoes ativas
+        $deducoesTotal = (float) $this->deducoesTotal($ano, $mes);
         $despesasTotal = (float) $this->despesasOperacionaisTotal($ano, $mes);
 
-        // FIX v3.0: Resultado = Receita - Deducoes - Despesas
-        $resultado = $receitaTotal - $despesasTotal;
+        // FIN-001: Resultado = Receita - Deducoes - Despesas
+        $resultado = $receitaTotal - $deducoesTotal - $despesasTotal;
         $margem = $receitaTotal > 0 ? ($resultado / $receitaTotal) * 100 : 0.0;
 
         $receitaPfPrev = $this->sumReceitaTipo($pAno, $pMes, 'pf');
         $receitaPjPrev = $this->sumReceitaTipo($pAno, $pMes, 'pj');
         $receitaPrev = $receitaPfPrev + $receitaPjPrev;
-        $deducoesPrev = 0.0;
+        $deducoesPrev = (float) $this->deducoesTotal($pAno, $pMes);
         $despesasPrev = (float) $this->despesasOperacionaisTotal($pAno, $pMes);
-        $resultadoPrev = $receitaPrev - $despesasPrev;
+        $resultadoPrev = $receitaPrev - $deducoesPrev - $despesasPrev;
         $margemPrev = $receitaPrev > 0 ? ($resultadoPrev / $receitaPrev) * 100 : 0.0;
         // FIX: YoY compara mesmo mes do ano anterior
         $yoyAno = $ano - 1;
@@ -815,9 +816,9 @@ public function getLucratividadeByMonth(int $ano): array
         $receitaPj = $this->sumReceitaTipo($ano, $mes, 'pj');
         $receita = $receitaPf + $receitaPj;
 
-        $deducoes = 0.0; // DEDUCAO eliminado
-        $despesas = abs((float) $this->despesasOperacionaisTotal($ano, $mes));
-        $resultado = $receita - $despesas; // deducoes agora sao DESPESA
+        $deducoes = (float) $this->deducoesTotal($ano, $mes);
+        $despesas = (float) $this->despesasOperacionaisTotal($ano, $mes);
+        $resultado = $receita - $deducoes - $despesas;
         $margem = $receita > 0 ? ($resultado / $receita) * 100 : 0.0;
 
         return [
@@ -966,7 +967,7 @@ public function getLucratividadeByMonth(int $ano): array
     {
         return (float) abs(Movimento::where('ano', $ano)
             ->where('mes', $mes)
-            ->where('classificacao', Movimento::DEDUCAO)
+            ->where('classificacao', 'DEDUCAO')
             ->sum('valor'));
     }
 
@@ -980,7 +981,7 @@ public function getLucratividadeByMonth(int $ano): array
 
         $rows = Movimento::select(DB::raw('mes'), DB::raw('SUM(valor) as total'))
             ->where('ano', $ano)
-            ->where('classificacao', Movimento::DEDUCAO)
+            ->where('classificacao', 'DEDUCAO')
             ->groupBy('mes')
             ->pluck('total', 'mes')
             ->toArray();
@@ -1000,11 +1001,10 @@ public function getLucratividadeByMonth(int $ano): array
      */
     private function despesasOperacionaisTotal(int $ano, int $mes): float
     {
-        // Classificacao 100% pela UI. Apenas valores negativos = despesa real.
+        // FIN-001: Natureza pela classificacao, sem filtro de sinal
         return (float) Movimento::where('ano', $ano)
             ->where('mes', $mes)
             ->where('classificacao', 'DESPESA')
-            ->where('valor', '<', 0)
             ->selectRaw('COALESCE(SUM(ABS(valor)), 0) as total')
             ->value('total');
     }
@@ -1018,11 +1018,10 @@ public function getLucratividadeByMonth(int $ano): array
     {
         $out = array_fill(0, 12, 0.0);
 
-        // Classificacao 100% pela UI. Apenas valores negativos = despesa real.
+        // FIN-001: Natureza pela classificacao, sem filtro de sinal
         $rows = Movimento::select(DB::raw('mes'), DB::raw('SUM(ABS(valor)) as total'))
             ->where('ano', $ano)
             ->where('classificacao', 'DESPESA')
-            ->where('valor', '<', 0)
             ->groupBy('mes')
             ->pluck('total', 'mes')
             ->toArray();
@@ -1141,7 +1140,7 @@ public function getLucratividadeByMonth(int $ano): array
         return Cache::remember($cacheKey, 3600, function () use ($ano) {
             $receitas = $this->getReceitaByMonth($ano);
             $despesas = $this->despesasOperacionaisByMonth($ano);
-    // DEDUCAO removido - agora e DESPESA
+    // FIN-001: Deducoes incluidas via getLucratividadeByMonth
             $lucro = $this->getLucratividadeByMonth($ano);
 
             // Receita total por mês = PF + PJ
