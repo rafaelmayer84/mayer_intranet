@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth'])->prefix('crm')->name('crm.')->group(function () {
+Route::middleware(['auth','modulo:operacional.crm,visualizar'])->prefix('crm')->name('crm.')->group(function () {
 
     // Leads (qualificados)
     Route::get('/leads', [CrmLeadsController::class, 'index'])->name('leads');

@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Route;
 | Middleware: auth (herdado do grupo)
 */
 
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth','modulo:resultados.bsc-insights,visualizar'])->group(function () {
     Route::get('/bsc-insights', [BscInsightsController::class, 'index'])
         ->name('bsc-insights.index');
 

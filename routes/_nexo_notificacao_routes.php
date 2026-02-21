@@ -1,7 +1,7 @@
 <?php
 use App\Http\Controllers\NexoNotificacaoController;
 use Illuminate\Support\Facades\Route;
-Route::middleware('auth')->prefix('nexo/notificacoes')->name('nexo.notificacoes.')->group(function () {
+Route::middleware(['auth','modulo:operacional.nexo-notificacoes,visualizar'])->prefix('nexo/notificacoes')->name('nexo.notificacoes.')->group(function () {
     Route::get('/',                    [NexoNotificacaoController::class, 'index'])->name('index');
     Route::get('/buscar-clientes',     [NexoNotificacaoController::class, 'buscarClientes'])->name('buscar-clientes');
     Route::post('/aprovar-massa',      [NexoNotificacaoController::class, 'aprovarMassa'])->name('aprovar-massa');

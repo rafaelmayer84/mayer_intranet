@@ -41,7 +41,7 @@ Route::middleware('auth')->group(function () {
 
     // ── Criar avaliação avulsa + notificar ──
     Route::post('/gdp/cycles/{id}/eval180/create', [Eval180Controller::class, 'createEval'])
-        ->name('gdp.eval180.create');
+        ->name('gdp.eval180.create')->middleware('admin');
 
     // ── Liberar feedback para avaliado ver ──
     Route::post('/gdp/cycles/{id}/eval180/{user}/{period}/release-feedback', [Eval180Controller::class, 'releaseFeedback'])
@@ -49,5 +49,5 @@ Route::middleware('auth')->group(function () {
 
     // ── Excluir avaliação (admin only, hard delete) ──
     Route::delete('/gdp/cycles/{id}/eval180/{user}/{period}', [Eval180Controller::class, 'deleteEval'])
-        ->name('gdp.eval180.delete');
+        ->name('gdp.eval180.delete')->middleware('admin');
 });

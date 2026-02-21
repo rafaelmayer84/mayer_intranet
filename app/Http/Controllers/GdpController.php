@@ -13,6 +13,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use App\Models\Gdp\GdpPenalizacao;
+use App\Models\Gdp\GdpPenalizacaoTipo;
+use App\Services\Gdp\GdpPenalizacaoScanner;
 
 class GdpController extends Controller
 {
@@ -505,4 +508,131 @@ class GdpController extends Controller
             'metas','hash','acordoAceito','mesesNomes'
         ));
     }
+
+
+    // =========================================================================
+    // PENALIZACOES
+    // =========================================================================
+
+    public function penalizacoes(Request $request)
+    {
+        $user = Auth::user();
+        $mes  = (int) $request->input('month', now()->month);
+        $ano  = (int) $request->input('year', now()->year);
+        $ciclo = GdpCiclo::where('status', 'aberto')->first();
+
+        $query = GdpPenalizacao::with(['tipo', 'usuario'])
+            ->where('mes', $mes)->where('ano', $ano);
+
+        if ($user->role === 'socio') {
+            $query->where('user_id', $user->id);
+        }
+        if (in_array($user->role, ['admin','coordenador']) && $request->filled('user_id')) {
+            $query->where('user_id', $request->input('user_id'));
+        }
+        if ($request->filled('eixo_id')) {
+            $eixoId = $request->input('eixo_id');
+            $query->whereHas('tipo', fn($q) => $q->where('eixo_id', $eixoId));
+        }
+        if ($request->filled('gravidade')) {
+            $grav = $request->input('gravidade');
+            $query->whereHas('tipo', fn($q) => $q->where('gravidade', $grav));
+        }
+        if ($request->filled('contestacao')) {
+            $cont = $request->input('contestacao');
+            if ($cont === 'nenhuma') { $query->where('contestada', false); }
+            else { $query->where('contestacao_status', $cont); }
+        }
+
+        $penalizacoes = $query->orderByDesc('created_at')->get();
+        $usuarios = in_array($user->role, ['admin','coordenador'])
+            ? User::whereIn('id', [1,3,7,8])->orderBy('name')->get() : collect();
+        $eixos = GdpEixo::orderBy('id')->get();
+        $tipos = GdpPenalizacaoTipo::where('ativo', true)->orderBy('codigo')->get();
+
+        return view('gdp.penalizacoes', compact('user','mes','ano','ciclo','penalizacoes','usuarios','eixos','tipos'));
+    }
+
+    public function criarManual(Request $request)
+    {
+        $user = Auth::user();
+        if (!in_array($user->role, ['admin','coordenador'])) {
+            return response()->json(['erro' => 'Sem permissao'], 403);
+        }
+        $tipo = GdpPenalizacaoTipo::find($request->input('tipo_id'));
+        $ciclo = GdpCiclo::where('status', 'aberto')->first();
+
+        GdpPenalizacao::create([
+            'ciclo_id' => $ciclo->id, 'user_id' => $request->input('user_id'),
+            'tipo_id' => $tipo->id, 'mes' => $request->input('mes', now()->month),
+            'ano' => $request->input('ano', now()->year), 'pontos_desconto' => $tipo->pontos_desconto,
+            'descricao_automatica' => $request->input('descricao'), 'automatica' => false,
+        ]);
+        return response()->json(['ok' => true]);
+    }
+
+    public function detalhePenalizacao(Request $request, int $id)
+    {
+        $pen = GdpPenalizacao::with(['tipo', 'usuario'])->findOrFail($id);
+        $user = Auth::user();
+        if ($user->role === 'socio' && $pen->user_id !== $user->id) {
+            return response()->json(['erro' => 'Sem permissao'], 403);
+        }
+        return response()->json([
+            'codigo' => $pen->tipo->codigo ?? null, 'tipo' => $pen->tipo->nome ?? 'Manual',
+            'usuario' => $pen->usuario->name ?? null, 'gravidade' => $pen->tipo->gravidade ?? null,
+            'pontos' => $pen->pontos_desconto, 'origem' => $pen->automatica ? 'Automatica' : 'Manual',
+            'descricao' => $pen->descricao_automatica,
+            'contestacao_texto' => $pen->contestacao_texto, 'contestacao_status' => $pen->contestacao_status,
+        ]);
+    }
+
+    public function avaliarContestacao(Request $request, int $id)
+    {
+        $user = Auth::user();
+        if (!in_array($user->role, ['admin','coordenador'])) {
+            return response()->json(['erro' => 'Sem permissao'], 403);
+        }
+        $pen = GdpPenalizacao::findOrFail($id);
+        if ($pen->contestacao_status !== 'pendente') {
+            return response()->json(['erro' => 'Ja avaliada'], 422);
+        }
+        $decisao = $request->input('decisao');
+        if (!in_array($decisao, ['aceita','rejeitada'])) {
+            return response()->json(['erro' => 'Decisao invalida'], 422);
+        }
+        $pen->update(['contestacao_status' => $decisao, 'contestacao_por' => $user->id, 'contestacao_em' => now()]);
+        return response()->json(['ok' => true, 'status' => $decisao]);
+    }
+
+    public function contestarPenalizacao(Request $request, int $id)
+    {
+        $user = Auth::user();
+        $pen = GdpPenalizacao::findOrFail($id);
+        if ($pen->user_id !== $user->id) return response()->json(['erro' => 'Sem permissao'], 403);
+        if ($pen->contestada) return response()->json(['erro' => 'Ja contestada'], 422);
+        $texto = $request->input('texto');
+        $pen->update(['contestada' => true, 'contestacao_texto' => $texto, 'contestacao_status' => 'pendente']);
+        return response()->json(['ok' => true]);
+    }
+
+    public function executarScanner(Request $request)
+    {
+        $user = Auth::user();
+        if (!in_array($user->role, ['admin','coordenador'])) {
+            return response()->json(['erro' => 'Sem permissao'], 403);
+        }
+        $mes = (int) $request->input('mes', now()->month);
+        $ano = (int) $request->input('ano', now()->year);
+        $ciclo = GdpCiclo::where('status', 'aberto')->first();
+
+        $scanner = new GdpPenalizacaoScanner($ciclo, $mes, $ano);
+        $novas = 0;
+        foreach ([1,3,7,8] as $uid) {
+            $result = $scanner->scanUsuario($uid);
+            $novas += $result['novas'] ?? 0;
+        }
+        return response()->json(['ok' => true, 'novas' => $novas]);
+    }
+
 }

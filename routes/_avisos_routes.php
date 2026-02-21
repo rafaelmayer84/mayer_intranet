@@ -30,7 +30,7 @@ Route::middleware('auth')->group(function () {
         ->name('avisos.lido');
 
     // Admin: Avisos
-    Route::prefix('admin')->name('admin.')->group(function () {
+    Route::prefix('admin')->name('admin.')->middleware('admin')->group(function () {
         Route::get('/avisos', [AvisoController::class, 'admin'])->name('avisos.index');
         Route::get('/avisos/create', [AvisoController::class, 'create'])->name('avisos.create');
         Route::post('/avisos', [AvisoController::class, 'store'])->name('avisos.store');

@@ -227,7 +227,49 @@
     @endforeach
 
     {{-- GRÁFICO HISTÓRICO --}}
-    @if($historico->isNotEmpty())
+    {{-- PENALIZACOES DO MES --}}
+    @php
+        $pensMes = \App\Models\Gdp\GdpPenalizacao::with('tipo')
+            ->where('user_id', $targetUser->id)
+            ->where('mes', $mes)->where('ano', $ano)
+            ->orderByDesc('created_at')->get();
+    @endphp
+    @if($pensMes->isNotEmpty())
+    <div id="penalizacoes-section" class="rounded-xl border border-red-200 bg-white p-5 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-semibold text-red-700">⚠️ Penalizações do Mês ({{ $pensMes->count() }})</h3>
+            <span class="text-xs font-bold text-red-600">-{{ $pensMes->where('contestacao_status', '!=', 'aceita')->sum('pontos_desconto') }} pts</span>
+        </div>
+        <div class="space-y-2">
+            @foreach($pensMes as $pen)
+            <div class="flex items-center justify-between rounded-lg border {{ $pen->contestacao_status === 'aceita' ? 'border-green-200 bg-green-50 opacity-60' : 'border-red-100 bg-red-50' }} px-4 py-2.5">
+                <div class="flex-1">
+                    <div class="flex items-center gap-2">
+                        <span class="font-mono text-xs text-gray-500">{{ $pen->tipo->codigo ?? 'MAN' }}</span>
+                        <span class="text-sm text-gray-800">{{ $pen->tipo->nome ?? 'Manual' }}</span>
+                        @php $grav = $pen->tipo->gravidade ?? 'leve'; @endphp
+                        <span class="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium {{ $grav === 'grave' ? 'bg-red-100 text-red-700' : ($grav === 'moderada' ? 'bg-amber-100 text-amber-700' : 'bg-yellow-100 text-yellow-700') }}">{{ ucfirst($grav) }}</span>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-0.5">{{ Str::limit($pen->descricao_automatica, 100) }}</p>
+                </div>
+                <div class="flex items-center gap-3 ml-4">
+                    <span class="font-bold text-red-600 text-sm">-{{ $pen->pontos_desconto }}</span>
+                    @if($pen->contestacao_status === 'pendente')
+                        <span class="text-xs text-amber-600">Contestada</span>
+                    @elseif($pen->contestacao_status === 'aceita')
+                        <span class="text-xs text-green-600">Aceita</span>
+                    @elseif($pen->contestacao_status === 'rejeitada')
+                        <span class="text-xs text-red-600">Rejeitada</span>
+                        <button onclick="contestar({{ $pen->id }})" class="rounded px-2 py-1 text-xs font-medium text-white" style="background-color:#385776">Contestar</button>
+                    @endif
+                </div>
+            </div>
+            @endforeach
+        </div>
+    </div>
+    @endif
+
+        @if($historico->isNotEmpty())
     <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <h3 class="text-sm font-semibold text-gray-800 mb-4">📊 Evolução do Score Total</h3>
         <canvas id="gdpHistoricoChart" height="80"></canvas>
@@ -304,6 +346,22 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 @endif
+
+function contestar(penId) {
+    const texto = prompt('Descreva sua justificativa para contestar esta penalização:');
+    fetch('/gdp/penalizacoes/' + penId + '/contestar', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},
+        credentials: 'same-origin',
+        body: JSON.stringify({texto: texto})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.erro) alert('Erro: ' + data.erro);
+        else { alert('Contestação registrada. Aguarde avaliação.'); location.reload(); }
+    })
+    .catch(e => alert('Erro: ' + e.message));
+}
 </script>
 @endpush
 @endsection

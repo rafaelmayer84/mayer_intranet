@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth','modulo:resultados.times-evolucao,visualizar'])->group(function () {
     Route::get('/times-evolucao', [TimesEvolucaoController::class, 'index'])
         ->name('times-evolucao.index');
 

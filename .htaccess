@@ -1,6 +1,10 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteBase /Intranet/
+
+# Forcar HTTPS
+    RewriteCond %{HTTPS} off
+    RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
     
     # Permitir acesso a arquivos reais (CSS, JS, images)
     RewriteCond %{REQUEST_FILENAME} -f
@@ -38,4 +42,7 @@ Options -Indexes -MultiViews
     Header set X-Content-Type-Options "nosniff"
     Header set X-Frame-Options "SAMEORIGIN"
     Header set X-XSS-Protection "1; mode=block"
+    Header set Strict-Transport-Security "max-age=31536000; includeSubDomains" env=HTTPS
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+    Header set Permissions-Policy "camera=(), microphone=(), geolocation=()"
 </IfModule>
