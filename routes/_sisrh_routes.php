@@ -20,6 +20,7 @@ Route::middleware(['auth'])->prefix('sisrh')->group(function () {
     Route::post('/regras-rb/nivel', [SisrhController::class, 'salvarRbNivel'])->name('sisrh.rb-nivel.salvar');
     Route::post('/regras-rb/override', [SisrhController::class, 'salvarRbOverride'])->name('sisrh.rb-override.salvar');
     Route::post('/regras-rb/faixa', [SisrhController::class, 'salvarFaixa'])->name('sisrh.faixa.salvar');
+    Route::put('/regras-rb/faixa/{id}', [SisrhController::class, 'atualizarFaixa'])->name('sisrh.faixa.atualizar');
     Route::delete('/regras-rb/faixa/{id}', [SisrhController::class, 'excluirFaixa'])->name('sisrh.faixa.excluir');
 
     // Apuração (admin/sócio)

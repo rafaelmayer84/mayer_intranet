@@ -127,6 +127,26 @@ class SisrhController extends Controller
         return back()->with('success', 'Override de RB salvo com sucesso.');
     }
 
+    public function atualizarFaixa(Request $request, int $id)
+    {
+        $this->checkAdmin();
+        $request->validate([
+            'score_min' => 'required|numeric|min:0|max:100',
+            'score_max' => 'required|numeric|min:0|max:100',
+            'percentual_remuneracao' => 'required|numeric|min:0|max:100',
+            'label' => 'nullable|string|max:50',
+        ]);
+        DB::table('gdp_remuneracao_faixas')->where('id', $id)->update([
+            'score_min' => $request->score_min,
+            'score_max' => $request->score_max,
+            'percentual_remuneracao' => $request->percentual_remuneracao,
+            'label' => $request->label,
+            'updated_at' => now(),
+        ]);
+        $this->auditLog('sisrh_faixa_update', 'Faixa ID:' . $id . ' atualizada');
+        return back()->with('success', 'Faixa atualizada.');
+    }
+
     public function salvarFaixa(Request $request)
     {
         $this->checkAdmin();

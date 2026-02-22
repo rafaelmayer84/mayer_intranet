@@ -138,16 +138,22 @@
             <tbody>
                 @foreach($faixas as $f)
                 <tr class="border-b border-gray-100">
-                    <td class="px-3 py-2">{{ number_format($f->score_min, 1) }}%</td>
-                    <td class="px-3 py-2">{{ number_format($f->score_max, 1) }}%</td>
-                    <td class="px-3 py-2 font-semibold">{{ number_format($f->percentual_remuneracao, 1) }}%</td>
-                    <td class="px-3 py-2 text-gray-500">{{ $f->label ?? '-' }}</td>
-                    <td class="px-3 py-2 text-center">
-                        <form action="{{ route('sisrh.faixa.excluir', $f->id) }}" method="POST" class="inline" onsubmit="return confirm('Remover faixa?')">
-                            @csrf @method('DELETE')
-                            <button type="submit" class="text-red-600 text-xs underline">Excluir</button>
-                        </form>
-                    </td>
+                    <form action="{{ route('sisrh.faixa.atualizar', $f->id) }}" method="POST">
+                        @csrf @method('PUT')
+                        <td class="px-3 py-2"><input type="number" step="0.01" name="score_min" value="{{ $f->score_min }}" class="border rounded px-2 py-1 text-sm w-20"></td>
+                        <td class="px-3 py-2"><input type="number" step="0.01" name="score_max" value="{{ $f->score_max }}" class="border rounded px-2 py-1 text-sm w-20"></td>
+                        <td class="px-3 py-2"><input type="number" step="0.01" name="percentual_remuneracao" value="{{ $f->percentual_remuneracao }}" class="border rounded px-2 py-1 text-sm w-20 font-semibold"></td>
+                        <td class="px-3 py-2"><input type="text" name="label" value="{{ $f->label }}" class="border rounded px-2 py-1 text-sm w-36"></td>
+                        <td class="px-3 py-2 text-center">
+                            <div class="flex gap-2 justify-center">
+                                <button type="submit" class="px-2 py-1 rounded text-white text-xs" style="background-color: #385776;">Salvar</button>
+                    </form>
+                                <form action="{{ route('sisrh.faixa.excluir', $f->id) }}" method="POST" class="inline" onsubmit="return confirm('Remover faixa?')">
+                                    @csrf @method('DELETE')
+                                    <button type="submit" class="text-red-600 text-xs underline">Excluir</button>
+                                </form>
+                            </div>
+                        </td>
                 </tr>
                 @endforeach
             </tbody>
