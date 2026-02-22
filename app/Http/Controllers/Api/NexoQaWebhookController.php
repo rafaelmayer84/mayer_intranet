@@ -22,6 +22,7 @@ class NexoQaWebhookController extends Controller
         '178.32.',
         '2a02:4780:',   // IPv6 OBRIGATÓRIO
         '188.40.',
+        '46.4.',
     ];
 
     /**
@@ -58,6 +59,11 @@ class NexoQaWebhookController extends Controller
         $payload = $request->all();
 
         // Extrair telefone e texto da mensagem
+        // === PROCESSAMENTO DE FLOW SENDPULSE (etapas estruturadas) ===
+        if (isset($payload['etapa'])) {
+            return $this->handleFlowPayload($payload);
+        }
+
         $extracted = $this->extractMessageData($payload);
 
         if ($extracted === null) {
@@ -134,6 +140,104 @@ class NexoQaWebhookController extends Controller
     /**
      * Extrai telefone e texto do payload (suporta formato SendPulse e simplificado).
      */
+    /**
+     * Processa payload estruturado vindo do Flow SendPulse (etapas: nota, nps, comentario, opt-out).
+     */
+    private function handleFlowPayload(array $payload): JsonResponse
+    {
+        $etapa = $payload['etapa'] ?? 'unknown';
+        $phone = $payload['phone'] ?? null;
+        $contactId = $payload['contact_id'] ?? null;
+
+        Log::info('[NexoQA Flow] Recebido etapa do flow', [
+            'etapa' => $etapa,
+            'phone' => $phone ? (substr($phone, 0, 4) . '***' . substr($phone, -4)) : 'null',
+            'contact_id' => $contactId,
+        ]);
+
+        if (!$phone) {
+            return response()->json(['status' => 'error', 'detail' => 'Phone missing'], 200);
+        }
+
+        $phoneClean = preg_replace('/[^0-9]/', '', $phone);
+        if (strlen($phoneClean) >= 10 && !str_starts_with($phoneClean, '55')) {
+            $phoneClean = '55' . $phoneClean;
+        }
+
+        $target = \App\Models\NexoQaSampledTarget::where('phone_e164', $phoneClean)
+            ->where('send_status', 'SENT')
+            ->latest('sampled_at')
+            ->first();
+
+        if (!$target) {
+            $phoneSuffix = substr($phoneClean, -8);
+            $target = \App\Models\NexoQaSampledTarget::where('phone_e164', 'like', '%' . $phoneSuffix)
+                ->where('send_status', 'SENT')
+                ->latest('sampled_at')
+                ->first();
+        }
+
+        if (!$target) {
+            Log::info('[NexoQA Flow] Target nao encontrado', [
+                'phone_suffix' => substr($phoneClean, -4),
+                'etapa' => $etapa,
+            ]);
+            return response()->json(['status' => 'ok', 'detail' => 'Target not found, data logged'], 200);
+        }
+
+        $identity = $target->responseIdentity()->firstOrCreate(
+            ['target_id' => $target->id],
+            ['phone_hash' => hash('sha256', $phoneClean), 'answered_at' => now()]
+        );
+
+        $content = $target->responseContent()->firstOrCreate(
+            ['target_id' => $target->id],
+            []
+        );
+
+        switch ($etapa) {
+            case 'nota':
+                $rawNota = $payload['qa_nota'] ?? '';
+                preg_match('/(\d+)/', $rawNota, $m);
+                $nota = intval($m[1] ?? 0);
+                if ($nota >= 1 && $nota <= 5) {
+                    $content->update(['score_1_5' => $nota]);
+                    $identity->update(['answered_at' => now()]);
+                    Log::info('[NexoQA Flow] Nota salva', ['target_id' => $target->id, 'nota' => $nota]);
+                }
+                break;
+
+            case 'nps':
+                $rawNps = $payload['qa_nps'] ?? '';
+                preg_match('/(\d+)/', $rawNps, $m);
+                $nps = intval($m[1] ?? -1);
+                if ($nps >= 0 && $nps <= 10) {
+                    $content->update(['nps' => $nps]);
+                    Log::info('[NexoQA Flow] NPS salvo', ['target_id' => $target->id, 'nps' => $nps]);
+                }
+                break;
+
+            case 'comentario':
+                $comentario = trim($payload['qa_comentario'] ?? '');
+                if ($comentario && strtolower($comentario) !== 'pular') {
+                    $content->update(['free_text' => $comentario]);
+                    Log::info('[NexoQA Flow] Comentario salvo', ['target_id' => $target->id]);
+                }
+                break;
+
+            case 'opt-out':
+                $target->update(['opted_out' => true]);
+                $identity->update(['opted_out' => true]);
+                Log::info('[NexoQA Flow] Opt-out registrado', ['target_id' => $target->id]);
+                break;
+
+            default:
+                Log::info('[NexoQA Flow] Etapa desconhecida', ['etapa' => $etapa]);
+        }
+
+        return response()->json(['status' => 'ok', 'etapa' => $etapa, 'target_id' => $target->id], 200);
+    }
+
     private function extractMessageData(array $payload): ?array
     {
         // Formato SendPulse incoming_message
