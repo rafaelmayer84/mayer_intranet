@@ -66,3 +66,5 @@ Route::prefix('nexo/autoatendimento')->group(function () {
     Route::post('/verificar-inatividade', [NexoInactivityController::class, 'verificarInatividade']);
     Route::post('/desativar-bot', [NexoAutoatendimentoController::class, 'desativarBot']);
 });
+// --- NEXO QA: Webhook de Respostas de Pesquisa ---
+Route::post('/webhooks/sendpulse/nexo-qa', [\App\Http\Controllers\Api\NexoQaWebhookController::class, 'handle'])->name('webhooks.sendpulse.nexo-qa');
