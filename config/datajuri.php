@@ -163,7 +163,7 @@ return [
             'label' => 'Movimentos Financeiros',
             'icon' => '💰',
             'table' => 'movimentos',
-            'campos' => 'id,data,valor,valorComSinal,tipo,descricao,observacao,planoConta.nomeCompleto,planoConta.codigo,planoConta.id,pessoa.nome,pessoa.id,contrato.id,processo.pasta,proprietario.nome,formaPagamento,conciliado,dataCadastro',
+            'campos' => 'id,data,valor,valorComSinal,tipo,descricao,observacao,planoConta.nomeCompleto,planoConta.codigo,planoConta.id,pessoa.nome,pessoa.id,contrato.id,processo.pasta,proprietario.nome,proprietario.id,formaPagamento,conciliado,dataCadastro',
             'criterio' => null,
             'mapping' => [
                 'id' => 'datajuri_id',
@@ -179,6 +179,7 @@ return [
                 'contrato.id' => 'contrato_id_datajuri',
                 'processo.pasta' => 'processo_pasta',
                 'proprietario.nome' => 'proprietario_nome',
+                'proprietario.id' => 'proprietario_id',
                 'conciliado' => 'conciliado',
             ],
         ],
