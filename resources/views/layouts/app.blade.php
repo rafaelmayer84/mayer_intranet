@@ -355,6 +355,18 @@
                         <a href="/sisrh/banco-creditos" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('sisrh.banco-creditos') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
                             <span class="ml-2 menu-text">Banco Créditos</span>
                         </a>
+                        <a href="/sisrh/folha" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('sisrh.folha') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
+                            <span class="ml-2 menu-text">Folha Pagamento</span>
+                        </a>
+                        <a href="/sisrh/lancamentos" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('sisrh.lancamentos') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
+                            <span class="ml-2 menu-text">Lançamentos</span>
+                        </a>
+                        <a href="/sisrh/contracheque" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('sisrh.contracheque') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
+                            <span class="ml-2 menu-text">Meu Contracheque</span>
+                        </a>
+                        <a href="/sisrh/rubricas" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('sisrh.rubricas') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
+                            <span class="ml-2 menu-text">Rubricas</span>
+                        </a>
                     </div>
                 @endif
 
