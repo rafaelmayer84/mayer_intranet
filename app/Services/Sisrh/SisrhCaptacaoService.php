@@ -7,68 +7,51 @@ use Illuminate\Support\Facades\DB;
 /**
  * Busca captação (receita efetivamente recebida) para um advogado em um mês.
  * Usa a mesma lógica do indicador F1 do GdpDataAdapter:
- *   movimentos com classificacao IN (RECEITA_PF, RECEITA_PJ), valor > 0,
- *   filtrado por mês/ano, usando gdp_validacao_financeira quando disponível,
- *   ou fallback para processo→advogado responsável.
+ *   1. gdp_validacao_financeira (se existir para o mês)
+ *   2. fallback: movimentos.proprietario_id = users.datajuri_proprietario_id
  */
 class SisrhCaptacaoService
 {
-    /**
-     * Retorna o valor total de captação de um usuário no mês/ano.
-     *
-     * Estratégia (mesma do F1 GDP):
-     * 1. Se existirem registros em gdp_validacao_financeira para o user/mês → usa soma de lá.
-     * 2. Senão, filtra movimentos via responsavel_id (se populado) ou processo→advogado.
-     */
     public function captacaoMensal(int $userId, int $ano, int $mes): float
     {
-        // Estratégia 1: gdp_validacao_financeira (fonte validada manualmente)
-        $validado = DB::table('gdp_validacao_financeira')
-            ->where('user_id', $userId)
-            ->where('ano', $ano)
-            ->where('mes', $mes)
-            ->where('indicador_codigo', 'F1')
-            ->value('valor_validado');
+        // Buscar datajuri_proprietario_id do user
+        $djPropId = DB::table('users')->where('id', $userId)->value('datajuri_proprietario_id');
 
-        if ($validado !== null) {
-            return round((float) $validado, 2);
+        if (!$djPropId) {
+            return 0.00;
         }
 
-        // Estratégia 2: movimentos via responsavel_id
-        $temResponsavel = DB::table('movimentos')
-            ->whereNotNull('responsavel_id')
-            ->where('responsavel_id', '>', 0)
+        // Estratégia 1: gdp_validacao_financeira (movimentos validados manualmente)
+        $temValidacao = DB::table('gdp_validacao_financeira')
+            ->where('ano', $ano)
+            ->where('mes', $mes)
             ->exists();
 
-        if ($temResponsavel) {
-            $valor = DB::table('movimentos')
-                ->where('responsavel_id', $userId)
+        if ($temValidacao) {
+            $valor = DB::table('gdp_validacao_financeira')
+                ->where('ano', $ano)
+                ->where('mes', $mes)
+                ->where(function ($q) use ($userId) {
+                    $q->where('user_id_override', $userId)
+                      ->orWhere(function ($q2) use ($userId) {
+                          $q2->whereNull('user_id_override')
+                              ->where('user_id_resolvido', $userId);
+                      });
+                })
                 ->whereIn('classificacao', ['RECEITA_PF', 'RECEITA_PJ'])
-                ->where('valor', '>', 0)
-                ->whereYear('data_movimento', $ano)
-                ->whereMonth('data_movimento', $mes)
+                ->where('status_pontuacao', '!=', 'excluido')
                 ->sum('valor');
 
             return round((float) $valor, 2);
         }
 
-        // Estratégia 3: fallback via processos do advogado
-        // Busca processos onde o advogado é responsável, depois soma movimentos desses processos
-        $processoDjIds = DB::table('processos')
-            ->where('advogado_responsavel_id', $userId)
-            ->pluck('datajuri_id')
-            ->toArray();
-
-        if (empty($processoDjIds)) {
-            return 0.00;
-        }
-
+        // Estratégia 2: movimentos via proprietario_id (DataJuri)
         $valor = DB::table('movimentos')
-            ->whereIn('processo_datajuri_id', $processoDjIds)
+            ->where('proprietario_id', $djPropId)
             ->whereIn('classificacao', ['RECEITA_PF', 'RECEITA_PJ'])
-            ->where('valor', '>', 0)
-            ->whereYear('data_movimento', $ano)
-            ->whereMonth('data_movimento', $mes)
+            ->whereRaw('CAST(valor AS DECIMAL(15,2)) > 0')
+            ->where('ano', $ano)
+            ->where('mes', $mes)
             ->sum('valor');
 
         return round((float) $valor, 2);

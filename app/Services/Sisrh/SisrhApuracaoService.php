@@ -55,7 +55,7 @@ class SisrhApuracaoService
      *
      * @return array Dados da apuração calculada
      */
-    public function apurar(int $userId, int $ano, int $mes, int $cicloId, bool $persistir = false): array
+    public function apurar(int $userId, int $ano, int $mes, int $cicloId, bool $persistir = false, bool $ignorarBloqueio = false): array
     {
         // Verificar se já existe apuração fechada
         $existente = SisrhApuracao::where('user_id', $userId)
@@ -82,9 +82,9 @@ class SisrhApuracaoService
 
         // Bloqueios
         $bloqueioMotivo = null;
-        if (!$temPlano) {
+        if (!$temPlano && !$ignorarBloqueio) {
             $bloqueioMotivo = 'blocked_by_plan';
-        } elseif ($gdpScore === null) {
+        } elseif ($gdpScore === null && !$ignorarBloqueio) {
             $bloqueioMotivo = 'blocked_by_score';
         }
 
@@ -100,7 +100,7 @@ class SisrhApuracaoService
         $captacao = $this->captacaoService->captacaoMensal($userId, $ano, $mes);
 
         // 5. Faixa GDP → percentual
-        $percentualFaixa = GdpRemuneracaoFaixa::percentualParaScore($cicloId, $gdpScore);
+        $percentualFaixa = GdpRemuneracaoFaixa::percentualParaScore($cicloId, $gdpScore ?? 0.0);
 
         // 6. RV Bruta
         $rvBruta = round($captacao * $percentualFaixa / 100, 2);

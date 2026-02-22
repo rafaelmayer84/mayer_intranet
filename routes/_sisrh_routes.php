@@ -16,6 +16,7 @@ Route::middleware(['auth'])->prefix('sisrh')->group(function () {
 
     // Regras RB (admin/sócio)
     Route::get('/regras-rb', [SisrhController::class, 'regrasRb'])->name('sisrh.regras-rb');
+        Route::post('/regras-rb/senioridade', [SisrhController::class, 'salvarSenioridade'])->name('sisrh.senioridade.salvar');
     Route::post('/regras-rb/nivel', [SisrhController::class, 'salvarRbNivel'])->name('sisrh.rb-nivel.salvar');
     Route::post('/regras-rb/override', [SisrhController::class, 'salvarRbOverride'])->name('sisrh.rb-override.salvar');
     Route::post('/regras-rb/faixa', [SisrhController::class, 'salvarFaixa'])->name('sisrh.faixa.salvar');

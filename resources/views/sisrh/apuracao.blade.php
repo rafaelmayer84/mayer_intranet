@@ -36,6 +36,10 @@
             <button onclick="sisrhFechar()" id="btn-fechar" class="px-4 py-2 rounded text-white text-sm" style="background-color: #1B334A;" disabled>
                 Fechar Competência
             </button>
+            <div class="flex items-center gap-2 ml-4">
+                <input type="checkbox" id="ignorar-bloqueio" class="rounded border-gray-300">
+                <label for="ignorar-bloqueio" class="text-sm text-gray-600">Ignorar bloqueio por plano/score</label>
+            </div>
         </div>
     </div>
 
@@ -112,7 +116,7 @@ async function sisrhSimular() {
         const resp = await fetch('{{ route("sisrh.apuracao.simular") }}', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}'},
-            body: JSON.stringify({ano: parseInt(ano), mes: parseInt(mes)})
+            body: JSON.stringify({ano: parseInt(ano), mes: parseInt(mes), ignorar_bloqueio: document.getElementById('ignorar-bloqueio').checked})
         });
         const data = await resp.json();
         if (data.erro) { alert(data.erro); return; }
@@ -132,7 +136,7 @@ async function sisrhFechar() {
         const resp = await fetch('{{ route("sisrh.apuracao.fechar") }}', {
             method: 'POST',
             headers: {'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}'},
-            body: JSON.stringify({ano: parseInt(ano), mes: parseInt(mes)})
+            body: JSON.stringify({ano: parseInt(ano), mes: parseInt(mes), ignorar_bloqueio: document.getElementById('ignorar-bloqueio').checked})
         });
         const data = await resp.json();
         if (data.success) {

@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
  *
  * Regras (AD002):
  * - Leve: -5%
- * - Média: -15%
+ * - Moderada/Média: -15%
  * - Grave: -30%
  * - Cap máximo de redução por conformidade no mês: 40%
  *
@@ -19,6 +19,7 @@ class SisrhConformidadeImpactService
 {
     private const IMPACTO_POR_GRAVIDADE = [
         'leve' => 5.00,
+        'moderada' => 15.00,
         'media' => 15.00,
         'grave' => 30.00,
     ];
@@ -27,20 +28,20 @@ class SisrhConformidadeImpactService
 
     /**
      * Retorna o percentual total de redução por conformidade para um advogado no mês.
-     * Busca ocorrências ativas na tabela gdp_penalizacoes.
+     * Busca ocorrências ativas na tabela gdp_penalizacoes + tipo via gdp_penalizacao_tipos.
      */
     public function reducaoConformidade(int $userId, int $ano, int $mes): float
     {
-        // Busca penalizações ativas (não contestadas com sucesso) no período
-        $penalizacoes = DB::table('gdp_penalizacoes')
-            ->where('user_id', $userId)
-            ->whereYear('created_at', $ano)
-            ->whereMonth('created_at', $mes)
+        $penalizacoes = DB::table('gdp_penalizacoes as p')
+            ->join('gdp_penalizacao_tipos as t', 'p.tipo_id', '=', 't.id')
+            ->where('p.user_id', $userId)
+            ->where('p.ano', $ano)
+            ->where('p.mes', $mes)
             ->where(function ($q) {
-                $q->whereNull('contestacao_status')
-                  ->orWhere('contestacao_status', '!=', 'aceita');
+                $q->whereNull('p.contestacao_status')
+                  ->orWhere('p.contestacao_status', '!=', 'aceita');
             })
-            ->get(['gravidade']);
+            ->get(['t.gravidade']);
 
         if ($penalizacoes->isEmpty()) {
             return 0.00;
@@ -61,15 +62,16 @@ class SisrhConformidadeImpactService
      */
     public function detalhamento(int $userId, int $ano, int $mes): array
     {
-        return DB::table('gdp_penalizacoes')
-            ->where('user_id', $userId)
-            ->whereYear('created_at', $ano)
-            ->whereMonth('created_at', $mes)
+        return DB::table('gdp_penalizacoes as p')
+            ->join('gdp_penalizacao_tipos as t', 'p.tipo_id', '=', 't.id')
+            ->where('p.user_id', $userId)
+            ->where('p.ano', $ano)
+            ->where('p.mes', $mes)
             ->where(function ($q) {
-                $q->whereNull('contestacao_status')
-                  ->orWhere('contestacao_status', '!=', 'aceita');
+                $q->whereNull('p.contestacao_status')
+                  ->orWhere('p.contestacao_status', '!=', 'aceita');
             })
-            ->get(['id', 'gravidade', 'descricao', 'created_at'])
+            ->get(['p.id', 't.gravidade', 't.nome as descricao', 'p.created_at'])
             ->toArray();
     }
 }

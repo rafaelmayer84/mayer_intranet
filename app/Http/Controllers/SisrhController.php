@@ -34,12 +34,12 @@ class SisrhController extends Controller
         if (in_array($user->role, ['admin'])) {
             $userIds = DB::table('users')
                 ->whereNotIn('id', [2, 5, 6])
-                ->where('is_active', true)
+                
                 ->pluck('id');
         } elseif ($user->role === 'coordenador') {
             $userIds = DB::table('users')
                 ->where('role', 'advogado')
-                ->where('is_active', true)
+                
                 ->pluck('id');
         } else {
             $userIds = collect([$user->id]);
@@ -73,7 +73,7 @@ class SisrhController extends Controller
         $niveis = SisrhRbNivel::where('ciclo_id', $ciclo->id ?? 0)->get();
         $overrides = SisrhRbOverride::where('ciclo_id', $ciclo->id ?? 0)->with('user')->get();
         $faixas = GdpRemuneracaoFaixa::where('ciclo_id', $ciclo->id ?? 0)->orderBy('score_min')->get();
-        $users = DB::table('users')->whereNotIn('id', [2, 5, 6])->where('is_active', true)->get(['id', 'name', 'nivel_senioridade']);
+        $users = DB::table('users')->whereNotIn('id', [2, 5, 6])->get(['id', 'name', 'nivel_senioridade']);
 
         return view('sisrh.regras-rb', compact('ciclo', 'niveis', 'overrides', 'faixas', 'users'));
     }
@@ -163,7 +163,7 @@ class SisrhController extends Controller
         $ciclo = DB::table('gdp_ciclos')->where('status', 'Aberto')->first();
         $users = DB::table('users')
             ->whereNotIn('id', [2, 5, 6])
-            ->where('is_active', true)
+            
             ->whereIn('role', ['advogado', 'coordenador', 'socio', 'admin'])
             ->get(['id', 'name', 'nivel_senioridade', 'role']);
 
@@ -174,9 +174,14 @@ class SisrhController extends Controller
     {
         $this->checkAdmin();
 
+        if ($request->isJson()) {
+            $request->merge(json_decode($request->getContent(), true) ?? []);
+        }
+
         $request->validate([
             'ano' => 'required|integer|min:2024|max:2030',
             'mes' => 'required|integer|min:1|max:12',
+            'ignorar_bloqueio' => 'nullable|boolean',
         ]);
 
         $ciclo = DB::table('gdp_ciclos')->where('status', 'Aberto')->first();
@@ -186,14 +191,14 @@ class SisrhController extends Controller
 
         $users = DB::table('users')
             ->whereNotIn('id', [2, 5, 6])
-            ->where('is_active', true)
+            
             ->whereIn('role', ['advogado', 'coordenador', 'socio', 'admin'])
             ->pluck('id');
 
         $resultados = [];
         foreach ($users as $userId) {
             $resultados[] = $this->apuracaoService->apurar(
-                $userId, $request->ano, $request->mes, $ciclo->id, false
+                $userId, $request->ano, $request->mes, $ciclo->id, false, (bool) $request->ignorar_bloqueio
             );
         }
 
@@ -203,6 +208,10 @@ class SisrhController extends Controller
     public function fecharCompetencia(Request $request)
     {
         $this->checkAdmin();
+
+        if ($request->isJson()) {
+            $request->merge(json_decode($request->getContent(), true) ?? []);
+        }
 
         $request->validate([
             'ano' => 'required|integer',
@@ -216,7 +225,7 @@ class SisrhController extends Controller
 
         $users = DB::table('users')
             ->whereNotIn('id', [2, 5, 6])
-            ->where('is_active', true)
+            
             ->whereIn('role', ['advogado', 'coordenador', 'socio', 'admin'])
             ->pluck('id');
 
@@ -225,7 +234,7 @@ class SisrhController extends Controller
             foreach ($users as $userId) {
                 // Persistir apuração
                 $dados = $this->apuracaoService->apurar(
-                    $userId, $request->ano, $request->mes, $ciclo->id, true
+                    $userId, $request->ano, $request->mes, $ciclo->id, true, (bool) $request->ignorar_bloqueio
                 );
 
                 if (isset($dados['erro'])) {
@@ -289,9 +298,9 @@ class SisrhController extends Controller
         $user = Auth::user();
 
         if (in_array($user->role, ['admin'])) {
-            $userIds = DB::table('users')->whereNotIn('id', [2, 5, 6])->where('is_active', true)->pluck('id');
+            $userIds = DB::table('users')->whereNotIn('id', [2, 5, 6])->pluck('id');
         } elseif ($user->role === 'coordenador') {
-            $userIds = DB::table('users')->where('role', 'advogado')->where('is_active', true)->pluck('id');
+            $userIds = DB::table('users')->where('role', 'advogado')->pluck('id');
         } else {
             $userIds = collect([$user->id]);
         }
@@ -349,6 +358,20 @@ class SisrhController extends Controller
     // ──────────────────────────────────────────
     // HELPERS
     // ──────────────────────────────────────────
+    public function salvarSenioridade(Request $request)
+    {
+        $this->checkAdmin();
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'nivel_senioridade' => 'required|in:Junior,Pleno,Senior_I,Senior_II,Senior_III',
+        ]);
+        DB::table('users')->where('id', $request->user_id)->update([
+            'nivel_senioridade' => $request->nivel_senioridade,
+        ]);
+        $this->auditLog('sisrh_senioridade', 'Nivel user:' . $request->user_id . ' alterado para ' . $request->nivel_senioridade);
+        return back()->with('success', 'Nivel de senioridade atualizado.');
+    }
+
     private function checkAdmin(): void
     {
         if (!in_array(Auth::user()->role, ['admin', 'socio'])) {

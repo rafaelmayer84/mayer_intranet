@@ -13,6 +13,44 @@
         <div class="bg-green-50 border border-green-200 text-green-700 rounded-lg px-4 py-3 mb-4 text-sm">{{ session('success') }}</div>
     @endif
 
+        {{-- Senioridade dos Advogados --}}
+    <div class="bg-white rounded-lg shadow p-4 mb-6">
+        <h2 class="font-semibold mb-3" style="color: #385776;">Nível de Senioridade dos Advogados</h2>
+        <table class="w-full text-sm mb-4">
+            <thead><tr class="border-b"><th class="text-left py-1">Advogado</th><th class="text-left py-1">Role</th><th class="text-left py-1">Nível Atual</th><th class="text-left py-1">Alterar</th></tr></thead>
+            <tbody>
+                @foreach($users as $u)
+                <tr class="border-b border-gray-100">
+                    <td class="py-2">{{ $u->name }}</td>
+                    <td class="py-2 text-xs text-gray-500">{{ $u->role ?? '-' }}</td>
+                    <td class="py-2">
+                        @if($u->nivel_senioridade)
+                            <span class="px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700">{{ str_replace('_', ' ', $u->nivel_senioridade) }}</span>
+                        @else
+                            <span class="text-xs text-red-500">Não definido</span>
+                        @endif
+                    </td>
+                    <td class="py-2">
+                        <form action="{{ route('sisrh.senioridade.salvar') }}" method="POST" class="flex gap-1">
+                            @csrf
+                            <input type="hidden" name="user_id" value="{{ $u->id }}">
+                            <select name="nivel_senioridade" class="border rounded px-2 py-1 text-xs">
+                                <option value="">Selecione</option>
+                                <option value="Junior" {{ $u->nivel_senioridade == 'Junior' ? 'selected' : '' }}>Junior</option>
+                                <option value="Pleno" {{ $u->nivel_senioridade == 'Pleno' ? 'selected' : '' }}>Pleno</option>
+                                <option value="Senior_I" {{ $u->nivel_senioridade == 'Senior_I' ? 'selected' : '' }}>Sênior I</option>
+                                <option value="Senior_II" {{ $u->nivel_senioridade == 'Senior_II' ? 'selected' : '' }}>Sênior II</option>
+                                <option value="Senior_III" {{ $u->nivel_senioridade == 'Senior_III' ? 'selected' : '' }}>Sênior III</option>
+                            </select>
+                            <button type="submit" class="px-2 py-1 rounded text-white text-xs" style="background-color: #385776;">Salvar</button>
+                        </form>
+                    </td>
+                </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {{-- RB por Nível --}}
         <div class="bg-white rounded-lg shadow p-4">
