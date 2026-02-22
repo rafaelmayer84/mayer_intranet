@@ -237,7 +237,7 @@
     @if($pensMes->isNotEmpty())
     <div id="penalizacoes-section" class="rounded-xl border border-red-200 bg-white p-5 shadow-sm">
         <div class="flex items-center justify-between mb-4">
-            <h3 class="text-sm font-semibold text-red-700">⚠️ Penalizações do Mês ({{ $pensMes->count() }})</h3>
+            <h3 class="text-sm font-semibold text-red-700">⚠️ Conformidade do Mês ({{ $pensMes->count() }})</h3>
             <span class="text-xs font-bold text-red-600">-{{ $pensMes->where('contestacao_status', '!=', 'aceita')->sum('pontos_desconto') }} pts</span>
         </div>
         <div class="space-y-2">
@@ -348,7 +348,7 @@ document.addEventListener('DOMContentLoaded', function() {
 @endif
 
 function contestar(penId) {
-    const texto = prompt('Descreva sua justificativa para contestar esta penalização:');
+    const texto = prompt('Descreva sua justificativa para contestar esta ocorrência:');
     fetch('/gdp/penalizacoes/' + penId + '/contestar', {
         method: 'POST',
         headers: {'Content-Type':'application/json','X-CSRF-TOKEN':'{{ csrf_token() }}'},

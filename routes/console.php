@@ -107,3 +107,27 @@ use App\Models\AuditLog;
 Schedule::call(function () {
     AuditLog::olderThan(90)->delete();
 })->dailyAt('03:00')->name('audit-log-cleanup');
+
+// --- NEXO QA: Pesquisa de Qualidade ---
+use App\Models\NexoQaCampaign;
+use App\Jobs\NexoQaWeeklySamplingJob;
+use App\Jobs\NexoQaWeeklyAggregateJob;
+
+Schedule::call(function () {
+    $campaigns = NexoQaCampaign::active()->get();
+    foreach ($campaigns as $campaign) {
+        NexoQaWeeklySamplingJob::dispatch($campaign->id);
+    }
+})->weeklyOn(1, '09:00')
+  ->timezone('America/Sao_Paulo')
+  ->name('nexo-qa-weekly-sampling')
+  ->withoutOverlapping();
+
+Schedule::call(function () {
+    $weekStart = now('America/Sao_Paulo')->startOfWeek(\Carbon\Carbon::MONDAY)->format('Y-m-d');
+    NexoQaWeeklyAggregateJob::dispatch($weekStart);
+})->weeklyOn(0, '22:00')
+  ->timezone('America/Sao_Paulo')
+  ->name('nexo-qa-weekly-aggregate')
+  ->withoutOverlapping();
+

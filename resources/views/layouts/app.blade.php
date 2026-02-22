@@ -310,7 +310,7 @@
                             <span class="ml-2 menu-text">Acordo de Desempenho</span>
                         </a>
                         <a href="{{ route('gdp.penalizacoes') }}" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('gdp.penalizacoes*') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
-                            <span class="ml-2 menu-text">Penalizações</span>
+                            <span class="ml-2 menu-text">Conformidade</span>
                         </a>
                         <a href="{{ route('gdp.eval180.me') }}" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('gdp.eval180*') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
                             <span class="ml-2 menu-text">Avaliações</span>

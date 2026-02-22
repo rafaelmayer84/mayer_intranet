@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'GDP — Penalizações')
+@section('title', 'GDP — Conformidade')
 @section('content')
 <div class="space-y-6">
 
@@ -7,10 +7,10 @@
     <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
             <h1 class="flex items-center gap-2 text-xl font-bold text-gray-900">
-                <span class="text-lg">⚠️</span> GDP — Penalizações
+                <span class="text-lg">⚠️</span> GDP — Conformidade
             </h1>
             <p class="mt-1 text-xs text-gray-500">
-                Gestão de penalizações automáticas e manuais | Competência: {{ str_pad($mes, 2, '0', STR_PAD_LEFT) }}/{{ $ano }}
+                Gestão de conformidade — ocorrências automáticas e manuais | Competência: {{ str_pad($mes, 2, '0', STR_PAD_LEFT) }}/{{ $ano }}
                 @if($ciclo) | Ciclo: {{ $ciclo->nome }} @endif
             </p>
         </div>
@@ -105,7 +105,7 @@
             <thead class="text-xs text-gray-500 uppercase border-b border-gray-100" style="background-color:rgba(56,87,118,0.05)">
                 <tr>
                     <th class="px-4 py-3 text-left">Código</th>
-                    <th class="px-4 py-3 text-left">Penalização</th>
+                    <th class="px-4 py-3 text-left">Ocorrência</th>
                     @if(in_array($user->role, ['admin','coordenador']))
                     <th class="px-4 py-3 text-left">Profissional</th>
                     @endif
@@ -169,7 +169,7 @@
                 @empty
                 <tr>
                     <td colspan="{{ in_array($user->role, ['admin','coordenador']) ? 9 : 8 }}" class="px-4 py-12 text-center text-gray-400">
-                        Nenhuma penalização registrada para este período.
+                        Nenhuma ocorrência registrada para este período.
                     </td>
                 </tr>
                 @endforelse
@@ -182,7 +182,7 @@
 <div id="modal-nova" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
         <div class="px-6 py-4 border-b border-gray-100" style="background-color:rgba(56,87,118,0.05)">
-            <h3 class="text-lg font-semibold text-gray-800">Nova Penalização Manual</h3>
+            <h3 class="text-lg font-semibold text-gray-800">Nova Ocorrência Manual</h3>
         </div>
         <div class="px-6 py-5 space-y-4">
             <div>
@@ -195,7 +195,7 @@
                 </select>
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Penalização</label>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Ocorrência</label>
                 <select id="nova-tipo" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
                     <option value="">Selecione...</option>
                     @foreach($tipos as $t)
@@ -219,7 +219,7 @@
 <div id="modal-detalhes" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
         <div class="px-6 py-4 border-b border-gray-100" style="background-color:rgba(56,87,118,0.05)">
-            <h3 class="text-lg font-semibold text-gray-800">Detalhes da Penalização</h3>
+            <h3 class="text-lg font-semibold text-gray-800">Detalhes da Ocorrência</h3>
         </div>
         <div id="detalhes-body" class="px-6 py-5 text-sm text-gray-700 space-y-2">Carregando...</div>
         <div class="px-6 py-4 border-t border-gray-100 flex justify-end">
@@ -258,7 +258,7 @@ const baseUrl = '{{ url("/gdp/penalizacoes") }}';
 
 function executarScanner() {
     const btn = document.getElementById('btn-scanner');
-    if (!confirm('Executar scanner de penalizações para {{ str_pad($mes, 2, "0", STR_PAD_LEFT) }}/{{ $ano }}?')) return;
+    if (!confirm('Executar scanner de conformidade para {{ str_pad($mes, 2, "0", STR_PAD_LEFT) }}/{{ $ano }}?')) return;
     btn.disabled = true;
     btn.innerHTML = 'Escaneando...';
     fetch(baseUrl + '/scanner', {
@@ -291,7 +291,7 @@ function salvarManual() {
     .then(r => r.json())
     .then(data => {
         if (data.erro) alert('Erro: ' + data.erro);
-        else { alert('Penalização registrada.'); location.reload(); }
+        else { alert('Ocorrência registrada.'); location.reload(); }
     })
     .catch(e => alert('Erro: ' + e.message))
     .finally(() => { document.getElementById('btn-salvar-manual').disabled = false; });
