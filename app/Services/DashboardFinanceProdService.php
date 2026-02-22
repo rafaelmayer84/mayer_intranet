@@ -31,55 +31,9 @@ class DashboardFinanceProdService
  */
 // REMOVIDO: RUBRICAS_EXCLUIDAS - classificacao 100% pela UI
 
-    /**
-     * Cache (curto) de valores distintos do campo "classificacao" em movimentos.
-     *
-     * Importante: este sistema teve ao menos duas versões de schema no histórico:
-     * - classificacao = PF / PJ / DESPESA / OUTRO
-     * - classificacao = RECEITA_PF / RECEITA_PJ / DESPESA / OUTRO
-     *
-     * Para evitar "gráficos em branco" quando o banco estiver na versão antiga,
-     * resolvemos dinamicamente quais valores representam PF/PJ.
-     */
-    private function distinctClassificacoes(): array
-    {
-        return Cache::remember('dash_fin_exec:movimentos:classificacoes', 600, function () {
-            try {
-                return Movimento::query()
-                    ->select('classificacao')
-                    ->distinct()
-                    ->whereNotNull('classificacao')
-                    ->limit(200)
-                    ->pluck('classificacao')
-                    ->filter()
-                    ->values()
-                    ->all();
-            } catch (\Throwable $e) {
-                return [];
-            }
-        });
-    }
 
-        $v = mb_strtolower($v, 'UTF-8');
-        // remove separadores comuns para facilitar matching
-        $v = str_replace([' ', '-', '_', '.', '/', '\\'], '', $v);
-        // remove tudo que não for alfanumérico
-        $v = preg_replace('/[^a-z0-9]/', '', $v) ?? '';
-        return $v;
-    }
 
-    /**
-     * Retorna quais valores de "classificacao" devem ser tratados como Receita PF/PJ.
-     *
-     * @return array{pf: array<int,string>, pj: array<int,string>}
-     */
-    /**
-     * FIN-003: Fonte única — classificacao_regras via UI.
-     */
-    private function resolveReceitaClassificacoes(): array
-    {
-        return ['pf' => ['RECEITA_PF'], 'pj' => ['RECEITA_PJ']];
-    }
+
 
 
 
@@ -90,24 +44,6 @@ class DashboardFinanceProdService
     {
         $vals = $tipo === 'pj' ? ['RECEITA_PJ'] : ['RECEITA_PF'];
         $query->whereIn('classificacao', $vals);
-    }
-
-            // 2) variações (ex: "Receita PF") em bancos com VARCHAR + collation case-insensitive
-            // Evita depender de constantes do Model.
-            $needle = $tipo === 'pj' ? 'pj' : 'pf';
-            $q->orWhereRaw('LOWER(COALESCE(classificacao,\'\')) LIKE ?', ["%{$needle}%"]);
-
-            // 3) fallback por código do plano de contas (quando classificação não separa)
-            if ($planCol && is_array($planos) && count($planos) > 0) {
-                $q->orWhere(function ($qq) use ($planCol, $planos) {
-                    foreach ($planos as $i => $prefix) {
-                        if (!$prefix) continue;
-                        $method = $i === 0 ? 'where' : 'orWhere';
-                        $qq->{$method}($planCol, 'like', $prefix . '%');
-                    }
-                });
-            }
-        });
     }
 
     private function sumReceitaTipo(int $ano, int $mes, string $tipo): float
