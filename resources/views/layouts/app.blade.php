@@ -312,6 +312,14 @@
                         <a href="{{ route('gdp.penalizacoes') }}" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('gdp.penalizacoes*') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
                             <span class="ml-2 menu-text">Conformidade</span>
                         </a>
+                        <a href="/gdp/acompanhamento" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('gdp.acompanhamento*') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
+                            <span class="ml-2 menu-text">Acompanhamento</span>
+                        </a>
+                        @if(in_array(Auth::user()->role, ['admin', 'socio']))
+                        <a href="/gdp/acompanhamento/admin" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('gdp.acompanhamento.admin*') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
+                            <span class="ml-2 menu-text">Acomp. Validação</span>
+                        </a>
+                        @endif
                         <a href="{{ route('gdp.eval180.me') }}" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('gdp.eval180*') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
                             <span class="ml-2 menu-text">Avaliações</span>
                         </a>
@@ -322,6 +330,34 @@
                                 @endif
                     </div>
                 </div>
+
+
+                @if(in_array(Auth::user()->role, ['admin', 'socio', 'coordenador', 'advogado']))
+                    <button onclick="toggleSubmenu('sisrh')" class="nav-link w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors {{ request()->is('sisrh*') ? 'nav-link-active' : '' }}" data-tooltip="SISRH">
+                        <span class="flex items-center gap-3">
+                            <svg class="w-5 h-5 menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <span class="font-medium menu-text">SISRH</span>
+                        </span>
+                        <svg id="arrow-sisrh" class="w-4 h-4 menu-arrow {{ request()->is('sisrh*') ? 'rotated' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div id="submenu-sisrh" class="submenu {{ request()->is('sisrh*') ? 'open' : '' }} ml-4 mt-1 space-y-1">
+                        <a href="/sisrh" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('sisrh.index') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
+                            <span class="ml-2 menu-text">Visão Geral</span>
+                        </a>
+                        @if(in_array(Auth::user()->role, ['admin', 'socio']))
+                        <a href="/sisrh/regras-rb" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('sisrh.regras-rb') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
+                            <span class="ml-2 menu-text">Regras RB/Faixas</span>
+                        </a>
+                        <a href="/sisrh/apuracao" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('sisrh.apuracao') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
+                            <span class="ml-2 menu-text">Apuração</span>
+                        </a>
+                        @endif
+                        <a href="/sisrh/banco-creditos" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('sisrh.banco-creditos') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
+                            <span class="ml-2 menu-text">Banco Créditos</span>
+                        </a>
+                    </div>
+                @endif
+
 
                 <!-- NEXO -->
                 <div class="menu-group">
