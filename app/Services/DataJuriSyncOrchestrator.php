@@ -540,6 +540,16 @@ class DataJuriSyncOrchestrator
         }
 
         // =====================================================================
+        // SANITIZACAO HTML: strip_tags em campos texto (FIX v2.4 - 21/02/2026)
+        // DataJuri retorna HTML em campo "prazo" (ex: <span style='color:red'>Vencido há X dias</span>)
+        // =====================================================================
+        foreach ($data as $k => $v) {
+            if (is_string($v) && str_contains($v, '<')) {
+                $data[$k] = trim(strip_tags($v));
+            }
+        }
+
+        // =====================================================================
         // SANITIZACAO GENERICA DE TIPOS (FIX v2.3 - 18/02/2026)
         // =====================================================================
 

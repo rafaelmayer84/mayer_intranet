@@ -305,7 +305,7 @@ return [
             'label' => 'Contas a Receber',
             'icon' => '💵',
             'table' => 'contas_receber',
-            'campos' => 'id,descricao,valor,dataVencimento,dataPagamento,prazo,tipo,pessoa.nome,pessoaId,cliente.nome,clienteId,processo.pasta,processoId,contrato.numero,contratoId,observacao,dataCadastro',
+            'campos' => 'id,descricao,valor,dataVencimento,dataPagamento,prazo,status,tipo,pessoa.nome,pessoaId,cliente.nome,clienteId,processo.pasta,processoId,contrato.numero,contratoId,observacao,dataCadastro',
             'criterio' => null,
             'mapping' => [
                 'id'                => 'datajuri_id',
@@ -313,7 +313,8 @@ return [
                 'valor'             => 'valor',
                 'dataVencimento'    => 'data_vencimento',
                 'dataPagamento'     => 'data_pagamento',
-                'prazo'             => 'status',
+                // 'prazo'          => 'status',  // REMOVIDO: prazo traz HTML dinâmico
+                'status'            => 'status',  // FIX: usar campo status real da API
                 'tipo'              => 'tipo',
                 'pessoa.nome'       => 'cliente',
                 'pessoaId'          => 'pessoa_datajuri_id',

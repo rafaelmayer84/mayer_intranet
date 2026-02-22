@@ -500,11 +500,10 @@ public function getLucratividadeByMonth(int $ano): array
         $refDate = $this->refDateCompetencia($ano, $mes);
 
         $rows = ContaReceber::query()
-            ->whereNull('data_pagamento')
             ->where('status', 'Não lançado')
             ->whereNotNull('data_vencimento')
-            ->whereDate('data_vencimento', '<=', $refDate->toDateString())
-            ->whereDate('data_vencimento', '>=', $refDate->copy()->subDays(90)->toDateString())
+            ->whereDate('data_vencimento', '<', $refDate->toDateString())
+            ->whereDate('data_vencimento', '>=', $refDate->copy()->subDays(720)->toDateString())
             ->orderBy('data_vencimento')
             ->limit(50)
             ->get();
@@ -644,7 +643,7 @@ public function getLucratividadeByMonth(int $ano): array
             'taxaCobrancaMeta' => (float) Configuracao::get("meta_taxa_cobranca_{$ano}_{$mes}", 95),
             'taxaCobrancaTrend' => $this->percentChange($taxa, $taxaPrev),
             'totalVencido' => $totalAtraso,
-            'totalAberto' => (float) ContaReceber::query()->whereNull('data_pagamento')->where('status', 'Não lançado')->where('data_vencimento', '>=', Carbon::create($ano, $mes, 1)->subDays(720))->sum('valor'),
+            'totalAberto' => (float) ContaReceber::query()->where('status', 'Não lançado')->whereNotNull('data_vencimento')->sum('valor'),
             'inadimplencia' => $this->calcularInadimplencia($ano, $mes),
         ];
     }
@@ -655,9 +654,10 @@ public function getLucratividadeByMonth(int $ano): array
     private function calcularInadimplencia(int $ano, int $mes): float
     {
         $ref = $this->refDateCompetencia($ano, $mes);
+        // FIN-INAD: Em aberto = tudo que NAO e Concluido
         $totalAberto = (float) ContaReceber::query()
-            ->whereNull('data_pagamento')
             ->where('status', 'Não lançado')
+            ->whereNotNull('data_vencimento')
             ->sum('valor');
 
         if ($totalAberto <= 0) return 0.0;
@@ -832,12 +832,15 @@ public function getLucratividadeByMonth(int $ano): array
 
     private function overdueQuery(Carbon $ref)
     {
+        // FIN-INAD DEFINITIVO v2: Mesma lógica UI DataJuri:
+        // status diferente de Concluído + data_vencimento no passado
+        // Após sync, campo status contém: "Concluído", "Não lançado", "Lançado", etc.
+        // Vencido = não concluído + vencimento passado (até 720 dias)
         return ContaReceber::query()
-            ->whereNotIn('status', ['Concluído', 'Concluido', 'Pago', 'Cancelado', 'Excluido', 'Excluído'])
-            ->whereNull('data_pagamento')
+            ->where('status', 'Não lançado')
             ->whereNotNull('data_vencimento')
-            ->whereDate('data_vencimento', '<=', $ref->toDateString())
-            ->whereDate('data_vencimento', '>=', $ref->copy()->subDays(90)->toDateString());
+            ->whereDate('data_vencimento', '<', $ref->toDateString())
+            ->whereDate('data_vencimento', '>=', $ref->copy()->subDays(720)->toDateString());
     }
 
     private function avgDiasAtraso($contas, Carbon $ref): int
@@ -868,14 +871,16 @@ public function getLucratividadeByMonth(int $ano): array
         $end = Carbon::create($ano, $mes, 1)->endOfMonth();
 
         $totalDue = (float) ContaReceber::query()
-            ->where('status', 'Não lançado')
+            ->where('status', 'not like', 'Conclu%')
             ->whereNotNull('data_vencimento')
             ->whereBetween('data_vencimento', [$start->toDateString(), $end->toDateString()])
             ->sum('valor');
 
+        // FIN-INAD: data_pagamento nunca preenchida; usar Concluido + vencimento no mes
         $totalPaid = (float) ContaReceber::query()
-            ->whereNotNull('data_pagamento')
-            ->whereBetween('data_pagamento', [$start->toDateString(), $end->toDateString()])
+            ->where('status', 'like', 'Conclu%')
+            ->whereNotNull('data_vencimento')
+            ->whereBetween('data_vencimento', [$start->toDateString(), $end->toDateString()])
             ->sum('valor');
 
         $taxa = $totalDue > 0 ? round(($totalPaid / $totalDue) * 100, 1) : 0.0;

@@ -131,19 +131,7 @@ class SyncService
                     continue; 
                 }
 
-                // TRAVA DE FUTURO: Se dataVencimento > HOJE, DESCARTAR
-                $dataVencStr = $it["dataVencimento"] ?? null;
-                if ($dataVencStr) {
-                    try {
-                        $venc = \Carbon\Carbon::createFromFormat('d/m/Y', $dataVencStr);
-                        if ($venc->isFuture()) {
-                            $ignored++;
-                            continue;
-                        }
-                    } catch (\Throwable $e) {
-                        // Se a data for inválida, ignoramos o filtro de futuro mas deixamos o map tratar
-                    }
-                }
+                // TRAVA DE FUTURO removida — contas futuras precisam existir no banco
 
 	                // TRAVA DE HTML: O campo prazo agora virá limpo. Se vier "Concluído", DESCARTAR (já pago)
 	                $prazo = $it["prazo"] ?? "";
@@ -354,14 +342,29 @@ class SyncService
         }
         $valor = (float) $valorRaw;
 
+        // Sanitizar campos INT: string vazia → null
+        $intOrNull = function ($v) {
+            if ($v === null || $v === "" || $v === "0" || $v === 0) return null;
+            return (int) $v;
+        };
+
+        // Status: usar campo "prazo" (que traz "Concluído", "Vencido há X dias", etc)
+        // Campo "status" do DataJuri traz "Não lançado" etc — menos útil
+        $statusFinal = $trimOrNull($it["prazo"] ?? null) ?: $trimOrNull($it["status"] ?? null);
+
         return [
             "datajuri_id" => (int) ($it["id"] ?? 0),
             "valor" => $valor,
             "data_vencimento" => $parseDate($dataVenc),
             "data_pagamento" => $parseDate($dataPag),
-            "status" => $trimOrNull($it["status"] ?? null),
+            "status" => $statusFinal,
             "cliente" => (function() use ($trimOrNull, $pessoaNome, $it) { $c = $trimOrNull($pessoaNome); if (!$c) { $c = $trimOrNull($it["descricao"] ?? null); } if ($c === null || $c === "" || $c === "0" || $c === 0) { return "Sem dados"; } return $c; })(),
             "tipo" => $trimOrNull($it["tipo"] ?? "normal"),
+            "pessoa_datajuri_id" => $intOrNull($it["pessoaId"] ?? null),
+            "cliente_datajuri_id" => $intOrNull($it["clienteId"] ?? null),
+            "processo_datajuri_id" => $intOrNull($it["processoId"] ?? null),
+            "descricao" => $trimOrNull($it["descricao"] ?? null),
+            "origem" => "datajuri",
         ];
     }
 
