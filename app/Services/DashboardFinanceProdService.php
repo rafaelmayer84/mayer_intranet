@@ -60,18 +60,6 @@ class DashboardFinanceProdService
         });
     }
 
-    private function normalizeKey(?string $value): string
-    {
-        $v = (string) ($value ?? '');
-        $v = trim($v);
-        if ($v === '') return '';
-
-        // tenta remover acentos (sem depender de extensões externas)
-        $ascii = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $v);
-        if (is_string($ascii) && $ascii !== '') {
-            $v = $ascii;
-        }
-
         $v = mb_strtolower($v, 'UTF-8');
         // remove separadores comuns para facilitar matching
         $v = str_replace([' ', '-', '_', '.', '/', '\\'], '', $v);
@@ -93,41 +81,16 @@ class DashboardFinanceProdService
         return ['pf' => ['RECEITA_PF'], 'pj' => ['RECEITA_PJ']];
     }
 
-    /**
-     * Identifica a coluna mais provável que armazena o código do plano de contas,
-     * para permitir fallback PF/PJ por prefixos quando a "classificacao" não separar.
-     */
-    private function planoCodigoColumn(): ?string
-    {
-        try {
-            foreach (['codigo_plano', 'plano_conta_codigo', 'plano_contas'] as $col) {
-                if (Schema::hasColumn('movimentos', $col)) {
-                    return $col;
-                }
-            }
-        } catch (\Throwable $e) {
-            // ignore
-        }
-        return null;
-    }
+
 
     /**
-     * Aplica filtros de Receita PF/PJ em uma query de Movimentos.
-     *
-     * @param 'pf'|'pj' $tipo
+     * FIN-003: Filtro direto por classificacao. Sem fallbacks.
      */
     private function applyReceitaTipoFilter($query, string $tipo): void
     {
-        $map = $this->resolveReceitaClassificacoes();
-        $vals = $tipo === 'pj' ? $map['pj'] : $map['pf'];
-        $planCol = $this->planoCodigoColumn();
-        $planos = $tipo === 'pj' ? (Movimento::PLANOS_PJ ?? []) : (Movimento::PLANOS_PF ?? []);
-
-        $query->where(function ($q) use ($vals, $planCol, $planos, $tipo) {
-            // 1) classificação direta (cobre PF/PJ e RECEITA_PF/RECEITA_PJ)
-            if (count($vals) > 0) {
-                $q->whereIn('classificacao', $vals);
-            }
+        $vals = $tipo === 'pj' ? ['RECEITA_PJ'] : ['RECEITA_PF'];
+        $query->whereIn('classificacao', $vals);
+    }
 
             // 2) variações (ex: "Receita PF") em bancos com VARCHAR + collation case-insensitive
             // Evita depender de constantes do Model.
