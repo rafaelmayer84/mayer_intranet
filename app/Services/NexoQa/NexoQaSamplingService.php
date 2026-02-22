@@ -126,6 +126,8 @@ class NexoQaSamplingService
                    ->where('crm_identities.kind', 'phone');
             })
             ->where('crm_events.created_at', '>=', $scanWindow)
+            ->whereNotIn('crm_events.type', ['opportunity_imported', 'opportunity_created'])
+            ->whereNotNull('crm_events.created_by_user_id')
             ->select([
                 DB::raw("'CRM_EVENT' as source_type"),
                 DB::raw('crm_events.id as source_id'),

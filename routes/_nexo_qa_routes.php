@@ -10,5 +10,7 @@ Route::middleware(['auth', 'user.active'])->group(function () {
         Route::patch('/{campaign}/toggle-status', [NexoQaController::class, 'toggleStatus'])->name('nexo.qualidade.toggle-status');
         Route::get('/{campaign}/targets', [NexoQaController::class, 'targets'])->name('nexo.qualidade.targets');
         Route::get('/{campaign}/respostas', [NexoQaController::class, 'respostas'])->name('nexo.qualidade.respostas');
+        Route::patch('/{campaign}/config', [NexoQaController::class, 'updateConfig'])->name('nexo.qualidade.update-config');
+        Route::delete('/{campaign}', [NexoQaController::class, 'destroy'])->name('nexo.qualidade.destroy');
     });
 });

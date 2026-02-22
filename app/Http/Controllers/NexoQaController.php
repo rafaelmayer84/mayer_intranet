@@ -22,7 +22,30 @@ class NexoQaController extends Controller
     }
 
     /**
-     * Listagem de campanhas + KPI cards agregados.
+     * Garante que exista uma campanha automática permanente.
+     * Cria na primeira vez, retorna sempre a mesma depois.
+     */
+    private function getOrCreateAutoCampaign(): NexoQaCampaign
+    {
+        $campaign = NexoQaCampaign::first();
+
+        if ($campaign === null) {
+            $campaign = NexoQaCampaign::create([
+                'name' => 'Pesquisa Contínua',
+                'sample_size' => 10,
+                'lookback_days' => 21,
+                'cooldown_days' => 60,
+                'status' => 'DRAFT',
+                'channels' => ['whatsapp'],
+                'created_by_user_id' => Auth::id(),
+            ]);
+        }
+
+        return $campaign;
+    }
+
+    /**
+     * Dashboard de monitoramento.
      * GET /nexo/qualidade
      */
     public function index(Request $request)
@@ -33,9 +56,7 @@ class NexoQaController extends Controller
             abort(403, 'Acesso negado ao módulo NEXO Qualidade.');
         }
 
-        $campaigns = NexoQaCampaign::withCount('targets')
-            ->orderByDesc('created_at')
-            ->get();
+        $campaign = $this->getOrCreateAutoCampaign();
 
         // KPIs globais (últimas 4 semanas)
         $fourWeeksAgo = Carbon::now('America/Sao_Paulo')->subWeeks(4)->startOfWeek(Carbon::MONDAY);
@@ -72,13 +93,41 @@ class NexoQaController extends Controller
             ->orderByDesc('avg_score')
             ->get();
 
+        // Últimos disparos (10 mais recentes)
+        $recentTargets = NexoQaSampledTarget::where('campaign_id', $campaign->id)
+            ->with('responsibleUser')
+            ->orderByDesc('sampled_at')
+            ->limit(10)
+            ->get();
+
+        // Últimas respostas (10 mais recentes)
+        $recentRespostas = DB::table('nexo_qa_sampled_targets as t')
+            ->join('nexo_qa_responses_content as c', 'c.target_id', '=', 't.id')
+            ->join('nexo_qa_responses_identity as i', 'i.target_id', '=', 't.id')
+            ->leftJoin('users as u', 'u.id', '=', 't.responsible_user_id')
+            ->where('t.campaign_id', $campaign->id)
+            ->select(['t.id as target_id', 'u.name as advogado_nome', 'c.score_1_5', 'c.nps', 'c.free_text', 'i.answered_at'])
+            ->orderByDesc('i.answered_at')
+            ->limit(10)
+            ->get();
+
+        // Contadores rápidos
+        $counters = (object) [
+            'total_targets' => NexoQaSampledTarget::where('campaign_id', $campaign->id)->count(),
+            'pending' => NexoQaSampledTarget::where('campaign_id', $campaign->id)->where('send_status', 'PENDING')->count(),
+            'sent' => NexoQaSampledTarget::where('campaign_id', $campaign->id)->where('send_status', 'SENT')->count(),
+            'skipped' => NexoQaSampledTarget::where('campaign_id', $campaign->id)->where('send_status', 'SKIPPED')->count(),
+            'failed' => NexoQaSampledTarget::where('campaign_id', $campaign->id)->where('send_status', 'FAILED')->count(),
+        ];
+
         return view('nexo.qualidade.index', compact(
-            'campaigns', 'globalStats', 'responseRate', 'weeklyTrend', 'ranking'
+            'campaign', 'globalStats', 'responseRate', 'weeklyTrend', 'ranking',
+            'recentTargets', 'recentRespostas', 'counters'
         ));
     }
 
     /**
-     * Detalhes de targets de uma campanha.
+     * Detalhes de targets.
      * GET /nexo/qualidade/{campaign}/targets
      */
     public function targets(Request $request, int $campaignId)
@@ -103,7 +152,7 @@ class NexoQaController extends Controller
     }
 
     /**
-     * Respostas recebidas (conteúdo mascarado).
+     * Respostas recebidas.
      * GET /nexo/qualidade/{campaign}/respostas
      */
     public function respostas(Request $request, int $campaignId)
@@ -142,38 +191,7 @@ class NexoQaController extends Controller
     }
 
     /**
-     * Criar campanha.
-     * POST /nexo/qualidade
-     */
-    public function store(Request $request)
-    {
-        $user = Auth::user();
-        if (!$this->policy->manageCampaigns($user)) {
-            abort(403);
-        }
-
-        $validated = $request->validate([
-            'name' => 'required|string|max:150',
-            'sample_size' => 'required|integer|min:1|max:500',
-            'lookback_days' => 'required|integer|min:1|max:365',
-            'cooldown_days' => 'required|integer|min:1|max:365',
-        ]);
-
-        NexoQaCampaign::create([
-            'name' => $validated['name'],
-            'sample_size' => $validated['sample_size'],
-            'lookback_days' => $validated['lookback_days'],
-            'cooldown_days' => $validated['cooldown_days'],
-            'status' => 'DRAFT',
-            'created_by_user_id' => $user->id,
-        ]);
-
-        return redirect()->route('nexo.qualidade.index')
-            ->with('success', 'Campanha criada com sucesso.');
-    }
-
-    /**
-     * Alternar status da campanha (DRAFT↔ACTIVE, ACTIVE→PAUSED, PAUSED→ACTIVE).
+     * Alternar status: DRAFT→ACTIVE, ACTIVE→PAUSED, PAUSED→ACTIVE.
      * PATCH /nexo/qualidade/{campaign}/toggle-status
      */
     public function toggleStatus(int $campaignId)
@@ -195,6 +213,55 @@ class NexoQaController extends Controller
         $campaign->update(['status' => $newStatus]);
 
         return redirect()->route('nexo.qualidade.index')
-            ->with('success', "Campanha atualizada para {$newStatus}.");
+            ->with('success', "Status alterado para {$newStatus}.");
+    }
+
+    /**
+     * Atualizar configuração da campanha.
+     * PATCH /nexo/qualidade/{campaign}/config
+     */
+    public function updateConfig(Request $request, int $campaignId)
+    {
+        $user = Auth::user();
+        if (!$this->policy->manageCampaigns($user)) {
+            abort(403);
+        }
+
+        $campaign = NexoQaCampaign::findOrFail($campaignId);
+
+        $validated = $request->validate([
+            'sample_size' => 'required|integer|min:1|max:100',
+            'lookback_days' => 'required|integer|min:1|max:90',
+            'cooldown_days' => 'required|integer|min:1|max:365',
+        ]);
+
+        $campaign->update($validated);
+
+        return redirect()->route('nexo.qualidade.index')
+            ->with('success', 'Configuração atualizada.');
+    }
+
+    /**
+     * Excluir campanha e todos os dados relacionados.
+     * DELETE /nexo/qualidade/{campaign}
+     */
+    public function destroy(int $campaignId)
+    {
+        $user = Auth::user();
+        if (!in_array($user->role, ['admin'])) {
+            abort(403);
+        }
+
+        $campaign = NexoQaCampaign::findOrFail($campaignId);
+
+        // Limpar dados relacionados
+        $targetIds = NexoQaSampledTarget::where('campaign_id', $campaign->id)->pluck('id');
+        DB::table('nexo_qa_responses_content')->whereIn('target_id', $targetIds)->delete();
+        DB::table('nexo_qa_responses_identity')->whereIn('target_id', $targetIds)->delete();
+        NexoQaSampledTarget::where('campaign_id', $campaign->id)->delete();
+        $campaign->delete();
+
+        return redirect()->route('nexo.qualidade.index')
+            ->with('success', 'Campanha excluída.');
     }
 }
