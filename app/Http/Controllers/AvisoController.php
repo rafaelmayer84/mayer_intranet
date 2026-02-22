@@ -40,6 +40,9 @@ class AvisoController extends Controller
     {
         abort_unless($aviso->isAtivo(), 404);
 
+        // Registra leitura automaticamente ao abrir o aviso
+        $this->avisoService->marcarComoLido($aviso->id, auth()->id());
+
         $aviso->load(['categoria', 'autor'])->loadCount('usuariosLidos');
         $totalUsuarios = $this->avisoService->getTotalUsuariosAtivos();
         $jaLeu = $this->avisoService->usuarioJaLeu($aviso->id, auth()->id());
