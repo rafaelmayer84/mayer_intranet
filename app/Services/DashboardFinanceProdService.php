@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Configuracao;
 use App\Models\ContaReceber;
 use App\Models\Movimento;
+use App\Services\FinanceiroCalculatorService;
 use App\Models\ClassificacaoRegra;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -23,6 +24,12 @@ use App\Helpers\KpiMetaHelper;
  */
 class DashboardFinanceProdService
 {
+    private FinanceiroCalculatorService $calc;
+
+    public function __construct()
+    {
+        $this->calc = app(FinanceiroCalculatorService::class);
+    }
 /**
  * Palavras-chave de rubricas que NÃO devem ser tratadas como despesa operacional
  * (distribuição de lucros, retirada de sócios, dividendos etc.).
@@ -57,16 +64,11 @@ class DashboardFinanceProdService
 
 
     /**
-     * FIN-009: Soma receitas financeiras e outras receitas operacionais.
+     * FIN-009: Delega para FinanceiroCalculatorService.
      */
     private function sumReceitaFinanceira(int $ano, int $mes): float
     {
-        return (float) abs(
-            Movimento::where('ano', $ano)
-                ->where('mes', $mes)
-                ->whereIn('classificacao', ['RECEITA_FINANCEIRA', 'OUTRAS_RECEITAS'])
-                ->sum('valor')
-        );
+        return $this->calc->sum($ano, $mes, ['RECEITA_FINANCEIRA', 'OUTRAS_RECEITAS']);
     }
     private function sumReceitaTipo(int $ano, int $mes, string $tipo): float
     {

@@ -76,15 +76,17 @@ class BscInsightSnapshotBuilder
                     ->whereYear('data', $m['ano'])
                     ->whereMonth('data', $m['mes']);
 
-                $receitaPF[$m['key']] = (float) (clone $base)->where('classificacao', 'RECEITA_PF')->sum('valor');
-                $receitaPJ[$m['key']] = (float) (clone $base)->where('classificacao', 'RECEITA_PJ')->sum('valor');
-                $despesas[$m['key']]  = (float) (clone $base)->where('classificacao', 'DESPESA')->sum('valor');
-                $deducoes[$m['key']]  = (float) (clone $base)->where('classificacao', 'DEDUCAO')->sum('valor');
+                $calc = app(FinanceiroCalculatorService::class);
+                $dre = $calc->dre($m['ano'], $m['mes']);
+                $receitaPF[$m['key']] = $dre['receita_pf'];
+                $receitaPJ[$m['key']] = $dre['receita_pj'];
+                $despesas[$m['key']]  = -$dre['despesas'];
+                $deducoes[$m['key']]  = -$dre['deducoes'];
             }
 
             $receitaTotal = [];
             foreach ($meses as $m) {
-                $receitaTotal[$m['key']] = $receitaPF[$m['key']] + $receitaPJ[$m['key']];
+                $receitaTotal[$m['key']] = $dre['receita_total'];
             }
 
             $resultado = [];
