@@ -38,14 +38,36 @@ class DashboardFinanceProdService
 
 
     /**
+     * FIN-003: Fonte unica - classificacao_regras via UI.
+     */
+    private function resolveReceitaClassificacoes(): array
+    {
+        return ['pf' => ['RECEITA_PF'], 'pj' => ['RECEITA_PJ']];
+    }
+
+    /**
      * FIN-003: Filtro direto por classificacao. Sem fallbacks.
      */
     private function applyReceitaTipoFilter($query, string $tipo): void
     {
-        $vals = $tipo === 'pj' ? ['RECEITA_PJ'] : ['RECEITA_PF'];
+        $map = $this->resolveReceitaClassificacoes();
+        $vals = $tipo === 'pj' ? $map['pj'] : $map['pf'];
         $query->whereIn('classificacao', $vals);
     }
 
+
+    /**
+     * FIN-009: Soma receitas financeiras e outras receitas operacionais.
+     */
+    private function sumReceitaFinanceira(int $ano, int $mes): float
+    {
+        return (float) abs(
+            Movimento::where('ano', $ano)
+                ->where('mes', $mes)
+                ->whereIn('classificacao', ['RECEITA_FINANCEIRA', 'OUTRAS_RECEITAS'])
+                ->sum('valor')
+        );
+    }
     private function sumReceitaTipo(int $ano, int $mes, string $tipo): float
     {
         $q = Movimento::query()->where('ano', $ano)->where('mes', $mes);
@@ -605,8 +627,7 @@ public function getLucratividadeByMonth(int $ano): array
         $receitaPf = $this->sumReceitaTipo($ano, $mes, 'pf');
         $receitaPj = $this->sumReceitaTipo($ano, $mes, 'pj');
         // FIN-009: Receitas financeiras e outras receitas operacionais
-        $receitaFinanceira = (float) abs(Movimento::where('ano', $ano)->where('mes', $mes)
-            ->whereIn('classificacao', ['RECEITA_FINANCEIRA', 'OUTRAS_RECEITAS'])->sum('valor'));
+        $receitaFinanceira = $this->sumReceitaFinanceira($ano, $mes);
         $receitaTotal = $receitaPf + $receitaPj + $receitaFinanceira;
 
         // FIN-001: Deducoes ativas
@@ -619,8 +640,7 @@ public function getLucratividadeByMonth(int $ano): array
 
         $receitaPfPrev = $this->sumReceitaTipo($pAno, $pMes, 'pf');
         $receitaPjPrev = $this->sumReceitaTipo($pAno, $pMes, 'pj');
-        $receitaFinanceiraPrev = (float) abs(Movimento::where('ano', $pAno)->where('mes', $pMes)
-            ->whereIn('classificacao', ['RECEITA_FINANCEIRA', 'OUTRAS_RECEITAS'])->sum('valor'));
+        $receitaFinanceiraPrev = $this->sumReceitaFinanceira($pAno, $pMes);
         $receitaPrev = $receitaPfPrev + $receitaPjPrev + $receitaFinanceiraPrev;
         $deducoesPrev = (float) $this->deducoesTotal($pAno, $pMes);
         $despesasPrev = (float) $this->despesasOperacionaisTotal($pAno, $pMes);
@@ -629,7 +649,7 @@ public function getLucratividadeByMonth(int $ano): array
         // FIX: YoY compara mesmo mes do ano anterior
         $yoyAno = $ano - 1;
         $receitaYoYPrev = $this->sumReceitaTipo($yoyAno, $mes, 'pf') + $this->sumReceitaTipo($yoyAno, $mes, 'pj')
-            + (float) abs(Movimento::where('ano', $yoyAno)->where('mes', $mes)->whereIn('classificacao', ['RECEITA_FINANCEIRA', 'OUTRAS_RECEITAS'])->sum('valor'));
+            + $this->sumReceitaFinanceira($yoyAno, $mes);
 
         $metaPf = (float) KpiMetaHelper::get('receita_pf', $ano, $mes, 0);
         $metaPj = (float) KpiMetaHelper::get('receita_pj', $ano, $mes, 0);
@@ -694,8 +714,7 @@ public function getLucratividadeByMonth(int $ano): array
     {
         $receitaPf = $this->sumReceitaTipo($ano, $mes, 'pf');
         $receitaPj = $this->sumReceitaTipo($ano, $mes, 'pj');
-        $receitaFin = (float) abs(Movimento::where('ano', $ano)->where('mes', $mes)
-            ->whereIn('classificacao', ['RECEITA_FINANCEIRA', 'OUTRAS_RECEITAS'])->sum('valor'));
+        $receitaFin = $this->sumReceitaFinanceira($ano, $mes);
         $receita = $receitaPf + $receitaPj + $receitaFin;
 
         $deducoes = (float) $this->deducoesTotal($ano, $mes);
