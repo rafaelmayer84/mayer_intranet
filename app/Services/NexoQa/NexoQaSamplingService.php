@@ -51,15 +51,10 @@ class NexoQaSamplingService
             $phoneE164 = NexoQaResolverService::normalizePhone($candidate->phone);
             $phoneHash = hash('sha256', $phoneE164);
 
-            // Resolver responsável
-            $responsibleUserId = $this->resolver->resolveResponsibleUser(
-                $candidate->source_type,
-                $candidate->source_id,
-                $phoneHash
-            );
-
-            // Resolver última interação
-            $lastInteraction = $this->resolver->resolveLastInteractionAt($phoneE164);
+            // Responsável vem direto do candidato (created_by_user_id ou assigned_user_id)
+            $responsibleUserId = isset($candidate->responsible_user_id) && $candidate->responsible_user_id
+                ? (int) $candidate->responsible_user_id
+                : $this->resolver->resolveResponsibleUser($candidate->source_type, $candidate->source_id, $phoneHash);
 
             // Se não tem responsável → SKIPPED
             $sendStatus = $responsibleUserId === null ? 'SKIPPED' : 'PENDING';
@@ -68,11 +63,11 @@ class NexoQaSamplingService
             NexoQaSampledTarget::create([
                 'campaign_id' => $campaign->id,
                 'source_type' => $candidate->source_type,
-                'source_id' => $candidate->source_id,
+                'source_id' => (int) $candidate->source_id,
                 'phone_e164' => $phoneE164,
                 'phone_hash' => $phoneHash,
                 'responsible_user_id' => $responsibleUserId,
-                'last_interaction_at' => $lastInteraction,
+                'last_interaction_at' => $now,
                 'sampled_at' => $now,
                 'send_status' => $sendStatus,
                 'skip_reason' => $skipReason,
@@ -92,16 +87,21 @@ class NexoQaSamplingService
     }
 
     /**
-     * Monta o universo elegível combinando DataJuri e NEXO.
+     * Monta o universo elegível baseado em INTERAÇÕES RECENTES:
+     * 1. crm_events (stage_changed, lead_status_changed, etc.)
+     * 2. crm_activities com done_at preenchido
+     * 3. wa_conversations com last_message_at recente
+     *
+     * Aplica cooldown e opt-out para não repetir pesquisa.
      */
     private function buildEligibleUniverse(NexoQaCampaign $campaign, Carbon $now): Collection
     {
         $cooldownDate = $now->copy()->subDays($campaign->cooldown_days);
-        $lookbackDate = $campaign->lookback_days > 0
+        $scanWindow = $campaign->lookback_days > 0
             ? $now->copy()->subDays($campaign->lookback_days)
-            : null;
+            : $now->copy()->subDays(7);
 
-        // Telefones que já receberam pesquisa no cooldown (por phone_hash + campaign)
+        // Telefones que já receberam pesquisa no cooldown
         $recentPhoneHashes = DB::table('nexo_qa_sampled_targets')
             ->where('campaign_id', $campaign->id)
             ->where('sampled_at', '>=', $cooldownDate)
@@ -116,58 +116,103 @@ class NexoQaSamplingService
 
         $excludedHashes = array_unique(array_merge($recentPhoneHashes, $optedOutHashes));
 
-        // Fonte 1: Clientes DataJuri com telefone válido
-        $dataJuriQuery = DB::table('clientes')
-            ->select([
-                DB::raw("'DATAJURI' as source_type"),
-                DB::raw('datajuri_id as source_id'),
-                DB::raw("COALESCE(celular, telefone) as phone"),
-            ])
-            ->where(function ($q) {
-                $q->whereNotNull('celular')->where('celular', '!=', '')
-                    ->orWhere(function ($q2) {
-                        $q2->whereNotNull('telefone')->where('telefone', '!=', '');
-                    });
-            });
+        $allCandidates = collect();
+        $seenHashes = [];
 
-        // Fonte 2: Conversas NEXO com telefone
-        $nexoQuery = DB::table('wa_conversations')
+        // --- FONTE 1: CRM Events recentes ---
+        $crmEvents = DB::table('crm_events')
+            ->join('crm_identities', function ($j) {
+                $j->on('crm_identities.account_id', '=', 'crm_events.account_id')
+                   ->where('crm_identities.kind', 'phone');
+            })
+            ->where('crm_events.created_at', '>=', $scanWindow)
+            ->select([
+                DB::raw("'CRM_EVENT' as source_type"),
+                DB::raw('crm_events.id as source_id'),
+                DB::raw('crm_identities.value as phone'),
+                DB::raw('crm_events.created_by_user_id as responsible_user_id'),
+            ])
+            ->get();
+
+        foreach ($crmEvents as $row) {
+            $this->addCandidate($allCandidates, $seenHashes, $excludedHashes, $row);
+        }
+
+        // --- FONTE 2: CRM Activities concluídas ---
+        $crmActivities = DB::table('crm_activities')
+            ->join('crm_identities', function ($j) {
+                $j->on('crm_identities.account_id', '=', 'crm_activities.account_id')
+                   ->where('crm_identities.kind', 'phone');
+            })
+            ->whereNotNull('crm_activities.done_at')
+            ->where('crm_activities.done_at', '>=', $scanWindow)
+            ->select([
+                DB::raw("'CRM_ACTIVITY' as source_type"),
+                DB::raw('crm_activities.id as source_id'),
+                DB::raw('crm_identities.value as phone'),
+                DB::raw('crm_activities.created_by_user_id as responsible_user_id'),
+            ])
+            ->get();
+
+        foreach ($crmActivities as $row) {
+            $this->addCandidate($allCandidates, $seenHashes, $excludedHashes, $row);
+        }
+
+        // --- FONTE 3: Conversas NEXO com mensagem recente ---
+        $nexoConversations = DB::table('wa_conversations')
+            ->whereNotNull('phone')
+            ->where('phone', '!=', '')
+            ->where('last_message_at', '>=', $scanWindow)
             ->select([
                 DB::raw("'NEXO' as source_type"),
                 DB::raw('id as source_id'),
                 'phone',
+                DB::raw('assigned_user_id as responsible_user_id'),
             ])
-            ->whereNotNull('phone')
-            ->where('phone', '!=', '');
+            ->get();
 
-        // Aplicar lookback se configurado (filtrar por última interação)
-        if ($lookbackDate !== null) {
-            $nexoQuery->where('updated_at', '>=', $lookbackDate);
+        foreach ($nexoConversations as $row) {
+            $this->addCandidate($allCandidates, $seenHashes, $excludedHashes, $row);
         }
 
-        // Combinar fontes
-        $allCandidates = collect();
-
-        foreach ([$dataJuriQuery->get(), $nexoQuery->get()] as $batch) {
-            foreach ($batch as $row) {
-                if (empty($row->phone)) {
-                    continue;
-                }
-                $normalized = NexoQaResolverService::normalizePhone($row->phone);
-                if (strlen($normalized) < 12) {
-                    continue; // Telefone inválido (precisa ter pelo menos 55+DDD+8dig)
-                }
-                $hash = hash('sha256', $normalized);
-                if (in_array($hash, $excludedHashes, true)) {
-                    continue;
-                }
-                // Deduplicar por phone_hash
-                if (!$allCandidates->contains(fn($c) => hash('sha256', NexoQaResolverService::normalizePhone($c->phone)) === $hash)) {
-                    $allCandidates->push($row);
-                }
-            }
-        }
+        Log::info('[NexoQA] Universo elegível construído', [
+            'campaign_id' => $campaign->id,
+            'crm_events' => $crmEvents->count(),
+            'crm_activities' => $crmActivities->count(),
+            'nexo_conversations' => $nexoConversations->count(),
+            'total_elegivel' => $allCandidates->count(),
+            'excluidos_cooldown' => count($recentPhoneHashes),
+            'excluidos_optout' => count($optedOutHashes),
+        ]);
 
         return $allCandidates;
+    }
+
+    /**
+     * Adiciona candidato se telefone válido, não excluído e não duplicado.
+     */
+    private function addCandidate(Collection &$candidates, array &$seenHashes, array $excludedHashes, object $row): void
+    {
+        if (empty($row->phone)) {
+            return;
+        }
+
+        $normalized = NexoQaResolverService::normalizePhone($row->phone);
+        if (strlen($normalized) < 12) {
+            return;
+        }
+
+        $hash = hash('sha256', $normalized);
+
+        if (in_array($hash, $excludedHashes, true)) {
+            return;
+        }
+
+        if (isset($seenHashes[$hash])) {
+            return;
+        }
+
+        $seenHashes[$hash] = true;
+        $candidates->push($row);
     }
 }

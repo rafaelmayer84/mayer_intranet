@@ -118,9 +118,9 @@ Schedule::call(function () {
     foreach ($campaigns as $campaign) {
         NexoQaWeeklySamplingJob::dispatch($campaign->id);
     }
-})->weeklyOn(1, '09:00')
+})->dailyAt('20:00')
   ->timezone('America/Sao_Paulo')
-  ->name('nexo-qa-weekly-sampling')
+  ->name('nexo-qa-daily-sampling')
   ->withoutOverlapping();
 
 Schedule::call(function () {
