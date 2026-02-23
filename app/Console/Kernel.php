@@ -14,6 +14,7 @@ class Kernel extends ConsoleKernel
      */
     protected $commands = [
         Commands\CronSyncDataJuri::class,
+        Commands\CronGdpApurar::class,
         // CronSyncEspoCrm removido em 13/02/2026
     ];
 
@@ -37,6 +38,20 @@ class Kernel extends ConsoleKernel
             ->dailyAt('18:00')
             ->timezone('America/Sao_Paulo')
             ->appendOutputTo(storage_path('logs/cron-datajuri.log'));
+
+        // GDP Apuracao → 3x/dia (02:30, 10:30, 18:30 - apos sync DataJuri)
+        $schedule->command('cron:gdp-apurar')
+            ->dailyAt('02:30')
+            ->timezone('America/Sao_Paulo')
+            ->appendOutputTo(storage_path('logs/cron-gdp.log'));
+        $schedule->command('cron:gdp-apurar')
+            ->dailyAt('10:30')
+            ->timezone('America/Sao_Paulo')
+            ->appendOutputTo(storage_path('logs/cron-gdp.log'));
+        $schedule->command('cron:gdp-apurar')
+            ->dailyAt('18:30')
+            ->timezone('America/Sao_Paulo')
+            ->appendOutputTo(storage_path('logs/cron-gdp.log'));
 
         // ESPO CRM → 2x/dia (9h, 17h)
         $schedule->command('cron:sync-espo')

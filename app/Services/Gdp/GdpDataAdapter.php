@@ -194,13 +194,13 @@ class GdpDataAdapter
         foreach ($conversas as $convId) {
             $firstIn = DB::table('wa_messages')
                 ->where('conversation_id', $convId)
-                ->where('direction', 'incoming')
+                ->where('direction', 1)
                 ->orderBy('created_at')
                 ->value('created_at');
 
             $firstOut = DB::table('wa_messages')
                 ->where('conversation_id', $convId)
-                ->where('direction', 'outgoing')
+                ->where('direction', 2)
                 ->orderBy('created_at')
                 ->value('created_at');
 
@@ -238,7 +238,7 @@ class GdpDataAdapter
                 $q->select(DB::raw(1))
                     ->from('wa_messages')
                     ->whereColumn('wa_messages.conversation_id', 'wa_conversations.id')
-                    ->where('wa_messages.direction', 'outgoing');
+                    ->where('wa_messages.direction', 2);
             })
             ->count();
 
@@ -255,7 +255,7 @@ class GdpDataAdapter
                     $q->select(DB::raw(1))
                         ->from('wa_messages')
                         ->whereColumn('wa_messages.conversation_id', 'wa_conversations.id')
-                        ->where('wa_messages.direction', 'outgoing');
+                        ->where('wa_messages.direction', 2);
                 })
                 ->where('created_at', '<=', Carbon::now()->subHours(24))
                 ->count();

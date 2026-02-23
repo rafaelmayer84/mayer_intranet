@@ -103,10 +103,14 @@ class GdpScoreService
             $percentual = null;
             $scorePonderado = null;
 
-            if ($valorApurado !== null && $meta !== null && (float) $meta > 0) {
+            if ($valorApurado !== null && $meta !== null && (float) $meta >= 0) {
                 $metaFloat = (float) $meta;
 
-                if ($indicador->direcao === 'menor_melhor') {
+                if ($metaFloat == 0) {
+                    // Meta zero = atingimento 100% (qualquer resultado vale)
+                    $percentual = 100.0;
+                } else
+if ($indicador->direcao === 'menor_melhor') {
                     $percentual = $valorApurado > 0
                         ? ($metaFloat / $valorApurado) * 100
                         : 100.0;
@@ -151,11 +155,22 @@ class GdpScoreService
             $pesosEixo[$eixo->codigo] = (float) $eixo->peso;
         }
 
+        // Calcular soma dos pesos dos indicadores por eixo (para normalizar)
+        $somaPesosIndPorEixo = [];
+        foreach ($indicadores as $ind) {
+            $ec = $ind->eixo->codigo;
+            $somaPesosIndPorEixo[$ec] = ($somaPesosIndPorEixo[$ec] ?? 0) + (float) $ind->peso;
+        }
+
         $scoreTotal = 0;
         foreach ($scoresPorEixo as $eixoCod => $scoreEixo) {
             $pesoEixo = $pesosEixo[$eixoCod] ?? 0;
-            $scoreTotal += ($scoreEixo / 100) * $pesoEixo;
+            $somaPesosInd = $somaPesosIndPorEixo[$eixoCod] ?? 100;
+            // Normalizar: scoreEixo / somaMaxPesos = fração 0..1.2, * pesoEixo = contribuição
+            $contribuicao = ($somaPesosInd > 0) ? ($scoreEixo / $somaPesosInd) * $pesoEixo : 0;
+            $scoreTotal += $contribuicao;
         }
+        $scoreTotal = min(round($scoreTotal, 2), 100.0);
 
         // Buscar nota Eval180 do período (nota do gestor, se submetida)
         $eval180Score = $this->getEval180Score($ciclo->id, $user->id, $mes, $ano);
@@ -185,10 +200,10 @@ class GdpScoreService
                 'ano'      => $ano,
             ],
             [
-                'score_juridico'        => round($scoresPorEixo['JURIDICO'], 2),
-                'score_financeiro'      => round($scoresPorEixo['FINANCEIRO'], 2),
-                'score_desenvolvimento' => round($scoresPorEixo['DESENVOLVIMENTO'], 2),
-                'score_atendimento'     => round($scoresPorEixo['ATENDIMENTO'], 2),
+                'score_juridico'        => min(round(($somaPesosIndPorEixo['JURIDICO'] ?? 100) > 0 ? ($scoresPorEixo['JURIDICO'] / $somaPesosIndPorEixo['JURIDICO']) * 100 : 0, 2), 100),
+                'score_financeiro'      => min(round(($somaPesosIndPorEixo['FINANCEIRO'] ?? 100) > 0 ? ($scoresPorEixo['FINANCEIRO'] / $somaPesosIndPorEixo['FINANCEIRO']) * 100 : 0, 2), 100),
+                'score_desenvolvimento' => min(round(($somaPesosIndPorEixo['DESENVOLVIMENTO'] ?? 100) > 0 ? ($scoresPorEixo['DESENVOLVIMENTO'] / $somaPesosIndPorEixo['DESENVOLVIMENTO']) * 100 : 0, 2), 100),
+                'score_atendimento'     => min(round(($somaPesosIndPorEixo['ATENDIMENTO'] ?? 100) > 0 ? ($scoresPorEixo['ATENDIMENTO'] / $somaPesosIndPorEixo['ATENDIMENTO']) * 100 : 0, 2), 100),
                 'score_eval180'         => $eval180Score,
                 'score_total_original'  => round($scoreTotalOriginal, 2),
                 'score_total'           => round($scoreTotal, 2),

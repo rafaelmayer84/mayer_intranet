@@ -307,6 +307,7 @@ class NexoConversationSyncService
             'provider_message_id' => data_get($result, 'data.id') ?? data_get($result, 'data.message_id'),
             'direction'           => WaMessage::DIRECTION_OUTGOING,
             'is_human'            => true,
+            'user_id'             => $userId,
             'message_type'        => 'text',
             'body'                => $text,
             'sent_at'             => now(),
@@ -314,7 +315,7 @@ class NexoConversationSyncService
 
         $updateData = ['last_message_at' => now()];
         if (!$conversation->first_response_at) $updateData['first_response_at'] = now();
-        if (!$conversation->assigned_user_id) $updateData['assigned_user_id'] = $userId;
+        $updateData['assigned_user_id'] = $userId;
         $updateData['unread_count'] = 0;
         $conversation->update($updateData);
 
