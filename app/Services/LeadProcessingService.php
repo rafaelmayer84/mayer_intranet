@@ -575,6 +575,51 @@ PROMPT;
     /**
      * Verificar se nome é lixo (vara, tribunal, robô, etc.)
      */
+    /**
+     * Normalizar nome de cidade
+     */
+    public static function normalizarCidade(string $cidade): string
+    {
+        $cidade = trim($cidade);
+        if ($cidade === '') return '';
+
+        // Remover UF no final (", SC", " - SC", "/SC")
+        $cidade = preg_replace('/[,\\s\\-\\/]+(SC|PR|RS|SP|RJ|MG|BA|CE|PE|GO|DF|MT|MS|PA|AM|MA|PI|RN|PB|AL|SE|ES|RO|AC|AP|RR|TO)\\s*$/i', '', $cidade);
+
+        // Descartar se parece endereco
+        $lower = mb_strtolower($cidade);
+        $enderecoPatterns = ['rua ', 'av ', 'av.', 'avenida ', 'travessa ', 'rod ', 'rodovia ', 'alameda ', '/bl', ' bl ', ' ap ', ' apto', ' sala ', ' lote '];
+        foreach ($enderecoPatterns as $p) {
+            if (str_contains($lower, $p)) return '';
+        }
+        if (preg_match('/\\d+\\//', $cidade) || preg_match('/\\d{5}-?\\d{3}/', $cidade)) return '';
+
+        $cidade = mb_convert_case(mb_strtolower($cidade), MB_CASE_TITLE, 'UTF-8');
+        $cidade = str_replace([' De ', ' Do ', ' Da ', ' Dos ', ' Das ', ' E '], [' de ', ' do ', ' da ', ' dos ', ' das ', ' e '], $cidade);
+
+        $mapa = [
+            'Florianopolis' => 'Florian\xc3\xb3polis',
+            'Balneario Camboriu' => 'Balne\xc3\xa1rio Cambori\xc3\xba',
+            'Balneario Cambori\xc3\xba' => 'Balne\xc3\xa1rio Cambori\xc3\xba',
+            'Balne\xc3\xa1rio Camboriu' => 'Balne\xc3\xa1rio Cambori\xc3\xba',
+            'Itajai' => 'Itaja\xc3\xad',
+            'Jaragua do Sul' => 'Jaragu\xc3\xa1 do Sul',
+            'Sao Jose' => 'S\xc3\xa3o Jos\xc3\xa9',
+            'Sao Paulo' => 'S\xc3\xa3o Paulo',
+            'Santa Lidia' => 'Santa L\xc3\xaddia',
+            'Camboriu' => 'Cambori\xc3\xba',
+            'Criciuma' => 'Crici\xc3\xbama',
+            'Chapeco' => 'Chapec\xc3\xb3',
+            'Timbo' => 'Timb\xc3\xb3',
+        ];
+
+        if (isset($mapa[$cidade])) {
+            $cidade = $mapa[$cidade];
+        }
+
+        return trim($cidade);
+    }
+
     private function isNomeLixo(string $nome): bool
     {
         if (empty(trim($nome))) return true;
@@ -724,6 +769,7 @@ PROMPT;
             }
 
             $cidade = $variables['Cidade'] ?? $variables['cidade'] ?? '';
+            $cidade = self::normalizarCidade($cidade);
             $gclid = $variables['GCLID'] ?? $variables['gclid'] ?? '';
 
             // Usar nome completo do fluxo se disponível
@@ -767,7 +813,7 @@ PROMPT;
 
             // Prioridade: webhook > IA > vazio
             if (empty($cidade) && !empty($aiResult['cidade'])) {
-                $cidade = $aiResult['cidade'];
+                $cidade = self::normalizarCidade($aiResult['cidade']);
             }
             if (empty($area) && !empty($aiResult['area_direito'])) {
                 $area = $aiResult['area_direito'];
