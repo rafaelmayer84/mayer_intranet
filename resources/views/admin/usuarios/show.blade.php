@@ -158,7 +158,7 @@
                                                 </label>
                                                 <div>
                                                     <p class="text-sm font-medium text-gray-900 dark:text-white">
-                                                        {!! \App\Helpers\IconHelper::render($item['modulo']->icone, 'w-5 h-5 text-gray-500 dark:text-gray-400 mr-2 flex-shrink-0') !!}
+                                                        {!! \App\Helpers\IconHelper::render($item['modulo']->icone ?? 'circle', 'w-5 h-5 text-gray-500 dark:text-gray-400 mr-2 flex-shrink-0') !!}
                                                     <span>{{ $item['modulo']->nome }}</span>
                                                     </p>
                                                     <p class="text-xs text-gray-500 dark:text-gray-400">{{ $item['modulo']->descricao }}</p>

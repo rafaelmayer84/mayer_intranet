@@ -524,10 +524,16 @@ class GdpController extends Controller
         $query = GdpPenalizacao::with(['tipo', 'usuario'])
             ->where('mes', $mes)->where('ano', $ano);
 
-        if ($user->role === 'socio') {
+        if (in_array($user->role, ['socio', 'advogado'])) {
             $query->where('user_id', $user->id);
-        }
-        if (in_array($user->role, ['admin','coordenador']) && $request->filled('user_id')) {
+        } elseif ($user->role === 'coordenador') {
+            $equipe = \App\Models\User::whereIn('role', ['advogado','socio','coordenador'])->pluck('id')->toArray();
+            if ($request->filled('user_id') && in_array($request->input('user_id'), $equipe)) {
+                $query->where('user_id', $request->input('user_id'));
+            } else {
+                $query->whereIn('user_id', $equipe);
+            }
+        } elseif ($user->role === 'admin' && $request->filled('user_id')) {
             $query->where('user_id', $request->input('user_id'));
         }
         if ($request->filled('eixo_id')) {

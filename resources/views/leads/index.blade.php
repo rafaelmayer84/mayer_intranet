@@ -24,7 +24,16 @@
 
     {{-- FILTROS --}}
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" >
-        <form method="GET" action="{{ route('leads.index') }}" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <form method="GET" action="{{ route('leads.index') }}" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
+            <div class="col-span-2 md:col-span-3 lg:col-span-7 mb-1">
+                <div class="relative">
+                    <input type="text" name="busca" value="{{ request('busca') }}" placeholder="Buscar por nome, telefone, cidade, area ou palavras-chave..." class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm pl-10 pr-4 py-2" autocomplete="off">
+                    <svg class="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    @if(request('busca'))
+                        <a href="{{ route('leads.index') }}" class="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 text-xs">x Limpar</a>
+                    @endif
+                </div>
+            </div>
             <select name="periodo" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm" onchange="this.form.submit()">
                 <option value="todos" {{ $filtroPeriodo == 'todos' ? 'selected' : '' }}>Todo período</option>
                 <option value="hoje" {{ $filtroPeriodo == 'hoje' ? 'selected' : '' }}>Hoje</option>

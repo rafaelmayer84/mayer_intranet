@@ -30,6 +30,7 @@ class LeadController extends Controller
         $filtroIntencao = $request->get('intencao', 'todos');
         $filtroOrigem = $request->get('origem', 'todos');
         $filtroPotencial = $request->get('potencial', 'todos');
+        $busca = trim($request->get('busca', ''));
 
         // Query base com filtros
         $query = Lead::query()
@@ -38,6 +39,18 @@ class LeadController extends Controller
             ->periodo($filtroPeriodo)
             ->intencao($filtroIntencao)
             ->where("status", "!=", "arquivado");
+
+        // Busca textual
+        if ($busca !== '') {
+            $query->where(function ($q) use ($busca) {
+                $q->where('nome', 'LIKE', "%{$busca}%")
+                  ->orWhere('telefone', 'LIKE', "%{$busca}%")
+                  ->orWhere('resumo_demanda', 'LIKE', "%{$busca}%")
+                  ->orWhere('cidade', 'LIKE', "%{$busca}%")
+                  ->orWhere('area_interesse', 'LIKE', "%{$busca}%")
+                  ->orWhere('palavras_chave', 'LIKE', "%{$busca}%");
+            });
+        }
 
         // Filtros adicionais
         if ($filtroOrigem !== 'todos') {

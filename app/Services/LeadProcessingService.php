@@ -563,6 +563,61 @@ PROMPT;
     }
 
     /**
+     * Tags de área jurídica válidas (indica fluxo completo do bot)
+     */
+    private const AREA_TAGS = [
+        'trabalhista', 'trabalhista/previdenciário', 'previdenciário',
+        'civil', 'cível', 'penal', 'empresarial', 'família',
+        'consumidor', 'tributário', 'imobiliário', 'contratual',
+        'bancário', 'trânsito', 'mediação', 'outras áreas', 'outra',
+    ];
+
+    /**
+     * Verificar se nome é lixo (vara, tribunal, robô, etc.)
+     */
+    private function isNomeLixo(string $nome): bool
+    {
+        if (empty(trim($nome))) return true;
+        $lower = mb_strtolower(trim($nome));
+        $patterns = [
+            'vara ', 'tribunal', 'comarca', 'juízo', 'juizo',
+            'fórum', 'forum', 'cartório', 'cartorio', 'serventia',
+            'secretaria da', 'gabinete', 'defensoria', 'ministério público',
+            'ministerio publico', 'procuradoria', 'delegacia',
+            'sala de audiência', 'sala de audiencia',
+        ];
+        foreach ($patterns as $p) {
+            if (str_contains($lower, $p)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Verificar se contato completou o fluxo do bot (tem tag de área jurídica)
+     */
+    private function contatoComFluxoCompleto(?string $contactId): array
+    {
+        if (!$contactId) return ['completo' => false, 'tags' => [], 'variables' => []];
+
+        try {
+            $service = app(\App\Services\SendPulseWhatsAppService::class);
+            $info = $service->getContactInfo($contactId);
+            $tags = $info['data']['tags'] ?? $info['tags'] ?? [];
+            $variables = $info['data']['variables'] ?? $info['variables'] ?? [];
+
+            foreach ($tags as $tag) {
+                if (in_array(mb_strtolower(trim($tag)), self::AREA_TAGS)) {
+                    return ['completo' => true, 'tags' => $tags, 'variables' => $variables];
+                }
+            }
+            return ['completo' => false, 'tags' => $tags, 'variables' => $variables];
+        } catch (\Throwable $e) {
+            Log::warning('Erro ao verificar fluxo do contato', ['contact_id' => $contactId, 'error' => $e->getMessage()]);
+            return ['completo' => false, 'tags' => [], 'variables' => []];
+        }
+    }
+
+    /**
      * Processar lead completo (método principal)
      */
     public function processLead(array $webhookData): ?Lead
@@ -599,7 +654,37 @@ PROMPT;
                 return null;
             }
 
-            // Idempotência
+            // ========== FILTRO 1: Telefone vazio ==========
+            $telefoneClean = preg_replace('/[^0-9]/', '', $telefone);
+            if (strlen($telefoneClean) < 10) {
+                Log::info('processLead: telefone vazio/invalido, ignorando', ['telefone' => $telefone]);
+                return null;
+            }
+
+            // ========== FILTRO 2: Nome lixo (varas, tribunais, robôs) ==========
+            if ($this->isNomeLixo($nome)) {
+                Log::info('processLead: nome filtrado como lixo', ['nome' => $nome, 'telefone' => $telefone]);
+                return null;
+            }
+
+            // ========== FILTRO 3: Fluxo do bot completo? ==========
+            $fluxo = $this->contatoComFluxoCompleto($contactId);
+            if (!$fluxo['completo']) {
+                Log::info('processLead: contato sem tag de area juridica (fluxo incompleto), ignorando', [
+                    'contact_id' => $contactId, 'nome' => $nome, 'tags' => $fluxo['tags']
+                ]);
+                return null;
+            }
+
+            // Mesclar variáveis do SendPulse (prioridade: API > webhook)
+            if (!empty($fluxo['variables'])) {
+                $variables = array_merge($variables, $fluxo['variables']);
+            }
+            if (!empty($fluxo['tags'])) {
+                $tags = array_unique(array_merge($tags, $fluxo['tags']));
+            }
+
+            // ========== IDEMPOTÊNCIA ATÔMICA ==========
             $existingLead = Lead::where('telefone', $telefone)->first();
 
             if ($existingLead) {
@@ -640,6 +725,12 @@ PROMPT;
 
             $cidade = $variables['Cidade'] ?? $variables['cidade'] ?? '';
             $gclid = $variables['GCLID'] ?? $variables['gclid'] ?? '';
+
+            // Usar nome completo do fluxo se disponível
+            $nomeCompleto = $variables['nomecompleto'] ?? $variables['Nomecompleto'] ?? '';
+            if (!empty($nomeCompleto)) {
+                $nome = $nomeCompleto;
+            }
 
             // Se sem mensagens, criar lead básico
             if (!$chatMessages || $msgCount === 0) {

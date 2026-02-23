@@ -341,10 +341,10 @@
                         <svg id="arrow-sisrh" class="w-4 h-4 menu-arrow {{ request()->is('sisrh*') ? 'rotated' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                     </button>
                     <div id="submenu-sisrh" class="submenu {{ request()->is('sisrh*') ? 'open' : '' }} ml-4 mt-1 space-y-1">
+                        @if(Auth::user()->role === 'admin')
                         <a href="/sisrh" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('sisrh.index') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
                             <span class="ml-2 menu-text">Visão Geral</span>
                         </a>
-                        @if(in_array(Auth::user()->role, ['admin', 'socio']))
                         <a href="/sisrh/regras-rb" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('sisrh.regras-rb') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
                             <span class="ml-2 menu-text">Regras RB/Faixas</span>
                         </a>
@@ -352,6 +352,7 @@
                             <span class="ml-2 menu-text">Apuração</span>
                         </a>
                         @endif
+                        @if(Auth::user()->role === 'admin')
                         <a href="/sisrh/banco-creditos" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('sisrh.banco-creditos') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
                             <span class="ml-2 menu-text">Banco Créditos</span>
                         </a>
@@ -364,12 +365,15 @@
                         <a href="/sisrh/lancamentos" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('sisrh.lancamentos') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
                             <span class="ml-2 menu-text">Lançamentos</span>
                         </a>
+                        @endif
                         <a href="/sisrh/contracheque" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('sisrh.contracheque') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
                             <span class="ml-2 menu-text">Meu Contracheque</span>
                         </a>
+                        @if(Auth::user()->role === 'admin')
                         <a href="/sisrh/rubricas" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('sisrh.rubricas') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
                             <span class="ml-2 menu-text">Rubricas</span>
                         </a>
+                        @endif
                     </div>
                 @endif
 
