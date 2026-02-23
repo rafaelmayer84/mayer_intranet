@@ -294,7 +294,7 @@
                 <div class="menu-group">
                     <button onclick="toggleSubmenu('gdp')" class="nav-link w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors {{ request()->is('gdp*') ? 'nav-link-active' : '' }}" data-tooltip="GDP">
                         <div class="flex items-center">
-                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><circle cx="12" cy="12" r="6" stroke-width="2"/><circle cx="12" cy="12" r="2" stroke-width="2" fill="currentColor"/></svg>
                             <span class="font-medium menu-text">GDP</span>
                         </div>
                         <svg id="arrow-gdp" class="w-4 h-4 menu-arrow {{ request()->is('gdp*') ? 'rotated' : '' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
@@ -354,6 +354,9 @@
                         @endif
                         <a href="/sisrh/banco-creditos" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('sisrh.banco-creditos') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
                             <span class="ml-2 menu-text">Banco Créditos</span>
+                        </a>
+                        <a href="/sisrh/advogados" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('sisrh.advogados') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
+                            <span class="ml-2 menu-text">Advogados</span>
                         </a>
                         <a href="/sisrh/folha" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('sisrh.folha') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
                             <span class="ml-2 menu-text">Folha Pagamento</span>
@@ -467,11 +470,15 @@
                 </div>
 
                 @if(auth()->user()->role === 'admin')
-                <!-- Sincronização Unificada (DataJuri) -->
-                            <a href="/administracao/metas-kpi-mensais" class="nav-link d-flex align-items-center gap-2 px-3 py-2 rounded {{ request()->is('administracao/metas-kpi*') ? 'active' : '' }}">
-                                <span style="font-size:1.1rem;">🎯</span>
-                                <span class="nav-text">Metas KPI</span>
-                            </a>
+                <!-- Metas KPI -->
+                <a href="/administracao/metas-kpi-mensais"
+                   class="nav-link flex items-center px-4 py-3 rounded-lg transition-colors {{ request()->is('administracao/metas-kpi*') ? 'nav-link-active' : '' }}"
+                   title="Metas KPI">
+                    <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" stroke-width="2"/><circle cx="12" cy="12" r="6" stroke-width="2"/><circle cx="12" cy="12" r="2" stroke-width="2" fill="currentColor"/>
+                    </svg>
+                    <span class="menu-text">Metas KPI</span>
+                </a>
                 <a href="{{ route('admin.sincronizacao-unificada.index') }}"
                    class="nav-link flex items-center px-4 py-3 rounded-lg transition-colors {{ request()->routeIs('admin.sincronizacao-unificada.*') ? 'nav-link-active' : '' }}"
                    data-tooltip="Sincronização">
@@ -495,9 +502,21 @@
                     <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
-                    <span class="nav-text">Audit Log</span>
+                    <span class="menu-text">Audit Log</span>
                 </a>
 
+                @endif
+
+                {{-- Log de Ocorrencias --}}
+                @if(auth()->user()->role === 'admin')
+                <a href="{{ route('admin.ocorrencias') }}"
+                   class="nav-link flex items-center px-4 py-3 rounded-lg transition-colors {{ request()->routeIs('admin.ocorrencias*') ? 'nav-link-active' : '' }}"
+                   title="Log Ocorrencias">
+                    <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                    </svg>
+                    <span class="menu-text">Log Ocorrências</span>
+                </a>
                 @endif
 
             </nav>

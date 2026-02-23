@@ -245,3 +245,7 @@ require __DIR__ . '/_nexo_qa_routes.php';
 
 require __DIR__ . '/_sisrh_routes.php';
     require __DIR__ . '/_sisrh_holerite_routes.php';
+    require __DIR__ . '/_sisrh_advogados_routes.php';
+    require __DIR__ . '/_sisrh_documentos_routes.php';
+
+require __DIR__.'/_ocorrencias_routes.php';

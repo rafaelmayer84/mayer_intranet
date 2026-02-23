@@ -104,6 +104,7 @@ Schedule::command('gdp:apurar')->dailyAt('06:00');
 
 // Limpeza audit_logs > 90 dias (diario as 03:00)
 use App\Models\AuditLog;
+use App\Models\SystemEvent;
 Schedule::call(function () {
     AuditLog::olderThan(90)->delete();
 })->dailyAt('03:00')->name('audit-log-cleanup');
@@ -130,4 +131,12 @@ Schedule::call(function () {
   ->timezone('America/Sao_Paulo')
   ->name('nexo-qa-weekly-aggregate')
   ->withoutOverlapping();
+
+// Cleanup system_events mais de 365 dias (03:15 BRT)
+Schedule::call(function () {
+    $deleted = SystemEvent::olderThan(365)->delete();
+    if ($deleted > 0) {
+        SystemEvent::sistema('cleanup.executado', 'info', "Cleanup: {$deleted} eventos antigos removidos");
+    }
+})->dailyAt('03:15')->timezone('America/Sao_Paulo');
 

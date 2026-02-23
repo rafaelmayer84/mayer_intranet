@@ -99,9 +99,11 @@ class SisrhHoleriteService
     public function gerarFolha(int $ano, int $mes): array
     {
         $users = DB::table('users')
-            ->whereNotIn('id', [2, 5, 6, 9])
-            ->whereIn('role', ['advogado', 'coordenador', 'socio', 'admin'])
-            ->orderBy('name')->get();
+            ->join('sisrh_vinculos as sv', 'users.id', '=', 'sv.user_id')
+            ->where('sv.ativo', true)
+            ->whereIn('users.role', ['advogado', 'coordenador', 'socio', 'admin'])
+            ->select('users.*')
+            ->orderBy('users.name')->get();
 
         $folha = [];
         $totais = ['proventos' => 0, 'descontos' => 0, 'liquido' => 0];
