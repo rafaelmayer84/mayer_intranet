@@ -63,22 +63,18 @@ class NexoQaResolverService
      */
     private function resolveFromNexoConversation(string $phoneHash): ?int
     {
-        // Buscar conversa pelo telefone (phone_hash ou phone direto)
-        // wa_conversations armazena telefone em formato E.164
+        // Buscar phone_e164 primeiro (evita LIMIT em subquery — MariaDB não suporta)
+        $phoneE164 = DB::table('nexo_qa_sampled_targets')
+            ->where('phone_hash', $phoneHash)
+            ->value('phone_e164');
+
+        if ($phoneE164 === null) {
+            return null;
+        }
+
         $userId = DB::table('wa_conversations')
             ->whereNotNull('assigned_user_id')
-            ->where(function ($q) use ($phoneHash) {
-                // Tentar por phone diretamente — wa_conversations não tem phone_hash
-                // Precisamos reverter: buscamos o phone_e164 do target e comparamos
-                // MAS aqui recebemos phoneHash, não o phone_e164 original
-                // Solução: usar subquery via sampled_targets
-                $q->whereIn('phone', function ($sub) use ($phoneHash) {
-                    $sub->select('phone_e164')
-                        ->from('nexo_qa_sampled_targets')
-                        ->where('phone_hash', $phoneHash)
-                        ->limit(1);
-                });
-            })
+            ->where('phone', $phoneE164)
             ->orderByDesc('updated_at')
             ->value('assigned_user_id');
 
