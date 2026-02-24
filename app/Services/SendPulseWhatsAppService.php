@@ -212,7 +212,8 @@ class SendPulseWhatsAppService
 
     public static function extractMessageType(array $msg): string
     {
-        return data_get($msg, 'data.type') ?? data_get($msg, 'type') ?? 'text';
+        $type = data_get($msg, 'data.type') ?? data_get($msg, 'type') ?? 'text';
+        return is_string($type) ? $type : 'text';
     }
 
     public static function extractDirection(array $msg): int

@@ -78,7 +78,7 @@ class SyncContasReceberRapido extends Command
                     [
                         'origem'              => 'datajuri',
                         'cliente'             => $nome,
-                        'pessoa_datajuri_id'  => $row['pessoaId'] ?? null,
+                        'pessoa_datajuri_id'  => ($row['pessoaId'] ?? null) !== '' ? ($row['pessoaId'] ?? null) : null,
                         'cliente_datajuri_id' => ($row['clienteId'] ?? null) !== '' ? ($row['clienteId'] ?? null) : null,
                         'processo_datajuri_id'=> ($row['processoId'] ?? null) !== '' ? ($row['processoId'] ?? null) : null,
                         'descricao'           => $row['descricao'] ?? null,
