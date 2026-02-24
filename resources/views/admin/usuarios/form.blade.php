@@ -107,6 +107,21 @@
                            class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 </div>
 
+                {{-- Alias do Operador (só admin) --}}
+                @if(($usuario->role ?? '') === 'admin')
+                <div>
+                    <label for="operator_alias" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Nome de exibição (WhatsApp)
+                    </label>
+                    <input type="text"
+                           id="operator_alias"
+                           name="operator_alias"
+                           value="{{ old('operator_alias', $usuario->operator_alias ?? '') }}"
+                           placeholder="Deixe vazio para usar o nome real"
+                           class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <p class="text-xs text-gray-500 mt-1">Se preenchido, este nome aparecerá no WhatsApp em vez do nome real.</p>
+                </div>
+                @endif
                 {{-- Papel --}}
                 <div>
                     <label for="role" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

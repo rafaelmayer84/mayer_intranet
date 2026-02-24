@@ -36,6 +36,7 @@ class User extends Authenticatable
         'ativo',
         'telefone',
         'cargo',
+        'operator_alias',
         'ultimo_acesso',
         'password_changed_at',
     ];

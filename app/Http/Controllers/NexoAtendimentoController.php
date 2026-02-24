@@ -71,18 +71,24 @@ class NexoAtendimentoController extends Controller
         try {
             $spService = app(SendPulseWhatsAppService::class);
 
+            // Prefixar nome do operador para o cliente ver no WhatsApp
+            $user = auth()->user();
+            $operatorName = ($user->role === "admin" && !empty($user->operator_alias)) ? $user->operator_alias : $user->name;
+            $textToSend = "*" . $operatorName . "*
+" . $request->text;
+
             // Envio com ou sem reply/quote
             if ($replyTo) {
-                $result = $spService->sendMessageWithReply($conversation->contact_id, $request->text, $replyTo);
+                $result = $spService->sendMessageWithReply($conversation->contact_id, $textToSend, $replyTo);
                 if (!($result['success'] ?? false) && $conversation->phone) {
                     Log::info('NEXO: fallback sendMessageByPhoneWithReply', ['conversa_id' => $id]);
-                    $result = $spService->sendMessageByPhoneWithReply($conversation->phone, $request->text, $replyTo);
+                    $result = $spService->sendMessageByPhoneWithReply($conversation->phone, $textToSend, $replyTo);
                 }
             } else {
-                $result = $spService->sendMessage($conversation->contact_id, $request->text);
+                $result = $spService->sendMessage($conversation->contact_id, $textToSend);
                 if (!($result['success'] ?? false) && $conversation->phone) {
                     Log::info('NEXO: fallback sendMessageByPhone', ['conversa_id' => $id, 'phone' => $conversation->phone]);
-                    $result = $spService->sendMessageByPhone($conversation->phone, $request->text);
+                    $result = $spService->sendMessageByPhone($conversation->phone, $textToSend);
                 }
             }
 
