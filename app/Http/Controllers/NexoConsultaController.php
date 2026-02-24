@@ -64,13 +64,14 @@ class NexoConsultaController extends Controller
         }
 
         $telefone = $request->input('telefone', '');
+        $cpf = $request->input('cpf', '') ?: $request->input('documento', '');
 
         if (empty($telefone)) {
             return response()->json(['error' => 'Telefone obrigatório'], 400);
         }
 
         try {
-            $resultado = $this->service->identificarCliente($telefone);
+            $resultado = $this->service->identificarCliente($telefone, $cpf ?: null);
             return response()->json($resultado);
         } catch (\Exception $e) {
             Log::error('[NEXO-CONSULTA] Erro identificar-cliente: ' . $e->getMessage());
@@ -158,7 +159,8 @@ class NexoConsultaController extends Controller
         }
 
         try {
-            $resultado = $this->service->consultaStatus($telefone);
+            $cpf = $request->input('cpf', '') ?: $request->input('documento', '');
+            $resultado = $this->service->consultaStatus($telefone, $cpf ?: null);
 
             if (isset($resultado['erro'])) {
                 return response()->json(['error' => $resultado['erro']], 404);

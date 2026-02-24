@@ -65,11 +65,11 @@ class NexoConsultaService
      * Identifica cliente pelo telefone.
      * Retorna: encontrado, nome, bloqueado
      */
-    public function identificarCliente(string $telefone): array
+    public function identificarCliente(string $telefone, ?string $cpf = null): array
     {
         $telefoneNorm = $this->normalizarTelefone($telefone);
 
-        Log::info('[NEXO-CONSULTA] identificarCliente', ['telefone' => $telefoneNorm]);
+        Log::info('[NEXO-CONSULTA] identificarCliente', ['telefone' => $telefoneNorm, 'cpf' => $cpf ?? 'nao informado']);
 
         // Verificar bloqueio
         $attempt = NexoAuthAttempt::where('telefone', $telefoneNorm)->first();
@@ -83,6 +83,19 @@ class NexoConsultaService
 
         // Buscar cliente pelo telefone (match exato)
         $cliente = $this->buscarClientePorTelefone($telefoneNorm);
+
+        // Fallback: buscar por CPF/CNPJ se informado
+        if (!$cliente && !empty($cpf)) {
+            Log::info('[NEXO-CONSULTA] Telefone nao encontrado, tentando CPF', ['cpf' => $cpf]);
+            $cliente = $this->buscarClientePorCpf($cpf);
+
+            // Se encontrou por CPF, atualizar celular para futuras consultas
+            if ($cliente && str_starts_with($telefoneNorm, '55') && strlen($telefoneNorm) >= 12) {
+                $celFormatado = '(' . substr($telefoneNorm, 2, 2) . ') ' . substr($telefoneNorm, 4, 5) . '-' . substr($telefoneNorm, 9);
+                DB::table('clientes')->where('id', $cliente->id)->update(['celular' => $celFormatado]);
+                Log::info('[NEXO-CONSULTA] Celular atualizado via CPF', ['cliente_id' => $cliente->id, 'celular' => $celFormatado]);
+            }
+        }
 
         if (!$cliente) {
             Log::info('[NEXO-CONSULTA] Cliente não encontrado', ['telefone' => $telefoneNorm]);
@@ -114,6 +127,12 @@ class NexoConsultaService
     {
         $telefoneNorm = $this->normalizarTelefone($telefone);
         $cliente = $this->buscarClientePorTelefone($telefoneNorm);
+
+        // Fallback: buscar por CPF/CNPJ
+        if (!$cliente && !empty($cpf)) {
+            Log::info('[NEXO-CONSULTA] consultaStatus: tentando CPF', ['cpf' => $cpf]);
+            $cliente = $this->buscarClientePorCpf($cpf);
+        }
 
         if (!$cliente) {
             return ['erro' => 'Cliente não encontrado'];
@@ -253,10 +272,16 @@ class NexoConsultaService
     /**
      * Lista processos do cliente ou retorna status direto (se 1 processo).
      */
-    public function consultaStatus(string $telefone): array
+    public function consultaStatus(string $telefone, ?string $cpf = null): array
     {
         $telefoneNorm = $this->normalizarTelefone($telefone);
         $cliente = $this->buscarClientePorTelefone($telefoneNorm);
+
+        // Fallback: buscar por CPF/CNPJ
+        if (!$cliente && !empty($cpf)) {
+            Log::info('[NEXO-CONSULTA] consultaStatus: tentando CPF', ['cpf' => $cpf]);
+            $cliente = $this->buscarClientePorCpf($cpf);
+        }
 
         if (!$cliente) {
             return ['erro' => 'Cliente não encontrado'];
@@ -859,25 +884,33 @@ class NexoConsultaService
                 $listaAndamentos .= "- {$a['data']} {$a['hora']}: {$desc}\n";
             }
 
-            $systemPrompt = "Você é assistente jurídico do escritório Mayer Advogados. "
-                . "Sua função é explicar andamentos processuais de forma clara e acessível "
-                . "para clientes que não são advogados. Responda sempre em português brasileiro.";
+            $systemPrompt = "Você é LEXUS, assistente jurídico digital do escritório Mayer Advogados.\n\n"
+                . "IDENTIDADE:\n"
+                . "- Você representa um escritório de advocacia sério e competente\n"
+                . "- Tom: profissional, seguro, empático — nunca robótico ou genérico\n"
+                . "- Trate o cliente pelo nome e transmita que o caso dele é acompanhado de perto\n\n"
+                . "ESTRUTURA DA RESPOSTA:\n"
+                . "1. SITUAÇÃO ATUAL: O que está acontecendo no processo agora\n"
+                . "2. SIGNIFICADO PRÁTICO: O que isso representa para o cliente no dia a dia\n"
+                . "3. PRÓXIMOS PASSOS: O que tende a acontecer a seguir (sem prometer resultados)\n"
+                . "4. ALERTA DE PRAZO: Se houver prazo ou intimação, destaque com ⏳\n\n"
+                . "REGRAS:\n"
+                . "- Use *negrito* para datas, valores e destaques (formato WhatsApp)\n"
+                . "- Traduza TODOS os termos jurídicos para linguagem leiga\n"
+                . "- Use no máximo 2 emojis estratégicos (⚖️ 📌 ⏳ ✅) — nunca excessivo\n"
+                . "- NUNCA invente informações que não estejam nos andamentos\n"
+                . "- NUNCA dê conselho jurídico ou opiniões sobre resultado\n"
+                . "- Máximo 700 caracteres\n"
+                . "- Responda em português brasileiro";
 
-            $userPrompt = "O cliente *{$cliente->nome}* consultou o status do processo:\n"
+            $userPrompt = "DADOS DO PROCESSO:\n"
+                . "- Cliente: {$cliente->nome}\n"
                 . "- Pasta: {$pasta}\n"
                 . "- Parte adversa: {$adverso}\n"
                 . "- Total de andamentos: {$totalAndamentos}\n\n"
-                . "Últimos andamentos (do mais recente ao mais antigo):\n\n"
-                . "{$listaAndamentos}\n"
-                . "INSTRUÇÕES OBRIGATÓRIAS:\n"
-                . "1. Escreva um resumo claro do status ATUAL do processo.\n"
-                . "2. Explique o que o andamento mais recente significa na prática.\n"
-                . "3. Se houver prazos mencionados, destaque com as datas.\n"
-                . "4. Use linguagem simples — o cliente não é advogado.\n"
-                . "5. Use *negrito* para datas e destaques importantes (formato WhatsApp).\n"
-                . "6. NÃO use emojis, saudações ou despedidas.\n"
-                . "7. NÃO invente informações que não estejam nos andamentos.\n"
-                . "8. Máximo 550 caracteres.";
+                . "ÚLTIMOS ANDAMENTOS (mais recente primeiro):\n"
+                . "{$listaAndamentos}\n\n"
+                . "Gere o resumo seguindo a estrutura definida no system prompt.";
 
             $response = Http::withHeaders([
                 'Authorization' => 'Bearer ' . env('OPENAI_API_KEY'),
@@ -888,7 +921,7 @@ class NexoConsultaService
                     ['role' => 'system', 'content' => $systemPrompt],
                     ['role' => 'user',   'content' => $userPrompt],
                 ],
-                'max_tokens'  => 350,
+                'max_tokens'  => 500,
                 'temperature' => 0.3,
             ]);
 
@@ -911,7 +944,7 @@ class NexoConsultaService
             $header = "📋 *Processo: Pasta {$pasta}*\n👥 {$cliente->nome} × {$adverso}\n\n";
             $footer = "\n\n💡 Em caso de dúvidas, fale com nossa equipe.";
 
-            $maxTextoIA = 950 - mb_strlen($header) - mb_strlen($footer);
+            $maxTextoIA = 1000 - mb_strlen($header) - mb_strlen($footer);
             if (mb_strlen($textoIA) > $maxTextoIA) {
                 $textoIA = mb_substr($textoIA, 0, $maxTextoIA - 3) . '...';
             }
@@ -976,6 +1009,40 @@ class NexoConsultaService
         }
 
         return $tel;
+    }
+
+    /**
+     * Busca cliente por CPF/CNPJ (normaliza removendo mascara)
+     */
+    private function buscarClientePorCpf(string $cpf): ?object
+    {
+        $cpfLimpo = preg_replace('/[^0-9]/', '', $cpf);
+
+        if (empty($cpfLimpo) || strlen($cpfLimpo) < 11) {
+            return null;
+        }
+
+        $cliente = DB::table('clientes')
+            ->where(function ($q) use ($cpfLimpo) {
+                $q->where('cpf_cnpj', $cpfLimpo);
+
+                if (strlen($cpfLimpo) === 11) {
+                    $mascarado = substr($cpfLimpo, 0, 3) . '.' . substr($cpfLimpo, 3, 3) . '.' . substr($cpfLimpo, 6, 3) . '-' . substr($cpfLimpo, 9, 2);
+                    $q->orWhere('cpf_cnpj', $mascarado);
+                }
+
+                if (strlen($cpfLimpo) === 14) {
+                    $mascarado = substr($cpfLimpo, 0, 2) . '.' . substr($cpfLimpo, 2, 3) . '.' . substr($cpfLimpo, 5, 3) . '/' . substr($cpfLimpo, 8, 4) . '-' . substr($cpfLimpo, 12, 2);
+                    $q->orWhere('cpf_cnpj', $mascarado);
+                }
+            })
+            ->first();
+
+        if ($cliente) {
+            Log::info('[NEXO-CONSULTA] Cliente encontrado por CPF/CNPJ', ['cpf' => $cpfLimpo, 'nome' => $cliente->nome]);
+        }
+
+        return $cliente;
     }
 
     private function buscarClientePorTelefone(string $telefoneNorm): ?object
