@@ -618,4 +618,19 @@ function atualizarBotaoReabrir(lastClientMsgTimestamp) {
 </div>
 
 </div>
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var sidebar = document.getElementById('sidebar');
+        sidebar.classList.add('sidebar-collapsed');
+        localStorage.setItem('sidebar_collapsed', 'true');
+        var toggleBtn = document.getElementById('sidebar-toggle-btn');
+        if (toggleBtn) {
+            toggleBtn.innerHTML = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path></svg>';
+        }
+    }
+});
+</script>
+@endpush
 @endsection
