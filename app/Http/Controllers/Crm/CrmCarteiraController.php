@@ -42,6 +42,9 @@ class CrmCarteiraController extends Controller
                   ->orWhere('health_score', '<=', (int) $request->health_max);
             });
         }
+        if ($request->filled('segment')) {
+            $query->where('segment', $request->segment);
+        }
         if ($request->filled('search')) {
             $s = '%' . $request->search . '%';
             $query->where(function ($q) use ($s) {
@@ -76,6 +79,9 @@ class CrmCarteiraController extends Controller
             'sem_contato_30d' => (clone $baseQuery)->byLifecycle('ativo')->withoutContactSince(30)->count(),
         ];
 
-        return view('crm.carteira.index', compact('accounts', 'users', 'totals'));
+        $segments = \App\Models\Crm\CrmAccount::whereNotNull('segment')
+            ->distinct()->orderBy('segment')->pluck('segment');
+
+        return view('crm.carteira.index', compact('accounts', 'users', 'totals', 'segments'));
     }
 }

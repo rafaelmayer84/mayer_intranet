@@ -64,6 +64,12 @@
                     <option value="{{ $u->id }}" {{ request('owner_user_id') == $u->id ? 'selected' : '' }}>{{ $u->name }}</option>
                 @endforeach
             </select>
+            <select name="segment" class="border rounded-lg px-3 py-2 text-sm">
+                <option value="">Todos os segmentos</option>
+                @foreach($segments as $seg)
+                    <option value="{{ $seg }}" {{ request('segment') === $seg ? 'selected' : '' }}>{{ $seg }}</option>
+                @endforeach
+            </select>
             <div class="flex gap-2">
                 <select name="sem_contato_dias" class="border rounded-lg px-3 py-2 text-sm flex-1">
                     <option value="">Sem contato</option>
@@ -96,6 +102,7 @@
                     <th class="text-left px-4 py-3 font-medium text-gray-600">Próxima ação</th>
                     <th class="text-center px-4 py-3 font-medium text-gray-600">Saúde</th>
                     <th class="text-left px-4 py-3 font-medium text-gray-600">Ciclo</th>
+                    <th class="text-left px-4 py-3 font-medium text-gray-600">Segmento</th>
                     <th class="text-center px-4 py-3 font-medium text-gray-600">Opps</th>
                     <th class="px-4 py-3"></th>
                 </tr>
@@ -156,6 +163,13 @@
                             {{ ucfirst($acc->lifecycle) }}
                         </span>
                     </td>
+                    <td class="px-4 py-3">
+                        @if($acc->segment)
+                            <span class="px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-700">{{ $acc->segment }}</span>
+                        @else
+                            <span class="text-gray-300">—</span>
+                        @endif
+                    </td>
                     <td class="px-4 py-3 text-center text-gray-600">{{ $acc->open_opps_count ?? 0 }}</td>
                     <td class="px-4 py-3 text-right">
                         <a href="{{ route('crm.accounts.show', $acc->id) }}" class="text-[#385776] hover:underline text-xs">360 →</a>
@@ -163,7 +177,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="9" class="px-4 py-8 text-center text-gray-400">Nenhum registro encontrado.</td>
+                    <td colspan="10" class="px-4 py-8 text-center text-gray-400">Nenhum registro encontrado.</td>
                 </tr>
                 @endforelse
             </tbody>

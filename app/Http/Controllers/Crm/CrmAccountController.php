@@ -136,7 +136,7 @@ class CrmAccountController extends Controller
     public function storeActivity(Request $request, int $id)
     {
         $request->validate([
-            'type'   => 'required|in:task,call,meeting,whatsapp,note',
+            'type'   => 'required|in:task,call,meeting,whatsapp,note,email',
             'title'  => 'required|string|max:255',
             'body'   => 'nullable|string|max:5000',
             'due_at' => 'nullable|date',

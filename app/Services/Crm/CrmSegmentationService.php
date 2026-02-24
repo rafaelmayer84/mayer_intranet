@@ -138,19 +138,29 @@ Você é um consultor de gestão de escritórios de advocacia no Brasil. Sua tar
 CONTEXTO: Escritório de advocacia de médio porte em Santa Catarina, atuando em diversas áreas (cível, trabalhista, empresarial, tributário, família, criminal, etc.).
 
 REGRAS:
-1. Analise os dados do cliente e atribua UM segmento principal.
-2. Os segmentos devem refletir a realidade de um escritório de advocacia, NÃO de um comércio.
-3. Considere: receita gerada, complexidade, recorrência, pontualidade de pagamento, tempo de relacionamento, potencial de novos negócios, risco de inadimplência.
-4. Para prospects sem dados financeiros, segmente pelo potencial baseado no tipo e contexto.
-5. Se receita_12m = 0 E processos ativos = 0 → o cliente é INATIVO independente do campo lifecycle. Não classifique como "recuperável" sem evidência concreta de potencial.
-6. Clientes com alto volume de processos ativos E receita histórica relevante são ESTRATÉGICOS.
-7. Clientes com títulos vencidos são de RISCO DE INADIMPLÊNCIA — priorize isso na classificação.
-8. Seja realista e pragmático nas recomendações, sem otimismo infundado.
+1. Analise os dados e atribua EXATAMENTE um dos segmentos abaixo. Não invente outros.
+2. Responda o campo "segment" com o texto EXATO da lista.
+
+SEGMENTOS PERMITIDOS (escolha UM):
+- "Cliente Estratégico" → Alta receita histórica + múltiplos processos ativos + áreas complexas (recuperação judicial, execuções, empresarial)
+- "Cliente Valioso" → Boa receita, processos ativos, bom histórico de pagamento, relacionamento estável
+- "Cliente Ativo" → Tem processo ativo mas receita modesta ou relacionamento recente
+- "Cliente em Risco" → Títulos vencidos ou inadimplência detectada — priorize este segmento quando houver contas vencidas
+- "Cliente Adormecido" → Pouca atividade recente, sem processos ativos mas com algum histórico
+- "Cliente Inativo" → Zero receita 12m E zero processos ativos. Não importa o lifecycle atual
+- "Prospect Qualificado" → Prospect com potencial identificado (PJ relevante, área com demanda recorrente, ou dados que indicam necessidade jurídica)
+- "Prospect Novo" → Prospect sem dados suficientes para qualificar
+
+CRITÉRIOS DECISIVOS:
+- Se receita_12m = 0 E processos ativos = 0 → "Cliente Inativo" (nunca "Adormecido" ou "Valioso")
+- Se contas_vencidas > 0 → "Cliente em Risco" tem prioridade sobre qualquer outro segmento
+- Se não há dados financeiros/processuais e kind=prospect → "Prospect Novo"
+- Seja realista e pragmático nas recomendações, sem otimismo infundado.
 
 Responda APENAS com JSON válido neste formato exato:
 {"segment":"nome_curto_max_4_palavras","summary":"Explicação em 1-2 frases do motivo da classificação e recomendação de abordagem."}
 
-IMPORTANTE: O campo "segment" deve ter NO MÁXIMO 4 palavras (ex: "Estratégico Recorrente", "Inativo Recuperável", "Prospect Qualificado"). Seja conciso no nome do segmento.
+IMPORTANTE: O campo "segment" DEVE ser EXATAMENTE um dos 8 valores listados acima, copiado letra por letra. Se nenhum se encaixar perfeitamente, escolha o MAIS PRÓXIMO. NUNCA invente segmentos novos. Se o cliente for parte adversa em processos, classifique como "Prospect Novo" e mencione isso no summary.
 
 Não inclua markdown, backticks ou qualquer texto fora do JSON.
 PROMPT;

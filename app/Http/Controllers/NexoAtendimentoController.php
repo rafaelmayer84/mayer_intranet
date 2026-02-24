@@ -121,6 +121,15 @@ class NexoAtendimentoController extends Controller
                 \App\Models\Lead::where('id', $conversation->linked_lead_id)
                     ->where('status', 'novo')
                     ->update(['status' => 'contatado', 'updated_at' => now()]);
+                // Sync lead com CRM account
+                try {
+                    $lead = \App\Models\Lead::find($conversation->linked_lead_id);
+                    if ($lead) {
+                        (new \App\Services\Crm\CrmLeadSyncService())->syncLead($lead);
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('[NEXO] CRM sync falhou lead #' . $conversation->linked_lead_id . ': ' . $e->getMessage());
+                }
             }
 
             WaEvent::log('send_message', $id, ['text_length' => strlen($request->text), 'delivered' => true]);
