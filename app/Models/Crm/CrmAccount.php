@@ -15,12 +15,14 @@ class CrmAccount extends Model
         'datajuri_pessoa_id', 'kind', 'name', 'doc_digits', 'email',
         'phone_e164', 'owner_user_id', 'lifecycle', 'health_score',
         'last_touch_at', 'next_touch_at', 'tags', 'notes',
+        'segment', 'segment_summary', 'segment_cached_at',
     ];
 
     protected $casts = [
         'health_score'   => 'integer',
         'last_touch_at'  => 'datetime',
-        'next_touch_at'  => 'datetime',
+        'next_touch_at'       => 'datetime',
+        'segment_cached_at'   => 'datetime',
     ];
 
     // --- Relationships ---

@@ -48,7 +48,7 @@
                                 {{ $cli->tipo === 'PF' ? 'Pessoa Física' : 'Pessoa Jurídica' }}
                             </span>
                         @endif
-                        @if($cli && $cli->status_pessoa)
+                        @if($cli && $cli->status_pessoa && !(isset($segmentation) && $segmentation))
                             <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/10 text-white/80">
                                 {{ $cli->status_pessoa }}
                             </span>
@@ -57,6 +57,11 @@
                             @php $hs = $account->health_score; @endphp
                             <span class="px-2.5 py-0.5 rounded-full text-xs font-medium {{ $hs >= 70 ? 'bg-green-400/20 text-green-200' : ($hs >= 40 ? 'bg-yellow-400/20 text-yellow-200' : 'bg-red-400/20 text-red-200') }}">
                                 Saúde: {{ $hs }}
+                            </span>
+                        @endif
+                        @if(isset($segmentation) && $segmentation)
+                            <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-400/20 text-purple-200" title="{{ $segmentation['summary'] ?? '' }}">
+                                {{ $segmentation['segment'] }}
                             </span>
                         @endif
                     </div>

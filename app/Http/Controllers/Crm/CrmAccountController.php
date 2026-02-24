@@ -12,6 +12,7 @@ use App\Services\Crm\CrmOpportunityService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Services\Crm\CrmSegmentationService;
 
 class CrmAccountController extends Controller
 {
@@ -61,8 +62,17 @@ class CrmAccountController extends Controller
 
         $users = User::orderBy('name')->get(['id', 'name']);
 
+        // Segmentação IA (cache 7 dias)
+        $segmentation = null;
+        try {
+            $segService = app(CrmSegmentationService::class);
+            $segmentation = $segService->segmentar($account->id);
+        } catch (\Exception $e) {
+            Log::warning('[CRM] Segmentação falhou account #' . $account->id . ': ' . $e->getMessage());
+        }
+
         return view('crm.accounts.show', compact(
-            'account', 'timeline', 'djContext', 'commContext', 'users'
+            'account', 'timeline', 'djContext', 'commContext', 'users', 'segmentation'
         ));
     }
 
