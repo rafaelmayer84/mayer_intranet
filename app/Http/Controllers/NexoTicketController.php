@@ -126,6 +126,44 @@ class NexoTicketController extends Controller
         ]);
     }
 
+    public function buscarClientes(Request $request)
+    {
+        $termo = trim($request->get('q', ''));
+        if (strlen($termo) < 3) return response()->json([]);
+
+        $clientes = \App\Models\Cliente::where(function ($q) use ($termo) {
+            $q->where('nome', 'LIKE', "%{$termo}%")
+              ->orWhere('telefone_normalizado', 'LIKE', "%{$termo}%")
+              ->orWhere('celular', 'LIKE', "%{$termo}%")
+              ->orWhere('telefone', 'LIKE', "%{$termo}%")
+              ->orWhere('cpf_cnpj', 'LIKE', "%{$termo}%")
+              ->orWhere('cpf', 'LIKE', "%{$termo}%");
+        })
+        ->where('is_cliente', true)
+        ->orderBy('nome')
+        ->limit(10)
+        ->get(['id', 'nome', 'telefone_normalizado', 'celular', 'telefone', 'cpf_cnpj', 'email']);
+
+        return response()->json($clientes->map(function ($c) {
+            $tel = $c->celular ?: $c->telefone_normalizado ?: $c->telefone ?: '';
+            // Formatar telefone para exibicao
+            $telLimpo = preg_replace('/\D/', '', $tel);
+            if (strlen($telLimpo) >= 11) {
+                $ddd = substr($telLimpo, -11, 2);
+                $num = substr($telLimpo, -9);
+                $tel = "({$ddd}) " . substr($num, 0, 5) . "-" . substr($num, 5);
+            }
+            return [
+                'id' => $c->id,
+                'nome' => $c->nome,
+                'telefone' => $tel,
+                'telefone_raw' => $c->celular ?: $c->telefone_normalizado ?: $c->telefone ?: '',
+                'cpf_cnpj' => $c->cpf_cnpj,
+                'email' => $c->email,
+            ];
+        }));
+    }
+
     public function store(Request $request)
     {
         $request->validate([

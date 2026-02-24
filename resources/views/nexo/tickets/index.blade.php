@@ -331,7 +331,12 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="text-xs text-gray-600">Nome do cliente</label>
-                        <input type="text" id="criar-nome" class="w-full mt-1 bg-white border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <div class="relative">
+                            <input type="text" id="criar-nome" autocomplete="off" placeholder="Digite o nome ou CPF..."
+                                class="w-full mt-1 bg-white border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                                oninput="buscarClienteTicket(this.value)">
+                            <div id="autocomplete-clientes" class="hidden absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto"></div>
+                        </div>
                     </div>
                     <div>
                         <label class="text-xs text-gray-600">Telefone</label>
@@ -563,6 +568,45 @@
     // =========================================================
     // CRIAR TICKET
     // =========================================================
+    let buscarTimeout = null;
+    function buscarClienteTicket(termo) {
+        clearTimeout(buscarTimeout);
+        const dropdown = document.getElementById('autocomplete-clientes');
+        if (termo.length < 3) { dropdown.classList.add('hidden'); return; }
+        buscarTimeout = setTimeout(async () => {
+            try {
+                const resp = await fetch('/nexo/atendimento/tickets/buscar-clientes?q=' + encodeURIComponent(termo), {
+                    headers: {'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content, 'Accept': 'application/json'}
+                });
+                const clientes = await resp.json();
+                if (clientes.length === 0) {
+                    dropdown.innerHTML = '<div class="px-3 py-2 text-xs text-gray-400">Nenhum cliente encontrado</div>';
+                    dropdown.classList.remove('hidden');
+                    return;
+                }
+                window._clientesCache = clientes;
+                dropdown.innerHTML = clientes.map((c, i) =>
+                    '<div class="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-0" onclick="selecionarClienteIdx('+i+')">' +
+                    '<div class="text-sm font-medium text-gray-800">' + (c.nome||'') + '</div>' +
+                    '<div class="text-xs text-gray-500">' + (c.telefone||'') + (c.cpf_cnpj ? ' | ' + c.cpf_cnpj : '') + '</div>' +
+                    '</div>'
+                ).join('');
+                dropdown.classList.remove('hidden');
+            } catch(e) { console.error(e); }
+        }, 300);
+    }
+    function selecionarClienteIdx(idx) {
+        const c = window._clientesCache[idx];
+        document.getElementById('criar-nome').value = c.nome || '';
+        document.getElementById('criar-telefone').value = c.telefone || '';
+        document.getElementById('autocomplete-clientes').classList.add('hidden');
+    }
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#criar-nome') && !e.target.closest('#autocomplete-clientes')) {
+            document.getElementById('autocomplete-clientes').classList.add('hidden');
+        }
+    });
+
     function criarTicket() {
         var assunto = document.getElementById('criar-assunto').value.trim();
         if (!assunto) { alert('Informe o assunto'); return; }

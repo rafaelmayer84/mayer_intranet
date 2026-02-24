@@ -16,36 +16,19 @@
             color: #1a1a1a;
         }
         .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
+            text-align: center;
             border-bottom: 2px solid #C4A35A;
-            padding-bottom: 12px;
-            margin-bottom: 24px;
+            padding-bottom: 16px;
+            margin-bottom: 28px;
         }
-        .header-left { font-family: 'Arial', sans-serif; }
-        .header-left .firm-name {
-            font-size: 16pt;
-            font-weight: bold;
-            letter-spacing: 2px;
-            color: #1B334A;
+        .header img {
+            height: 60px;
+            margin-bottom: 6px;
         }
-        .header-left .firm-sub {
-            font-size: 8pt;
-            letter-spacing: 3px;
-            color: #666;
-            text-transform: uppercase;
-        }
-        .header-left .firm-oab {
-            font-size: 8pt;
+        .header .firm-oab {
+            font-size: 7.5pt;
             color: #999;
-            margin-top: 2px;
-        }
-        .header-right {
-            text-align: right;
-            font-size: 8pt;
-            color: #666;
-            line-height: 1.6;
+            letter-spacing: 1px;
         }
         .titulo {
             text-align: center;
@@ -164,17 +147,9 @@
 
     {{-- HEADER --}}
     <div class="header">
-        <div class="header-left">
-            <div class="firm-name">MAYER‖ALBANEZ</div>
-            <div class="firm-sub">Sociedade de Advogados</div>
+            <img src="/logo.png" alt="Mayer Sociedade de Advogados">
             <div class="firm-oab">OAB/SC 2097</div>
         </div>
-        <div class="header-right">
-            (47) 3842-1050<br>
-            www.mayeradvogados.adv.br<br>
-            Av. Marcos Konder, 1207, 62, Centro, Itajaí/SC
-        </div>
-    </div>
 
     {{-- TÍTULO --}}
     <div class="titulo">ACORDO DE DESEMPENHO</div>
@@ -281,7 +256,7 @@
     <div class="assinaturas">
         <div class="assinatura-box">
             <div class="assinatura-linha">ESCRITÓRIO</div>
-            <div class="assinatura-cargo">Mayer Albanez Sociedade de Advogados</div>
+            <div class="assinatura-cargo">Mayer Sociedade de Advogados</div>
         </div>
         <div class="assinatura-box">
             <div class="assinatura-linha">{{ $targetUser->name }}</div>

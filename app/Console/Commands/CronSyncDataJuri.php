@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Services\DataJuriSyncOrchestrator;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class CronSyncDataJuri extends Command
@@ -43,6 +44,21 @@ class CronSyncDataJuri extends Command
                 }
             }
             
+            // Ciclo stale automatico para ContasReceber (detectar exclusoes no DataJuri)
+            try {
+                Log::info('[CRON] Iniciando ciclo stale ContasReceber...');
+                DB::table('contas_receber')->where('origem', 'datajuri')->update(['is_stale' => true]);
+                $orchestrator->syncModule('ContasReceber');
+                $staleRemoved = DB::table('contas_receber')->where('origem', 'datajuri')->where('is_stale', true)->count();
+                if ($staleRemoved > 0) {
+                    DB::table('contas_receber')->where('origem', 'datajuri')->where('is_stale', true)->delete();
+                    Log::info("[CRON] ContasReceber: {$staleRemoved} orfaos removidos");
+                }
+            } catch (\Exception $e) {
+                DB::table('contas_receber')->where('is_stale', true)->update(['is_stale' => false]);
+                Log::error('[CRON] Erro ciclo stale ContasReceber: ' . $e->getMessage());
+            }
+
             $orchestrator->finishRun('completed', 'cron_full');
             
             Log::info('[CRON] Sync DataJuri OK', $totais);

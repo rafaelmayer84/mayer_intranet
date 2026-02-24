@@ -10,6 +10,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin/sincronizacao-unificada')->n
     Route::post('/sync-all', [SincronizacaoUnificadaController::class, 'syncAll'])->name('sync-all');
     Route::post('/sync/{modulo}', [SincronizacaoUnificadaController::class, 'syncModule'])->name('sync-module');
     Route::post('/reprocessar-financeiro', [SincronizacaoUnificadaController::class, 'reprocessarFinanceiro'])->name('reprocessar-financeiro');
+    Route::post('/reprocessar-contas-receber', [SincronizacaoUnificadaController::class, 'reprocessarContasReceber'])->name('reprocessar-contas-receber');
     Route::get('/status/{runId?}', [SincronizacaoUnificadaController::class, 'status'])->name('status');
     Route::post('/cancel/{runId}', [SincronizacaoUnificadaController::class, 'cancel'])->name('cancel');
     Route::post('/clear-history', [SincronizacaoUnificadaController::class, 'clearHistory'])->name('clear-history');

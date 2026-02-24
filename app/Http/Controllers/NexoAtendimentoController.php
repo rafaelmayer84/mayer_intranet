@@ -573,12 +573,55 @@ class NexoAtendimentoController extends Controller
             'assigned_user_id' => $user->id,
             'assigned_at' => now(),
         ]);
+
+        // Pausar automacao no SendPulse
+        if ($conversation->contact_id) {
+            try {
+                $sp = app(\App\Services\SendPulseWhatsAppService::class);
+                $sp->pausarAutomacao($conversation->contact_id);
+                \Log::info('Bot control: automacao pausada no SendPulse', ['contact_id' => $conversation->contact_id]);
+            } catch (\Throwable $e) {
+                \Log::warning('Bot control: falha ao pausar automacao SendPulse', ['error' => $e->getMessage()]);
+            }
+        }
+
         \Log::info('Bot control: conversa assumida manualmente', [
             'conv_id' => $id,
             'user_id' => $user->id,
             'user_name' => $user->name,
         ]);
         return response()->json(['success' => true, 'message' => 'Conversa assumida']);
+    }
+
+    public function devolverAoBot(Request $request, int $id)
+    {
+        $user = auth()->user();
+        if (!in_array($user->role, ['admin', 'coordenador', 'socio'])) {
+            return response()->json(['error' => 'Sem permissao'], 403);
+        }
+        $conversation = WaConversation::findOrFail($id);
+        $conversation->update([
+            'bot_ativo' => true,
+            'assigned_user_id' => null,
+            'assigned_at' => null,
+        ]);
+
+        // Reativar automacao no SendPulse
+        if ($conversation->contact_id) {
+            try {
+                $sp = app(\App\Services\SendPulseWhatsAppService::class);
+                $sp->reativarAutomacao($conversation->contact_id);
+                \Log::info('Bot control: automacao reativada no SendPulse', ['contact_id' => $conversation->contact_id]);
+            } catch (\Throwable $e) {
+                \Log::warning('Bot control: falha ao reativar automacao SendPulse', ['error' => $e->getMessage()]);
+            }
+        }
+
+        \Log::info('Bot control: conversa devolvida ao bot', [
+            'conv_id' => $id,
+            'user_id' => $user->id,
+        ]);
+        return response()->json(['success' => true, 'message' => 'Conversa devolvida ao bot']);
     }
 
     public function updateCategory(Request $request, int $id)

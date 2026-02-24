@@ -1038,8 +1038,68 @@ class NexoAutoatendimentoService
             $ultimos10 = substr($telefoneNormalizado, -10);
             $cliente = Cliente::where('telefone_normalizado', 'LIKE', '%' . $ultimos10)->first();
         }
+
+        // Fallback: buscar por celular
         if (!$cliente) {
-            return ['erro' => 'Cliente não encontrado no sistema.'];
+            $cliente = Cliente::where('celular', 'LIKE', '%' . $ultimos10)->first();
+        }
+
+        // Fallback: buscar por telefone fixo
+        if (!$cliente) {
+            $cliente = Cliente::where('telefone', 'LIKE', '%' . $ultimos10)->first();
+        }
+
+        // Fallback: buscar por CPF/CNPJ via variavel do SendPulse
+        if (!$cliente) {
+            try {
+                $sp = app(\App\Services\SendPulseWhatsAppService::class);
+                $contact = $sp->getContactByPhone($telefoneNormalizado);
+                $contactId = $contact['id'] ?? null;
+                if ($contactId) {
+                    $info = $sp->getContactInfo($contactId);
+                    $vars = $info['data']['variables'] ?? $info['variables'] ?? [];
+
+                    // Tentar por CPF/CNPJ
+                    $cpfInformado = $vars['cpf'] ?? $vars['CPF'] ?? $vars['cpf_cnpj'] ?? $vars['documento'] ?? '';
+                    if (!empty($cpfInformado)) {
+                        $cpfLimpo = preg_replace('/\D/', '', $cpfInformado);
+                        $cliente = Cliente::where(function ($q) use ($cpfLimpo) {
+                            $q->where('cpf', $cpfLimpo)
+                              ->orWhere('cnpj', $cpfLimpo)
+                              ->orWhere('cpf_cnpj', $cpfLimpo)
+                              ->orWhere('cpf_cnpj', 'LIKE', '%' . $cpfLimpo . '%');
+                        })->first();
+                        if ($cliente) {
+                            \Log::info('Nexo fallback: cliente encontrado por CPF/CNPJ', ['cpf' => $cpfLimpo, 'cliente_id' => $cliente->id]);
+                        }
+                    }
+
+                    // Tentar por nome completo
+                    if (!$cliente) {
+                        $nomeInformado = $vars['nomecompleto'] ?? $vars['Nomecompleto'] ?? $vars['nome'] ?? '';
+                        if (!empty($nomeInformado) && strlen($nomeInformado) >= 5) {
+                            $cliente = Cliente::where('nome', 'LIKE', '%' . trim($nomeInformado) . '%')->first();
+                            if ($cliente) {
+                                \Log::info('Nexo fallback: cliente encontrado por nome', ['nome' => $nomeInformado, 'cliente_id' => $cliente->id]);
+                            }
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                \Log::warning('Nexo fallback: erro ao buscar dados SendPulse', ['error' => $e->getMessage()]);
+            }
+        }
+
+        if (!$cliente) {
+            \Log::info('Nexo: cliente nao encontrado por nenhum metodo', ['telefone' => $telefoneNormalizado]);
+            return ['erro' => 'Nao conseguimos localizar seu cadastro. Por favor, entre em contato com nosso escritorio pelo telefone (47) 3349-7979 para atualizar seus dados.'];
+        }
+
+        // Atualizar telefone do cliente se encontrado por fallback
+        if ($cliente->telefone_normalizado !== $telefoneNormalizado) {
+            \Log::info('Nexo: atualizando telefone do cliente via fallback', [
+                'cliente_id' => $cliente->id, 'antigo' => $cliente->telefone_normalizado, 'novo' => $telefoneNormalizado
+            ]);
         }
 
         return $cliente;

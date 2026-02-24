@@ -38,6 +38,8 @@ Route::middleware(['auth', 'user.active'])->group(function () {
         Route::post('/conversas/{id}/run-flow', [NexoAtendimentoController::class, 'runFlow'])->name('nexo.atendimento.run-flow')->whereNumber('id');
         Route::post('/conversas/{id}/reaction', [NexoAtendimentoController::class, 'reaction'])->name('nexo.atendimento.reaction')->whereNumber('id');
         Route::post('/conversas/{id}/assumir', [NexoAtendimentoController::class, 'assumirConversa'])->name('nexo.atendimento.assumir')->whereNumber('id');
+        Route::get('/tickets/buscar-clientes', [\App\Http\Controllers\NexoTicketController::class, 'buscarClientes'])->name('nexo.tickets.buscar-clientes');
+        Route::post('/conversas/{id}/devolver-bot', [NexoAtendimentoController::class, 'devolverAoBot'])->name('nexo.atendimento.devolver-bot')->whereNumber('id');
 
     // v2.1: Busca unificada para autocomplete (Bug 3)
     Route::get('/search-contacts', [NexoAtendimentoController::class, 'searchContacts'])->name('nexo.atendimento.search-contacts');

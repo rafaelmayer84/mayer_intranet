@@ -22,62 +22,7 @@
         </div>
     </div>
 
-    {{-- FILTROS --}}
-    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4" >
-        <form method="GET" action="{{ route('leads.index') }}" class="space-y-3">
-            <div class="relative">
-                <input type="text" name="busca" value="{{ request('busca') }}" placeholder="Buscar por nome, telefone, cidade, area ou palavras-chave..." class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm pl-10 pr-10 py-2" autocomplete="off">
-                <svg class="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                @if(request('busca'))
-                    <a href="{{ route('leads.index') }}" class="absolute right-3 top-2.5 text-gray-400 hover:text-red-500 text-sm font-bold" title="Limpar busca">&times;</a>
-                @endif
-            </div>
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            <select name="periodo" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm" onchange="this.form.submit()">
-                <option value="todos" {{ $filtroPeriodo == 'todos' ? 'selected' : '' }}>Todo período</option>
-                <option value="hoje" {{ $filtroPeriodo == 'hoje' ? 'selected' : '' }}>Hoje</option>
-                <option value="semana" {{ $filtroPeriodo == 'semana' ? 'selected' : '' }}>Última semana</option>
-                <option value="mes" {{ $filtroPeriodo == 'mes' ? 'selected' : '' }}>Último mês</option>
-                <option value="trimestre" {{ $filtroPeriodo == 'trimestre' ? 'selected' : '' }}>Último trimestre</option>
-            </select>
-
-            <select name="area" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm" onchange="this.form.submit()">
-                <option value="todos">Todas as áreas</option>
-                @foreach($areas as $area)
-                    <option value="{{ $area }}" {{ $filtroArea == $area ? 'selected' : '' }}>{{ $area }}</option>
-                @endforeach
-            </select>
-
-            <select name="cidade" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm" onchange="this.form.submit()">
-                <option value="todos">Todas as cidades</option>
-                @foreach($cidades as $cidade)
-                    <option value="{{ $cidade }}" {{ $filtroCidade == $cidade ? 'selected' : '' }}>{{ $cidade }}</option>
-                @endforeach
-            </select>
-
-            <select name="intencao" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm" onchange="this.form.submit()">
-                <option value="todos">Toda intenção</option>
-                <option value="sim" {{ $filtroIntencao == 'sim' ? 'selected' : '' }}>✅ Sim</option>
-                <option value="talvez" {{ $filtroIntencao == 'talvez' ? 'selected' : '' }}>⚠️ Talvez</option>
-                <option value="não" {{ $filtroIntencao == 'não' ? 'selected' : '' }}>❌ Não</option>
-            </select>
-
-            <select name="origem" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm" onchange="this.form.submit()">
-                <option value="todos">Todas as origens</option>
-                @foreach($origens as $origem)
-                    <option value="{{ $origem }}" {{ $filtroOrigem == $origem ? 'selected' : '' }}>{{ $origem }}</option>
-                @endforeach
-            </select>
-
-            <select name="potencial" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm" onchange="this.form.submit()">
-                <option value="todos">Todo potencial</option>
-                <option value="alto" {{ $filtroPotencial == 'alto' ? 'selected' : '' }}>🟢 Alto</option>
-                <option value="médio" {{ $filtroPotencial == 'médio' ? 'selected' : '' }}>🟡 Médio</option>
-                <option value="baixo" {{ $filtroPotencial == 'baixo' ? 'selected' : '' }}>⚪ Baixo</option>
-            </select>
-        </div>
-        </form>
-    </div>
+    
 
     {{-- KPIs PRINCIPAIS --}}
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -223,6 +168,61 @@
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <div class="p-4 border-b border-gray-200 dark:border-gray-700">
             <h3 class="text-lg font-semibold text-gray-900 dark:text-white">📋 Todos os Leads</h3>
+        </div>
+        <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+            <form method="GET" action="{{ route('leads.index') }}" class="space-y-3">
+            <div class="relative">
+                <input type="text" name="busca" value="{{ request('busca') }}" placeholder="Buscar por nome, telefone, cidade, area ou palavras-chave..." class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm pl-10 pr-10 py-2" autocomplete="off">
+                <svg class="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                @if(request('busca'))
+                    <a href="{{ route('leads.index') }}" class="absolute right-3 top-2.5 text-gray-400 hover:text-red-500 text-sm font-bold" title="Limpar busca">&times;</a>
+                @endif
+            </div>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <select name="periodo" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm" onchange="this.form.submit()">
+                <option value="todos" {{ $filtroPeriodo == 'todos' ? 'selected' : '' }}>Todo período</option>
+                <option value="hoje" {{ $filtroPeriodo == 'hoje' ? 'selected' : '' }}>Hoje</option>
+                <option value="semana" {{ $filtroPeriodo == 'semana' ? 'selected' : '' }}>Última semana</option>
+                <option value="mes" {{ $filtroPeriodo == 'mes' ? 'selected' : '' }}>Último mês</option>
+                <option value="trimestre" {{ $filtroPeriodo == 'trimestre' ? 'selected' : '' }}>Último trimestre</option>
+            </select>
+
+            <select name="area" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm" onchange="this.form.submit()">
+                <option value="todos">Todas as áreas</option>
+                @foreach($areas as $area)
+                    <option value="{{ $area }}" {{ $filtroArea == $area ? 'selected' : '' }}>{{ $area }}</option>
+                @endforeach
+            </select>
+
+            <select name="cidade" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm" onchange="this.form.submit()">
+                <option value="todos">Todas as cidades</option>
+                @foreach($cidades as $cidade)
+                    <option value="{{ $cidade }}" {{ $filtroCidade == $cidade ? 'selected' : '' }}>{{ $cidade }}</option>
+                @endforeach
+            </select>
+
+            <select name="intencao" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm" onchange="this.form.submit()">
+                <option value="todos">Toda intenção</option>
+                <option value="sim" {{ $filtroIntencao == 'sim' ? 'selected' : '' }}>✅ Sim</option>
+                <option value="talvez" {{ $filtroIntencao == 'talvez' ? 'selected' : '' }}>⚠️ Talvez</option>
+                <option value="não" {{ $filtroIntencao == 'não' ? 'selected' : '' }}>❌ Não</option>
+            </select>
+
+            <select name="origem" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm" onchange="this.form.submit()">
+                <option value="todos">Todas as origens</option>
+                @foreach($origens as $origem)
+                    <option value="{{ $origem }}" {{ $filtroOrigem == $origem ? 'selected' : '' }}>{{ $origem }}</option>
+                @endforeach
+            </select>
+
+            <select name="potencial" class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm" onchange="this.form.submit()">
+                <option value="todos">Todo potencial</option>
+                <option value="alto" {{ $filtroPotencial == 'alto' ? 'selected' : '' }}>🟢 Alto</option>
+                <option value="médio" {{ $filtroPotencial == 'médio' ? 'selected' : '' }}>🟡 Médio</option>
+                <option value="baixo" {{ $filtroPotencial == 'baixo' ? 'selected' : '' }}>⚪ Baixo</option>
+            </select>
+        </div>
+        </form>
         </div>
         <div class="overflow-x-auto">
             {{-- Barra de Exportação Google Ads --}}

@@ -352,6 +352,38 @@ class SincronizacaoUnificadaController extends Controller
     }
 
     /**
+     * Reprocessar contas a receber (detectar exclusões)
+     */
+    public function reprocessarContasReceber()
+    {
+        $orchestrator = new DataJuriSyncOrchestrator();
+        $orchestrator->cleanupStaleRuns();
+
+        $running = DB::table('sync_runs')->where('status', 'running')->first();
+        if ($running) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ja existe uma sincronizacao em andamento',
+            ], 409);
+        }
+
+        try {
+            $results = $orchestrator->reprocessarContasReceber();
+
+            return response()->json([
+                'success' => true,
+                'message' => "Contas a receber reprocessadas: {$results['processados']} processados, {$results['deletados']} orfaos removidos",
+                'results' => $results,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Erro: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Obter status da sincronizacao
      */
     public function status(string $runId = null)

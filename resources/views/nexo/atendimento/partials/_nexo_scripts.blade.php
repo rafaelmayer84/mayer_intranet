@@ -196,13 +196,19 @@ const NexoApp = {
     toggleBotUI(botAtivo){
         const banner=document.getElementById('bot-ativo-banner');
         const input=document.getElementById('chat-input-bar');
-        if(botAtivo){if(banner)banner.classList.remove('hidden');if(input)input.classList.add('hidden')}
-        else{if(banner)banner.classList.add('hidden');if(input)input.classList.remove('hidden')}
+        const devolverBar=document.getElementById('devolver-bot-bar');
+        if(botAtivo){if(banner)banner.classList.remove('hidden');if(input)input.classList.add('hidden');if(devolverBar)devolverBar.classList.add('hidden')}
+        else{if(banner)banner.classList.add('hidden');if(input)input.classList.remove('hidden');if(devolverBar)devolverBar.classList.remove('hidden')}
     },
     async assumirConversa(){
         if(!this.conversaAtual)return;
         if(!confirm('Assumir esta conversa e desativar o bot?'))return;
         try{await this.api('/nexo/atendimento/conversas/'+this.conversaAtual.id+'/assumir',{method:'POST'});this.conversaAtual.bot_ativo=false;this.toggleBotUI(false);this.loadConversas(true)}catch(e){alert('Erro: '+e.message)}
+    },
+    async devolverAoBot(){
+        if(!this.conversaAtual)return;
+        if(!confirm('Devolver esta conversa ao bot automatico?'))return;
+        try{await this.api('/nexo/atendimento/conversas/'+this.conversaAtual.id+'/devolver-bot',{method:'POST'});this.conversaAtual.bot_ativo=true;this.toggleBotUI(true);this.loadConversas(true)}catch(e){alert('Erro: '+e.message)}
     },
     async sendMessage(){
         if(!this.conversaAtual)return;

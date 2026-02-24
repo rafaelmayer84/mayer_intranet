@@ -598,19 +598,19 @@ PROMPT;
         $cidade = str_replace([' De ', ' Do ', ' Da ', ' Dos ', ' Das ', ' E '], [' de ', ' do ', ' da ', ' dos ', ' das ', ' e '], $cidade);
 
         $mapa = [
-            'Florianopolis' => 'Florian\xc3\xb3polis',
-            'Balneario Camboriu' => 'Balne\xc3\xa1rio Cambori\xc3\xba',
-            'Balneario Cambori\xc3\xba' => 'Balne\xc3\xa1rio Cambori\xc3\xba',
-            'Balne\xc3\xa1rio Camboriu' => 'Balne\xc3\xa1rio Cambori\xc3\xba',
-            'Itajai' => 'Itaja\xc3\xad',
-            'Jaragua do Sul' => 'Jaragu\xc3\xa1 do Sul',
-            'Sao Jose' => 'S\xc3\xa3o Jos\xc3\xa9',
-            'Sao Paulo' => 'S\xc3\xa3o Paulo',
-            'Santa Lidia' => 'Santa L\xc3\xaddia',
-            'Camboriu' => 'Cambori\xc3\xba',
-            'Criciuma' => 'Crici\xc3\xbama',
-            'Chapeco' => 'Chapec\xc3\xb3',
-            'Timbo' => 'Timb\xc3\xb3',
+            'Florianopolis' => 'Florianópolis',
+            'Balneario Camboriu' => 'Balneário Camboriú',
+            'Balneario Camboriú' => 'Balneário Camboriú',
+            'Balneário Camboriu' => 'Balneário Camboriú',
+            'Itajai' => 'Itajaí',
+            'Jaragua do Sul' => 'Jaraguá do Sul',
+            'Sao Jose' => 'São José',
+            'Sao Paulo' => 'São Paulo',
+            'Santa Lidia' => 'Santa Lídia',
+            'Camboriu' => 'Camboriú',
+            'Criciuma' => 'Criciúma',
+            'Chapeco' => 'Chapecó',
+            'Timbo' => 'Timbó',
         ];
 
         if (isset($mapa[$cidade])) {

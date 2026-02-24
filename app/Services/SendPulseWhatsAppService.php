@@ -478,6 +478,38 @@ class SendPulseWhatsAppService
         ]);
     }
 
+    public function setContactVariable(string $contactId, string $name, string $value): array
+    {
+        return $this->apiPost('/whatsapp/contacts/setVariable', [
+            'contact_id' => $contactId,
+            'variable_id' => null,
+            'variable_name' => $name,
+            'variable_value' => $value,
+        ]);
+    }
+
+    /**
+     * Pausar automacao do contato (seta variavel + abre chat ao vivo)
+     */
+    public function pausarAutomacao(string $contactId): bool
+    {
+        $result = $this->setContactVariable($contactId, 'atendimento_humano', 'sim');
+        if (!$result['success']) {
+            Log::warning('SendPulse: falha ao setar atendimento_humano', ['contact_id' => $contactId, 'error' => $result['error']]);
+        }
+        return $result['success'] ?? false;
+    }
+
+    /**
+     * Reativar automacao do contato (limpa variavel + fecha chat)
+     */
+    public function reativarAutomacao(string $contactId): bool
+    {
+        $this->setContactVariable($contactId, 'atendimento_humano', 'nao');
+        $result = $this->closeChat($contactId);
+        return $result['success'] ?? false;
+    }
+
     public function setContactTags(string $contactId, array $tagNames): bool
     {
         $result = $this->apiPost("/chatbots/contacts/tags/set", [

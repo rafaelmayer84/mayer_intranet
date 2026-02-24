@@ -198,6 +198,14 @@
             </div>
         </div>
         <div id="chat-input-bar" class="hidden px-4 py-3 bg-white border-t-0">
+            @if(in_array(Auth::user()->role, ['admin', 'coordenador', 'socio']))
+            <div id="devolver-bot-bar" class="hidden flex items-center justify-between mb-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                <span class="text-[12px] text-blue-800 font-medium">Voce esta atendendo esta conversa</span>
+                <button onclick="NexoApp.devolverAoBot()" class="text-[11px] px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors shadow-sm">
+                    Devolver ao Bot
+                </button>
+            </div>
+            @endif
             <div class="flex items-end gap-3">
                 <textarea id="chat-input" rows="1" placeholder="Digite uma mensagem..."
                     class="flex-1 resize-none px-4 py-3 text-[14px] bg-[#f8f9fb] border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/15 focus:border-[#1e3a5f]/30 focus:bg-white max-h-32 leading-relaxed transition-all"

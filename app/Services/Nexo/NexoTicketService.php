@@ -221,6 +221,11 @@ class NexoTicketService
             'user_id' => $userId,
         ]);
 
+        // Notificar cliente por WhatsApp
+        $mensagemResolucao = "Seu atendimento foi concluido!\n\n"
+            . "Resolucao: {$resolucao}";
+        $this->notificarClienteWhatsApp($ticket, $mensagemResolucao);
+
         return $ticket;
     }
 
@@ -232,7 +237,7 @@ class NexoTicketService
                 . "Protocolo: {$protocolo}\n"
                 . "Assunto: {$ticket->assunto}\n\n"
                 . "{$mensagemNota}\n\n"
-                . "Mayer Albanez Sociedade de Advogados";
+                . "Mayer Sociedade de Advogados";
 
             $telefone = $ticket->telefone;
             $resultado = $this->sendPulse->sendMessageByPhone($telefone, $mensagem);

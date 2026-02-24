@@ -1014,6 +1014,55 @@ if ($existing) {
     }
 
     // =========================================================================
+    // REPROCESSAR CONTAS A RECEBER (INADIMPLENCIA)
+    // =========================================================================
+
+    public function reprocessarContasReceber(callable $progressCallback = null): array
+    {
+        $result = ['processados' => 0, 'criados' => 0, 'atualizados' => 0, 'deletados' => 0, 'erros' => 0];
+
+        try {
+            $this->updateProgress(['mensagem' => 'Marcando contas a receber como stale...']);
+            DB::table('contas_receber')->where('origem', 'datajuri')->update(['is_stale' => true]);
+
+            if ($progressCallback) {
+                $progressCallback('ContasReceber', 0, 0, 'marking_stale');
+            }
+
+            $syncResult = $this->syncModule('ContasReceber', $progressCallback);
+            $result['processados'] = $syncResult['processados'];
+            $result['criados'] = $syncResult['criados'];
+            $result['atualizados'] = $syncResult['atualizados'];
+            $result['erros'] = $syncResult['erros'];
+
+            $staleCount = DB::table('contas_receber')->where('origem', 'datajuri')->where('is_stale', true)->count();
+            $result['deletados'] = $staleCount;
+
+            if ($staleCount > 0) {
+                DB::table('contas_receber')->where('origem', 'datajuri')->where('is_stale', true)->delete();
+                Log::info("ContasReceber: {$staleCount} registros orfaos removidos");
+            }
+
+            \Illuminate\Support\Facades\Cache::flush();
+            $this->finishRun('completed', "ContasReceber: {$result['processados']} processados, {$staleCount} orfaos removidos");
+
+        } catch (\Exception $e) {
+            try {
+                $reverted = DB::table('contas_receber')->where('is_stale', true)->update(['is_stale' => false]);
+                Log::warning("Reprocessar ContasReceber FALHOU - revertidos {$reverted} stale", ['error' => $e->getMessage()]);
+            } catch (\Exception $revertEx) {
+                Log::critical("Reprocessar ContasReceber: falha ao reverter stale!", ['original_error' => $e->getMessage(), 'revert_error' => $revertEx->getMessage()]);
+            }
+            try { \Illuminate\Support\Facades\Cache::flush(); } catch (\Exception $ce) {}
+            $this->finishRun('failed', 'Falha ContasReceber: ' . substr($e->getMessage(), 0, 200));
+            Log::error('Reprocessamento ContasReceber falhou', ['error' => $e->getMessage()]);
+            throw $e;
+        }
+
+        return $result;
+    }
+
+    // =========================================================================
     // SMOKE TEST
     // =========================================================================
 

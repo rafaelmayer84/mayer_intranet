@@ -74,6 +74,9 @@
                 <button id="btn-reprocessar" class="rounded-lg bg-purple-600 px-4 py-2 text-sm text-white hover:bg-purple-700 flex items-center gap-2">
                     <span>&#x1F504;</span> Reprocessar Financeiro
                 </button>
+                <button id="btn-reprocessar-cr" class="rounded-lg bg-amber-600 px-4 py-2 text-sm text-white hover:bg-amber-700 flex items-center gap-2">
+                    <span>&#x1F4B5;</span> Reprocessar Inadimplência
+                </button>
             </div>
 
             {{-- BOTÕES POR MÓDULO --}}
@@ -560,6 +563,44 @@ document.addEventListener('DOMContentLoaded', function() {
         syncCancelled = true;
         showToast('Cancelando após módulo atual finalizar...', 'warning');
         addLog('&#x23F3; Cancelando... aguardando módulo atual finalizar', 'warning');
+    });
+
+    // Reprocessar Contas a Receber (Inadimplência)
+    document.getElementById('btn-reprocessar-cr').addEventListener('click', async () => {
+        if (syncInProgress) {
+            showToast('Aguarde a sincronização atual terminar', 'warning');
+            return;
+        }
+
+
+        syncInProgress = true;
+        addLog('💵 Iniciando reprocessamento de contas a receber...', 'info');
+        showProgress('Reprocessando inadimplência...', 10);
+
+        try {
+            const r = await fetch('{{ route("admin.sincronizacao-unificada.reprocessar-contas-receber") }}', {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
+            });
+            const d = await r.json();
+
+            showProgress('Concluído!', 100);
+
+            if (d.success) {
+                addLog('✅ ' + d.message, 'success');
+                showToast(d.message, 'success');
+                setTimeout(() => location.reload(), 2000);
+            } else {
+                addLog('❌ ' + d.message, 'error');
+                showToast(d.message, 'error');
+            }
+        } catch (e) {
+            addLog('❌ Erro: ' + e.message, 'error');
+            showToast('Erro no reprocessamento', 'error');
+        } finally {
+            syncInProgress = false;
+            setTimeout(hideProgress, 3000);
+        }
     });
 
     // Reprocessar Financeiro

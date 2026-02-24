@@ -398,6 +398,7 @@ public function getLucratividadeByMonth(int $ano): array
         $refDate = $this->refDateCompetencia($ano, $mes);
 
         $rows = ContaReceber::query()
+            ->where('is_stale', false)
             ->where('status', 'Não lançado')
             ->whereNotNull('data_vencimento')
             ->whereDate('data_vencimento', '<', $refDate->toDateString())
@@ -554,6 +555,7 @@ public function getLucratividadeByMonth(int $ano): array
         $ref = $this->refDateCompetencia($ano, $mes);
         // FIN-INAD: Em aberto = tudo que NAO e Concluido
         $totalAberto = (float) ContaReceber::query()
+            ->where('is_stale', false)
             ->where('status', 'Não lançado')
             ->whereNotNull('data_vencimento')
             ->sum('valor');
@@ -740,6 +742,7 @@ public function getLucratividadeByMonth(int $ano): array
         // Após sync, campo status contém: "Concluído", "Não lançado", "Lançado", etc.
         // Vencido = não concluído + vencimento passado (até 720 dias)
         return ContaReceber::query()
+            ->where('is_stale', false)
             ->where('status', 'Não lançado')
             ->whereNotNull('data_vencimento')
             ->whereDate('data_vencimento', '<', $ref->toDateString())
@@ -774,6 +777,7 @@ public function getLucratividadeByMonth(int $ano): array
         $end = Carbon::create($ano, $mes, 1)->endOfMonth();
 
         $totalDue = (float) ContaReceber::query()
+            ->where('is_stale', false)
             ->where('status', 'not like', 'Conclu%')
             ->whereNotNull('data_vencimento')
             ->whereBetween('data_vencimento', [$start->toDateString(), $end->toDateString()])
@@ -781,6 +785,7 @@ public function getLucratividadeByMonth(int $ano): array
 
         // FIN-INAD: data_pagamento nunca preenchida; usar Concluido + vencimento no mes
         $totalPaid = (float) ContaReceber::query()
+            ->where('is_stale', false)
             ->where('status', 'like', 'Conclu%')
             ->whereNotNull('data_vencimento')
             ->whereBetween('data_vencimento', [$start->toDateString(), $end->toDateString()])
