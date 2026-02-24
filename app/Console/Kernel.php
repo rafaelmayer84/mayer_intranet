@@ -15,6 +15,7 @@ class Kernel extends ConsoleKernel
     protected $commands = [
         Commands\CronSyncDataJuri::class,
         Commands\CronGdpApurar::class,
+        Commands\CronGdpLembreteAcordo::class,
         // CronSyncEspoCrm removido em 13/02/2026
     ];
 
@@ -52,6 +53,12 @@ class Kernel extends ConsoleKernel
             ->dailyAt('18:30')
             ->timezone('America/Sao_Paulo')
             ->appendOutputTo(storage_path('logs/cron-gdp.log'));
+
+        // GDP Lembrete Acordo pendente -> diario 9h
+        $schedule->command('cron:gdp-lembrete-acordo')
+            ->dailyAt('09:00')
+            ->timezone('America/Sao_Paulo')
+            ->appendOutputTo(storage_path('logs/cron-gdp-lembrete.log'));
 
         // ESPO CRM → 2x/dia (9h, 17h)
         $schedule->command('cron:sync-espo')

@@ -345,6 +345,36 @@ class GdpController extends Controller
                 'created_at'      => $now,
             ]);
 
+            // Notificar advogado via sininho + email
+            try {
+                $targetUser = \App\Models\User::find($userId);
+                if ($targetUser && $targetUser->id !== $adminId) {
+                    $linkAceite = url("/gdp/acordo/{$userId}/visualizar");
+
+                    \App\Models\NotificationIntranet::enviar(
+                        $userId,
+                        'Acordo de Desempenho disponivel',
+                        "Seu Acordo de Desempenho do ciclo {$ciclo->nome} foi elaborado. Revise e assine.",
+                        $linkAceite,
+                        'info',
+                        'file-text'
+                    );
+
+                    if ($targetUser->email) {
+                        \Illuminate\Support\Facades\Mail::to($targetUser->email)->queue(
+                            new \App\Mail\GdpAcordoPendente(
+                                advogado: $targetUser,
+                                cicloNome: $ciclo->nome,
+                                linkAceite: $linkAceite,
+                                isLembrete: false
+                            )
+                        );
+                    }
+                }
+            } catch (\Throwable $notifErr) {
+                \Log::warning('GDP Acordo notificacao erro: ' . $notifErr->getMessage());
+            }
+
             return response()->json(['sucesso' => true, 'metas_salvas' => $saved]);
         } catch (\Throwable $e) {
             DB::rollBack();
