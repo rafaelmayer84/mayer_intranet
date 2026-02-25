@@ -1,54 +1,38 @@
 <?php
-
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
-use App\Services\DataJuriSyncOrchestrator;
+use App\Services\DataJuriSyncService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class CronSyncDataJuri extends Command
 {
     protected $signature = 'cron:sync-datajuri';
-    protected $description = 'Cron: Sincroniza todos os 8 módulos DataJuri';
+    protected $description = 'Cron: Sincroniza todos os modulos DataJuri (via SyncService_NOVO)';
 
     public function handle()
     {
         try {
-            Log::info('[CRON] Iniciando sync DataJuri completo');
-            
-            $orchestrator = new DataJuriSyncOrchestrator();
-            $orchestrator->cleanupStaleRuns();
-            
-            $runId = $orchestrator->startRun('cron_full');
-            
-            // Iterar modulos habilitados do config (FIX 20/02/2026)
-            $allModulos = config('datajuri.modulos', []);
-            $modulos = [];
-            foreach ($allModulos as $nome => $cfg) {
-                if (!empty($cfg['enabled'])) $modulos[] = $nome;
+            Log::info('[CRON] Iniciando sync DataJuri (SyncService_NOVO)');
+
+            $service = new DataJuriSyncService();
+
+            if (!$service->authenticate()) {
+                Log::error('[CRON] Falha na autenticacao DataJuri');
+                return 1;
             }
-            
-            $totais = ['processados' => 0, 'criados' => 0, 'atualizados' => 0, 'erros' => 0];
-            
-            foreach ($modulos as $modulo) {
-                try {
-                    $result = $orchestrator->syncModule($modulo);
-                    $totais['processados'] += $result['processados'] ?? 0;
-                    $totais['criados'] += $result['criados'] ?? 0;
-                    $totais['atualizados'] += $result['atualizados'] ?? 0;
-                    $totais['erros'] += $result['erros'] ?? 0;
-                } catch (\Exception $e) {
-                    Log::error("[CRON] Erro módulo {$modulo}: " . $e->getMessage());
-                    $totais['erros']++;
-                }
-            }
-            
-            // Ciclo stale automatico para ContasReceber (detectar exclusoes no DataJuri)
+
+            $syncId = 'cron_' . now()->format('Ymd_His');
+            $service->setSyncId($syncId);
+
+            $results = $service->syncAll();
+
+            // Ciclo stale para ContasReceber (detectar exclusoes no DataJuri)
             try {
                 Log::info('[CRON] Iniciando ciclo stale ContasReceber...');
                 DB::table('contas_receber')->where('origem', 'datajuri')->update(['is_stale' => true]);
-                $orchestrator->syncModule('ContasReceber');
+                $service->syncContasReceber();
                 $staleRemoved = DB::table('contas_receber')->where('origem', 'datajuri')->where('is_stale', true)->count();
                 if ($staleRemoved > 0) {
                     DB::table('contas_receber')->where('origem', 'datajuri')->where('is_stale', true)->delete();
@@ -59,11 +43,10 @@ class CronSyncDataJuri extends Command
                 Log::error('[CRON] Erro ciclo stale ContasReceber: ' . $e->getMessage());
             }
 
-            $orchestrator->finishRun('completed', 'cron_full');
-            
-            Log::info('[CRON] Sync DataJuri OK', $totais);
+            $stats = $service->getStats();
+            Log::info('[CRON] Sync DataJuri OK', $stats);
+
             return 0;
-            
         } catch (\Exception $e) {
             Log::error('[CRON] Erro sync DataJuri: ' . $e->getMessage());
             return 1;

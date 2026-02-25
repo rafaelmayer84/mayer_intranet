@@ -1,73 +1,52 @@
 <?php
 namespace App\Console\Commands;
+
 use App\Services\DataJuriSyncService;
 use Illuminate\Console\Command;
+
 class SyncDataJuriCommand extends Command
 {
     protected $signature = 'sync:datajuri {--entity=all : Entidade a sincronizar (pessoas|processos|movimentos|all)}';
     protected $description = 'Sincronizar dados do DataJuri para a Intranet';
+
     public function handle()
     {
-        $this->info('🔄 Iniciando sincronização DataJuri...');
-        
+        $this->info('Iniciando sincronizacao DataJuri...');
         $service = new DataJuriSyncService();
-        $entity = $this->option('entity');
+
         if (!$service->authenticate()) {
-            $this->error('❌ Falha na autenticação com DataJuri');
+            $this->error('Falha na autenticacao com DataJuri');
             return Command::FAILURE;
         }
-        $this->info('✅ Autenticado com sucesso');
+        $this->info('Autenticado com sucesso');
+
+        $syncId = 'cmd_' . now()->format('Ymd_His');
+        $service->setSyncId($syncId);
+        $entity = $this->option('entity');
+
         switch ($entity) {
             case 'pessoas':
-                $this->syncPessoas($service);
+                $this->info('Sincronizando Pessoas...');
+                $service->syncPessoas();
                 break;
             case 'processos':
-                $this->syncProcessos($service);
+                $this->info('Sincronizando Processos...');
+                $service->syncProcessos();
                 break;
             case 'movimentos':
-                $this->syncMovimentos($service);
+                $this->info('Sincronizando Movimentos...');
+                $service->syncMovimentos();
                 break;
             case 'all':
             default:
-                $this->syncPessoas($service);
-                $this->syncProcessos($service);
-                $this->syncMovimentos($service);
+                $this->info('Sincronizacao completa...');
+                $service->syncAll();
                 break;
         }
-        $this->info('✅ Sincronização concluída!');
+
+        $stats = $service->getStats();
+        $this->info('Sincronizacao concluida!');
+        $this->table(['Metrica', 'Valor'], collect($stats)->map(fn($v, $k) => [$k, $v])->toArray());
         return Command::SUCCESS;
-    }
-    private function syncPessoas($service)
-    {
-        $this->info('📊 Sincronizando Pessoas...');
-        $result = $service->syncPessoas();
-        
-        if ($result['success']) {
-            $this->info("   ✅ Processadas: {$result['count']} pessoas");
-        } else {
-            $this->error("   ❌ Erro: {$result['error']}");
-        }
-    }
-    private function syncProcessos($service)
-    {
-        $this->info('⚖️  Sincronizando Processos...');
-        $result = $service->syncProcessos();
-        
-        if ($result['success']) {
-            $this->info("   ✅ Processados: {$result['count']} processos");
-        } else {
-            $this->error("   ❌ Erro: {$result['error']}");
-        }
-    }
-    private function syncMovimentos($service)
-    {
-        $this->info('💰 Sincronizando Movimentos...');
-        $result = $service->syncMovimentos();
-        
-        if ($result['success']) {
-            $this->info("   ✅ Processados: {$result['count']} movimentos");
-        } else {
-            $this->error("   ❌ Erro: {$result['error']}");
-        }
     }
 }

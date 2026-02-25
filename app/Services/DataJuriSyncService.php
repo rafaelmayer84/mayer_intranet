@@ -2,81 +2,91 @@
 
 namespace App\Services;
 
-use App\Models\Cliente;
-use App\Models\Processo;
-use App\Models\Movimento;
-use App\Models\IntegrationLog;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
-use Exception;
+use Illuminate\Support\Facades\Http;
 
 /**
- * DataJuriSyncService - Vers„o corrigida
- * 
- * CORRE«’ES APLICADAS (patch 2026-02-05):
- * 1. ensureAuthenticated() em TODOS os mÈtodos sync - n„o depende mais de syncAll()
- * 2. Token persistido via Cache (50 min) + refresh autom·tico em 401
- * 3. Retry com reautenticaÁ„o em caso de 401
- * 4. Campos int nullable tratados (plano_conta_id, pessoa_id, etc.)
- * 5. ClassificacaoService È opcional (n„o quebra se n„o existir)
- * 6. Credenciais via env() mantidas como no backup funcional
+ * DataJuriSyncService - Vers√£o 3.0 com Auditoria
+ *
+ * NOVIDADES:
+ * - Detec√ß√£o de altera√ß√µes via hash de conte√∫do
+ * - Detec√ß√£o de exclus√µes (registros que sumiram da API)
+ * - Auditoria completa de mudan√ßas
+ * - Marca√ß√£o de sync_status para filtros
+ *
+ * @version 3.0 - Com Auditoria
+ * @date 2026-02-05
  */
 class DataJuriSyncService
 {
-    private $baseUrl = 'https://api.datajuri.com.br';
-    private $token;
-    private $clientId;
-    private $secretId;
-    private $username;
-    private $password;
-    private $perPage = 100;
-    private $classificacaoService;
+    private ?string $token = null;
+    private string $baseUrl = 'https://api.datajuri.com.br';
+    private ?string $currentSyncId = null;
+
+    // Credenciais OAuth2
+    private string $clientId;
+    private string $secretId;
+    private string $username;
+    private string $password;
+
+    // Contadores para relat√≥rio
+    private array $stats = [
+        'inseridos' => 0,
+        'atualizados' => 0,
+        'removidos' => 0,
+        'inalterados' => 0,
+    ];
 
     public function __construct()
     {
-        $this->clientId = env('DATAJURI_CLIENT_ID');
-        $this->secretId = env('DATAJURI_SECRET_ID');
-        $this->username = env('DATAJURI_EMAIL');
-        $this->password = env('DATAJURI_PASSWORD');
+        $this->clientId = config('services.datajuri.client_id', env('DATAJURI_CLIENT_ID'));
+        $this->secretId = config('services.datajuri.secret_id', env('DATAJURI_SECRET_ID'));
+        $this->username = config('services.datajuri.username', env('DATAJURI_USERNAME'));
+        $this->password = config('services.datajuri.password', env('DATAJURI_PASSWORD'));
+    }
 
-        // ClassificacaoService opcional - n„o quebra se n„o existir
-        try {
-            if (class_exists(\App\Services\ClassificacaoService::class)) {
-                $this->classificacaoService = app(\App\Services\ClassificacaoService::class);
-            }
-        } catch (Exception $e) {
-            $this->classificacaoService = null;
-        }
+    /**
+     * Define o ID da sync atual (para rastreabilidade)
+     */
+    public function setSyncId(string $syncId): void
+    {
+        $this->currentSyncId = $syncId;
+    }
+
+    /**
+     * Retorna estat√≠sticas da √∫ltima sync
+     */
+    public function getStats(): array
+    {
+        return $this->stats;
+    }
+
+    /**
+     * Reseta contadores
+     */
+    private function resetStats(): void
+    {
+        $this->stats = [
+            'inseridos' => 0,
+            'atualizados' => 0,
+            'removidos' => 0,
+            'inalterados' => 0,
+        ];
     }
 
     // =========================================================================
-    // AUTENTICA«√O (com Cache persistente + retry)
+    // AUTENTICA√á√ÉO
     // =========================================================================
 
-    /**
-     * Autenticar na API DataJuri
-     * Persiste token em Cache por 50 min para compartilhar entre requests
-     */
     public function authenticate(): bool
     {
         try {
-            // Verificar cache primeiro
-            $cachedToken = Cache::get('datajuri_access_token');
-            if ($cachedToken) {
-                $this->token = $cachedToken;
-                Log::debug('DataJuri: Token recuperado do cache');
-                return true;
-            }
-
             $credentials = base64_encode("{$this->clientId}:{$this->secretId}");
-            
-            $response = Http::withHeaders([
-                'Authorization' => "Basic {$credentials}",
-                'Content-Type' => 'application/x-www-form-urlencoded'
-            ])->asForm()->post("{$this->baseUrl}/oauth/token", [
+
+            $response = Http::asForm()->withHeaders([
+                'Authorization' => "Basic {$credentials}"
+            ])->post("{$this->baseUrl}/oauth/token", [
                 'grant_type' => 'password',
                 'username' => $this->username,
                 'password' => $this->password
@@ -84,598 +94,913 @@ class DataJuriSyncService
 
             if ($response->successful()) {
                 $this->token = $response->json()['access_token'];
-                // Cachear por 50 min (token expira em ~60 min)
-                Cache::put('datajuri_access_token', $this->token, now()->addMinutes(50));
-                Log::info('DataJuri: AutenticaÁ„o OK, token cacheado');
                 return true;
             }
 
-            $this->logError('DataJuri', 'AutenticaÁ„o', 'Falha na autenticaÁ„o: ' . $response->body());
+            Log::error('DataJuri Auth Failed', ['response' => $response->json()]);
             return false;
-
-        } catch (Exception $e) {
-            $this->logError('DataJuri', 'AutenticaÁ„o', $e->getMessage());
+        } catch (\Exception $e) {
+            Log::error('DataJuri Auth Exception', ['error' => $e->getMessage()]);
             return false;
         }
     }
 
-    /**
-     * Garante que h· um token v·lido antes de qualquer chamada ‡ API.
-     * Se o token est· nulo, tenta autenticar.
-     * 
-     * @throws Exception se n„o conseguir autenticar
-     */
-    private function ensureAuthenticated(): void
+    private function getHeaders(): array
     {
-        if (!empty($this->token)) {
-            return;
-        }
-
-        // Tentar recuperar do cache
-        $cachedToken = Cache::get('datajuri_access_token');
-        if ($cachedToken) {
-            $this->token = $cachedToken;
-            return;
-        }
-
-        // Autenticar do zero
-        if (!$this->authenticate()) {
-            throw new Exception('DataJuri: N„o foi possÌvel autenticar. Verifique credenciais no .env');
-        }
-    }
-
-    /**
-     * ForÁa reautenticaÁ„o (limpa cache e token em memÛria)
-     */
-    private function forceReauthenticate(): bool
-    {
-        Cache::forget('datajuri_access_token');
-        $this->token = null;
-        Log::info('DataJuri: ForÁando reautenticaÁ„o...');
-        return $this->authenticate();
-    }
-
-    /**
-     * Faz GET com retry autom·tico em 401 (reautentica e tenta de novo)
-     */
-    private function authenticatedGet(string $url, array $params = [], int $retries = 1): \Illuminate\Http\Client\Response
-    {
-        $this->ensureAuthenticated();
-
-        $response = Http::withHeaders([
+        return [
             'Authorization' => "Bearer {$this->token}",
             'Content-Type' => 'application/json'
-        ])->timeout(120)->get($url, $params);
+        ];
+    }
 
-        // Se 401 e ainda tem retries, reautentica e tenta novamente
-        if ($response->status() === 401 && $retries > 0) {
-            Log::warning("DataJuri: 401 recebido, reautenticando... (retries restantes: {$retries})");
-            if ($this->forceReauthenticate()) {
-                return $this->authenticatedGet($url, $params, $retries - 1);
+    // =========================================================================
+    // BUSCA GEN√âRICA PAGINADA
+    // =========================================================================
+
+    private function fetchAllPages(string $modulo, string $campos, int $pageSize = 100): array
+    {
+        $allRows = [];
+        $page = 1;
+        $hasMore = true;
+
+        while ($hasMore) {
+            $response = Http::withHeaders($this->getHeaders())
+                ->timeout(120)
+                ->get("{$this->baseUrl}/v1/entidades/{$modulo}", [
+                    'page' => $page,
+                    'pageSize' => $pageSize,
+                    'campos' => $campos
+                ]);
+
+            if (!$response->successful()) {
+                Log::error("DataJuri Fetch Failed: {$modulo}", ['page' => $page, 'error' => $response->body()]);
+                break;
+            }
+
+            $data = $response->json();
+            $rows = $data['rows'] ?? [];
+            $allRows = array_merge($allRows, $rows);
+
+            $listSize = $data['listSize'] ?? 0;
+            $hasMore = ($page * $pageSize) < $listSize;
+            $page++;
+
+            // Safety limit
+            if ($page > 500) {
+                Log::warning("DataJuri Safety Limit: {$modulo}", ['pages' => $page]);
+                break;
             }
         }
 
-        return $response;
+        return $allRows;
     }
 
     // =========================================================================
-    // SYNC ALL
+    // FUN√á√ïES DE HASH E AUDITORIA
     // =========================================================================
 
     /**
-     * Sincronizar todas as entidades
+     * Gera hash dos campos cr√≠ticos para detectar altera√ß√µes
      */
-    public function syncAll(): array
+    private function gerarHashMovimento(array $dados): string
     {
-        if (!$this->authenticate()) {
-            return [
-                'success' => false,
-                'message' => 'Falha na autenticaÁ„o com DataJuri'
-            ];
-        }
-
-        $results = [
-            'pessoas' => $this->syncPessoasComPaginacao(),
-            'processos' => $this->syncProcessosComPaginacao(),
-            'movimentos' => $this->syncMovimentosComPaginacao(),
+        // Campos que importam para detectar mudan√ßa
+        $camposCriticos = [
+            'valor' => $dados['valor'] ?? 0,
+            'data' => $dados['data'] ?? '',
+            'plano_contas' => $dados['plano_contas'] ?? '',
+            'codigo_plano' => $dados['codigo_plano'] ?? '',
+            'descricao' => $dados['descricao'] ?? '',
+            'conciliado' => $dados['conciliado'] ?? false,
         ];
-
-        return [
-            'success' => true,
-            'results' => $results
-        ];
+        
+        return hash('sha256', json_encode($camposCriticos));
     }
-
-    // =========================================================================
-    // SYNC PESSOAS
-    // =========================================================================
-
-    public function syncPessoasComPaginacao(): array
-    {
-        try {
-            $this->ensureAuthenticated();
-
-            $offset = 0;
-            $totalSincronizadas = 0;
-            $totalErros = 0;
-            $listSize = null;
-
-            do {
-                try {
-                    $response = $this->authenticatedGet(
-                        "{$this->baseUrl}/v1/entidades/Pessoa",
-                        ['offset' => $offset, 'maxResults' => $this->perPage]
-                    );
-
-                    if (!$response->successful()) {
-                        throw new Exception('Falha ao buscar pessoas: ' . $response->body());
-                    }
-
-                    $data = $response->json();
-                    $pessoas = $data['rows'] ?? [];
-                    $listSize = $data['listSize'] ?? 0;
-
-                    if (empty($pessoas)) {
-                        break;
-                    }
-
-                    foreach ($pessoas as $pessoa) {
-                        try {
-                            Cliente::updateOrCreate(
-                                ['datajuri_id' => $pessoa['id'] ?? null],
-                                [
-                                    'nome' => substr($pessoa['nome'] ?? '', 0, 255),
-                                    'email' => substr($pessoa['email'] ?? '', 0, 255),
-                                    'telefone' => substr($pessoa['telefone'] ?? '', 0, 20),
-                                    'tipo' => substr($pessoa['tipo'] ?? 'PF', 0, 50),
-                                ]
-                            );
-                            $totalSincronizadas++;
-                        } catch (Exception $e) {
-                            Log::warning("Erro ao sincronizar pessoa {$pessoa['id']}: " . $e->getMessage());
-                            $totalErros++;
-                        }
-                    }
-
-                    $offset += count($pessoas);
-                } catch (Exception $e) {
-                    Log::error("Erro no offset {$offset} de pessoas: " . $e->getMessage());
-                    break;
-                }
-            } while ($offset < $listSize && $offset < 10000);
-
-            $this->logSuccess('DataJuri', 'Pessoas', "Sincronizadas {$totalSincronizadas} pessoas ({$totalErros} erros)");
-            return ['success' => true, 'count' => $totalSincronizadas, 'errors' => $totalErros];
-
-        } catch (Exception $e) {
-            $this->logError('DataJuri', 'Pessoas', $e->getMessage());
-            return ['success' => false, 'error' => $e->getMessage(), 'count' => 0];
-        }
-    }
-
-    // =========================================================================
-    // SYNC PROCESSOS
-    // =========================================================================
-
-    public function syncProcessosComPaginacao(): array
-    {
-        try {
-            $this->ensureAuthenticated();
-
-            $offset = 0;
-            $totalSincronizadas = 0;
-            $totalErros = 0;
-            $listSize = null;
-
-            do {
-                try {
-                    $response = $this->authenticatedGet(
-                        "{$this->baseUrl}/v1/entidades/Processo",
-                        ['offset' => $offset, 'maxResults' => $this->perPage]
-                    );
-
-                    if (!$response->successful()) {
-                        throw new Exception('Falha ao buscar processos: ' . $response->body());
-                    }
-
-                    $data = $response->json();
-                    $processos = $data['rows'] ?? [];
-                    $listSize = $data['listSize'] ?? 0;
-
-                    if (empty($processos)) {
-                        break;
-                    }
-
-                    foreach ($processos as $processo) {
-                        try {
-                            $clienteId = null;
-                            $clienteNome = $processo['cliente.nome'] ?? $processo['cliente'] ?? null;
-                            if ($clienteNome && is_string($clienteNome)) {
-                                $cliente = Cliente::where('nome', 'LIKE', '%' . substr($clienteNome, 0, 50) . '%')->first();
-                                $clienteId = $cliente ? $cliente->id : null;
-                            }
-
-                            Processo::updateOrCreate(
-                                ['datajuri_id' => $processo['id'] ?? null],
-                                [
-                                    'pasta' => substr($processo['pasta'] ?? '', 0, 50),
-                                    'numero' => substr($processo['numero'] ?? '', 0, 100),
-                                    'descricao' => substr($processo['descricao'] ?? '', 0, 500),
-                                    'status' => substr($processo['status'] ?? $processo['situacao'] ?? 'Ativo', 0, 50),
-                                    'cliente_id' => $clienteId,
-                                ]
-                            );
-                            $totalSincronizadas++;
-                        } catch (Exception $e) {
-                            Log::warning("Erro ao sincronizar processo {$processo['id']}: " . $e->getMessage());
-                            $totalErros++;
-                        }
-                    }
-
-                    $offset += count($processos);
-                } catch (Exception $e) {
-                    Log::error("Erro no offset {$offset} de processos: " . $e->getMessage());
-                    break;
-                }
-            } while ($offset < $listSize && $offset < 10000);
-
-            $this->logSuccess('DataJuri', 'Processos', "Sincronizados {$totalSincronizadas} processos ({$totalErros} erros)");
-            return ['success' => true, 'count' => $totalSincronizadas, 'errors' => $totalErros];
-
-        } catch (Exception $e) {
-            $this->logError('DataJuri', 'Processos', $e->getMessage());
-            return ['success' => false, 'error' => $e->getMessage(), 'count' => 0];
-        }
-    }
-
-    // =========================================================================
-    // SYNC MOVIMENTOS
-    // =========================================================================
 
     /**
-     * Sincronizar Movimentos com paginaÁ„o
-     * 
-     * IMPORTANTE: 
-     * - N√O usar 'criterio' ou 'removerHtml' - quebra a API
-     * - O campo 'codigo_plano' N√O existe na API, deve ser extraÌdo de 'planoConta.nomeCompleto'
-     * - O valor vem com HTML (ex: <span class='valor-positivo'>830,09</span>)
-     * - A data vem no formato brasileiro DD/MM/YYYY
+     * Registra altera√ß√£o na tabela de auditoria
      */
-    public function syncMovimentosComPaginacao(): array
-    {
+    private function registrarAuditoria(
+        string $tipoAlteracao,
+        int $datajuriId,
+        ?int $movimentoId = null,
+        ?array $dadosAntes = null,
+        ?array $dadosDepois = null
+    ): void {
         try {
-            $this->ensureAuthenticated();
-
-            $offset = 0;
-            $totalSincronizadas = 0;
-            $totalErros = 0;
-            $listSize = null;
-
-            do {
-                try {
-                    $response = $this->authenticatedGet(
-                        "{$this->baseUrl}/v1/entidades/Movimento",
-                        ['offset' => $offset, 'maxResults' => $this->perPage]
-                    );
-
-                    if (!$response->successful()) {
-                        throw new Exception('Falha ao buscar movimentos (HTTP ' . $response->status() . '): ' . $response->body());
-                    }
-
-                    $data = $response->json();
-                    $movimentos = $data['rows'] ?? [];
-                    $listSize = $data['listSize'] ?? 0;
-
-                    Log::info("DataJuri Movimentos: offset={$offset}, recebidos=" . count($movimentos) . ", listSize={$listSize}");
-
-                    if (empty($movimentos)) {
-                        break;
-                    }
-
-                    foreach ($movimentos as $movimento) {
-                        try {
-                            $planoContaCompleto = $movimento['planoConta.nomeCompleto'] ?? $movimento['planoConta'] ?? null;
-                            $codigoPlano = $this->extrairCodigoPlano($planoContaCompleto);
-
-                            // Filtro DRE: so importar grupo 3.* (Resultado Operacional)
-                            if (empty($codigoPlano) || !str_starts_with($codigoPlano, '3.')) {
-                                continue;
-                            }
-                            
-                            $valorBruto = $movimento['valorComSinal'] ?? $movimento['valor'] ?? 0;
-                            $valor = $this->parseValorBrasileiro($valorBruto);
-                            
-                            $dataBruta = $movimento['data'] ?? null;
-                            $dataFormatada = $this->parseDataBrasileira($dataBruta);
-                            
-                            $ano = null;
-                            $mes = null;
-                            if ($dataFormatada) {
-                                $ano = (int) substr($dataFormatada, 0, 4);
-                                $mes = (int) substr($dataFormatada, 5, 2);
-                            }
-                            
-                            $pessoaIdDj = $this->toNullableInt($movimento['pessoaId'] ?? null);
-                            $classificacao = $this->classificarMovimento($codigoPlano, $valor, $pessoaIdDj);
-
-                            // Verificar se registro existente tem classificacao manual
-                            $existente = Movimento::where('datajuri_id', $movimento['id'] ?? null)->first();
-                            $mantemManual = ($existente && $existente->classificacao_manual == 1);
-
-                            $dados = [
-                                'descricao' => substr($movimento['descricao'] ?? '', 0, 500),
-                                'observacao' => substr($movimento['observacao'] ?? '', 0, 1000),
-                                'data' => $dataFormatada,
-                                'ano' => $ano,
-                                'mes' => $mes,
-                                'valor' => $valor,
-                                'plano_contas' => substr($planoContaCompleto ?? '', 0, 500),
-                                'codigo_plano' => $codigoPlano,
-                                'pessoa' => substr($movimento['pessoa.nome'] ?? $movimento['pessoa'] ?? '', 0, 255),
-                                'conta' => substr($movimento['contaId'] ?? '', 0, 100),
-                                'conciliado' => ($movimento['conciliado'] ?? '') === 'Sim',
-                                'plano_conta_id' => $this->toNullableInt($movimento['planoContaId'] ?? null),
-                                'pessoa_id_datajuri' => $pessoaIdDj,
-                                'contrato_id_datajuri' => $this->toNullableInt($movimento['contratoId'] ?? null),
-                                'proprietario_id' => $this->toNullableInt($movimento['proprietarioId'] ?? null),
-                            ];
-
-                            // So sobrescreve classificacao se NAO for manual
-                            if (!$mantemManual) {
-                                $dados['classificacao'] = $classificacao;
-                            }
-
-                            Movimento::updateOrCreate(
-                                ['datajuri_id' => $movimento['id'] ?? null],
-                                $dados
-                            );
-                            $totalSincronizadas++;
-                        } catch (Exception $e) {
-                            Log::warning("Erro ao sincronizar movimento {$movimento['id']}: " . $e->getMessage());
-                            $totalErros++;
-                        }
-                    }
-
-                    $offset += count($movimentos);
-                } catch (Exception $e) {
-                    Log::error("Erro no offset {$offset} de movimentos: " . $e->getMessage());
-                    break;
-                }
-            } while ($offset < $listSize && $offset < 50000);
-
-            $this->logSuccess('DataJuri', 'Movimentos', "Sincronizados {$totalSincronizadas} movimentos ({$totalErros} erros)");
-            return ['success' => true, 'count' => $totalSincronizadas, 'errors' => $totalErros];
-
-        } catch (Exception $e) {
-            $this->logError('DataJuri', 'Movimentos', $e->getMessage());
-            return ['success' => false, 'error' => $e->getMessage(), 'count' => 0];
+            DB::table('movimentos_audit')->insert([
+                'movimento_id' => $movimentoId,
+                'datajuri_id' => $datajuriId,
+                'tipo_alteracao' => $tipoAlteracao,
+                'dados_antes' => $dadosAntes ? json_encode($dadosAntes) : null,
+                'dados_depois' => $dadosDepois ? json_encode($dadosDepois) : null,
+                'valor_antes' => $dadosAntes['valor'] ?? null,
+                'valor_depois' => $dadosDepois['valor'] ?? null,
+                'plano_antes' => $dadosAntes['codigo_plano'] ?? null,
+                'plano_depois' => $dadosDepois['codigo_plano'] ?? null,
+                'classificacao_antes' => $dadosAntes['classificacao'] ?? null,
+                'classificacao_depois' => $dadosDepois['classificacao'] ?? null,
+                'sync_run_id' => $this->currentSyncId,
+                'detectado_em' => now(),
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Erro ao registrar auditoria', [
+                'tipo' => $tipoAlteracao,
+                'datajuri_id' => $datajuriId,
+                'error' => $e->getMessage()
+            ]);
         }
     }
 
     // =========================================================================
-    // ALIASES (compatibilidade)
+    // SYNC: MOVIMENTO ‚Üí MOVIMENTOS (COM AUDITORIA)
     // =========================================================================
-
-    public function syncPessoas(): array
-    {
-        return $this->syncPessoasComPaginacao();
-    }
-
-    public function syncProcessos(): array
-    {
-        return $this->syncProcessosComPaginacao();
-    }
 
     public function syncMovimentos(): array
     {
-        return $this->syncMovimentosComPaginacao();
+        $this->resetStats();
+        
+        $campos = implode(',', [
+            'id', 'data', 'valorComSinal', 'descricao',
+            'planoConta.nomeCompleto', 'planoContaId',
+            'pessoaId', 'contratoId', 'processo.pasta',
+            'proprietario.nome', 'proprietarioId', 'conciliado'
+        ]);
+
+        $rows = $this->fetchAllPages('Movimento', $campos);
+        
+        // Coletar todos os IDs que vieram da API
+        $idsRecebidos = [];
+        
+        foreach ($rows as $mov) {
+            $datajuriId = $mov['id'] ?? null;
+            if (!$datajuriId) continue;
+            
+            $idsRecebidos[] = $datajuriId;
+        }
+
+        // FASE 1: Processar registros recebidos (inserir/atualizar)
+        foreach ($rows as $mov) {
+            try {
+                $datajuriId = $mov['id'] ?? null;
+                if (!$datajuriId) continue;
+
+                $valor = $this->parseValorBrasileiro($mov['valorComSinal'] ?? 0);
+                $planoContas = $mov['planoConta.nomeCompleto'] ?? '';
+                $codigoPlano = $this->extrairCodigoPlano($planoContas);
+                $dataMovimento = $this->parseDataBrasileira($mov['data'] ?? null);
+
+                $dadosNovos = [
+                    'datajuri_id' => $datajuriId,
+                    'data' => $dataMovimento,
+                    'valor' => $valor,
+                    'descricao' => $mov['descricao'] ?? null,
+                    'plano_contas' => $planoContas,
+                    'codigo_plano' => $codigoPlano,
+                    'plano_conta_id' => $mov['planoContaId'] ?? null,
+                    'pessoa_id_datajuri' => $mov['pessoaId'] ?? null,
+                    'contrato_id_datajuri' => $mov['contratoId'] ?? null,
+                    'processo_pasta' => $mov['processo.pasta'] ?? null,
+                    'proprietario_nome' => $mov['proprietario.nome'] ?? null,
+                    'proprietario_id' => $mov['proprietarioId'] ?? null,
+                    'conciliado' => ($mov['conciliado'] ?? 'N√£o') === 'Sim',
+                    'ano' => $dataMovimento ? (int) date('Y', strtotime($dataMovimento)) : null,
+                    'mes' => $dataMovimento ? (int) date('n', strtotime($dataMovimento)) : null,
+                    'classificacao' => $this->inferirClassificacao($codigoPlano, $valor),
+                ];
+
+                // Gerar hash do conte√∫do
+                $novoHash = $this->gerarHashMovimento($dadosNovos);
+
+                // Verificar se j√° existe
+                $existente = DB::table('movimentos')
+                    ->where('datajuri_id', $datajuriId)
+                    ->first();
+
+                if ($existente) {
+                    // EXISTE - verificar se mudou
+                    $hashAntigo = $existente->payload_hash;
+                    
+                    if ($hashAntigo !== $novoHash) {
+                        // MUDOU! Registrar auditoria e atualizar
+                        $dadosAntes = [
+                            'valor' => (float) $existente->valor,
+                            'data' => $existente->data,
+                            'plano_contas' => $existente->plano_contas,
+                            'codigo_plano' => $existente->codigo_plano,
+                            'classificacao' => $existente->classificacao,
+                            'descricao' => $existente->descricao,
+                        ];
+
+                        $this->registrarAuditoria(
+                            'alterado',
+                            $datajuriId,
+                            $existente->id,
+                            $dadosAntes,
+                            $dadosNovos
+                        );
+
+                        // Atualizar registro
+                        DB::table('movimentos')
+                            ->where('id', $existente->id)
+                            ->update(array_merge($dadosNovos, [
+                                'payload_hash' => $novoHash,
+                                'sync_status' => 'alterado',
+                                'ultima_sync_id' => $this->currentSyncId,
+                                'updated_at' => now(),
+                                'is_stale' => false,
+                            ]));
+
+                        $this->stats['atualizados']++;
+                        
+                        Log::info('Movimento ALTERADO detectado', [
+                            'datajuri_id' => $datajuriId,
+                            'valor_antes' => $existente->valor,
+                            'valor_depois' => $valor,
+                        ]);
+                    } else {
+                        // N√£o mudou, apenas atualizar sync_id
+                        DB::table('movimentos')
+                            ->where('id', $existente->id)
+                            ->update([
+                                'ultima_sync_id' => $this->currentSyncId,
+                                'sync_status' => 'ativo',
+                                'is_stale' => false,
+                                'updated_at' => now(),
+                            ]);
+                        
+                        $this->stats['inalterados']++;
+                    }
+                } else {
+                    // NOVO - inserir
+                    $novoId = DB::table('movimentos')->insertGetId(array_merge($dadosNovos, [
+                        'origem' => 'datajuri',
+                        'payload_hash' => $novoHash,
+                        'sync_status' => 'novo',
+                        'ultima_sync_id' => $this->currentSyncId,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                        'is_stale' => false,
+                    ]));
+
+                    $this->registrarAuditoria(
+                        'criado',
+                        $datajuriId,
+                        $novoId,
+                        null,
+                        $dadosNovos
+                    );
+
+                    $this->stats['inseridos']++;
+                    
+                    Log::info('Movimento NOVO inserido', [
+                        'datajuri_id' => $datajuriId,
+                        'valor' => $valor,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::error('Sync Movimento Error', [
+                    'id' => $mov['id'] ?? 'N/A', 
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+
+        // FASE 2: Detectar registros REMOVIDOS (est√£o no banco mas n√£o vieram da API)
+        if (!empty($idsRecebidos)) {
+            $removidos = DB::table('movimentos')
+                ->where('origem', 'datajuri')
+                ->where('sync_status', '!=', 'removido')
+                ->whereNotIn('datajuri_id', $idsRecebidos)
+                ->get();
+
+            foreach ($removidos as $rem) {
+                // Registrar auditoria de remo√ß√£o
+                $dadosAntes = [
+                    'valor' => (float) $rem->valor,
+                    'data' => $rem->data,
+                    'plano_contas' => $rem->plano_contas,
+                    'codigo_plano' => $rem->codigo_plano,
+                    'classificacao' => $rem->classificacao,
+                    'descricao' => $rem->descricao,
+                ];
+
+                $this->registrarAuditoria(
+                    'removido',
+                    $rem->datajuri_id,
+                    $rem->id,
+                    $dadosAntes,
+                    null
+                );
+
+                // Marcar como removido (n√£o deletamos para manter hist√≥rico)
+                DB::table('movimentos')
+                    ->where('id', $rem->id)
+                    ->update([
+                        'sync_status' => 'removido',
+                        'is_stale' => true,
+                        'ultima_sync_id' => $this->currentSyncId,
+                        'updated_at' => now(),
+                    ]);
+
+                $this->stats['removidos']++;
+                
+                Log::warning('Movimento REMOVIDO detectado', [
+                    'datajuri_id' => $rem->datajuri_id,
+                    'valor' => $rem->valor,
+                    'descricao' => $rem->descricao,
+                ]);
+            }
+        }
+
+        // Log do resumo
+        Log::info('Sync Movimentos Completa', $this->stats);
+
+        return $this->stats;
+    }
+
+    // =========================================================================
+    // SYNC: PESSOA ‚Üí CLIENTES
+    // =========================================================================
+
+    public function syncPessoas(): int
+    {
+        $campos = implode(',', [
+            'id', 'nome', 'numeroDocumento', 'tipoPessoa', 'dataCadastro',
+            'cliente', 'statusPessoa', 'codigoPessoa', 'valorHora',
+            'totalContasReceber', 'totalContasReceberVencidas', 'valorTotalContasAbertas',
+            'cpf', 'cnpj', 'dataNascimento', 'email', 'telefone', 'celular'
+        ]);
+
+        $rows = $this->fetchAllPages('Pessoa', $campos);
+        $count = 0;
+
+        foreach ($rows as $pessoa) {
+            try {
+                $datajuriId = $pessoa['id'] ?? null;
+                if (!$datajuriId) continue;
+
+                $data = [
+                    'datajuri_id' => $datajuriId,
+                    'nome' => $pessoa['nome'] ?? null,
+                    'documento' => $pessoa['numeroDocumento'] ?? null,
+                    'cpf_cnpj' => $pessoa['numeroDocumento'] ?? null,
+                    'cpf' => $pessoa['cpf'] ?? null,
+                    'cnpj' => $pessoa['cnpj'] ?? null,
+                    'tipo' => $this->inferirTipoPessoa($pessoa['tipoPessoa'] ?? ''),
+                    'is_cliente' => ($pessoa['cliente'] ?? '') === 'Sim',
+                    'status_pessoa' => $pessoa['statusPessoa'] ?? null,
+                    'valor_hora' => $this->parseValorBrasileiro($pessoa['valorHora'] ?? 0),
+                    'total_contas_receber' => $this->parseValorBrasileiro($pessoa['totalContasReceber'] ?? 0),
+                    'total_contas_vencidas' => $this->parseValorBrasileiro($pessoa['totalContasReceberVencidas'] ?? 0),
+                    'valor_contas_abertas' => $this->parseValorBrasileiro($pessoa['valorTotalContasAbertas'] ?? 0),
+                    'data_nascimento' => $this->parseDataBrasileira($pessoa['dataNascimento'] ?? null),
+                    'data_primeiro_contato' => $this->parseDataBrasileira($pessoa['dataCadastro'] ?? null),
+                    'email' => $pessoa['email'] ?? null,
+                    'telefone' => $pessoa['telefone'] ?? $pessoa['celular'] ?? null,
+                    'updated_at' => now(),
+                ];
+
+                DB::table('clientes')->updateOrInsert(
+                    ['datajuri_id' => $datajuriId],
+                    array_merge($data, ['created_at' => now()])
+                );
+                $count++;
+            } catch (\Exception $e) {
+                Log::error('Sync Pessoa Error', ['id' => $pessoa['id'] ?? 'N/A', 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $count;
+    }
+
+    // =========================================================================
+    // SYNC: PROCESSO ‚Üí PROCESSOS
+    // =========================================================================
+
+    public function syncProcessos(): int
+    {
+        $campos = implode(',', [
+            'id', 'pasta', 'status', 'assunto', 'natureza',
+            'valorCausa', 'valorProvisionado', 'valorSentenca',
+            'possibilidade', 'ganhoCausa', 'tipoEncerramento', 'dataCadastro',
+            'proprietario.nome', 'proprietarioId',
+            'cliente.nome', 'clienteId', 'cliente.numeroDocumento'
+        ]);
+
+        $rows = $this->fetchAllPages('Processo', $campos);
+        $count = 0;
+
+        foreach ($rows as $processo) {
+            try {
+                $datajuriId = $processo['id'] ?? null;
+                if (!$datajuriId) continue;
+
+                // Buscar cliente_id local pelo datajuri_id do cliente
+                $clienteIdLocal = null;
+                if (!empty($processo['clienteId'])) {
+                    $cliente = DB::table('clientes')->where('datajuri_id', $processo['clienteId'])->first();
+                    $clienteIdLocal = $cliente?->id;
+                }
+
+                $data = [
+                    'datajuri_id' => $datajuriId,
+                    'pasta' => $processo['pasta'] ?? null,
+                    'status' => $processo['status'] ?? null,
+                    'assunto' => $processo['assunto'] ?? null,
+                    'natureza' => $processo['natureza'] ?? null,
+                    'valor_causa' => $this->parseValorBrasileiro($processo['valorCausa'] ?? 0),
+                    'valor_provisionado' => $this->parseValorBrasileiro($processo['valorProvisionado'] ?? 0),
+                    'valor_sentenca' => $this->parseValorBrasileiro($processo['valorSentenca'] ?? 0),
+                    'possibilidade' => $processo['possibilidade'] ?? null,
+                    'ganho_causa' => $processo['ganhoCausa'] ?? null,
+                    'tipo_encerramento' => $processo['tipoEncerramento'] ?? null,
+                    'cliente_nome' => $processo['cliente.nome'] ?? null,
+                    'cliente_id' => $clienteIdLocal,
+                    'cliente_documento' => $processo['cliente.numeroDocumento'] ?? null,
+                    'proprietario_nome' => $processo['proprietario.nome'] ?? null,
+                    'proprietario_id' => $processo['proprietarioId'] ?? null,
+                    'data_cadastro_dj' => $this->parseDataBrasileira($processo['dataCadastro'] ?? null),
+                    'updated_at' => now(),
+                ];
+
+                DB::table('processos')->updateOrInsert(
+                    ['datajuri_id' => $datajuriId],
+                    array_merge($data, ['created_at' => now()])
+                );
+                $count++;
+            } catch (\Exception $e) {
+                Log::error('Sync Processo Error', ['id' => $processo['id'] ?? 'N/A', 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $count;
+    }
+
+    // =========================================================================
+    // SYNC: FASEPROCESSO ‚Üí FASES_PROCESSO
+    // =========================================================================
+
+    public function syncFases(): int
+    {
+        $campos = implode(',', [
+            'id', 'processo.pasta', 'processoId', 'tipoFase', 'localidade',
+            'instancia', 'data', 'faseAtual', 'diasFaseAtiva', 'dataUltimoAndamento',
+            'proprietario.nome', 'proprietarioId'
+        ]);
+
+        $rows = $this->fetchAllPages('FaseProcesso', $campos);
+        $count = 0;
+
+        foreach ($rows as $fase) {
+            try {
+                $datajuriId = $fase['id'] ?? null;
+                if (!$datajuriId) continue;
+
+                $data = [
+                    'datajuri_id' => $datajuriId,
+                    'processo_pasta' => $fase['processo.pasta'] ?? null,
+                    'processo_id_datajuri' => $fase['processoId'] ?? null,
+                    'tipo_fase' => $fase['tipoFase'] ?? null,
+                    'localidade' => $fase['localidade'] ?? null,
+                    'instancia' => $fase['instancia'] ?? null,
+                    'data' => $this->parseDataBrasileira($fase['data'] ?? null),
+                    'fase_atual' => ($fase['faseAtual'] ?? 'N√£o') === 'Sim',
+                    'dias_fase_ativa' => (int) ($fase['diasFaseAtiva'] ?? 0),
+                    'data_ultimo_andamento' => $this->parseDataBrasileira($fase['dataUltimoAndamento'] ?? null),
+                    'proprietario_nome' => $fase['proprietario.nome'] ?? null,
+                    'proprietario_id' => $fase['proprietarioId'] ?? null,
+                    'updated_at' => now(),
+                ];
+
+                DB::table('fases_processo')->updateOrInsert(
+                    ['datajuri_id' => $datajuriId],
+                    array_merge($data, ['created_at' => now()])
+                );
+                $count++;
+            } catch (\Exception $e) {
+                Log::error('Sync FaseProcesso Error', ['id' => $fase['id'] ?? 'N/A', 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $count;
+    }
+
+    // =========================================================================
+    // SYNC: CONTRATO ‚Üí CONTRATOS
+    // =========================================================================
+
+    public function syncContratos(): int
+    {
+        $campos = implode(',', [
+            'id', 'numero', 'valor', 'dataAssinatura',
+            'contratante.nome', 'contratanteId',
+            'proprietario.nome', 'proprietarioId'
+        ]);
+
+        $rows = $this->fetchAllPages('Contrato', $campos);
+        $count = 0;
+
+        foreach ($rows as $contrato) {
+            try {
+                $datajuriId = $contrato['id'] ?? null;
+                if (!$datajuriId) continue;
+
+                $data = [
+                    'datajuri_id' => $datajuriId,
+                    'numero' => $contrato['numero'] ?? null,
+                    'valor' => $this->parseValorBrasileiro($contrato['valor'] ?? 0),
+                    'data_assinatura' => $this->parseDataBrasileira($contrato['dataAssinatura'] ?? null),
+                    'contratante_nome' => $contrato['contratante.nome'] ?? null,
+                    'contratante_id_datajuri' => $contrato['contratanteId'] ?? null,
+                    'proprietario_nome' => $contrato['proprietario.nome'] ?? null,
+                    'proprietario_id' => $contrato['proprietarioId'] ?? null,
+                    'updated_at' => now(),
+                ];
+
+                DB::table('contratos')->updateOrInsert(
+                    ['datajuri_id' => $datajuriId],
+                    array_merge($data, ['created_at' => now()])
+                );
+                $count++;
+            } catch (\Exception $e) {
+                Log::error('Sync Contrato Error', ['id' => $contrato['id'] ?? 'N/A', 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $count;
+    }
+
+    // =========================================================================
+    // SYNC: ATIVIDADE ‚Üí ATIVIDADES_DATAJURI
+    // =========================================================================
+
+    public function syncAtividades(): int
+    {
+        $campos = implode(',', [
+            'id', 'status', 'dataHora', 'dataConclusao', 'dataPrazoFatal',
+            'processo.pasta', 'proprietarioId', 'particular'
+        ]);
+
+        $rows = $this->fetchAllPages('Atividade', $campos);
+        $count = 0;
+
+        foreach ($rows as $atividade) {
+            try {
+                $datajuriId = $atividade['id'] ?? null;
+                if (!$datajuriId) continue;
+
+                $data = [
+                    'datajuri_id' => $datajuriId,
+                    'status' => $atividade['status'] ?? null,
+                    'data_hora' => $this->parseDataHoraBrasileira($atividade['dataHora'] ?? null),
+                    'data_conclusao' => $this->parseDataHoraBrasileira($atividade['dataConclusao'] ?? null),
+                    'data_prazo_fatal' => $this->parseDataHoraBrasileira($atividade['dataPrazoFatal'] ?? null),
+                    'processo_pasta' => $atividade['processo.pasta'] ?? null,
+                    'proprietario_id' => $atividade['proprietarioId'] ?? null,
+                    'particular' => ($atividade['particular'] ?? 'N√£o') === 'Sim',
+                    'updated_at' => now(),
+                ];
+
+                DB::table('atividades_datajuri')->updateOrInsert(
+                    ['datajuri_id' => $datajuriId],
+                    array_merge($data, ['created_at' => now()])
+                );
+                $count++;
+            } catch (\Exception $e) {
+                Log::error('Sync Atividade Error', ['id' => $atividade['id'] ?? 'N/A', 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $count;
+    }
+
+    // =========================================================================
+    // SYNC: HORATRABALHADA ‚Üí HORAS_TRABALHADAS_DATAJURI
+    // =========================================================================
+
+    public function syncHorasTrabalhadas(): int
+    {
+        $campos = implode(',', [
+            'id', 'data', 'duracao', 'totalHoraTrabalhada', 'horaInicial', 'horaFinal',
+            'valorHora', 'valorTotalOriginal', 'assunto', 'tipo', 'status',
+            'proprietarioId', 'particular', 'dataFaturado'
+        ]);
+
+        $rows = $this->fetchAllPages('HoraTrabalhada', $campos);
+        $count = 0;
+
+        foreach ($rows as $hora) {
+            try {
+                $datajuriId = $hora['id'] ?? null;
+                if (!$datajuriId) continue;
+
+                $data = [
+                    'datajuri_id' => $datajuriId,
+                    'data' => $this->parseDataBrasileira($hora['data'] ?? null),
+                    'duracao_original' => $hora['duracao'] ?? null,
+                    'total_hora_trabalhada' => $this->parseValorBrasileiro($hora['totalHoraTrabalhada'] ?? 0),
+                    'hora_inicial' => $hora['horaInicial'] ?? null,
+                    'hora_final' => $hora['horaFinal'] ?? null,
+                    'valor_hora' => $this->parseValorBrasileiro($hora['valorHora'] ?? 0),
+                    'valor_total_original' => $this->parseValorBrasileiro($hora['valorTotalOriginal'] ?? 0),
+                    'assunto' => $hora['assunto'] ?? null,
+                    'tipo' => $hora['tipo'] ?? null,
+                    'status' => $hora['status'] ?? null,
+                    'proprietario_id' => $hora['proprietarioId'] ?? null,
+                    'particular' => ($hora['particular'] ?? 'N√£o') === 'Sim',
+                    'data_faturado' => $this->parseDataBrasileira($hora['dataFaturado'] ?? null),
+                    'updated_at' => now(),
+                ];
+
+                DB::table('horas_trabalhadas_datajuri')->updateOrInsert(
+                    ['datajuri_id' => $datajuriId],
+                    array_merge($data, ['created_at' => now()])
+                );
+                $count++;
+            } catch (\Exception $e) {
+                Log::error('Sync HoraTrabalhada Error', ['id' => $hora['id'] ?? 'N/A', 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $count;
+    }
+
+    // =========================================================================
+    // SYNC: ORDEMSERVICO ‚Üí ORDENS_SERVICO
+    // =========================================================================
+
+    public function syncOrdensServico(): int
+    {
+        $campos = implode(',', [
+            'id', 'numero', 'situacao', 'dataConclusao', 'dataUltimoAndamento',
+            'advogado.nome', 'advogadoId'
+        ]);
+
+        $rows = $this->fetchAllPages('OrdemServico', $campos);
+        $count = 0;
+
+        foreach ($rows as $os) {
+            try {
+                $datajuriId = $os['id'] ?? null;
+                if (!$datajuriId) continue;
+
+                $data = [
+                    'datajuri_id' => $datajuriId,
+                    'numero' => $os['numero'] ?? null,
+                    'situacao' => $os['situacao'] ?? null,
+                    'data_conclusao' => $this->parseDataBrasileira($os['dataConclusao'] ?? null),
+                    'data_ultimo_andamento' => $this->parseDataBrasileira($os['dataUltimoAndamento'] ?? null),
+                    'advogado_nome' => $os['advogado.nome'] ?? null,
+                    'advogado_id' => $os['advogadoId'] ?? null,
+                    'updated_at' => now(),
+                ];
+
+                DB::table('ordens_servico')->updateOrInsert(
+                    ['datajuri_id' => $datajuriId],
+                    array_merge($data, ['created_at' => now()])
+                );
+                $count++;
+            } catch (\Exception $e) {
+                Log::error('Sync OrdemServico Error', ['id' => $os['id'] ?? 'N/A', 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $count;
+    }
+
+    // =========================================================================
+    // SYNC: CONTASRECEBER
+    // =========================================================================
+
+    public function syncContasReceber(): int
+    {
+        $campos = implode(',', [
+            'id', 'dataVencimento', 'valor', 'status', 
+            'pessoa.nome', 'descricao', 'dataPagamento'
+        ]);
+
+        $rows = $this->fetchAllPages('ContasReceber', $campos);
+        $count = 0;
+
+        foreach ($rows as $conta) {
+            try {
+                $datajuriId = $conta['id'] ?? null;
+                if (!$datajuriId) continue;
+
+                $data = [
+                    'datajuri_id' => $datajuriId,
+                    'cliente' => $conta['pessoa.nome'] ?? '(Sem cliente)',
+                    'valor' => $this->parseValorBrasileiro($conta['valor'] ?? 0),
+                    'data_vencimento' => $this->parseDataBrasileira($conta['dataVencimento'] ?? null),
+                    'data_pagamento' => $this->parseDataBrasileira($conta['dataPagamento'] ?? null),
+                    'status' => $conta['status'] ?? null,
+                    'descricao' => $conta['descricao'] ?? null,
+                    'updated_at' => now(),
+                ];
+
+                DB::table('contas_receber')->updateOrInsert(
+                    ['datajuri_id' => $datajuriId],
+                    array_merge($data, ['created_at' => now()])
+                );
+                $count++;
+            } catch (\Exception $e) {
+                Log::error('Sync ContasReceber Error', ['id' => $conta['id'] ?? 'N/A', 'error' => $e->getMessage()]);
+            }
+        }
+
+        return $count;
+    }
+
+    // =========================================================================
+    // SYNC COMPLETA (TODOS OS M√ìDULOS)
+    // =========================================================================
+
+    public function syncAll(): array
+    {
+        $results = [
+            'success' => false,
+            'modules' => [],
+            'movimentos_stats' => [],
+            'error' => null
+        ];
+
+        if (!$this->authenticate()) {
+            $results['error'] = 'Falha na autentica√ß√£o';
+            return $results;
+        }
+
+        try {
+            // Sync na ordem correta (depend√™ncias primeiro)
+            $results['modules']['pessoas'] = $this->syncPessoas();
+            $results['modules']['processos'] = $this->syncProcessos();
+            $results['modules']['fases'] = $this->syncFases();
+            $results['modules']['contratos'] = $this->syncContratos();
+            $results['modules']['atividades'] = $this->syncAtividades();
+            $results['modules']['horas'] = $this->syncHorasTrabalhadas();
+            $results['modules']['ordens'] = $this->syncOrdensServico();
+            $results['modules']['contas_receber'] = $this->syncContasReceber();
+            
+            // Movimentos por √∫ltimo (com auditoria)
+            $results['movimentos_stats'] = $this->syncMovimentos();
+            $results['modules']['movimentos'] = array_sum($results['movimentos_stats']);
+            
+            $results['success'] = true;
+        } catch (\Exception $e) {
+            $results['error'] = $e->getMessage();
+            Log::error('Sync All Failed', ['error' => $e->getMessage()]);
+        }
+
+        return $results;
     }
 
     // =========================================================================
     // HELPERS
     // =========================================================================
 
-    /**
-     * Converte valor para int nullable - resolve "Incorrect integer value: ''"
-     */
-    private function toNullableInt($value): ?int
-    {
-        if ($value === null || $value === '' || $value === 'null') {
-            return null;
-        }
-        if (is_numeric($value)) {
-            return (int) $value;
-        }
-        return null;
-    }
-
-    /**
-     * Extrai o cÛdigo do plano de contas de uma string completa
-     */
-    private function extrairCodigoPlano(?string $nomeCompleto): ?string
-    {
-        if (empty($nomeCompleto)) {
-            return null;
-        }
-
-        // Padr„o 1: "3.01.01.01 - " (4 nÌveis com hÌfen)
-        if (preg_match('/(\d+\.\d+\.\d+\.\d+)\s*-/', $nomeCompleto, $m)) {
-            return $m[1];
-        }
-        
-        // Padr„o 2: "3.01.01.01" (4 nÌveis sem hÌfen, no final da string antes de :)
-        if (preg_match('/:(\d+\.\d+\.\d+\.\d+)/', $nomeCompleto, $m)) {
-            return $m[1];
-        }
-        
-        // Padr„o 3: Qualquer 4 nÌveis na string
-        if (preg_match('/(\d+\.\d+\.\d+\.\d+)/', $nomeCompleto, $m)) {
-            return $m[1];
-        }
-        
-        // Fallback: 3 nÌveis
-        if (preg_match('/(\d+\.\d+\.\d+)\s*-/', $nomeCompleto, $m)) {
-            return $m[1];
-        }
-        
-        // Fallback: 2 nÌveis
-        if (preg_match('/(\d+\.\d+)\s*-/', $nomeCompleto, $m)) {
-            return $m[1];
-        }
-        
-        return null;
-    }
-
-    /**
-     * Parseia valor brasileiro que pode conter HTML
-     */
     private function parseValorBrasileiro($valor): float
     {
-        if (is_numeric($valor)) {
-            return (float) $valor;
-        }
-        
-        if (!is_string($valor)) {
-            return 0.0;
-        }
-        
-        $negativo = (stripos($valor, 'valor-negativo') !== false);
+        if (is_numeric($valor)) return (float) $valor;
+        if (!is_string($valor)) return 0.0;
+
+        // Detectar negativo por classe CSS ou sinal
+        $negativo = (stripos($valor, 'valor-negativo') !== false) ||
+                    (preg_match('/^-|^\(-/', strip_tags($valor)));
+
+        // Remover HTML
         $valor = strip_tags($valor);
-        
-        if (!$negativo && strpos($valor, '-') !== false) {
-            $negativo = true;
-        }
-        
+
+        // Remover pontos de milhar, trocar v√≠rgula por ponto
         $valor = str_replace('.', '', $valor);
         $valor = str_replace(',', '.', $valor);
-        $valor = preg_replace('/[^0-9.\-]/', '', $valor);
-        
-        $float = (float) $valor;
-        
-        if ($negativo && $float > 0) {
-            $float = -$float;
-        }
-        
-        return $float;
+
+        $float = (float) preg_replace('/[^0-9.\-]/', '', $valor);
+
+        return $negativo && $float > 0 ? -$float : $float;
     }
 
-    /**
-     * Converte data brasileira DD/MM/YYYY para formato MySQL Y-m-d
-     */
     private function parseDataBrasileira(?string $data): ?string
     {
-        if (empty($data)) {
-            return null;
-        }
-        
+        if (empty($data)) return null;
+
+        // DD/MM/YYYY
         if (preg_match('/(\d{2})\/(\d{2})\/(\d{4})/', $data, $m)) {
             return "{$m[3]}-{$m[2]}-{$m[1]}";
         }
-        
-        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $data)) {
-            return $data;
+
+        // J√° est√° em formato ISO
+        if (preg_match('/^\d{4}-\d{2}-\d{2}/', $data)) {
+            return substr($data, 0, 10);
         }
-        
+
+        return null;
+    }
+
+    private function parseDataHoraBrasileira(?string $dataHora): ?string
+    {
+        if (empty($dataHora)) return null;
+
+        // DD/MM/YYYY HH:MM
+        if (preg_match('/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/', $dataHora, $m)) {
+            return "{$m[3]}-{$m[2]}-{$m[1]} {$m[4]}:{$m[5]}:00";
+        }
+
+        // DD/MM/YYYY
+        if (preg_match('/(\d{2})\/(\d{2})\/(\d{4})/', $dataHora, $m)) {
+            return "{$m[3]}-{$m[2]}-{$m[1]}";
+        }
+
         return null;
     }
 
     /**
-     * Classifica um movimento usando tabela de regras + fallback PF/PJ
+     * Extrai c√≥digo do plano de contas da hierarquia completa
+     * Ex: "3.01 RESULTADO:3.02.01.07.01 Tarifas" ‚Üí "3.02.01.07.01"
      */
-    private function classificarMovimento(?string $codigoPlano, float $valor, ?int $pessoaIdDatajuri = null): string
+    private function extrairCodigoPlano(?string $nomeCompleto): ?string
     {
-        $classificacao = 'PENDENTE_CLASSIFICACAO';
+        if (empty($nomeCompleto)) return null;
 
-        if (!empty($codigoPlano)) {
-            // Fonte unica: tabela classificacao_regras
-            try {
-                $regra = \App\Models\ClassificacaoRegra::buscarRegraMaisEspecifica($codigoPlano);
-                if ($regra) {
-                    $classificacao = $regra->classificacao;
-                }
-            } catch (Exception $e) {
-                Log::warning("Erro ao buscar regra para {$codigoPlano}: " . $e->getMessage());
-            }
+        // Tentar extrair c√≥digo com 5 n√≠veis (ex: 3.02.01.07.01)
+        if (preg_match('/(\d+\.\d+\.\d+\.\d+\.\d+)/', $nomeCompleto, $m)) {
+            return $m[1];
         }
 
-        // Se nao encontrou regra, default por sinal do valor
-        if ($classificacao === 'PENDENTE_CLASSIFICACAO' && $valor < 0) {
-            $classificacao = 'DESPESA';
+        // Tentar extrair c√≥digo com 4 n√≠veis (ex: 3.01.01.01)
+        if (preg_match('/(\d+\.\d+\.\d+\.\d+)/', $nomeCompleto, $m)) {
+            return $m[1];
         }
 
-        // Fallback PF/PJ: se receita pendente, tentar por CPF/CNPJ do cliente
-        if ($classificacao === 'PENDENTE_CLASSIFICACAO'
-            && $valor > 0
-            && $pessoaIdDatajuri) {
-            $classificacao = $this->fallbackPfPjPorDocumento($pessoaIdDatajuri, $classificacao);
+        // Tentar extrair c√≥digo com 3 n√≠veis (ex: 3.01.01)
+        if (preg_match('/(\d+\.\d+\.\d+)/', $nomeCompleto, $m)) {
+            return $m[1];
         }
 
-        return $classificacao;
+        return null;
+    }
+
+    private function inferirTipoPessoa(?string $tipo): string
+    {
+        if (empty($tipo)) return 'PF';
+
+        $tipo = strtoupper($tipo);
+        if (str_contains($tipo, 'JUR') || str_contains($tipo, 'PJ')) {
+            return 'PJ';
+        }
+        return 'PF';
     }
 
     /**
-     * Fallback: determina PF/PJ pelo CPF/CNPJ do cliente vinculado
+     * Infere classifica√ß√£o baseada no c√≥digo do plano de contas
      */
-    private function fallbackPfPjPorDocumento(int $pessoaIdDatajuri, string $classificacaoAtual): string
+    private function inferirClassificacao(?string $codigoPlano, float $valor): ?string
     {
-        try {
-            $cliente = DB::table('clientes')
-                ->where('datajuri_id', $pessoaIdDatajuri)
-                ->first(['cpf', 'cnpj']);
-
-            if (!$cliente) {
-                return $classificacaoAtual;
-            }
-
-            if (!empty($cliente->cnpj)) {
-                return 'RECEITA_PJ';
-            }
-
-            if (!empty($cliente->cpf)) {
-                return 'RECEITA_PF';
-            }
-        } catch (Exception $e) {
-            Log::warning("Fallback PF/PJ falhou para pessoa {$pessoaIdDatajuri}: " . $e->getMessage());
+        if (empty($codigoPlano)) {
+            // Sem plano = TRANSITO (n√£o entra na DRE)
+            return 'TRANSITO';
         }
 
-        return $classificacaoAtual;
-    }
+        // Buscar regra na tabela
+        $regra = DB::table('classificacao_regras')
+            ->where('ativo', true)
+            ->where('codigo_plano', $codigoPlano)
+            ->first();
 
-    // =========================================================================
-    // LOGGING
-    // =========================================================================
-
-    private function logSuccess($sistema, $tipo, $mensagem)
-    {
-        try {
-            IntegrationLog::create([
-                'sync_id' => Str::uuid(),
-                'tipo' => $tipo,
-                'fonte' => 'datajuri',
-                'status' => 'concluido',
-                'registros_processados' => 0
-            ]);
-        } catch (Exception $e) {
-            Log::error("Erro ao registrar log de sucesso: " . $e->getMessage());
+        if ($regra) {
+            return $regra->classificacao;
         }
 
-        Log::info("[{$sistema}] {$tipo}: {$mensagem}");
-    }
-
-    private function logError($sistema, $tipo, $mensagem)
-    {
-        try {
-            IntegrationLog::create([
-                'sync_id' => Str::uuid(),
-                'tipo' => $tipo,
-                'fonte' => 'datajuri',
-                'status' => 'erro',
-                'mensagem_erro' => $mensagem
-            ]);
-        } catch (Exception $e) {
-            Log::error("Erro ao registrar log de erro: " . $e->getMessage());
+        // Infer√™ncia por padr√£o cont√°bil
+        // 3.01.01.01, 3.01.01.03 = Receita PF
+        if (in_array($codigoPlano, ['3.01.01.01', '3.01.01.03'])) {
+            return 'RECEITA_PF';
         }
 
-        Log::error("[{$sistema}] {$tipo}: {$mensagem}");
+        // 3.01.01.02, 3.01.01.05 = Receita PJ
+        if (in_array($codigoPlano, ['3.01.01.02', '3.01.01.05'])) {
+            return 'RECEITA_PJ';
+        }
+
+        // 3.01.02.* ou 3.01.03.* = Dedu√ß√µes
+        if (preg_match('/^3\.01\.0[23]/', $codigoPlano)) {
+            return 'DEDUCAO';
+        }
+
+        // 3.02.* = Despesas
+        if (str_starts_with($codigoPlano, '3.02')) {
+            return 'DESPESA';
+        }
+
+        // 3.03.* = Receitas financeiras
+        if (str_starts_with($codigoPlano, '3.03')) {
+            return 'RECEITA_FINANCEIRA';
+        }
+
+        // 3.04.* = Despesas financeiras
+        if (str_starts_with($codigoPlano, '3.04')) {
+            return 'DESPESA_FINANCEIRA';
+        }
+
+        return 'PENDENTE';
     }
 }
