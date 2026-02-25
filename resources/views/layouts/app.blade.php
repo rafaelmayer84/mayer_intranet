@@ -221,6 +221,17 @@
                 <img src="/img/logo-icon-white.svg" alt="Mayer Albanez" class="h-10 w-auto menu-text" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
             </div>
 
+            <!-- Toggle Sidebar (topo) -->
+            <button id="sidebar-toggle-btn"
+                    type="button"
+                    class="hidden md:flex items-center justify-center w-full py-1.5 text-white/30 hover:text-white/70 transition-colors border-b border-white/10"
+                    aria-label="Retrair/Expandir menu lateral"
+                    title="Retrair menu">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7"></path>
+                </svg>
+            </button>
+
             <!-- Menu Principal -->
             <nav class="flex-1 p-4 space-y-1">
                 <a href="{{ route('avisos.index') }}"
@@ -529,16 +540,7 @@
 
             </nav>
 
-            <!-- Toggle Sidebar (discreto) -->
-            <button id="sidebar-toggle-btn"
-                    type="button"
-                    class="hidden md:flex items-center justify-center w-full py-2 text-white/30 hover:text-white/70 transition-colors"
-                    aria-label="Retrair/Expandir menu lateral"
-                    title="Retrair menu">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7"></path>
-                </svg>
-            </button>
+
 
         </aside>
 
