@@ -157,6 +157,21 @@ class NexoNotificacaoService
                     'audiencia_data' => $dataHora->format('d/m/Y H:i'),
                     'pasta' => $aud->processo_pasta,
                 ]);
+
+                // Registrar no CRM como atividade WhatsApp
+                $advUserId = null;
+                if (!empty($processo->proprietario_id)) {
+                    $advUser = DB::table('users')->where('datajuri_proprietario_id', $processo->proprietario_id)->first();
+                    $advUserId = $advUser->id ?? 1;
+                }
+                $this->registrarAtividadeCRM(
+                    DB::table('nexo_notificacoes')->where('tipo', 'audiencia')->where('entidade_id', $aud->id)->value('id') ?? 0,
+                    $cliente->id,
+                    $cliente->nome,
+                    'Lembrete WhatsApp: Audiência ' . $dataHora->format('d/m/Y H:i'),
+                    'Lembrete automático de audiência enviado via WhatsApp. Processo: ' . $aud->processo_pasta . ' | Data: ' . $dataHora->format('d/m/Y') . ' às ' . $dataHora->format('H:i'),
+                    $advUserId ?? 1
+                );
             } catch (\Throwable $e) {
                 $stats['falha']++;
                 $this->registrar('audiencia', $aud->id, 'atividades_datajuri', $cliente->id, $cliente->nome, $telefone, 'failed', $templateVars, $e->getMessage(), $aud->processo_pasta);
