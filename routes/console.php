@@ -132,6 +132,13 @@ Schedule::call(function () {
   ->name('nexo-qa-weekly-aggregate')
   ->withoutOverlapping();
 
+// Processar fila de jobs a cada 5 minutos (Hostinger não suporta queue:work permanente)
+Schedule::command('queue:work --stop-when-empty --max-time=55 --tries=3')
+    ->everyFiveMinutes()
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/queue-worker.log'));
+
 // Cleanup system_events mais de 365 dias (03:15 BRT)
 Schedule::call(function () {
     $deleted = SystemEvent::olderThan(365)->delete();
@@ -140,3 +147,8 @@ Schedule::call(function () {
     }
 })->dailyAt('03:15')->timezone('America/Sao_Paulo');
 
+// CRM Cadência — verificar tasks vencendo hoje (sininho + email) — 8h BRT
+Schedule::command('crm:cadence-check')
+    ->dailyAt('08:00')
+    ->timezone('America/Sao_Paulo')
+    ->appendOutputTo(storage_path('logs/cron-crm-cadence.log'));
