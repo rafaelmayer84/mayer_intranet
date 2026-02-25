@@ -483,7 +483,6 @@ class SendPulseWhatsAppService
     {
         return $this->apiPost('/whatsapp/contacts/setVariable', [
             'contact_id' => $contactId,
-            'variable_id' => null,
             'variable_name' => $name,
             'variable_value' => $value,
         ]);

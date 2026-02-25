@@ -16,7 +16,58 @@
         {{-- Coluna principal (2/3) --}}
         <div class="lg:col-span-2 space-y-6">
             {{-- Header --}}
+            
+            {{-- Cadência de Follow-up --}}
+            @if(isset($cadenceTasks) && $cadenceTasks->isNotEmpty())
             <div class="bg-white rounded-lg shadow-sm border p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-[#1B334A]">📋 Cadência de Follow-up</h2>
+                    <span class="text-xs text-gray-400">{{ $cadenceTasks->where('completed_at', '!=', null)->count() }}/{{ $cadenceTasks->count() }} concluídas</span>
+                </div>
+                {{-- Progress bar --}}
+                @php $cadPct = $cadenceTasks->count() > 0 ? round($cadenceTasks->whereNotNull('completed_at')->count() / $cadenceTasks->count() * 100) : 0; @endphp
+                <div class="w-full bg-gray-100 rounded-full h-2 mb-4">
+                    <div class="h-full rounded-full bg-green-500 transition-all" style="width: {{ $cadPct }}%"></div>
+                </div>
+                <div class="space-y-2">
+                    @foreach($cadenceTasks as $ct)
+                    @php
+                        $isDone = $ct->completed_at !== null;
+                        $isOverdue = !$isDone && $ct->due_date && $ct->due_date->isPast();
+                        $isToday = !$isDone && $ct->due_date && $ct->due_date->isToday();
+                    @endphp
+                    <div class="flex items-center gap-3 p-3 rounded-lg border {{ $isDone ? 'bg-green-50 border-green-200' : ($isOverdue ? 'bg-red-50 border-red-200' : ($isToday ? 'bg-blue-50 border-blue-200' : 'bg-white')) }}">
+                        @if($isDone)
+                            <span class="text-green-500 text-lg flex-shrink-0">✅</span>
+                        @elseif($isOverdue)
+                            <button onclick="completeCadenceTask({{ $ct->id }})" class="w-6 h-6 rounded-full border-2 border-red-400 hover:bg-red-100 flex-shrink-0 transition" title="Marcar concluída"></button>
+                        @else
+                            <button onclick="completeCadenceTask({{ $ct->id }})" class="w-6 h-6 rounded-full border-2 border-gray-300 hover:bg-gray-100 flex-shrink-0 transition" title="Marcar concluída"></button>
+                        @endif
+                        <div class="flex-1 min-w-0">
+                            <p class="font-medium text-sm {{ $isDone ? 'text-green-700 line-through' : 'text-gray-800' }}">
+                                Passo {{ $ct->step_number }}: {{ $ct->title }}
+                            </p>
+                            @if($ct->description)<p class="text-xs text-gray-500 mt-0.5">{{ $ct->description }}</p>@endif
+                        </div>
+                        <div class="text-right flex-shrink-0 text-xs">
+                            @if($isDone)
+                                <span class="text-green-600">{{ $ct->completed_at->format('d/m') }}</span>
+                            @elseif($isOverdue)
+                                <span class="text-red-600 font-medium">Vencida {{ $ct->due_date->diffForHumans() }}</span>
+                            @elseif($isToday)
+                                <span class="text-blue-600 font-medium">Hoje</span>
+                            @else
+                                <span class="text-gray-400">{{ $ct->due_date->format('d/m') }}</span>
+                            @endif
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+            </div>
+            @endif
+
+<div class="bg-white rounded-lg shadow-sm border p-6">
                 <div class="flex items-start justify-between mb-4">
                     <div>
                         <h1 class="text-2xl font-bold text-[#1B334A]">{{ $opp->title }}</h1>
@@ -227,6 +278,26 @@ function completeActivity(actId) {
     fetch(`/crm/oportunidades/${oppId}/activities/${actId}/complete`, {
         method: 'POST', headers: {'X-CSRF-TOKEN':csrf}
     }).then(r => r.json()).then(d => { if(d.ok) location.reload(); });
+}
+
+function completeCadenceTask(taskId) {
+    if (!confirm('Marcar esta etapa como concluída?')) return;
+    fetch('{{ url("/crm/oportunidades") }}/{{ $opp->id }}/cadence/' + taskId + '/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
+    }).then(r => r.json()).then(d => {
+        if (d.ok) location.reload();
+    });
+}
+
+function completeCadenceTask(taskId) {
+    if (!confirm('Marcar esta etapa como concluída?')) return;
+    fetch('{{ url("/crm/oportunidades") }}/{{ $opp->id }}/cadence/' + taskId + '/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
+    }).then(r => r.json()).then(d => {
+        if (d.ok) location.reload();
+    });
 }
 </script>
 @endsection

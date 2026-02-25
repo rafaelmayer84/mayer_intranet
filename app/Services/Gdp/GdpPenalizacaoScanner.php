@@ -487,12 +487,26 @@ class GdpPenalizacaoScanner
             ->select('wc.id', 'wc.name', 'wc.phone', 'wc.last_incoming_at')
             ->get();
 
+        // Obter telefone do proprio usuario para excluir auto-conversas
+        $userPhone = DB::table('users')->where('id', $userId)->value('phone');
+        $userPhoneSuffix = $userPhone ? substr(preg_replace('/\D/', '', $userPhone), -8) : null;
+
         $count = 0;
         foreach ($conversas as $conv) {
+            // Excluir auto-conversas (usuario respondendo a si mesmo)
+            if ($userPhoneSuffix && strlen($userPhoneSuffix) === 8) {
+                $convPhoneClean = preg_replace('/\D/', '', $conv->phone ?? '');
+                if (str_ends_with($convPhoneClean, $userPhoneSuffix)) continue;
+            }
+
+            // Ignorar incoming fora do horario comercial (8h-18h seg-sex)
+            $incomingAt = Carbon::parse($conv->last_incoming_at);
+            if ($incomingAt->isWeekend() || $incomingAt->hour < 8 || $incomingAt->hour >= 18) continue;
+
             // Verificar de forma mais granular se houve outgoing apos o last_incoming
             $respondeu = DB::table('wa_messages')
                 ->where('conversation_id', $conv->id)
-                ->where('direction', 0)
+                ->where('direction', 2)
                 ->where('sent_at', '>', $conv->last_incoming_at)
                 ->exists();
 
@@ -595,12 +609,16 @@ class GdpPenalizacaoScanner
 
         $count = 0;
         foreach ($conversas as $conv) {
-            $deadline = Carbon::parse($conv->assigned_at)->addMinutes($minutos);
+            $assignedAt = Carbon::parse($conv->assigned_at);
+            $deadline = $assignedAt->copy()->addMinutes($minutos);
             if (!$deadline->isPast()) continue; // Ainda dentro do prazo
+
+            // Ignorar assumidas fora do horario comercial (8h-18h seg-sex)
+            if ($assignedAt->isWeekend() || $assignedAt->hour < 8 || $assignedAt->hour >= 18) continue;
 
             $respondeu = DB::table('wa_messages')
                 ->where('conversation_id', $conv->id)
-                ->where('direction', 0)
+                ->where('direction', 2)
                 ->where('sent_at', '>=', $conv->assigned_at)
                 ->where('sent_at', '<=', $deadline->toDateTimeString())
                 ->exists();
@@ -669,6 +687,12 @@ class GdpPenalizacaoScanner
 
         $count = 0;
         foreach ($convIds as $convId) {
+            // Pular conversas muito antigas (mais de 1 mes antes do periodo)
+            $convCriada = DB::table('wa_conversations')->where('id', $convId)->value('created_at');
+            if ($convCriada && Carbon::parse($convCriada)->lt(Carbon::create($this->ano, $this->mes, 1)->subMonths(1))) {
+                continue;
+            }
+
             $incomings = DB::table('wa_messages')
                 ->where('conversation_id', $convId)
                 ->where('direction', 1)
@@ -678,24 +702,31 @@ class GdpPenalizacaoScanner
                 ->limit(100)
                 ->get();
 
+            $jaRegistrouConversa = false; // Max 1 ocorrencia por conversa/mes
+
             for ($i = 0; $i < count($incomings) - 1; $i++) {
+                if ($jaRegistrouConversa) break;
+
                 $msg1 = $incomings[$i];
                 $msg2 = $incomings[$i + 1];
 
-                $diff = Carbon::parse($msg1->sent_at)->diffInHours(Carbon::parse($msg2->sent_at));
-                if ($diff < $horas) continue;
+                $diffHoras = Carbon::parse($msg1->sent_at)->diffInMinutes(Carbon::parse($msg2->sent_at)) / 60;
+                if ($diffHoras < $horas) continue;
+                if ($diffHoras > 168) continue; // Ignorar intervalos > 7 dias
 
                 $respondeu = DB::table('wa_messages')
                     ->where('conversation_id', $convId)
-                    ->where('direction', 0)
+                    ->where('direction', 2)
                     ->where('sent_at', '>', $msg1->sent_at)
                     ->where('sent_at', '<', $msg2->sent_at)
                     ->exists();
 
                 if (!$respondeu) {
+                    $diffArred = round($diffHoras, 1);
                     $count += $this->registrar('PEN-A06', $userId, $cfg,
-                        "Cliente reenviou mensagem apos {$diff}h sem resposta (conversa #{$convId}).",
-                        'wa_message', $msg2->id);
+                        "Cliente reenviou mensagem apos {$diffArred}h sem resposta (conversa #{$convId}).",
+                        'wa_conversation', $convId);
+                    $jaRegistrouConversa = true;
                 }
             }
         }
@@ -715,17 +746,20 @@ class GdpPenalizacaoScanner
         $inicioMes = Carbon::create($this->ano, $this->mes, 1)->startOfMonth()->toDateTimeString();
         $fimMes    = Carbon::create($this->ano, $this->mes, 1)->endOfMonth()->endOfDay()->toDateTimeString();
 
+        // Somente leads cujo crm_account pertence (owner_user_id) ao advogado sendo escaneado
         $leads = DB::table('leads as l')
+            ->join('crm_accounts as ca', 'ca.id', '=', 'l.crm_account_id')
             ->where('l.intencao_contratar', 'sim')
             ->whereBetween('l.created_at', [$inicioMes, $fimMes])
             ->where('l.created_at', '<=', $corte)
             ->whereNotNull('l.crm_account_id')
+            ->where('ca.owner_user_id', $userId)
             ->whereNotExists(function ($q) use ($userId) {
                 $q->select(DB::raw(1))
-                  ->from('crm_activities as ca')
-                  ->whereColumn('ca.account_id', 'l.crm_account_id')
-                  ->where('ca.created_by_user_id', $userId)
-                  ->whereColumn('ca.created_at', '>=', 'l.created_at');
+                  ->from('crm_activities as act')
+                  ->whereColumn('act.account_id', 'l.crm_account_id')
+                  ->where('act.created_by_user_id', $userId)
+                  ->whereColumn('act.created_at', '>=', 'l.created_at');
             })
             ->select('l.id', 'l.nome', 'l.telefone', 'l.created_at')
             ->get();
@@ -858,29 +892,32 @@ class GdpPenalizacaoScanner
 
         $dias = $cfg['threshold'];
 
-        // Verificar se existe snapshot congelado (acordo aceito)
-        $snapshot = DB::table('gdp_snapshots')
+        // Verificar se ja aceitou (snapshot congelado)
+        $jaAceitou = DB::table('gdp_snapshots')
             ->where('ciclo_id', $this->cicloId)
             ->where('user_id', $userId)
-            ->orderByDesc('created_at')
-            ->first();
+            ->where('congelado', true)
+            ->exists();
 
-        if (!$snapshot) return 0;
-        if (!empty($snapshot->congelado)) return 0;
+        if ($jaAceitou) return 0;
 
-        $metaCriada = DB::table('gdp_metas_individuais')
-            ->where('ciclo_id', $this->cicloId)
-            ->where('user_id', $userId)
+        // Verificar se o acordo foi FORMALMENTE enviado ao advogado
+        // Evidencia: registro no audit_log de 'acordo_salvo' para este usuario
+        $envioFormal = DB::table('gdp_audit_log')
+            ->where('entidade', 'gdp_metas_individuais')
+            ->where('entidade_id', $userId)
+            ->where('campo', 'acordo_salvo')
             ->min('created_at');
 
-        if (!$metaCriada) return 0;
+        // Se nunca foi enviado formalmente, nao penalizar
+        if (!$envioFormal) return 0;
 
-        $diasDesde = Carbon::parse($metaCriada)->diffInDays(Carbon::now());
-        if ($diasDesde <= $dias) return 0;
+        $diasDesdeEnvio = (int) Carbon::parse($envioFormal)->diffInDays(Carbon::now());
+        if ($diasDesdeEnvio <= $dias) return 0;
 
         return $this->registrar('PEN-D03', $userId, $cfg,
-            "Acordo GDP do ciclo nao aceito ha {$diasDesde} dias (limite: {$dias} dias).",
-            'gdp_snapshot', $snapshot->id ?? 0);
+            "Acordo GDP enviado em " . Carbon::parse($envioFormal)->format('d/m/Y') . " nao aceito ha {$diasDesdeEnvio} dias (limite: {$dias} dias).",
+            'gdp_audit', 0);
     }
 
     /**
@@ -953,7 +990,7 @@ class GdpPenalizacaoScanner
                 $temWA = DB::table('wa_messages as wm')
                     ->join('wa_conversations as wc', 'wc.id', '=', 'wm.conversation_id')
                     ->where('wc.phone', 'LIKE', '%' . $suffix)
-                    ->where('wm.direction', 0)
+                    ->where('wm.direction', 2)
                     ->where('wm.sent_at', '>=', $desde)
                     ->exists();
                 if ($temWA) return true;

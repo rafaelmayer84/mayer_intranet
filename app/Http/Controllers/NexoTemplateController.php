@@ -81,7 +81,17 @@ public function listar(Request $request)
             $service = app(SendPulseWhatsAppService::class);
             // Garantir que language seja array conforme API SendPulse exige
             $lang = $request->input('language', 'pt_BR');
-            $templatePayload = ['name' => $templateName, 'language' => ['code' => $lang], 'components' => []];
+            $components = [];
+            $bodyComponent = collect($templateData['components'] ?? $templateData)->firstWhere('type', 'BODY');
+            if ($bodyComponent && preg_match('/\{\{\d+\}\}/', $bodyComponent['text'] ?? '')) {
+                $components[] = [
+                    'type' => 'body',
+                    'parameters' => [
+                        ['type' => 'text', 'text' => $request->input('nome_contato', 'Cliente')],
+                    ],
+                ];
+            }
+            $templatePayload = ['name' => $templateName, 'language' => ['code' => $lang], 'components' => $components];
             $result = $service->sendTemplateByPhone($telefone, $templatePayload);
 
             Log::info('NexoTemplate@enviar', [
@@ -151,11 +161,27 @@ public function listar(Request $request)
         try {
             $service = app(SendPulseWhatsAppService::class);
 
-            // Montar template payload
+            // Montar template payload com parâmetros
+            $templateData = $request->input('template_data', []);
+            $components = [];
+
+            // Verificar se o template tem variáveis no BODY (ex: {{1}})
+            $bodyComponent = collect($templateData['components'] ?? $templateData)->firstWhere('type', 'BODY');
+            if ($bodyComponent && preg_match('/\{\{\d+\}\}/', $bodyComponent['text'] ?? '')) {
+                // Template tem variáveis - preencher com nome do contato
+                $nomeParam = $nomeContato ?: 'Cliente';
+                $components[] = [
+                    'type' => 'body',
+                    'parameters' => [
+                        ['type' => 'text', 'text' => $nomeParam],
+                    ],
+                ];
+            }
+
             $templatePayload = [
                 'name'       => $templateName,
                 'language'   => ['code' => $lang],
-                'components' => [],
+                'components' => $components,
             ];
 
             // Enviar template via SendPulse
@@ -175,6 +201,24 @@ public function listar(Request $request)
                 ], 422);
             }
 
+            // Buscar contact_id do SendPulse (pode não vir no resultado do template)
+            $spContactId = $result['data']['contact_id'] ?? null;
+            if (!$spContactId) {
+                try {
+                    $contactData = $service->getContactByPhone($telefone);
+                    $spContactId = $contactData['id'] ?? null;
+                    Log::info('NexoTemplate: contact_id obtido via getContactByPhone', [
+                        'telefone' => $telefone,
+                        'contact_id' => $spContactId,
+                    ]);
+                } catch (\Throwable $e) {
+                    Log::warning('NexoTemplate: falha ao buscar contact_id', [
+                        'telefone' => $telefone,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
             // Verificar se já existe conversa com esse telefone
             $conversation = WaConversation::where('phone', $telefone)->first();
 
@@ -185,7 +229,7 @@ public function listar(Request $request)
                 $conversation = WaConversation::create([
                     'phone'            => $telefone,
                     'contact_name'     => $contactName,
-                    'contact_id'       => $result['data']['contact_id'] ?? null,
+                    'contact_id'       => $spContactId,
                     'status'           => 'open',
                     'assigned_user_id' => Auth::id(),
                     'last_message_at'  => now(),
@@ -204,6 +248,21 @@ public function listar(Request $request)
                 $conversation->last_message_at = now();
                 if (!$conversation->assigned_user_id) {
                     $conversation->assigned_user_id = Auth::id();
+                }
+                // Preencher contact_id se estava vazio
+                if (empty($conversation->contact_id) && $spContactId) {
+                    $conversation->contact_id = $spContactId;
+                    Log::info('NexoTemplate: contact_id preenchido em conversa existente', [
+                        'conversation_id' => $conversation->id,
+                        'contact_id' => $spContactId,
+                    ]);
+                }
+                // Preencher nome se vazio
+                if (empty($conversation->name)) {
+                    $contactName = $nomeContato ?: $this->buscarNomeContato($telefone);
+                    if ($contactName) {
+                        $conversation->name = $contactName;
+                    }
                 }
                 $conversation->save();
             }

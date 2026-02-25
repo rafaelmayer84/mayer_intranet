@@ -24,8 +24,13 @@ class CrmCarteiraController extends Controller
         if ($request->filled('kind')) {
             $query->where('kind', $request->kind);
         }
+        // Default: exibir apenas ativos; 'todos' mostra tudo
         if ($request->filled('lifecycle')) {
-            $query->where('lifecycle', $request->lifecycle);
+            if ($request->lifecycle !== 'todos') {
+                $query->where('lifecycle', $request->lifecycle);
+            }
+        } else {
+            $query->where('lifecycle', 'ativo');
         }
         if ($request->filled('owner_user_id')) {
             $query->where('owner_user_id', $request->owner_user_id);

@@ -60,6 +60,16 @@ class Kernel extends ConsoleKernel
             ->timezone('America/Sao_Paulo')
             ->appendOutputTo(storage_path('logs/cron-gdp-lembrete.log'));
 
+        // CRM Health Score → diario 03:00 (apos sync DataJuri)
+        $schedule->command('crm:recalc-health')
+            ->dailyAt('03:00')
+            ->timezone('America/Sao_Paulo')
+            ->appendOutputTo(storage_path('logs/cron-crm-health.log'));
+        // CRM Notificar contas inativas → diario 08:00
+        $schedule->command('crm:notify-inactive')
+            ->dailyAt('08:00')
+            ->timezone('America/Sao_Paulo')
+            ->appendOutputTo(storage_path('logs/cron-crm-notify.log'));
         // ESPO CRM → 2x/dia (9h, 17h)
         $schedule->command('cron:sync-espo')
             ->dailyAt('09:00')

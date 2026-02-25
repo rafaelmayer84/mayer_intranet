@@ -7,6 +7,7 @@ use App\Models\Crm\CrmActivity;
 use App\Models\Crm\CrmEvent;
 use App\Models\Crm\CrmOpportunity;
 use App\Models\Crm\CrmStage;
+use App\Models\Crm\CrmCadenceTask;
 use App\Models\User;
 use App\Services\Crm\CrmOpportunityService;
 use Illuminate\Http\Request;
@@ -21,7 +22,11 @@ class CrmOpportunityController extends Controller
         $stages = CrmStage::active()->ordered()->get();
         $users = User::orderBy('name')->get(['id', 'name']);
 
-        return view('crm.opportunities.show', compact('opp', 'events', 'stages', 'users'));
+        $cadenceTasks = CrmCadenceTask::where('opportunity_id', $id)
+            ->orderBy('step_number')
+            ->get();
+
+        return view('crm.opportunities.show', compact('opp', 'events', 'stages', 'users', 'cadenceTasks'));
     }
 
     /**
@@ -73,6 +78,22 @@ class CrmOpportunityController extends Controller
         $opp->account->update(['last_touch_at' => now()]);
 
         return response()->json(['ok' => true, 'id' => $activity->id]);
+    }
+
+    /**
+     * Marcar cadence task como concluída (AJAX).
+     */
+    public function completeCadenceTask(int $oppId, int $taskId)
+    {
+        $task = CrmCadenceTask::where('opportunity_id', $oppId)->findOrFail($taskId);
+        $task->update(['completed_at' => now()]);
+
+        // Atualizar last_touch do account
+        if ($task->account_id) {
+            \App\Models\Crm\CrmAccount::where('id', $task->account_id)->update(['last_touch_at' => now()]);
+        }
+
+        return response()->json(['ok' => true]);
     }
 
     /**

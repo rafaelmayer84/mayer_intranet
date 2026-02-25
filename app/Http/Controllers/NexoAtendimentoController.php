@@ -114,6 +114,20 @@ class NexoAtendimentoController extends Controller
             if (!$conversation->assigned_user_id) $conversation->assigned_user_id = auth()->id();
             $conversation->last_message_at = now();
             $conversation->unread_count = 0;
+
+            // Auto-pausar bot quando operador responde
+            if ($conversation->bot_ativo && $conversation->contact_id) {
+                $conversation->bot_ativo = false;
+                try {
+                    $spService->pausarAutomacao($conversation->contact_id);
+                    Log::info('Bot control: automacao pausada automaticamente ao responder', [
+                        'conv_id' => $id, 'user' => auth()->user()->name,
+                    ]);
+                } catch (\Throwable $e) {
+                    Log::warning('Bot control: falha ao pausar automacao ao responder', ['error' => $e->getMessage()]);
+                }
+            }
+
             $conversation->save();
 
             // Auto-update: lead vinculado -> contatado

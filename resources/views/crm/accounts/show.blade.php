@@ -66,13 +66,13 @@
                     </div>
                 </div>
                 <div class="flex gap-2">
-                    @if($cli && $cli->celular)
-                        @php $waPhone = preg_replace('/\D/', '', $cli->celular); if(!str_starts_with($waPhone, '55')) $waPhone = '55'.$waPhone; @endphp
-                        <a href="https://wa.me/{{ $waPhone }}" target="_blank"
+                    @if($commContext['has_wa'])
+                        <a href="{{ route('nexo.atendimento') }}?conversation={{ $commContext['whatsapp']->id }}"
                            class="px-3 py-2 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600 flex items-center gap-1.5">
                             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/></svg>
-                            WhatsApp
+                            NEXO
                         </a>
+
                     @endif
                     <button onclick="document.getElementById('modal-new-opp').classList.remove('hidden')"
                             class="px-3 py-2 bg-white/20 text-white rounded-lg text-sm hover:bg-white/30 backdrop-blur">
@@ -116,10 +116,13 @@
                     📋 Resumo
                 </button>
                 <button onclick="switchTab('atividades')" data-tab="atividades" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
-                    📝 Atividades <span class="ml-1 px-1.5 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600">{{ $activities->count() }}</span>
+                    📋 Registro de Interações <span class="ml-1 px-1.5 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600">{{ $activities->count() }}</span>
                 </button>
                 <button onclick="switchTab('processos')" data-tab="processos" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
                     ⚖️ Processos <span class="ml-1 px-1.5 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600">{{ count($djContext['processos']) }}</span>
+                </button>
+                <button onclick="switchTab('comunicacao')" data-tab="comunicacao" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                    💬 Comunicação
                 </button>
                 <button onclick="switchTab('financeiro')" data-tab="financeiro" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
                     💰 Financeiro
@@ -252,7 +255,7 @@
                         @csrf
                         <div><label class="text-xs text-gray-500">Responsável</label><select name="owner_user_id" class="w-full border rounded-lg px-3 py-2 text-sm mt-1"><option value="">Sem responsável</option>@foreach($users as $u)<option value="{{ $u->id }}" {{ $account->owner_user_id == $u->id ? 'selected' : '' }}>{{ $u->name }}</option>@endforeach</select></div>
                         <div><label class="text-xs text-gray-500">Ciclo de Vida</label><select name="lifecycle" class="w-full border rounded-lg px-3 py-2 text-sm mt-1">@foreach(['onboarding','ativo','adormecido','arquivado','risco'] as $lc)<option value="{{ $lc }}" {{ $account->lifecycle === $lc ? 'selected' : '' }}>{{ ucfirst($lc) }}</option>@endforeach</select></div>
-                        <div><label class="text-xs text-gray-500">Saúde (0-100)</label><input type="number" name="health_score" min="0" max="100" value="{{ $account->health_score }}" class="w-full border rounded-lg px-3 py-2 text-sm mt-1"></div>
+                        <div><label class="text-xs text-gray-500">Saúde</label><div class="flex items-center gap-2 mt-1">@php $hs = $account->health_score; @endphp<div class="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden"><div class="h-full rounded-full flex items-center justify-center text-xs font-medium text-white" style="width: {{ max(15, $hs ?? 0) }}%; background-color: {{ ($hs ?? 0) >= 70 ? '#22C55E' : (($hs ?? 0) >= 40 ? '#F59E0B' : '#EF4444') }}">{{ $hs ?? '—' }}</div></div><span class="text-xs text-gray-400">auto</span></div></div>
                         <div><label class="text-xs text-gray-500">Próxima ação</label><input type="date" name="next_touch_at" value="{{ $account->next_touch_at?->format('Y-m-d') }}" class="w-full border rounded-lg px-3 py-2 text-sm mt-1"></div>
                         <div><label class="text-xs text-gray-500">Notas</label><textarea name="notes" rows="4" class="w-full border rounded-lg px-3 py-2 text-sm mt-1">{{ $account->notes }}</textarea></div>
                         <div><label class="text-xs text-gray-500">Tags (separar por vírgula)</label><input type="text" name="tags" value="{{ implode(', ', $account->getTagsArray()) }}" class="w-full border rounded-lg px-3 py-2 text-sm mt-1"></div>
@@ -265,6 +268,39 @@
                     @if($account->datajuri_pessoa_id)<p><strong>DataJuri ID:</strong> {{ $account->datajuri_pessoa_id }}</p>@endif
                     <p><strong>Criado:</strong> {{ $account->created_at?->format('d/m/Y') }}</p>
                 </div>
+
+                @if(in_array(auth()->user()->role, ['admin', 'coordenador', 'socio']))
+                <div class="bg-white rounded-lg shadow-sm border p-4 space-y-3">
+                    <h3 class="text-sm font-semibold text-gray-700">Ações Administrativas</h3>
+                    {{-- Transferir --}}
+                    <div>
+                        <label class="text-xs text-gray-500">Transferir para</label>
+                        <div class="flex gap-2 mt-1">
+                            <select id="transfer-owner" class="flex-1 border rounded-lg px-2 py-1.5 text-sm">
+                                <option value="">Selecionar...</option>
+                                @foreach($users as $u)
+                                    @if($u->id !== $account->owner_user_id)
+                                    <option value="{{ $u->id }}">{{ $u->name }}</option>
+                                    @endif
+                                @endforeach
+                            </select>
+                            <button onclick="transferOwner()" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700">Transferir</button>
+                        </div>
+                        <input type="text" id="transfer-reason" placeholder="Motivo (opcional)" class="w-full border rounded-lg px-2 py-1.5 text-sm mt-1">
+                    </div>
+                    {{-- Arquivar --}}
+                    @if($account->lifecycle !== 'arquivado')
+                    <div class="border-t pt-3">
+                        <input type="text" id="archive-reason" placeholder="Motivo do arquivamento" class="w-full border rounded-lg px-2 py-1.5 text-sm">
+                        <button onclick="archiveAccount()" class="w-full mt-1 px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs hover:bg-gray-600">Arquivar Conta</button>
+                    </div>
+                    @else
+                    <div class="border-t pt-3">
+                        <button onclick="unarchiveAccount()" class="w-full px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700">Reativar Conta</button>
+                    </div>
+                    @endif
+                </div>
+                @endif
             </div>
         </div>
     </div>
@@ -277,22 +313,39 @@
             {{-- Form de registro (destaque) --}}
             <div class="lg:col-span-1">
                 <div class="bg-white rounded-lg shadow-sm border p-6 sticky top-4">
-                    <h2 class="text-lg font-semibold text-[#1B334A] mb-4">📝 Registrar Ocorrência</h2>
+                    <h2 class="text-lg font-semibold text-[#1B334A] mb-4">📋 Registrar Interação</h2>
                     <form id="form-activity" class="space-y-3">
                         @csrf
-                        <select name="type" class="w-full border rounded-lg px-3 py-2 text-sm">
-                            <option value="note">📝 Nota / Observação</option>
-                            <option value="call">📞 Ligação</option>
-                            <option value="meeting">🤝 Reunião</option>
-                            <option value="task">✅ Tarefa</option>
-                            <option value="whatsapp">💬 WhatsApp</option>
-                            <option value="email">✉️ Email</option>
-                        </select>
-                        <input type="text" name="title" placeholder="O que aconteceu?" required class="w-full border rounded-lg px-3 py-2 text-sm">
-                        <textarea name="body" placeholder="Detalhes (opcional)" rows="3" class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
-                        <input type="datetime-local" name="due_at" class="w-full border rounded-lg px-3 py-2 text-sm text-gray-500" title="Agendar para (opcional)">
+                        <div>
+                            <label class="text-xs text-gray-500 mb-1 block">Canal</label>
+                            <select name="type" class="w-full border rounded-lg px-3 py-2 text-sm">
+                                <option value="call">📞 Ligação</option>
+                                <option value="meeting">🤝 Reunião</option>
+                                <option value="whatsapp">💬 WhatsApp</option>
+                                <option value="email">✉️ E-mail</option>
+                                <option value="note">📝 Registro Interno</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-500 mb-1 block">Natureza</label>
+                            <select name="purpose" class="w-full border rounded-lg px-3 py-2 text-sm">
+                                <option value="acompanhamento">Acompanhamento processual</option>
+                                <option value="comercial">Comercial / Prospecção</option>
+                                <option value="cobranca">Cobrança</option>
+                                <option value="orientacao">Orientação jurídica</option>
+                                <option value="documental">Documental</option>
+                                <option value="agendamento">Agendamento</option>
+                                <option value="retorno">Retorno de contato</option>
+                                <option value="registro_interno">Registro interno</option>
+                            </select>
+                        </div>
+                        <input type="text" name="title" placeholder="Resumo da interação" required class="w-full border rounded-lg px-3 py-2 text-sm">
+                        <textarea name="body" placeholder="Descrição detalhada" rows="3" class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+                        <textarea name="decisions" placeholder="Decisões / Recomendações (opcional)" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+                        <textarea name="pending_items" placeholder="Pendências (opcional)" rows="2" class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+                        <input type="datetime-local" name="due_at" class="w-full border rounded-lg px-3 py-2 text-sm text-gray-500" title="Agendar follow-up (opcional)">
                         <button type="button" onclick="saveActivity()" class="w-full px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 font-medium">
-                            Registrar
+                            Registrar Interação
                         </button>
                     </form>
                 </div>
@@ -301,26 +354,44 @@
             {{-- Lista de atividades --}}
             <div class="lg:col-span-2">
                 <div class="bg-white rounded-lg shadow-sm border p-6">
-                    <h2 class="text-lg font-semibold text-[#1B334A] mb-4">Histórico de Ocorrências ({{ $activities->count() }})</h2>
+                    <h2 class="text-lg font-semibold text-[#1B334A] mb-4">Histórico de Interações ({{ $activities->count() }})</h2>
                     @if($activities->isEmpty())
                         <div class="text-center py-8">
-                            <p class="text-gray-400 text-sm">Nenhuma ocorrência registrada.</p>
-                            <p class="text-gray-300 text-xs mt-1">Registre a primeira ocorrência ao lado →</p>
+                            <p class="text-gray-400 text-sm">Nenhuma interação registrada.</p>
+                            <p class="text-gray-300 text-xs mt-1">Registre a primeira interação ao lado →</p>
                         </div>
                     @else
                         <div class="space-y-3">
                             @foreach($activities as $act)
                             @php
-                                $actIcon = match($act->type) { 'call' => '📞', 'meeting' => '🤝', 'whatsapp' => '💬', 'task' => '✅', 'note' => '📝', 'email' => '✉️', default => '•' };
-                                $actColor = match($act->type) { 'call' => 'border-blue-400 bg-blue-50', 'meeting' => 'border-purple-400 bg-purple-50', 'whatsapp' => 'border-green-400 bg-green-50', 'task' => 'border-orange-400 bg-orange-50', 'note' => 'border-gray-300 bg-gray-50', 'email' => 'border-indigo-400 bg-indigo-50', default => 'border-gray-200 bg-gray-50' };
+                                $actIcon = match($act->type) { 'call' => '📞', 'meeting' => '🤝', 'whatsapp' => '💬', 'note' => '📝', 'email' => '✉️', default => '•' };
+                                $actColor = match($act->type) { 'call' => 'border-blue-400 bg-blue-50', 'meeting' => 'border-purple-400 bg-purple-50', 'whatsapp' => 'border-green-400 bg-green-50', 'note' => 'border-gray-300 bg-gray-50', 'email' => 'border-indigo-400 bg-indigo-50', default => 'border-gray-200 bg-gray-50' };
+                                $purposeLabel = match($act->purpose ?? '') { 'acompanhamento' => 'Acompanhamento', 'comercial' => 'Comercial', 'cobranca' => 'Cobrança', 'orientacao' => 'Orientação', 'documental' => 'Documental', 'agendamento' => 'Agendamento', 'retorno' => 'Retorno', 'registro_interno' => 'Registro Interno', default => '' };
                             @endphp
                             <div class="border-l-4 {{ $actColor }} rounded-r-lg p-4">
                                 <div class="flex items-start justify-between">
                                     <div class="flex items-start gap-2">
                                         <span class="text-lg">{{ $actIcon }}</span>
                                         <div>
-                                            <p class="font-medium text-gray-800">{{ $act->title }}</p>
+                                            <div class="flex items-center gap-2 flex-wrap">
+                                                <p class="font-medium text-gray-800">{{ $act->title }}</p>
+                                                @if($purposeLabel)
+                                                    <span class="px-1.5 py-0.5 rounded text-xs bg-gray-200 text-gray-600">{{ $purposeLabel }}</span>
+                                                @endif
+                                            </div>
                                             @if($act->body)<p class="text-gray-600 text-sm mt-1">{{ $act->body }}</p>@endif
+                                            @if($act->decisions)
+                                                <div class="mt-2 p-2 bg-blue-50 rounded text-sm">
+                                                    <span class="text-xs font-medium text-blue-700">Decisões:</span>
+                                                    <p class="text-blue-800 text-xs mt-0.5">{{ $act->decisions }}</p>
+                                                </div>
+                                            @endif
+                                            @if($act->pending_items)
+                                                <div class="mt-1 p-2 bg-amber-50 rounded text-sm">
+                                                    <span class="text-xs font-medium text-amber-700">Pendências:</span>
+                                                    <p class="text-amber-800 text-xs mt-0.5">{{ $act->pending_items }}</p>
+                                                </div>
+                                            @endif
                                         </div>
                                     </div>
                                     <div class="text-right text-xs text-gray-400 flex-shrink-0 ml-4">
@@ -395,6 +466,72 @@
     </div>
 
     {{-- ================================================================== --}}
+    {{-- TAB: COMUNICACAO                                                  --}}
+    {{-- ================================================================== --}}
+    <div id="tab-comunicacao" class="tab-content hidden">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {{-- WhatsApp Messages --}}
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-[#1B334A]">💬 WhatsApp</h2>
+                    @if($commContext['has_wa'])
+                    <span class="text-xs px-2 py-1 rounded-full {{ $commContext['whatsapp']->status === 'open' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500' }}">{{ ucfirst($commContext['whatsapp']->status ?? 'closed') }}</span>
+                    @endif
+                </div>
+                @if($commContext['has_wa'] && !empty($commContext['wa_messages']))
+                <div class="space-y-2 max-h-96 overflow-y-auto pr-2" id="wa-messages-box">
+                    @foreach($commContext['wa_messages'] as $msg)
+                    @php $isIncoming = ($msg->direction ?? '') === 'incoming'; @endphp
+                    <div class="flex {{ $isIncoming ? 'justify-start' : 'justify-end' }}">
+                        <div class="max-w-[80%] rounded-lg px-3 py-2 text-sm {{ $isIncoming ? 'bg-gray-100 text-gray-800' : 'bg-[#385776] text-white' }}">
+                            @if($msg->body)<p>{{ \Illuminate\Support\Str::limit($msg->body, 300) }}</p>@endif
+                            @if($msg->type !== 'text')<span class="text-xs opacity-60">[{{ $msg->type }}]</span>@endif
+                            <p class="text-xs {{ $isIncoming ? 'text-gray-400' : 'text-blue-200' }} mt-1">{{ \Carbon\Carbon::parse($msg->created_at)->format('d/m H:i') }}</p>
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+                <script>document.addEventListener('DOMContentLoaded',()=>{const b=document.getElementById('wa-messages-box');if(b)b.scrollTop=b.scrollHeight;});</script>
+                @elseif($commContext['has_wa'])
+                <p class="text-gray-400 text-sm">Conversa encontrada mas sem mensagens recentes.</p>
+                <p class="text-xs text-gray-300 mt-1">Contato: {{ $commContext['whatsapp']->phone ?? '' }} · {{ $commContext['whatsapp']->name ?? '' }}</p>
+                @else
+                <p class="text-gray-400 text-sm">Nenhuma conversa WhatsApp vinculada.</p>
+                @endif
+            </div>
+
+            {{-- Tickets NEXO --}}
+            <div class="bg-white rounded-lg shadow-sm border p-6">
+                <h2 class="text-lg font-semibold text-[#1B334A] mb-4">🎫 Tickets NEXO</h2>
+                @if($commContext['has_tickets'])
+                <div class="space-y-2">
+                    @foreach($commContext['tickets'] as $tk)
+                    @php
+                        $tkObj = (object) $tk;
+                        $tkStatus = $tkObj->status ?? 'aberto';
+                        $tkCor = match(strtolower($tkStatus)) { 'resolvido','fechado' => 'bg-green-100 text-green-700', 'em andamento','em_andamento' => 'bg-blue-100 text-blue-700', default => 'bg-yellow-100 text-yellow-700' };
+                    @endphp
+                    <div class="border rounded-lg p-3 hover:bg-gray-50">
+                        <div class="flex items-center justify-between">
+                            <span class="font-medium text-gray-800 text-sm">{{ $tkObj->assunto ?? 'Ticket #' . ($tkObj->protocolo ?? $tkObj->id ?? '?') }}</span>
+                            <span class="px-1.5 py-0.5 rounded text-xs {{ $tkCor }}">{{ ucfirst($tkStatus) }}</span>
+                        </div>
+                        <div class="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                            @if($tkObj->protocolo ?? null)<span>#{{ $tkObj->protocolo }}</span>@endif
+                            @if($tkObj->tipo ?? null)<span>{{ $tkObj->tipo }}</span>@endif
+                            @if($tkObj->created_at ?? null)<span>{{ \Carbon\Carbon::parse($tkObj->created_at)->format('d/m/Y') }}</span>@endif
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+                @else
+                <p class="text-gray-400 text-sm">Nenhum ticket encontrado.</p>
+                @endif
+            </div>
+        </div>
+    </div>
+
+    {{-- ================================================================== --}}
     {{-- TAB: FINANCEIRO                                                   --}}
     {{-- ================================================================== --}}
     <div id="tab-financeiro" class="tab-content hidden">
@@ -405,6 +542,47 @@
                     <h2 class="text-lg font-semibold text-[#1B334A]">Contas a Receber ({{ count($djContext['contas_receber']) }})</h2>
                     @if($contasVencidas->count() > 0)<span class="text-xs px-2 py-1 rounded-full bg-red-100 text-red-700">{{ $contasVencidas->count() }} vencida(s)</span>@endif
                 </div>
+
+                {{-- Aging Summary --}}
+                @if(isset($finSummary))
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                    <div class="bg-green-50 rounded-lg p-3 text-center">
+                        <p class="text-xs text-green-600 uppercase">Recebido</p>
+                        <p class="text-lg font-bold text-green-700">R$ {{ number_format($finSummary['total_recebido'], 0, ',', '.') }}</p>
+                    </div>
+                    <div class="bg-yellow-50 rounded-lg p-3 text-center">
+                        <p class="text-xs text-yellow-600 uppercase">Em Aberto</p>
+                        <p class="text-lg font-bold text-yellow-700">R$ {{ number_format($finSummary['total_aberto'], 0, ',', '.') }}</p>
+                    </div>
+                    <div class="bg-red-50 rounded-lg p-3 text-center">
+                        <p class="text-xs text-red-600 uppercase">Vencido</p>
+                        <p class="text-lg font-bold text-red-700">R$ {{ number_format($finSummary['total_vencido'], 0, ',', '.') }}</p>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3 text-center">
+                        <p class="text-xs text-gray-500 uppercase">Títulos Abertos</p>
+                        <p class="text-lg font-bold text-gray-700">{{ $finSummary['qty_abertas'] }}</p>
+                    </div>
+                </div>
+
+                {{-- Aging Bars --}}
+                @php $agingMax = max(1, collect($finSummary['aging'])->max('valor')); @endphp
+                <div class="space-y-2 mb-4">
+                    @foreach($finSummary['aging'] as $ag)
+                    @if($ag['valor'] > 0)
+                    <div class="flex items-center gap-3 text-sm">
+                        <span class="w-24 text-gray-600 text-xs">{{ $ag['label'] }}</span>
+                        <div class="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
+                            <div class="h-full rounded-full flex items-center justify-end pr-2" style="width: {{ round($ag['valor'] / $agingMax * 100) }}%; background-color: {{ $ag['cor'] }}">
+                                <span class="text-white text-xs font-medium">R$ {{ number_format($ag['valor'], 0, ',', '.') }}</span>
+                            </div>
+                        </div>
+                        <span class="text-xs text-gray-400 w-12 text-right">{{ $ag['qty'] }}x</span>
+                    </div>
+                    @endif
+                    @endforeach
+                </div>
+                @endif
+
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm">
                         <thead><tr class="text-left text-xs text-gray-400 border-b"><th class="pb-2 pr-3">Descrição</th><th class="pb-2 pr-3">Valor</th><th class="pb-2 pr-3">Vencimento</th><th class="pb-2 pr-3">Pagamento</th><th class="pb-2">Status</th></tr></thead>
@@ -518,6 +696,46 @@ function saveActivity() {
         btn.textContent = 'Erro — tente novamente'; btn.classList.remove('bg-green-600'); btn.classList.add('bg-red-500'); btn.disabled = false;
         setTimeout(() => { btn.textContent = 'Registrar'; btn.classList.remove('bg-red-500'); btn.classList.add('bg-green-600'); }, 2000);
     });
+}
+
+function transferOwner() {
+    const newOwner = document.getElementById('transfer-owner').value;
+    const reason = document.getElementById('transfer-reason').value;
+    if (!newOwner) { alert('Selecione o novo responsável'); return; }
+    if (!confirm('Confirma a transferência de responsável?')) return;
+    fetch('{{ route("crm.accounts.transfer", $account->id) }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+        body: JSON.stringify({ new_owner_id: newOwner, reason: reason })
+    }).then(r => r.json()).then(d => {
+        if (d.ok) { alert('Transferido para ' + d.new_owner); location.reload(); }
+        else { alert(d.error || 'Erro na transferência'); }
+    }).catch(() => alert('Erro de conexão'));
+}
+
+function archiveAccount() {
+    const reason = document.getElementById('archive-reason').value;
+    if (!reason) { alert('Informe o motivo do arquivamento'); return; }
+    if (!confirm('Confirma o arquivamento desta conta?')) return;
+    fetch('{{ route("crm.accounts.archive", $account->id) }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+        body: JSON.stringify({ reason: reason })
+    }).then(r => r.json()).then(d => {
+        if (d.ok) { alert('Conta arquivada'); location.reload(); }
+        else { alert(d.error || 'Erro'); }
+    }).catch(() => alert('Erro de conexão'));
+}
+
+function unarchiveAccount() {
+    if (!confirm('Reativar esta conta?')) return;
+    fetch('{{ route("crm.accounts.unarchive", $account->id) }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+    }).then(r => r.json()).then(d => {
+        if (d.ok) { alert('Conta reativada'); location.reload(); }
+        else { alert(d.error || 'Erro'); }
+    }).catch(() => alert('Erro de conexão'));
 }
 </script>
 @endpush

@@ -427,9 +427,9 @@
                             <span class="menu-text">Notificações</span>
                         </a>
                     {{-- CRM (sub-itens) --}}
-                    <div x-data="{ crmOpen: {{ request()->is('crm/*') ? 'true' : 'false' }} }" class="relative">
+                    <div x-data="{ crmOpen: {{ request()->is('crm*') ? 'true' : 'false' }} }" class="relative">
                         <button @click="crmOpen = !crmOpen" class="flex items-center justify-between w-full px-3 py-1.5 text-sm rounded-lg hover:bg-gray-100 transition
-                            {{ request()->is('crm/*') ? 'text-[#385776] font-medium' : 'text-gray-500' }}">
+                            {{ request()->is('crm*') ? 'text-[#385776] font-medium' : 'text-gray-500' }}">
                             <span class="flex items-center gap-2">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                 CRM
@@ -437,10 +437,14 @@
                             <svg class="w-3 h-3 transition-transform" :class="crmOpen ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                         </button>
                         <div x-show="crmOpen" x-transition class="ml-4 mt-1 space-y-0.5">
+                            <a href="{{ route('crm.dashboard') }}" class="block px-3 py-1 text-xs rounded-lg hover:bg-gray-100 {{ request()->routeIs('crm.dashboard') ? 'text-[#385776] font-medium' : 'text-gray-400' }}">Meu CRM</a>
                             <a href="{{ route('crm.leads') }}" class="block px-3 py-1 text-xs rounded-lg hover:bg-gray-100 {{ request()->routeIs('crm.leads') ? 'text-[#385776] font-medium' : 'text-gray-400' }}">Leads</a>
                             <a href="{{ route('crm.pipeline') }}" class="block px-3 py-1 text-xs rounded-lg hover:bg-gray-100 {{ request()->routeIs('crm.pipeline') ? 'text-[#385776] font-medium' : 'text-gray-400' }}">Oportunidades</a>
                             <a href="{{ route('crm.carteira') }}" class="block px-3 py-1 text-xs rounded-lg hover:bg-gray-100 {{ request()->routeIs('crm.carteira') ? 'text-[#385776] font-medium' : 'text-gray-400' }}">Carteira</a>
                             <a href="{{ route('crm.reports') }}" class="block px-3 py-1 text-xs rounded-lg hover:bg-gray-100 {{ request()->routeIs('crm.reports') ? 'text-[#385776] font-medium' : 'text-gray-400' }}">Relatórios</a>
+                            @if(auth()->user()->role === 'admin')
+                            <a href="{{ route('crm.distribution') }}" class="block px-3 py-1 text-xs rounded-lg hover:bg-gray-100 {{ request()->routeIs('crm.distribution*') ? 'text-[#385776] font-medium' : 'text-gray-400' }}">Distribuição</a>
+                            @endif
                         </div>
                     </div>
 {{-- CRM avulso removido 15/02 --}}

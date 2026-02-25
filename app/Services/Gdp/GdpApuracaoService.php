@@ -41,20 +41,14 @@ class GdpApuracaoService
             return ['success' => false, 'message' => 'Nenhum ciclo GDP ativo.'];
         }
 
-        // 2. Obter usuarios elegiveis (excluir contas teste: 2, 5, 6)
+        // 2. Obter usuarios elegiveis GDP
+        // Criterio: ativo=true + datajuri_proprietario_id preenchido (exclui contas teste)
         $usuarios = DB::table('users')
-            ->whereNotIn('id', [2, 5, 6])
             ->where('ativo', true)
+            ->whereNotNull('datajuri_proprietario_id')
+            ->where('datajuri_proprietario_id', '>', 0)
             ->pluck('id')
             ->toArray();
-
-        if (empty($usuarios)) {
-            // Fallback: verificar sem campo ativo (pode nao existir)
-            $usuarios = DB::table('users')
-                ->whereNotIn('id', [2, 5, 6])
-                ->pluck('id')
-                ->toArray();
-        }
 
         Log::info("{$this->logPrefix} Usuarios elegiveis: " . implode(',', $usuarios));
 

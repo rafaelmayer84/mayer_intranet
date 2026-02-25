@@ -9,15 +9,21 @@ class CrmReportsController extends Controller
 {
     public function index(CrmMetricsService $metrics)
     {
-        $funnel     = $metrics->funnelReport(6);
+        // Existentes
+        $projected  = $metrics->projectedValue();
+        $winRate    = $metrics->winRateByOwner(3);
+        $funnel     = $metrics->funnelEnriched(6);
         $conversion = $metrics->conversionByStage(6);
         $avgTime    = $metrics->avgTimePerStage(6);
-        $winRate    = $metrics->winRateByOwner(3);
         $lostReasons = $metrics->lostReasons(6);
-        $projected  = $metrics->projectedValue();
+
+        // Novos — Bloco C
+        $carteira   = $metrics->carteiraByOwner();
+        $heatmap    = $metrics->heatmapInatividade();
 
         return view('crm.reports.index', compact(
-            'funnel', 'conversion', 'avgTime', 'winRate', 'lostReasons', 'projected'
+            'projected', 'winRate', 'funnel', 'conversion', 'avgTime', 'lostReasons',
+            'carteira', 'heatmap'
         ));
     }
 }

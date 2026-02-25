@@ -11,7 +11,8 @@ class CrmActivity extends Model
     protected $table = 'crm_activities';
 
     protected $fillable = [
-        'opportunity_id', 'account_id', 'type', 'title', 'body',
+        'opportunity_id', 'account_id', 'type', 'purpose', 'title', 'body',
+        'decisions', 'pending_items',
         'due_at', 'done_at', 'created_by_user_id',
     ];
 

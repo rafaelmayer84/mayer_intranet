@@ -53,9 +53,9 @@
                 <option value="prospect" {{ request('kind') === 'prospect' ? 'selected' : '' }}>Prospects</option>
             </select>
             <select name="lifecycle" class="border rounded-lg px-3 py-2 text-sm">
-                <option value="">Todos os ciclos</option>
+                <option value="todos" {{ request('lifecycle') === 'todos' ? 'selected' : '' }}>Todos os ciclos</option>
                 @foreach(['onboarding','ativo','adormecido','arquivado','risco'] as $lc)
-                    <option value="{{ $lc }}" {{ request('lifecycle') === $lc ? 'selected' : '' }}>{{ ucfirst($lc) }}</option>
+                    <option value="{{ $lc }}" {{ (request('lifecycle', 'ativo')) === $lc ? 'selected' : '' }}>{{ ucfirst($lc) }}</option>
                 @endforeach
             </select>
             <select name="owner_user_id" class="border rounded-lg px-3 py-2 text-sm">

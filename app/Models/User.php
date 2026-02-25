@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use App\Models\Crm\CrmAccount;
 
 class User extends Authenticatable
 {
@@ -298,4 +299,9 @@ class User extends Authenticatable
         return max($dias, 0);
     }
 
+
+    public function crmAccounts()
+    {
+        return $this->hasMany(CrmAccount::class, 'owner_user_id');
+    }
 }
