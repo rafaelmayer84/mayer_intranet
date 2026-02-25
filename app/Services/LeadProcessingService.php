@@ -729,18 +729,31 @@ PROMPT;
                 $tags = array_unique(array_merge($tags, $fluxo['tags']));
             }
 
-            // ========== IDEMPOTÊNCIA ATÔMICA ==========
-            $existingLead = Lead::where('telefone', $telefone)->first();
+            // ========== IDEMPOTÊNCIA ATÔMICA (com lock DB) ==========
+            $lockKey = 'lead_process_' . $telefoneClean;
+            $lock = \Illuminate\Support\Facades\Cache::lock($lockKey, 30);
 
-            if ($existingLead) {
-                // Atualizar contact_id se veio vazio
-                if (empty($existingLead->contact_id) && !empty($contactId)) {
-                    $existingLead->contact_id = $contactId;
-                    $existingLead->timestamps = false;
-                    $existingLead->save();
+            if (!$lock->get()) {
+                Log::info('processLead: lock ativo, ignorando duplicata', ['telefone' => $telefone]);
+                return Lead::where('telefone', $telefone)->first();
+            }
+
+            try {
+                $existingLead = Lead::where('telefone', $telefone)->first();
+
+                if ($existingLead) {
+                    if (empty($existingLead->contact_id) && !empty($contactId)) {
+                        $existingLead->contact_id = $contactId;
+                        $existingLead->timestamps = false;
+                        $existingLead->save();
+                    }
+                    Log::info('Lead ja existe', ['lead_id' => $existingLead->id]);
+                    $lock->release();
+                    return $existingLead;
                 }
-                Log::info('Lead ja existe', ['lead_id' => $existingLead->id]);
-                return $existingLead;
+            } catch (\Throwable $e) {
+                $lock->release();
+                throw $e;
             }
 
             // Token SendPulse
@@ -845,6 +858,11 @@ PROMPT;
             ]);
 
             Log::info('Lead criado', ['lead_id' => $lead->id, 'cidade' => $cidade, 'area' => $lead->area_interesse]);
+
+            // Liberar lock de idempotência
+            if (isset($lock)) {
+                $lock->release();
+            }
             // === TRACKING DE ORIGEM (GCLID/UTM) ===
             try { \App\Services\LeadTrackingService::applyToLead($lead); } catch (\Throwable $e) { \Illuminate\Support\Facades\Log::warning("[Lead] Tracking: " . $e->getMessage()); }
 
