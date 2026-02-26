@@ -81,8 +81,18 @@ class CrmHealthScoreService
             default                => 0,
         };
 
-        // Persistir
+        // Persistir com auditoria
+        $oldScore = $account->health_score;
         $account->update(['health_score' => $score]);
+
+        if ($oldScore !== $score) {
+            \App\Models\Crm\CrmEvent::create([
+                'account_id'  => $account->id,
+                'type'        => 'health_score_changed',
+                'payload'     => ['from' => $oldScore, 'to' => $score],
+                'happened_at' => now(),
+            ]);
+        }
 
         return $score;
     }

@@ -34,12 +34,22 @@ class CrmSegmentationService
         $result = $this->chamarIA($snapshot);
 
         if ($result) {
+            $oldSegment = DB::table('crm_accounts')->where('id', $accountId)->value('segment');
             DB::table('crm_accounts')->where('id', $accountId)->update([
                 'segment'           => $result['segment'],
                 'segment_summary'   => $result['summary'],
                 'segment_cached_at' => now(),
                 'updated_at'        => now(),
             ]);
+
+            if ($oldSegment !== $result['segment']) {
+                \App\Models\Crm\CrmEvent::create([
+                    'account_id'  => $accountId,
+                    'type'        => 'segment_changed',
+                    'payload'     => ['from' => $oldSegment, 'to' => $result['segment'], 'summary' => $result['summary']],
+                    'happened_at' => now(),
+                ]);
+            }
 
             return array_merge($result, ['cached' => false]);
         }

@@ -108,15 +108,27 @@ class CrmAccountController extends Controller
             'tags'          => 'nullable|string|max:1000',
         ]);
 
+        $before = $account->only(array_keys($validated));
         $account->update($validated);
+        $after = $account->only(array_keys($validated));
 
-        CrmEvent::create([
-            'account_id'         => $id,
-            'type'               => 'account_updated',
-            'payload'            => array_keys($validated),
-            'happened_at'        => now(),
-            'created_by_user_id' => auth()->id(),
-        ]);
+        $changes = [];
+        foreach ($before as $key => $oldVal) {
+            $newVal = $after[$key] ?? null;
+            if ((string) $oldVal !== (string) $newVal) {
+                $changes[$key] = ['from' => $oldVal, 'to' => $newVal];
+            }
+        }
+
+        if (!empty($changes)) {
+            CrmEvent::create([
+                'account_id'         => $id,
+                'type'               => 'account_updated',
+                'payload'            => $changes,
+                'happened_at'        => now(),
+                'created_by_user_id' => auth()->id(),
+            ]);
+        }
 
         return response()->json(['ok' => true]);
     }
@@ -539,16 +551,52 @@ class CrmAccountController extends Controller
         ];
     }
 
+    private function describeAccountUpdate(array $p): string
+    {
+        if (empty($p)) return 'Dados atualizados';
+
+        // Novo formato: {campo: {from: x, to: y}}
+        $labels = [
+            'owner_user_id' => 'Responsável',
+            'lifecycle'     => 'Lifecycle',
+            'health_score'  => 'Saúde',
+            'notes'         => 'Anotações',
+            'tags'          => 'Tags',
+            'next_touch_at' => 'Próximo contato',
+        ];
+
+        $parts = [];
+        foreach ($p as $key => $change) {
+            if (is_array($change) && isset($change['from'], $change['to'])) {
+                $label = $labels[$key] ?? $key;
+                $parts[] = $label . ': ' . ($change['from'] ?: '—') . ' → ' . ($change['to'] ?: '—');
+            }
+        }
+
+        return $parts ? 'Atualizado: ' . implode(', ', $parts) : 'Dados atualizados';
+    }
+
     private function eventTitle(CrmEvent $event): string
     {
+        $p = $event->payload ?? [];
         return match ($event->type) {
-            'opportunity_created'  => 'Nova oportunidade criada',
-            'stage_changed'        => 'Estágio alterado: ' . ($event->payload['from_stage'] ?? '?') . ' → ' . ($event->payload['to_stage'] ?? '?'),
-            'opportunity_lost'     => 'Oportunidade perdida' . (isset($event->payload['reason']) ? ': ' . $event->payload['reason'] : ''),
-            'lead_qualified'       => 'Lead qualificado',
-            'nexo_opened_chat'     => 'Chat WhatsApp aberto (NEXO)',
-            'account_updated'      => 'Dados atualizados',
-            default                => ucfirst(str_replace('_', ' ', $event->type)),
+            'opportunity_created'        => 'Nova oportunidade criada',
+            'opportunity_imported'       => 'Oportunidade importada (ESPO)',
+            'opportunity_lost'           => 'Oportunidade perdida' . (isset($p['reason']) ? ': ' . $p['reason'] : ''),
+            'stage_changed'              => 'Estágio alterado: ' . ($p['from_stage'] ?? '?') . ' → ' . ($p['to_stage'] ?? '?'),
+            'lead_qualified'             => 'Lead qualificado',
+            'lead_status_changed'        => 'Status do lead: ' . ($p['from'] ?? '?') . ' → ' . ($p['to'] ?? '?'),
+            'nexo_opened_chat'           => 'Chat WhatsApp aberto (NEXO)',
+            'account_created_from_lead'  => 'Conta criada a partir de lead',
+            'account_updated'            => $this->describeAccountUpdate($p),
+            'account_archived'           => 'Conta arquivada',
+            'health_score_changed'       => 'Saúde: ' . ($p['from'] ?? '?') . ' → ' . ($p['to'] ?? '?'),
+            'segment_changed'            => 'Segmentação: ' . ($p['from'] ?? '?') . ' → ' . ($p['to'] ?? '?'),
+            'document_uploaded'          => 'Documento enviado: ' . ($p['name'] ?? ''),
+            'document_deleted'           => 'Documento removido: ' . ($p['name'] ?? ''),
+            'service_request_created'    => 'Solicitação criada: ' . ($p['subject'] ?? '#' . ($p['sr_id'] ?? '')),
+            'service_request_updated'    => 'Solicitação atualizada' . (isset($p['from_status']) ? ' (' . $p['from_status'] . ' → ' . ($p['status'] ?? '?') . ')' : ''),
+            default                      => ucfirst(str_replace('_', ' ', $event->type)),
         };
     }
 
