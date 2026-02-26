@@ -170,17 +170,29 @@ class CrmAccountController extends Controller
      */
     public function storeActivity(Request $request, int $id)
     {
-        $request->validate([
-            'type'          => 'required|in:call,meeting,whatsapp,note,email',
-            'purpose'       => 'required|in:acompanhamento,comercial,cobranca,orientacao,documental,agendamento,retorno,registro_interno',
+        $rules = [
+            'type'          => 'required|in:call,meeting,whatsapp,note,email,visit',
+            'purpose'       => 'required|in:acompanhamento,comercial,cobranca,orientacao,documental,agendamento,retorno,registro_interno,relacionamento,assinatura,estrategica',
             'title'         => 'required|string|max:255',
             'body'          => 'nullable|string|max:5000',
             'decisions'     => 'nullable|string|max:3000',
             'pending_items' => 'nullable|string|max:3000',
             'due_at'        => 'nullable|date',
-        ]);
-
-        $activity = CrmActivity::create([
+        ];
+        if ($request->input('type') === 'visit') {
+            $rules = array_merge($rules, [
+                'visit_arrival_time'   => 'required|date_format:H:i',
+                'visit_departure_time' => 'required|date_format:H:i|after:visit_arrival_time',
+                'visit_transport'      => 'required|in:carro_proprio,aplicativo,taxi,transporte_publico,a_pe,moto,outro',
+                'visit_location'       => 'nullable|string|max:500',
+                'visit_attendees'      => 'nullable|string|max:1000',
+                'visit_objective'      => 'required|in:acompanhamento,relacionamento,prospeccao,cobranca,entrega_docs,assinatura,reuniao_estrategica,outro',
+                'visit_receptivity'    => 'nullable|in:positiva,neutra,negativa',
+                'visit_next_contact'   => 'nullable|date',
+            ]);
+        }
+        $request->validate($rules);
+        $data = [
             'account_id'         => $id,
             'type'               => $request->type,
             'purpose'            => $request->purpose,
@@ -190,7 +202,15 @@ class CrmAccountController extends Controller
             'pending_items'      => $request->pending_items,
             'due_at'             => $request->due_at,
             'created_by_user_id' => auth()->id(),
-        ]);
+        ];
+        if ($request->type === 'visit') {
+            $data = array_merge($data, $request->only([
+                'visit_arrival_time', 'visit_departure_time', 'visit_transport',
+                'visit_location', 'visit_attendees', 'visit_objective',
+                'visit_receptivity', 'visit_next_contact',
+            ]));
+        }
+        $activity = CrmActivity::create($data);
 
         CrmAccount::where('id', $id)->update(['last_touch_at' => now()]);
 
@@ -202,6 +222,43 @@ class CrmAccountController extends Controller
         }
 
         return response()->json(['ok' => true, 'id' => $activity->id]);
+    }
+
+    /**
+     * Gerar PDF do relatorio de visita presencial.
+     */
+    public function generateVisitPdf(int $id, int $activityId)
+    {
+        $account = CrmAccount::findOrFail($id);
+        $activity = CrmActivity::where('id', $activityId)
+            ->where('account_id', $id)
+            ->where('type', 'visit')
+            ->firstOrFail();
+
+        $transportLabels = [
+            'carro_proprio' => 'Carro proprio', 'aplicativo' => 'Aplicativo (Uber/99)',
+            'taxi' => 'Taxi', 'transporte_publico' => 'Transporte publico',
+            'a_pe' => 'A pe', 'moto' => 'Moto', 'outro' => 'Outro',
+        ];
+        $objectiveLabels = [
+            'acompanhamento' => 'Acompanhamento processual', 'relacionamento' => 'Relacionamento',
+            'prospeccao' => 'Prospeccao comercial', 'cobranca' => 'Cobranca',
+            'entrega_docs' => 'Entrega de documentos', 'assinatura' => 'Assinatura de contrato',
+            'reuniao_estrategica' => 'Reuniao estrategica', 'outro' => 'Outro',
+        ];
+        $receptivityLabels = ['positiva' => 'Positiva', 'neutra' => 'Neutra', 'negativa' => 'Negativa'];
+
+        $html = view('crm.visit-pdf', compact('account', 'activity', 'transportLabels', 'objectiveLabels', 'receptivityLabels'))->render();
+
+        $dompdf = new \Dompdf\Dompdf(['isRemoteEnabled' => true]);
+        $dompdf->loadHtml($html);
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+
+        $filename = 'Visita_' . str_replace(' ', '_', $account->name) . '_' . $activity->created_at->format('d-m-Y') . '.pdf';
+        return response($dompdf->output(), 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="' . $filename . '"');
     }
 
     /**

@@ -49,6 +49,7 @@ Route::middleware(['auth','modulo:operacional.crm,visualizar'])->prefix('crm')->
     Route::post('/accounts/{id}/opportunities', [CrmAccountController::class, 'createOpportunity'])->name('accounts.create-opp');
     Route::post('/accounts/{id}/activities', [CrmAccountController::class, 'storeActivity'])->name('accounts.store-activity');
     Route::post('/accounts/{id}/activities/{activityId}/complete', [CrmAccountController::class, 'completeActivity'])->name('accounts.complete-activity');
+    Route::get('/accounts/{id}/activities/{activityId}/pdf', [CrmAccountController::class, 'generateVisitPdf'])->name('accounts.visit-pdf');
 
     // Transferência de responsável (admin/coordenador)
     Route::post('/accounts/{id}/transfer', [CrmAccountController::class, 'transferOwner'])->name('accounts.transfer');

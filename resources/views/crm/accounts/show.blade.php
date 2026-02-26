@@ -333,12 +333,13 @@
                                 <option value="whatsapp">💬 WhatsApp</option>
                                 <option value="email">✉️ E-mail</option>
                                 <option value="note">📝 Registro Interno</option>
+                                <option value="visit">🏢 Visita Presencial</option>
                             </select>
                         </div>
                         <div>
                             <label class="text-xs text-gray-500 mb-1 block">Natureza</label>
                             <select name="purpose" class="w-full border rounded-lg px-3 py-2 text-sm">
-                                <option value="acompanhamento">Acompanhamento processual</option>
+                                <option value="acompanhamento">📋 Acompanhamento processual</option>
                                 <option value="comercial">Comercial / Prospecção</option>
                                 <option value="cobranca">Cobrança</option>
                                 <option value="orientacao">Orientação jurídica</option>
@@ -346,6 +347,9 @@
                                 <option value="agendamento">Agendamento</option>
                                 <option value="retorno">Retorno de contato</option>
                                 <option value="registro_interno">Registro interno</option>
+                                <option value="relacionamento">Relacionamento</option>
+                                <option value="assinatura">✍️ Assinatura de contrato</option>
+                                <option value="estrategica">📊 Reunião estratégica</option>
                             </select>
                         </div>
                         <input type="text" name="title" placeholder="Resumo da interação" required class="w-full border rounded-lg px-3 py-2 text-sm">
@@ -374,8 +378,8 @@
                             @foreach($activities as $act)
                             @php
                                 $actIcon = match($act->type) { 'call' => '📞', 'meeting' => '🤝', 'whatsapp' => '💬', 'note' => '📝', 'email' => '✉️', default => '•' };
-                                $actColor = match($act->type) { 'call' => 'border-blue-400 bg-blue-50', 'meeting' => 'border-purple-400 bg-purple-50', 'whatsapp' => 'border-green-400 bg-green-50', 'note' => 'border-gray-300 bg-gray-50', 'email' => 'border-indigo-400 bg-indigo-50', default => 'border-gray-200 bg-gray-50' };
-                                $purposeLabel = match($act->purpose ?? '') { 'acompanhamento' => 'Acompanhamento', 'comercial' => 'Comercial', 'cobranca' => 'Cobrança', 'orientacao' => 'Orientação', 'documental' => 'Documental', 'agendamento' => 'Agendamento', 'retorno' => 'Retorno', 'registro_interno' => 'Registro Interno', default => '' };
+                                $actColor = match($act->type) { 'call' => 'border-blue-400 bg-blue-50', 'meeting' => 'border-purple-400 bg-purple-50', 'whatsapp' => 'border-green-400 bg-green-50', 'note' => 'border-gray-300 bg-gray-50', 'email' => 'border-indigo-400 bg-indigo-50', 'visit' => 'border-teal-400 bg-teal-50', default => 'border-gray-200 bg-gray-50' };
+                                $purposeLabel = match($act->purpose ?? '') { 'acompanhamento' => 'Acompanhamento', 'comercial' => 'Comercial', 'cobranca' => 'Cobrança', 'orientacao' => 'Orientação', 'documental' => 'Documental', 'agendamento' => 'Agendamento', 'retorno' => 'Retorno', 'registro_interno' => 'Registro Interno', 'relacionamento' => 'Relacionamento', 'assinatura' => 'Assinatura', 'estrategica' => 'Estratégica', default => '' };
                             @endphp
                             <div class="border-l-4 {{ $actColor }} rounded-r-lg p-4">
                                 <div class="flex items-start justify-between">
@@ -399,6 +403,29 @@
                                                 <div class="mt-1 p-2 bg-amber-50 rounded text-sm">
                                                     <span class="text-xs font-medium text-amber-700">Pendências:</span>
                                                     <p class="text-amber-800 text-xs mt-0.5">{{ $act->pending_items }}</p>
+                                                </div>
+                                            @endif
+                                            @if($act->type === 'visit')
+                                                <div class="mt-2 p-3 bg-teal-50 border border-teal-200 rounded-lg text-xs space-y-1">
+                                                    <div class="flex items-center gap-4 flex-wrap">
+                                                        @if($act->visit_arrival_time)<span>â° <strong>Chegada:</strong> {{ \Carbon\Carbon::parse($act->visit_arrival_time)->format('H:i') }}</span>@endif
+                                                        @if($act->visit_departure_time)<span>ð <strong>Saída:</strong> {{ \Carbon\Carbon::parse($act->visit_departure_time)->format('H:i') }}</span>@endif
+                                                        @if($act->visit_transport)<span>ð <strong>Transporte:</strong> {{ ['carro_proprio'=>'Carro próprio','aplicativo'=>'Aplicativo','taxi'=>'Táxi','transporte_publico'=>'Transp. público','a_pe'=>'A pé','moto'=>'Moto','outro'=>'Outro'][$act->visit_transport] ?? $act->visit_transport }}</span>@endif
+                                                    </div>
+                                                    <div class="flex items-center gap-4 flex-wrap">
+                                                        @if($act->visit_objective)<span>ð¯ <strong>Objetivo:</strong> {{ ['acompanhamento'=>'Acompanhamento','relacionamento'=>'Relacionamento','prospeccao'=>'Prospecção','cobranca'=>'Cobrança','entrega_docs'=>'Entrega docs','assinatura'=>'Assinatura','reuniao_estrategica'=>'Reunião estratégica','outro'=>'Outro'][$act->visit_objective] ?? $act->visit_objective }}</span>@endif
+                                                        @if($act->visit_location)<span>ð <strong>Local:</strong> {{ $act->visit_location }}</span>@endif
+                                                    </div>
+                                                    @if($act->visit_attendees)<div>ð¥ <strong>Participantes:</strong> {{ $act->visit_attendees }}</div>@endif
+                                                    @if($act->visit_receptivity)
+                                                        <div>ð¬ <strong>Receptividade:</strong>
+                                                            <span class="px-1.5 py-0.5 rounded {{ $act->visit_receptivity === 'positiva' ? 'bg-green-100 text-green-800' : ($act->visit_receptivity === 'negativa' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800') }}">{{ ucfirst($act->visit_receptivity) }}</span>
+                                                        </div>
+                                                    @endif
+                                                    @if($act->visit_next_contact)<div>ð <strong>Próximo contato:</strong> {{ $act->visit_next_contact->format('d/m/Y') }}</div>@endif
+                                                    <div class="mt-1 pt-1 border-t border-teal-200">
+                                                        <a href="{{ url('crm/accounts/' . $act->account_id . '/activities/' . $act->id . '/pdf') }}" target="_blank" class="text-teal-700 hover:text-teal-900 font-medium">ð Gerar PDF</a>
+                                                    </div>
                                                 </div>
                                             @endif
                                         </div>
@@ -1004,5 +1031,120 @@ function unarchiveAccount() {
         else { alert(d.error || 'Erro'); }
     }).catch(() => alert('Erro de conexão'));
 }
+
+document.querySelector('select[name="type"]').addEventListener('change', function() {
+    if (this.value === 'visit') { openVisitModal(); this.value = 'call'; }
+});
+function openVisitModal() { document.getElementById('modal-visit').classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
+function closeVisitModal() { document.getElementById('modal-visit').classList.add('hidden'); document.body.style.overflow = ''; }
+function selectReceptivity(el) {
+    document.querySelectorAll('#visit-receptivity-pills button').forEach(function(b) {
+        b.className = 'px-3 py-1.5 rounded-full text-xs font-semibold border-2 border-gray-200 bg-white text-gray-500';
+    });
+    var val = el.getAttribute('data-val');
+    document.getElementById('visit_receptivity').value = val;
+    var styles = { positiva: 'border-green-500 bg-green-50 text-green-800', neutra: 'border-yellow-500 bg-yellow-50 text-yellow-800', negativa: 'border-red-500 bg-red-50 text-red-800' };
+    el.className = 'px-3 py-1.5 rounded-full text-xs font-semibold border-2 ' + styles[val];
+}
+function saveVisit(generatePdf) {
+    var arrival = document.getElementById('visit_arrival').value;
+    var departure = document.getElementById('visit_departure').value;
+    var transport = document.getElementById('visit_transport').value;
+    var objective = document.getElementById('visit_objective').value;
+    var body = document.getElementById('visit_body').value.trim();
+    var visitDate = document.getElementById('visit_date').value;
+    if (!arrival || !departure || !transport || !objective || !body) { alert('Preencha os campos obrigatorios: Hora de Chegada, Hora de Saida, Meio de Deslocamento, Objetivo e Relato.'); return; }
+    var btn = generatePdf ? document.getElementById('btn-visit-pdf') : document.getElementById('btn-visit-save');
+    btn.disabled = true; var origText = btn.innerHTML; btn.innerHTML = 'Salvando...';
+    var purposeMap = { prospeccao: 'comercial', cobranca: 'cobranca', relacionamento: 'relacionamento', assinatura: 'assinatura', reuniao_estrategica: 'estrategica' };
+    var payload = {
+        type: 'visit', purpose: purposeMap[objective] || 'acompanhamento',
+        title: 'Visita Presencial - ' + visitDate, body: body,
+        decisions: document.getElementById('visit_decisions').value.trim() || null,
+        pending_items: document.getElementById('visit_pending').value.trim() || null,
+        due_at: document.getElementById('visit_next_contact').value || null,
+        visit_arrival_time: arrival, visit_departure_time: departure,
+        visit_transport: transport,
+        visit_location: document.getElementById('visit_location').value.trim() || null,
+        visit_attendees: document.getElementById('visit_attendees').value.trim() || null,
+        visit_objective: objective,
+        visit_receptivity: document.getElementById('visit_receptivity').value || null,
+        visit_next_contact: document.getElementById('visit_next_contact').value || null,
+    };
+    fetch('{{ route("crm.accounts.store-activity", $account->id) }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+        body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.ok) {
+            btn.innerHTML = 'Registrado!';
+            if (generatePdf) { window.open('{{ url("crm/accounts") }}/{{ $account->id }}/activities/' + d.id + '/pdf', '_blank'); }
+            setTimeout(function() { window.location.href = window.location.pathname + '#atividades'; location.reload(); }, 800);
+        } else { btn.innerHTML = origText; btn.disabled = false; alert(d.message || 'Erro ao salvar'); }
+    }).catch(function() { btn.innerHTML = origText; btn.disabled = false; alert('Erro de conexao'); });
+}
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && !document.getElementById('modal-visit').classList.contains('hidden')) closeVisitModal(); });
+document.getElementById('modal-visit').addEventListener('click', function(e) { if (e.target === this) closeVisitModal(); });
 </script>
+
+<!-- ======= MODAL VISITA PRESENCIAL ======= -->
+<div id="modal-visit" class="hidden fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(27,51,74,0.55);backdrop-filter:blur(4px)">
+    <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl" style="animation:slideUp .3s ease">
+        <div class="px-6 py-4 rounded-t-2xl flex items-center justify-between" style="background:linear-gradient(135deg,#1B334A,#385776)">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg flex items-center justify-center" style="background:rgba(255,255,255,.15)">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                </div>
+                <div>
+                    <h2 class="text-white font-bold text-lg">Relat&oacute;rio de Visita Presencial</h2>
+                    <p class="text-white/60 text-xs">{{ $account->name }}</p>
+                </div>
+            </div>
+            <button onclick="closeVisitModal()" class="text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/10">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div class="px-6 py-5 overflow-y-auto flex-1 space-y-5">
+            <div>
+                <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#385776] border-b-2 border-gray-100 pb-1 mb-3">⏰ Identificação da Visita</div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="text-xs font-semibold text-gray-500 block mb-1">Data da Visita <span class="text-red-500">*</span></label><input type="date" id="visit_date" class="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50" value="{{ date('Y-m-d') }}"></div>
+                    <div><label class="text-xs font-semibold text-gray-500 block mb-1">Respons&aacute;vel</label><select id="visit_responsible" class="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50">@foreach(\App\Models\User::whereNotNull('datajuri_proprietario_id')->orderBy('name')->get() as $u)<option value="{{ $u->id }}" {{ $u->id == auth()->id() ? 'selected' : '' }}>{{ $u->name }}</option>@endforeach</select></div>
+                    <div><label class="text-xs font-semibold text-gray-500 block mb-1">Hora de Chegada <span class="text-red-500">*</span></label><input type="time" id="visit_arrival" class="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50"></div>
+                    <div><label class="text-xs font-semibold text-gray-500 block mb-1">Hora de Sa&iacute;da <span class="text-red-500">*</span></label><input type="time" id="visit_departure" class="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50"></div>
+                    <div><label class="text-xs font-semibold text-gray-500 block mb-1">Meio de Deslocamento <span class="text-red-500">*</span></label><select id="visit_transport" class="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50"><option value="">Selecione...</option><option value="carro_proprio">🚗 Carro próprio</option><option value="aplicativo">📱 Aplicativo (Uber/99)</option><option value="taxi">🚕 Táxi</option><option value="transporte_publico">🚌 Transporte público</option><option value="a_pe">🚶 A pé</option><option value="moto">🏍 Moto</option><option value="outro">Outro</option></select></div>
+                    <div><label class="text-xs font-semibold text-gray-500 block mb-1">Local da Visita</label><input type="text" id="visit_location" placeholder="Endereco ou sede do cliente" class="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50"></div>
+                </div>
+            </div>
+            <div>
+                <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#385776] border-b-2 border-gray-100 pb-1 mb-3">Participantes</div>
+                <div><label class="text-xs font-semibold text-gray-500 block mb-1">Pessoas presentes (lado do cliente)</label><input type="text" id="visit_attendees" placeholder="Nome e cargo" class="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50"></div>
+            </div>
+            <div>
+                <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#385776] border-b-2 border-gray-100 pb-1 mb-3">✍️ Conteúdo da Visita</div>
+                <div class="space-y-3">
+                    <div><label class="text-xs font-semibold text-gray-500 block mb-1">Objetivo <span class="text-red-500">*</span></label><select id="visit_objective" class="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50"><option value="">Selecione...</option><option value="acompanhamento">📋 Acompanhamento processual</option><option value="relacionamento">🤝 Relacionamento</option><option value="prospeccao">💼 Prospecção comercial</option><option value="cobranca">💰 Cobrança</option><option value="entrega_docs">📦 Entrega de documentos</option><option value="assinatura">✍️ Assinatura de contrato</option><option value="reuniao_estrategica">📊 Reunião estratégica</option><option value="outro">Outro</option></select></div>
+                    <div><label class="text-xs font-semibold text-gray-500 block mb-1">Relato da Visita <span class="text-red-500">*</span></label><textarea id="visit_body" rows="4" placeholder="Descreva detalhadamente..." class="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50"></textarea></div>
+                    <div><label class="text-xs font-semibold text-gray-500 block mb-1">Decisoes / Encaminhamentos</label><textarea id="visit_decisions" rows="2" placeholder="Decisoes e proximos passos..." class="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50"></textarea></div>
+                    <div><label class="text-xs font-semibold text-gray-500 block mb-1">Pendencias Geradas</label><textarea id="visit_pending" rows="2" placeholder="Pendencias abertas..." class="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50"></textarea></div>
+                </div>
+            </div>
+            <div>
+                <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#385776] border-b-2 border-gray-100 pb-1 mb-3">📅 Follow-up & Percepção</div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="text-xs font-semibold text-gray-500 block mb-1">Proximo Contato</label><input type="date" id="visit_next_contact" class="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50"></div>
+                    <div><label class="text-xs font-semibold text-gray-500 block mb-1">Receptividade</label><div class="flex gap-2 mt-1" id="visit-receptivity-pills"><button type="button" data-val="positiva" onclick="selectReceptivity(this)" class="px-3 py-1.5 rounded-full text-xs font-semibold border-2 border-gray-200 bg-white text-gray-500">😊 Positiva</button><button type="button" data-val="neutra" onclick="selectReceptivity(this)" class="px-3 py-1.5 rounded-full text-xs font-semibold border-2 border-gray-200 bg-white text-gray-500">😐 Neutra</button><button type="button" data-val="negativa" onclick="selectReceptivity(this)" class="px-3 py-1.5 rounded-full text-xs font-semibold border-2 border-gray-200 bg-white text-gray-500">😞 Negativa</button></div><input type="hidden" id="visit_receptivity" value=""></div>
+                </div>
+            </div>
+        </div>
+        <div class="px-6 py-3 border-t bg-gray-50 rounded-b-2xl flex justify-between items-center">
+            <button onclick="closeVisitModal()" class="px-4 py-2 text-sm text-gray-500 border rounded-lg hover:bg-gray-100 font-medium">Cancelar</button>
+            <div class="flex gap-2">
+                <button onclick="saveVisit(true)" id="btn-visit-pdf" class="px-4 py-2 text-sm text-[#385776] border border-[#385776] rounded-lg hover:bg-blue-50 font-medium">Salvar + PDF</button>
+                <button onclick="saveVisit(false)" id="btn-visit-save" class="px-4 py-2 text-sm text-white rounded-lg font-medium" style="background:linear-gradient(135deg,#1B334A,#385776)">Registrar Visita</button>
+            </div>
+        </div>
+    </div>
+</div>
+<style>@keyframes slideUp{from{opacity:0;transform:translateY(20px)scale(.97)}to{opacity:1;transform:translateY(0)scale(1)}}</style>
 @endpush

@@ -14,11 +14,15 @@ class CrmActivity extends Model
         'opportunity_id', 'account_id', 'type', 'purpose', 'title', 'body',
         'decisions', 'pending_items',
         'due_at', 'done_at', 'resolution_status', 'resolution_notes', 'completed_by_user_id', 'created_by_user_id',
+        'visit_arrival_time', 'visit_departure_time', 'visit_transport',
+        'visit_location', 'visit_attendees', 'visit_objective',
+        'visit_receptivity', 'visit_next_contact',
     ];
 
     protected $casts = [
-        'due_at'  => 'datetime',
-        'done_at' => 'datetime',
+        'due_at'              => 'datetime',
+        'done_at'             => 'datetime',
+        'visit_next_contact'  => 'date',
     ];
 
     public function opportunity(): BelongsTo
