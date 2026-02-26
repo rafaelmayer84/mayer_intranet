@@ -83,6 +83,11 @@ class NexoConversationSyncService
                 if (empty($conversation->phone) && !empty($phone)) $updateData['phone'] = $phone;
                 $conversation->update($updateData);
                 $conversation->refresh();
+
+                // Auto-link se conversa reabriu sem vínculo
+                if (!$conversation->linked_cliente_id && !$conversation->linked_lead_id) {
+                    $this->autoLink($conversation);
+                }
             }
 
             // Verificar duplicata
@@ -340,27 +345,48 @@ class NexoConversationSyncService
     public function autoLink(WaConversation $conversation): void
     {
         if (empty($conversation->phone)) return;
-        $phone = $conversation->phone;
+        $phone = $conversation->phone; // formato: 55XXXXXXXXXXX (só dígitos)
 
-        if (!$conversation->linked_lead_id) {
-            $leads = Lead::where('telefone', $phone)->get();
-            if ($leads->count() === 1) {
-                $conversation->update(['linked_lead_id' => $leads->first()->id]);
-            } elseif ($leads->count() > 1) {
-                WaEvent::log('autolink_ambiguous', $conversation->id, [
-                    'entity' => 'lead', 'phone' => $phone, 'candidates' => $leads->pluck('id')->toArray(),
-                ]);
+        // ── CLIENTE: buscar por telefone_normalizado, depois celular normalizado ──
+        if (!$conversation->linked_cliente_id) {
+            $cliente = Cliente::where('telefone_normalizado', $phone)->first();
+
+            if (!$cliente) {
+                // Fallback: normalizar celular e comparar
+                $cliente = Cliente::whereNotNull('celular')
+                    ->where('celular', '!=', '')
+                    ->where('celular', 'NOT LIKE', '%(00)%')
+                    ->get()
+                    ->first(function ($c) use ($phone) {
+                        $norm = preg_replace('/\D/', '', $c->celular);
+                        if (!str_starts_with($norm, '55') && strlen($norm) >= 10 && strlen($norm) <= 11) {
+                            $norm = '55' . $norm;
+                        }
+                        return $norm === $phone;
+                    });
+            }
+
+            if ($cliente) {
+                $conversation->update(['linked_cliente_id' => $cliente->id]);
             }
         }
 
-        if (!$conversation->linked_cliente_id) {
-            $clientes = Cliente::where('telefone', $phone)->get();
-            if ($clientes->count() === 1) {
-                $conversation->update(['linked_cliente_id' => $clientes->first()->id]);
-            } elseif ($clientes->count() > 1) {
-                WaEvent::log('autolink_ambiguous', $conversation->id, [
-                    'entity' => 'cliente', 'phone' => $phone, 'candidates' => $clientes->pluck('id')->toArray(),
-                ]);
+        // ── LEAD: normalizar dígitos do telefone do lead antes de comparar ──
+        if (!$conversation->linked_lead_id && !$conversation->linked_cliente_id) {
+            // Só vincular lead se NÃO vinculou como cliente (cliente tem prioridade)
+            $lead = Lead::whereNotNull('telefone')
+                ->where('telefone', '!=', '')
+                ->get()
+                ->first(function ($l) use ($phone) {
+                    $norm = preg_replace('/\D/', '', $l->telefone);
+                    if (!str_starts_with($norm, '55') && strlen($norm) >= 10 && strlen($norm) <= 11) {
+                        $norm = '55' . $norm;
+                    }
+                    return $norm === $phone;
+                });
+
+            if ($lead) {
+                $conversation->update(['linked_lead_id' => $lead->id]);
             }
         }
     }
