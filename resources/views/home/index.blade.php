@@ -355,7 +355,7 @@ function buscaGlobal() {
             if (this.query.length < 2) { this.resultados = []; this.aberto = false; return; }
             this.loading = true;
             try {
-                const r = await fetch('/home/buscar?q=' + encodeURIComponent(this.query));
+                const r = await fetch('{{ url("/home/buscar") }}?q=' + encodeURIComponent(this.query));
                 this.resultados = await r.json();
                 this.aberto = true;
             } catch(e) { this.resultados = []; } finally { this.loading = false; }

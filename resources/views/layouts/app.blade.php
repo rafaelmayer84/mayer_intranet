@@ -218,7 +218,7 @@
 
             <!-- Logo/Nome do Sistema -->
             <div class="sidebar-logo p-5 border-b border-white/10 flex items-center justify-center">
-                <img src="/img/logo-icon-white.svg" alt="Mayer Albanez" class="h-10 w-auto menu-text" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
+                <img src="{{ asset('img/logo-icon-white.svg') }}" alt="Mayer Albanez" class="h-10 w-auto menu-text" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
             </div>
 
             <!-- Toggle Sidebar (topo) -->
@@ -551,7 +551,45 @@
         <main id="main-content" class="flex-1 overflow-auto w-full">
             <!-- Notification Bar Desktop -->
             @auth
-            <div id="notification-bar" class="hidden md:flex items-center justify-end px-6 py-2 bg-white border-b border-gray-200">
+            <div id="notification-bar" class="hidden md:flex items-center justify-between px-6 py-2 bg-white border-b border-gray-200">
+                <!-- Busca Global -->
+                <div x-data="buscaGlobalHeader()" class="relative flex-1 max-w-xl">
+                    <div class="relative group">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                            <svg class="w-4 h-4 text-gray-300 group-focus-within:text-gray-500 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        </span>
+                        <input type="text" x-model="query" x-on:input.debounce.300ms="buscar()"
+                            x-on:focus="aberto = query.length >= 2" x-on:click.away="aberto = false" x-on:keydown.escape="aberto = false"
+                            placeholder="Buscar cliente, lead, processo, CRM..."
+                            class="w-full pl-9 pr-8 py-2 rounded-xl border border-gray-200 bg-gray-50 text-sm focus:outline-none focus:border-blue-300 focus:bg-white focus:shadow-md transition-all duration-200"
+                            autocomplete="off">
+                        <span x-show="loading" class="absolute inset-y-0 right-0 flex items-center pr-3">
+                            <svg class="animate-spin h-4 w-4 text-blue-400" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                        </span>
+                    </div>
+                    <div x-show="aberto && resultados.length > 0" x-transition.opacity.duration.150ms
+                        class="absolute z-50 w-full mt-1 bg-white rounded-xl shadow-2xl border border-gray-100 max-h-80 overflow-y-auto">
+                        <template x-for="item in resultados" :key="item.tipo + item.titulo + (item.subtitulo||'')">
+                            <a :href="item.url" class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition border-b border-gray-50 last:border-0">
+                                <span class="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold" style="background: linear-gradient(135deg, #385776, #1B334A);" x-text="item.tipo ? item.tipo.charAt(0).toUpperCase() : '?'"></span>
+                                <div class="flex-1 min-w-0">
+                                    <p class="text-sm font-medium text-gray-800 truncate" x-text="item.titulo"></p>
+                                    <p class="text-xs text-gray-500 truncate" x-text="item.subtitulo || ''"></p>
+                                </div>
+                                <span class="text-[10px] px-2 py-0.5 rounded-full font-medium"
+                                    :class="{'bg-blue-100 text-blue-700': item.tipo==='cliente', 'bg-green-100 text-green-700': item.tipo==='lead', 'bg-purple-100 text-purple-700': item.tipo==='crm', 'bg-amber-100 text-amber-700': item.tipo==='processo', 'bg-gray-100 text-gray-600': !['cliente','lead','crm','processo'].includes(item.tipo)}"
+                                    x-text="item.tipo"></span>
+                            </a>
+                        </template>
+                    </div>
+                    <div x-show="aberto && resultados.length === 0 && query.length >= 2 && !loading" x-transition
+                        class="absolute z-50 w-full mt-1 bg-white rounded-xl shadow-xl border border-gray-100 p-6 text-center">
+                        <svg class="w-8 h-8 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <p class="text-sm text-gray-400">Nenhum resultado encontrado</p>
+                    </div>
+                </div>
+                <!-- Notificações + Perfil -->
+                <div class="flex items-center gap-2 ml-4">
                 <div class="relative" id="notif-wrapper">
                     <button id="notif-bell" onclick="toggleNotifDropdown()" class="relative p-2 text-gray-500 hover:text-blue-600 transition-colors rounded-lg hover:bg-gray-100">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -595,6 +633,7 @@
                         </form>
                     </div>
                 </div>
+            </div>
             </div>
             @endauth
             <!-- Header Mobile -->
@@ -784,6 +823,20 @@ document.addEventListener("DOMContentLoaded", fetchNotifications);
     </div>
 </div>
 <script>
+function buscaGlobalHeader() {
+    return {
+        query: '', resultados: [], aberto: false, loading: false,
+        async buscar() {
+            if (this.query.length < 2) { this.resultados = []; this.aberto = false; return; }
+            this.loading = true;
+            try {
+                const r = await fetch('{{ url("/home/buscar") }}?q=' + encodeURIComponent(this.query));
+                this.resultados = await r.json();
+                this.aberto = true;
+            } catch(e) { this.resultados = []; } finally { this.loading = false; }
+        }
+    };
+}
 function abrirSipexModal(leadId) {
     const modal = document.getElementById('sipex-modal');
     const loading = document.getElementById('sipex-modal-loading');
@@ -870,6 +923,20 @@ document.getElementById('sipex-modal').addEventListener('click', function(e) { i
     </div>
 </div>
 <script>
+function buscaGlobalHeader() {
+    return {
+        query: '', resultados: [], aberto: false, loading: false,
+        async buscar() {
+            if (this.query.length < 2) { this.resultados = []; this.aberto = false; return; }
+            this.loading = true;
+            try {
+                const r = await fetch('{{ url("/home/buscar") }}?q=' + encodeURIComponent(this.query));
+                this.resultados = await r.json();
+                this.aberto = true;
+            } catch(e) { this.resultados = []; } finally { this.loading = false; }
+        }
+    };
+}
 function abrirSipexModal(leadId) {
     const modal = document.getElementById('sipex-modal');
     const loading = document.getElementById('sipex-modal-loading');
