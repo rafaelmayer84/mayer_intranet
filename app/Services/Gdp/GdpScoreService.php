@@ -70,6 +70,7 @@ class GdpScoreService
         $this->gerarRanking($ciclo->id, $mes, $ano);
 
         Log::info("[GDP-Score] Apuracao {$mes}/{$ano}: " . json_encode($stats));
+        SystemEvent::gdp('score.recalculado', 'info', "Scores GDP apurados {$mes}/{$ano}", null, ['mes' => $mes, 'ano' => $ano, 'usuarios' => $stats['usuarios'], 'resultados' => $stats['resultados'], 'erros' => $stats['erros']]);
         return $stats;
     }
 
