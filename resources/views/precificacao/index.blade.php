@@ -207,7 +207,7 @@ let proposalId = null;
     const params = new URLSearchParams(window.location.search);
     const leadId = params.get('lead_id');
     if (!leadId) return;
-    fetch('/precificacao/lead/' + leadId, { headers: { 'Accept': 'application/json' } })
+    fetch('{{ url("/precificacao/lead") }}/' + leadId, { headers: { 'Accept': 'application/json' } })
     .then(r => r.json())
     .then(dados => {
         if (!dados || !dados.proponente) return;
@@ -237,7 +237,7 @@ document.getElementById('busca-proponente').addEventListener('input', function()
         return;
     }
     debounceTimer = setTimeout(() => {
-        fetch(`/precificacao/buscar?q=${encodeURIComponent(val)}`, {
+        fetch(`{{ url('/precificacao/buscar') }}?q=${encodeURIComponent(val)}`, {
             headers: { 'Accept': 'application/json' }
         })
         .then(r => r.json())
@@ -277,8 +277,8 @@ function selecionarProponente(item) {
 
     // Carregar dados completos
     const url = item.tipo === 'lead'
-        ? `/precificacao/lead/${item.id}`
-        : `/precificacao/cliente/${item.id}`;
+        ? `{{ url('/precificacao/lead') }}/${item.id}`
+        : `{{ url('/precificacao/cliente') }}/${item.id}`;
 
     fetch(url, { headers: { 'Accept': 'application/json' } })
     .then(r => r.json())

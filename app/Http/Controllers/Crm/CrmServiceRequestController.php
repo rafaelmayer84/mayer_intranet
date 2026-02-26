@@ -44,6 +44,15 @@ class CrmServiceRequestController extends Controller
             'assigned_at'          => $request->assigned_to_user_id ? now() : null,
         ]);
 
+        // Auto-aprovacao: se criador e admin/socio, aprova automaticamente
+        if ($requiresApproval && in_array(auth()->user()->role, ['admin', 'socio'])) {
+            $sr->update([
+                'status'               => 'aprovado',
+                'approved_by_user_id'  => auth()->id(),
+                'approved_at'          => now(),
+            ]);
+        }
+
         // Evento CRM
         CrmEvent::create([
             'account_id'         => $accountId,
@@ -253,12 +262,13 @@ class CrmServiceRequestController extends Controller
     {
         try {
             if (class_exists(SystemEvent::class)) {
-                SystemEvent::crm('service_request', 'info', $message, [
+                SystemEvent::crm('service_request', 'info', $message, null, [
                     'sr_id'      => $sr->id,
                     'account_id' => $sr->account_id,
                     'category'   => $sr->category,
                     'status'     => $sr->status,
-                ], $sr->assigned_to_user_id);
+                    'notify_user_id' => $sr->assigned_to_user_id,
+                ]);
             }
         } catch (\Exception $e) {
             Log::warning('[CRM] Falha ao criar notificação bell: ' . $e->getMessage());

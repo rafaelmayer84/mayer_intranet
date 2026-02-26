@@ -140,7 +140,7 @@
                                 <button onclick="promoverLead({{ $row->id }})" class="text-[10px] px-2 py-1 bg-[#385776] text-white rounded hover:bg-[#1B334A]" title="Promover ao CRM">CRM</button>
                             @endif
                             @if($row->origem === 'marketing')
-                                <button onclick="window.open('/precificacao?lead_id={{ $row->id }}','_blank','width=1200,height=800,scrollbars=yes')" class="text-[10px] px-2 py-1 bg-amber-600 text-white rounded hover:bg-amber-700" title="Cotar SIPEX">SIPEX</button>
+                                <button onclick="abrirSipexModal({{ $row->id }})" class="text-[10px] px-2 py-1 bg-amber-600 text-white rounded hover:bg-amber-700" title="Cotar SIPEX">SIPEX</button>
                             @endif
                             @if($row->origem === 'crm')
                                 <a href="{{ route('crm.accounts.show', $row->id) }}" class="text-[10px] px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200">360</a>

@@ -44,6 +44,22 @@ Schedule::command('sync:contas-receber-rapido')
     ->timezone('America/Sao_Paulo')
     ->appendOutputTo(storage_path('logs/cron-contas-receber.log'));
 
+// CRM Sync Carteira → 3x/dia após sync DataJuri (02:06, 10:06, 18:06)
+Schedule::command('crm:sync-carteira')
+    ->dailyAt('02:06')
+    ->timezone('America/Sao_Paulo')
+    ->appendOutputTo(storage_path('logs/cron-crm-sync-carteira.log'));
+
+Schedule::command('crm:sync-carteira')
+    ->dailyAt('10:06')
+    ->timezone('America/Sao_Paulo')
+    ->appendOutputTo(storage_path('logs/cron-crm-sync-carteira.log'));
+
+Schedule::command('crm:sync-carteira')
+    ->dailyAt('18:06')
+    ->timezone('America/Sao_Paulo')
+    ->appendOutputTo(storage_path('logs/cron-crm-sync-carteira.log'));
+
 // CRM Carteira → 3x/dia após sync (02:08, 10:08, 18:08)
 Schedule::command('crm:recalcular-carteira')
     ->dailyAt('02:08')

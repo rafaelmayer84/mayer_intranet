@@ -734,5 +734,177 @@ setInterval(fetchNotifications, 30000);
 document.addEventListener("DOMContentLoaded", fetchNotifications);
 </script>
 
+
+<!-- Modal SIPEX - Cotar Honorários -->
+<div id="sipex-modal" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/50 backdrop-blur-sm" style="display:none;">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden" style="border-top: 4px solid #385776;">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold" style="background:#385776;">$</div>
+                <div>
+                    <h3 class="text-lg font-bold" style="color:#1B334A;">Cotar no SIPEX</h3>
+                    <p class="text-xs text-gray-500">Sistema Inteligente de Precificação</p>
+                </div>
+            </div>
+            <button onclick="fecharSipexModal()" class="text-gray-400 hover:text-gray-600 transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <!-- Body -->
+        <div id="sipex-modal-body" class="px-6 py-5">
+            <div id="sipex-modal-loading" class="text-center py-8">
+                <div class="inline-block w-8 h-8 border-4 border-gray-200 rounded-full animate-spin" style="border-top-color:#385776;"></div>
+                <p class="mt-3 text-sm text-gray-500">Carregando dados...</p>
+            </div>
+            <div id="sipex-modal-content" class="hidden space-y-4">
+                <div class="bg-gray-50 rounded-xl p-4 space-y-2">
+                    <div class="flex justify-between"><span class="text-xs text-gray-500 uppercase tracking-wide">Nome</span><span id="sipex-m-nome" class="text-sm font-semibold text-gray-800">-</span></div>
+                    <div class="flex justify-between"><span class="text-xs text-gray-500 uppercase tracking-wide">Contato</span><span id="sipex-m-contato" class="text-sm text-gray-700">-</span></div>
+                    <div class="flex justify-between"><span class="text-xs text-gray-500 uppercase tracking-wide">Área</span><span id="sipex-m-area" class="text-sm text-gray-700">-</span></div>
+                    <div class="flex justify-between"><span class="text-xs text-gray-500 uppercase tracking-wide">Potencial</span><span id="sipex-m-potencial" class="text-sm text-gray-700">-</span></div>
+                    <div class="flex justify-between"><span class="text-xs text-gray-500 uppercase tracking-wide">Urgência</span><span id="sipex-m-urgencia" class="text-sm text-gray-700">-</span></div>
+                </div>
+                <div id="sipex-m-resumo-box" class="hidden bg-blue-50 rounded-xl p-4">
+                    <p class="text-xs text-blue-600 uppercase tracking-wide mb-1">Resumo da demanda</p>
+                    <p id="sipex-m-resumo" class="text-sm text-gray-700">-</p>
+                </div>
+            </div>
+            <div id="sipex-modal-error" class="hidden text-center py-8">
+                <p class="text-red-500 text-sm">Erro ao carregar dados do lead.</p>
+            </div>
+        </div>
+        <!-- Footer -->
+        <div class="px-6 py-4 border-t border-gray-100 flex gap-3 justify-end">
+            <button onclick="fecharSipexModal()" class="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition font-medium">Cancelar</button>
+            <a id="sipex-modal-link" href="#" target="_blank" class="px-5 py-2 text-sm text-white rounded-lg hover:opacity-90 transition font-medium inline-flex items-center gap-2" style="background:#385776;">
+                💰 Abrir SIPEX <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+            </a>
+        </div>
+    </div>
+</div>
+<script>
+function abrirSipexModal(leadId) {
+    const modal = document.getElementById('sipex-modal');
+    const loading = document.getElementById('sipex-modal-loading');
+    const content = document.getElementById('sipex-modal-content');
+    const errorEl = document.getElementById('sipex-modal-error');
+    modal.style.display = 'flex';
+    loading.classList.remove('hidden');
+    content.classList.add('hidden');
+    errorEl.classList.add('hidden');
+    document.getElementById('sipex-modal-link').href = '{{ url("/precificacao") }}?lead_id=' + leadId;
+    fetch('{{ url("/precificacao/lead") }}/' + leadId, { headers: { 'Accept': 'application/json' } })
+    .then(r => r.json())
+    .then(dados => {
+        loading.classList.add('hidden');
+        if (!dados || dados.erro) { errorEl.classList.remove('hidden'); return; }
+        const p = dados.proponente || {};
+        const d = dados.demanda || {};
+        document.getElementById('sipex-m-nome').textContent = p.nome || 'Lead #' + leadId;
+        document.getElementById('sipex-m-contato').textContent = [p.telefone, p.email].filter(Boolean).join(' | ') || 'N/A';
+        document.getElementById('sipex-m-area').textContent = d.area_interesse || 'Não identificada';
+        document.getElementById('sipex-m-potencial').textContent = d.potencial_honorarios || 'N/A';
+        document.getElementById('sipex-m-urgencia').textContent = d.urgencia || 'N/A';
+        if (d.resumo_demanda) {
+            document.getElementById('sipex-m-resumo').textContent = d.resumo_demanda;
+            document.getElementById('sipex-m-resumo-box').classList.remove('hidden');
+        } else {
+            document.getElementById('sipex-m-resumo-box').classList.add('hidden');
+        }
+        content.classList.remove('hidden');
+    })
+    .catch(() => { loading.classList.add('hidden'); errorEl.classList.remove('hidden'); });
+}
+function fecharSipexModal() { document.getElementById('sipex-modal').style.display = 'none'; }
+document.getElementById('sipex-modal').addEventListener('click', function(e) { if (e.target === this) fecharSipexModal(); });
+</script>
+
+
+<!-- Modal SIPEX - Cotar Honorários -->
+<div id="sipex-modal" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/50 backdrop-blur-sm" style="display:none;">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden" style="border-top: 4px solid #385776;">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold" style="background:#385776;">$</div>
+                <div>
+                    <h3 class="text-lg font-bold" style="color:#1B334A;">Cotar no SIPEX</h3>
+                    <p class="text-xs text-gray-500">Sistema Inteligente de Precificação</p>
+                </div>
+            </div>
+            <button onclick="fecharSipexModal()" class="text-gray-400 hover:text-gray-600 transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <!-- Body -->
+        <div id="sipex-modal-body" class="px-6 py-5">
+            <div id="sipex-modal-loading" class="text-center py-8">
+                <div class="inline-block w-8 h-8 border-4 border-gray-200 rounded-full animate-spin" style="border-top-color:#385776;"></div>
+                <p class="mt-3 text-sm text-gray-500">Carregando dados...</p>
+            </div>
+            <div id="sipex-modal-content" class="hidden space-y-4">
+                <div class="bg-gray-50 rounded-xl p-4 space-y-2">
+                    <div class="flex justify-between"><span class="text-xs text-gray-500 uppercase tracking-wide">Nome</span><span id="sipex-m-nome" class="text-sm font-semibold text-gray-800">-</span></div>
+                    <div class="flex justify-between"><span class="text-xs text-gray-500 uppercase tracking-wide">Contato</span><span id="sipex-m-contato" class="text-sm text-gray-700">-</span></div>
+                    <div class="flex justify-between"><span class="text-xs text-gray-500 uppercase tracking-wide">Área</span><span id="sipex-m-area" class="text-sm text-gray-700">-</span></div>
+                    <div class="flex justify-between"><span class="text-xs text-gray-500 uppercase tracking-wide">Potencial</span><span id="sipex-m-potencial" class="text-sm text-gray-700">-</span></div>
+                    <div class="flex justify-between"><span class="text-xs text-gray-500 uppercase tracking-wide">Urgência</span><span id="sipex-m-urgencia" class="text-sm text-gray-700">-</span></div>
+                </div>
+                <div id="sipex-m-resumo-box" class="hidden bg-blue-50 rounded-xl p-4">
+                    <p class="text-xs text-blue-600 uppercase tracking-wide mb-1">Resumo da demanda</p>
+                    <p id="sipex-m-resumo" class="text-sm text-gray-700">-</p>
+                </div>
+            </div>
+            <div id="sipex-modal-error" class="hidden text-center py-8">
+                <p class="text-red-500 text-sm">Erro ao carregar dados do lead.</p>
+            </div>
+        </div>
+        <!-- Footer -->
+        <div class="px-6 py-4 border-t border-gray-100 flex gap-3 justify-end">
+            <button onclick="fecharSipexModal()" class="px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition font-medium">Cancelar</button>
+            <a id="sipex-modal-link" href="#" target="_blank" class="px-5 py-2 text-sm text-white rounded-lg hover:opacity-90 transition font-medium inline-flex items-center gap-2" style="background:#385776;">
+                💰 Abrir SIPEX <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+            </a>
+        </div>
+    </div>
+</div>
+<script>
+function abrirSipexModal(leadId) {
+    const modal = document.getElementById('sipex-modal');
+    const loading = document.getElementById('sipex-modal-loading');
+    const content = document.getElementById('sipex-modal-content');
+    const errorEl = document.getElementById('sipex-modal-error');
+    modal.style.display = 'flex';
+    loading.classList.remove('hidden');
+    content.classList.add('hidden');
+    errorEl.classList.add('hidden');
+    document.getElementById('sipex-modal-link').href = '{{ url("/precificacao") }}?lead_id=' + leadId;
+    fetch('{{ url("/precificacao/lead") }}/' + leadId, { headers: { 'Accept': 'application/json' } })
+    .then(r => r.json())
+    .then(dados => {
+        loading.classList.add('hidden');
+        if (!dados || dados.erro) { errorEl.classList.remove('hidden'); return; }
+        const p = dados.proponente || {};
+        const d = dados.demanda || {};
+        document.getElementById('sipex-m-nome').textContent = p.nome || 'Lead #' + leadId;
+        document.getElementById('sipex-m-contato').textContent = [p.telefone, p.email].filter(Boolean).join(' | ') || 'N/A';
+        document.getElementById('sipex-m-area').textContent = d.area_interesse || 'Não identificada';
+        document.getElementById('sipex-m-potencial').textContent = d.potencial_honorarios || 'N/A';
+        document.getElementById('sipex-m-urgencia').textContent = d.urgencia || 'N/A';
+        if (d.resumo_demanda) {
+            document.getElementById('sipex-m-resumo').textContent = d.resumo_demanda;
+            document.getElementById('sipex-m-resumo-box').classList.remove('hidden');
+        } else {
+            document.getElementById('sipex-m-resumo-box').classList.add('hidden');
+        }
+        content.classList.remove('hidden');
+    })
+    .catch(() => { loading.classList.add('hidden'); errorEl.classList.remove('hidden'); });
+}
+function fecharSipexModal() { document.getElementById('sipex-modal').style.display = 'none'; }
+document.getElementById('sipex-modal').addEventListener('click', function(e) { if (e.target === this) fecharSipexModal(); });
+</script>
+
 </body>
 </html>

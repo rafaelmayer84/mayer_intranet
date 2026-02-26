@@ -437,7 +437,7 @@ const NexoApp = {
 
     // ═══ AÇÕES ═══
     abrirSipex(leadId){
-        window.open('/precificacao?lead_id=' + leadId, '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+        abrirSipexModal(leadId);
     },
 
     async promoverLeadCrm(leadId){

@@ -2,7 +2,7 @@
 @section('title', 'Solicitação #' . $sr->id)
 
 @section('content')
-<div class="max-w-4xl mx-auto px-4 py-6">
+<div class="max-w-7xl mx-auto px-4 py-6">
     {{-- Header --}}
     <div class="flex items-center gap-3 mb-6">
         <a href="{{ route('crm.accounts.show', $sr->account_id) }}#solicitacoes" class="text-sm text-[#385776] hover:underline">← Voltar ao cliente</a>
