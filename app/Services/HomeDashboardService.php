@@ -226,33 +226,20 @@ class HomeDashboardService
     public function getResumoFinanceiro(): array
     {
         try {
+            $calc = app(\App\Services\FinanceiroCalculatorService::class);
             $mesAtual = Carbon::now()->month;
             $anoAtual = Carbon::now()->year;
+            $dre = $calc->dre($anoAtual, $mesAtual);
 
-            $receita = DB::table('movimentos')
-                ->whereIn('classificacao', ['RECEITA_PF', 'RECEITA_PJ'])
-                ->where('valor', '>', 0)
-                ->whereMonth('data_movimento', $mesAtual)
-                ->whereYear('data_movimento', $anoAtual)
-                ->sum('valor');
+            $mesAnt = $mesAtual - 1 ?: 12;
+            $anoAnt = $mesAtual == 1 ? $anoAtual - 1 : $anoAtual;
+            $dreAnt = $calc->dre($anoAnt, $mesAnt);
 
-            $despesa = DB::table('movimentos')
-                ->where('classificacao', 'DESPESA')
-                ->where('valor', '<', 0)
-                ->whereMonth('data_movimento', $mesAtual)
-                ->whereYear('data_movimento', $anoAtual)
-                ->sum(DB::raw('ABS(valor)'));
-
-            $receitaMesAnt = DB::table('movimentos')
-                ->whereIn('classificacao', ['RECEITA_PF', 'RECEITA_PJ'])
-                ->where('valor', '>', 0)
-                ->whereMonth('data_movimento', $mesAtual - 1 ?: 12)
-                ->whereYear('data_movimento', $mesAtual == 1 ? $anoAtual - 1 : $anoAtual)
-                ->sum('valor');
-
-            $resultado = $receita - $despesa;
+            $receita = $dre['receita_total'];
+            $despesa = $dre['despesas'];
+            $resultado = $dre['resultado'];
             $margem = $receita > 0 ? round(($resultado / $receita) * 100, 1) : 0;
-            $varReceita = $receitaMesAnt > 0 ? round((($receita - $receitaMesAnt) / $receitaMesAnt) * 100, 1) : null;
+            $varReceita = $dreAnt['receita_total'] > 0 ? round((($receita - $dreAnt['receita_total']) / $dreAnt['receita_total']) * 100, 1) : null;
 
             return [
                 'receita'     => $receita,
