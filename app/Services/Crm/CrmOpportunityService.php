@@ -8,6 +8,7 @@ use App\Models\Crm\CrmOpportunity;
 use App\Models\Crm\CrmStage;
 use Illuminate\Support\Facades\DB;
 use App\Services\Crm\CrmProactiveService;
+use App\Models\SystemEvent;
 use Illuminate\Support\Facades\Log;
 
 class CrmOpportunityService
@@ -119,7 +120,9 @@ class CrmOpportunityService
     {
         $wonStage = CrmStage::where('is_won', true)->first();
         if (!$wonStage) throw new \RuntimeException('Stage "Ganho" não encontrado.');
-        return $this->moveToStage($opp, $wonStage->id, $userId);
+        $opp = $this->moveToStage($opp, $wonStage->id, $userId);
+        SystemEvent::crm('oportunidade.ganha', 'info', 'Oportunidade ganha: ' . $opp->name, null, ['oportunidade_id' => $opp->id, 'valor' => $opp->amount ?? null], 'CrmOpportunity', $opp->id);
+        return $opp;
     }
 
     /**
@@ -144,6 +147,7 @@ class CrmOpportunityService
             'created_by_user_id' => $userId,
         ]);
 
+        SystemEvent::crm('oportunidade.perdida', 'warning', 'Oportunidade perdida: ' . $opp->name, $reason, ['oportunidade_id' => $opp->id, 'valor' => $opp->amount ?? null, 'motivo' => $reason], 'CrmOpportunity', $opp->id);
         return $opp;
     }
 }

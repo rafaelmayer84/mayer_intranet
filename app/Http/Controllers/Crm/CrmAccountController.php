@@ -182,6 +182,38 @@ class CrmAccountController extends Controller
     }
 
     /**
+     * Concluir atividade com status e anotação (AJAX).
+     */
+    public function completeActivity(Request $request, int $id, int $activityId)
+    {
+        $request->validate([
+            'resolution_status' => 'required|in:procedente,improcedente,parcial,cancelada',
+            'resolution_notes'  => 'required|string|max:3000',
+        ]);
+
+        $activity = CrmActivity::where('id', $activityId)
+            ->where('account_id', $id)
+            ->whereNull('done_at')
+            ->firstOrFail();
+
+        $activity->update([
+            'done_at'              => now(),
+            'resolution_status'    => $request->resolution_status,
+            'resolution_notes'     => $request->resolution_notes,
+            'completed_by_user_id' => auth()->id(),
+        ]);
+
+        // Recalcular health score
+        try {
+            app(CrmHealthScoreService::class)->recalculate($id);
+        } catch (\Exception $e) {
+            Log::warning("[CRM] HealthScore falhou account #{$id}: {$e->getMessage()}");
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
      * Transferir responsável do account (admin/coordenador).
      */
     public function transferOwner(Request $request, int $id)

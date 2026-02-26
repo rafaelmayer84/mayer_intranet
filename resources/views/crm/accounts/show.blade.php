@@ -397,7 +397,30 @@
                                     <div class="text-right text-xs text-gray-400 flex-shrink-0 ml-4">
                                         <p>{{ $act->created_at->format('d/m/Y H:i') }}</p>
                                         @if($act->createdBy)<p class="font-medium">{{ $act->createdBy->name }}</p>@endif
-                                        @if($act->done_at)<span class="px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-700">Concluída</span>@endif
+                                        @if($act->done_at)
+                                            @php
+                                                $resCor = match($act->resolution_status ?? '') {
+                                                    'procedente' => 'bg-green-100 text-green-700',
+                                                    'improcedente' => 'bg-red-100 text-red-700',
+                                                    'parcial' => 'bg-yellow-100 text-yellow-700',
+                                                    'cancelada' => 'bg-gray-200 text-gray-600',
+                                                    default => 'bg-green-100 text-green-700',
+                                                };
+                                                $resLabel = match($act->resolution_status ?? '') {
+                                                    'procedente' => 'Procedente',
+                                                    'improcedente' => 'Improcedente',
+                                                    'parcial' => 'Parcial',
+                                                    'cancelada' => 'Cancelada',
+                                                    default => 'Concluída',
+                                                };
+                                            @endphp
+                                            <span class="px-1.5 py-0.5 rounded text-xs {{ $resCor }}">{{ $resLabel }}</span>
+                                            @if($act->resolution_notes)
+                                                <p class="text-xs text-gray-500 mt-1 italic">{{ Str::limit($act->resolution_notes, 80) }}</p>
+                                            @endif
+                                        @else
+                                            <button onclick="openCompleteModal({{ $act->id }})" class="px-2 py-1 rounded text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 mt-1">✓ Concluir</button>
+                                        @endif
                                         @if($act->due_at && !$act->done_at)
                                             <p class="mt-1 {{ $act->due_at->isPast() ? 'text-red-500 font-medium' : 'text-gray-500' }}">
                                                 📅 {{ $act->due_at->format('d/m/Y H:i') }}
@@ -615,6 +638,33 @@
     </div>
 </div>
 
+{{-- Modal Concluir Atividade --}}
+<div id="modal-complete" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+    <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+        <h3 class="text-lg font-semibold text-[#1B334A] mb-4">Concluir Atividade</h3>
+        <input type="hidden" id="complete-activity-id">
+        <div class="space-y-3">
+            <div>
+                <label class="text-xs text-gray-500 mb-1 block">Resultado</label>
+                <select id="complete-status" class="w-full border rounded-lg px-3 py-2 text-sm">
+                    <option value="procedente">✅ Procedente — realizado com sucesso</option>
+                    <option value="improcedente">❌ Improcedente — não se aplica / indevido</option>
+                    <option value="parcial">⚠️ Parcial — resolvido parcialmente</option>
+                    <option value="cancelada">🚫 Cancelada — não foi possível realizar</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs text-gray-500 mb-1 block">Anotações <span class="text-red-500">*</span></label>
+                <textarea id="complete-notes" rows="3" placeholder="Descreva o que foi feito, resultado obtido..." class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="submitComplete()" class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">Concluir</button>
+                <button onclick="document.getElementById('modal-complete').classList.add('hidden')" class="px-4 py-2 border rounded-lg text-sm">Cancelar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {{-- Modal Nova Oportunidade --}}
 <div id="modal-new-opp" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
     <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
@@ -696,6 +746,31 @@ function saveActivity() {
         btn.textContent = 'Erro — tente novamente'; btn.classList.remove('bg-green-600'); btn.classList.add('bg-red-500'); btn.disabled = false;
         setTimeout(() => { btn.textContent = 'Registrar'; btn.classList.remove('bg-red-500'); btn.classList.add('bg-green-600'); }, 2000);
     });
+}
+
+function openCompleteModal(activityId) {
+    document.getElementById('complete-activity-id').value = activityId;
+    document.getElementById('complete-status').value = 'procedente';
+    document.getElementById('complete-notes').value = '';
+    document.getElementById('modal-complete').classList.remove('hidden');
+}
+
+function submitComplete() {
+    const activityId = document.getElementById('complete-activity-id').value;
+    const status = document.getElementById('complete-status').value;
+    const notes = document.getElementById('complete-notes').value.trim();
+    if (!notes) { alert('Anotações são obrigatórias'); return; }
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = 'Salvando...';
+    fetch('{{ url("crm/accounts") }}/{{ $account->id }}/activities/' + activityId + '/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+        body: JSON.stringify({ resolution_status: status, resolution_notes: notes })
+    }).then(r => r.json()).then(d => {
+        if (d.ok) { location.reload(); }
+        else { alert(d.error || 'Erro ao concluir'); btn.disabled = false; btn.textContent = 'Concluir'; }
+    }).catch(() => { alert('Erro de conexão'); btn.disabled = false; btn.textContent = 'Concluir'; });
 }
 
 function transferOwner() {

@@ -14,7 +14,7 @@ Route::get("/login", [LoginController::class, "showLoginForm"])->name("login");
 Route::post("/login", [LoginController::class, "login"]);
 Route::post("/logout", [LoginController::class, "logout"])->name("logout");
 // Rotas protegidas
-Route::get("/", function () {    return redirect()->route("visao-gerencial");
+Route::get("/", function () {    return redirect("/home");
 })->name("home");
 
 Route::middleware(["auth"])->group(function () {
@@ -249,3 +249,4 @@ require __DIR__ . '/_sisrh_routes.php';
     require __DIR__ . '/_sisrh_documentos_routes.php';
 
 require __DIR__.'/_ocorrencias_routes.php';
+require __DIR__.'/_home_routes.php';

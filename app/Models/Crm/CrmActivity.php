@@ -13,7 +13,7 @@ class CrmActivity extends Model
     protected $fillable = [
         'opportunity_id', 'account_id', 'type', 'purpose', 'title', 'body',
         'decisions', 'pending_items',
-        'due_at', 'done_at', 'created_by_user_id',
+        'due_at', 'done_at', 'resolution_status', 'resolution_notes', 'completed_by_user_id', 'created_by_user_id',
     ];
 
     protected $casts = [

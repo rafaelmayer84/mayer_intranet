@@ -56,6 +56,7 @@ class NexoAtendimentoController extends Controller
         }
 
         $messages = WaMessage::where('conversation_id', $id)->orderBy('sent_at', 'asc')->get();
+        $messages = $this->filterQaMessages($messages);
         return response()->json(['conversation' => $conversation, 'messages' => $messages, 'bot_ativo' => (bool) $conversation->bot_ativo]);
     }
 
@@ -198,24 +199,24 @@ class NexoAtendimentoController extends Controller
 
         $throttleKey = "nexo_poll_throttle_{$uid}_{$cid}";
         if (Cache::has($throttleKey)) {
-            $msgs = WaMessage::where('conversation_id', $cid)->orderBy('sent_at', 'asc')->get();
+            $msgs = $this->filterQaMessages(WaMessage::where('conversation_id', $cid)->orderBy('sent_at', 'asc')->get());
             return response()->json(['throttled' => true, 'new_count' => 0, 'messages' => $msgs]);
         }
 
         $lock = Cache::lock("nexo_poll_{$cid}", 10);
         if (!$lock->get()) {
-            $msgs = WaMessage::where('conversation_id', $cid)->orderBy('sent_at', 'asc')->get();
+            $msgs = $this->filterQaMessages(WaMessage::where('conversation_id', $cid)->orderBy('sent_at', 'asc')->get());
             return response()->json(['throttled' => true, 'new_count' => 0, 'messages' => $msgs]);
         }
 
         try {
             app(NexoConversationSyncService::class)->syncConversation($conversation);
             Cache::put($throttleKey, true, 8);
-            $msgs = WaMessage::where('conversation_id', $cid)->orderBy('sent_at', 'asc')->get();
+            $msgs = $this->filterQaMessages(WaMessage::where('conversation_id', $cid)->orderBy('sent_at', 'asc')->get());
             return response()->json(['throttled' => false, 'new_count' => $msgs->count(), 'messages' => $msgs]);
         } catch (\Throwable $e) {
             Log::warning('Poll sync error', ['conversa_id' => $cid, 'error' => $e->getMessage()]);
-            $msgs = WaMessage::where('conversation_id', $cid)->orderBy('sent_at', 'asc')->get();
+            $msgs = $this->filterQaMessages(WaMessage::where('conversation_id', $cid)->orderBy('sent_at', 'asc')->get());
             return response()->json(['throttled' => false, 'new_count' => $msgs->count(), 'messages' => $msgs]);
         } finally {
             $lock->release();
@@ -802,4 +803,62 @@ class NexoAtendimentoController extends Controller
             return response()->json(['success' => false, 'error' => 'Erro interno: '.$e->getMessage()], 500);
         }
     }
+
+    /**
+     * Filtra mensagens de pesquisa QA para usuarios nao-admin.
+     * Admins/socios veem tudo; demais nao veem o fluxo QA.
+     */
+    private function filterQaMessages($messages)
+    {
+        $user = auth()->user();
+        $isPrivileged = (($user->role ?? '') === 'admin');
+
+        if ($isPrivileged) {
+            return $messages;
+        }
+
+        $qaChainId = '699afac558acd07d14042143';
+
+        // Identificar IDs de mensagens outbound do flow QA (pelo chain.id no raw_payload)
+        $qaOutboundIds = $messages->filter(function ($m) use ($qaChainId) {
+            if ($m->direction == 2 && $m->raw_payload) {
+                $payload = is_string($m->raw_payload) ? json_decode($m->raw_payload, true) : (array) $m->raw_payload;
+                return isset($payload['chain']['id']) && $payload['chain']['id'] === $qaChainId;
+            }
+            return false;
+        })->pluck('id')->toArray();
+
+        if (empty($qaOutboundIds)) {
+            return $messages;
+        }
+
+        // Pegar timestamps do primeiro e ultimo outbound QA para delimitar a janela
+        $qaMessages = $messages->whereIn('id', $qaOutboundIds);
+        $qaStart = $qaMessages->min('sent_at');
+        $qaEnd = $qaMessages->max('sent_at');
+
+        // Expandir janela: respostas inbound podem vir ate 10min depois
+        $qaEndExpanded = \Carbon\Carbon::parse($qaEnd)->addMinutes(10);
+
+        // Filtrar: remover outbound QA e inbound dentro da janela QA
+        return $messages->filter(function ($m) use ($qaOutboundIds, $qaStart, $qaEndExpanded) {
+            // Sempre remover outbound QA
+            if (in_array($m->id, $qaOutboundIds)) {
+                return false;
+            }
+            // Remover inbound na janela QA (respostas de botao, estrelas, texto de feedback)
+            if ($m->direction == 1 && $m->sent_at >= $qaStart && $m->sent_at <= $qaEndExpanded) {
+                // Verificar se eh resposta QA: button, interactive com estrela, ou texto curto na janela
+                if (in_array($m->message_type, ['button', 'interactive'])) {
+                    return false;
+                }
+                // Texto que parece feedback QA (logo apos perguntas)
+                if ($m->message_type === 'text' && $m->sent_at <= $qaEndExpanded) {
+                    return false;
+                }
+            }
+            return true;
+        })->values();
+    }
+
 }

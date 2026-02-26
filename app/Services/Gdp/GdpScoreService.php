@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Models\Eval180Response;
 use App\Models\Eval180Form;
+use App\Models\SystemEvent;
 
 class GdpScoreService
 {

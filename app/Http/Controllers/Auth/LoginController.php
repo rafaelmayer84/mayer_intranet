@@ -42,7 +42,7 @@ class LoginController extends Controller
             // Registrar ultimo acesso
             Auth::user()->update(['ultimo_acesso' => now()]);
 
-            return redirect()->intended('/avisos');
+            return redirect()->intended('/home');
         }
 
         RateLimiter::hit($throttleKey, 300); // bloqueio de 5 minutos apos 5 falhas

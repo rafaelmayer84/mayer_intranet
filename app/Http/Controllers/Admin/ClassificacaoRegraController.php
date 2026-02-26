@@ -7,6 +7,7 @@ use App\Models\ClassificacaoRegra;
 use App\Services\Sync\Customization\ClassificacaoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use App\Models\SystemEvent;
 
 class ClassificacaoRegraController extends Controller
 {

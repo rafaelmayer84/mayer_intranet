@@ -117,7 +117,7 @@ class CrmDashboardController extends Controller
         $scList = $semContato->orderBy('last_touch_at')->limit(5)->get(['id', 'name', 'last_touch_at']);
 
         foreach ($scList as $acc) {
-            $dias = $acc->last_touch_at ? (int) now()->diffInDays($acc->last_touch_at) : 999;
+            $dias = $acc->last_touch_at ? (int) \Carbon\Carbon::parse($acc->last_touch_at)->diffInDays(now()) : 999;
             $alertas[] = [
                 'tipo'  => 'sem_contato',
                 'icone' => '⚠️',
@@ -135,7 +135,7 @@ class CrmDashboardController extends Controller
         $odList = $overdue->orderBy('due_at')->limit(5)->get();
 
         foreach ($odList as $act) {
-            $dias = (int) now()->diffInDays($act->due_at);
+            $dias = (int) \Carbon\Carbon::parse($act->due_at)->diffInDays(now());
             $alertas[] = [
                 'tipo'  => 'followup_vencido',
                 'icone' => '🔴',

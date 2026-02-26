@@ -16,6 +16,7 @@ use Carbon\Carbon;
 use App\Models\Gdp\GdpPenalizacao;
 use App\Models\Gdp\GdpPenalizacaoTipo;
 use App\Services\Gdp\GdpPenalizacaoScanner;
+use App\Models\SystemEvent;
 
 class GdpController extends Controller
 {
@@ -375,6 +376,7 @@ class GdpController extends Controller
                 \Log::warning('GDP Acordo notificacao erro: ' . $notifErr->getMessage());
             }
 
+            SystemEvent::gdp('meta.alterada', 'info', 'Acordo de desempenho atualizado - ' . (User::find($userId)->name ?? 'ID:' . $userId), null, ['user_id' => $userId, 'metas_salvas' => $saved, 'ciclo' => $ciclo->nome]);
             return response()->json(['sucesso' => true, 'metas_salvas' => $saved]);
         } catch (\Throwable $e) {
             DB::rollBack();
@@ -604,6 +606,7 @@ class GdpController extends Controller
             'ano' => $request->input('ano', now()->year), 'pontos_desconto' => $tipo->pontos_desconto,
             'descricao_automatica' => $request->input('descricao'), 'automatica' => false,
         ]);
+        SystemEvent::gdp('penalidade.criada', 'warning', 'Penalidade manual: ' . ($tipo->nome ?? 'N/A') . ' - ' . (User::find($request->input('user_id'))->name ?? ''), null, ['tipo' => $tipo->nome ?? null, 'user_id' => $request->input('user_id')]);
         return response()->json(['ok' => true]);
     }
 
@@ -638,6 +641,8 @@ class GdpController extends Controller
             return response()->json(['erro' => 'Decisao invalida'], 422);
         }
         $pen->update(['contestacao_status' => $decisao, 'contestacao_por' => $user->id, 'contestacao_em' => now()]);
+        $eventType = $decisao === 'aceita' ? 'penalidade.baixada' : 'penalidade.rejeitada';
+        SystemEvent::gdp($eventType, $decisao === 'aceita' ? 'info' : 'warning', 'Contestacao ' . $decisao . ' - Penalidade #' . $id, null, ['penalidade_id' => $id, 'decisao' => $decisao, 'avaliador' => $user->name], 'GdpPenalizacao', $id);
         return response()->json(['ok' => true, 'status' => $decisao]);
     }
 
@@ -649,6 +654,7 @@ class GdpController extends Controller
         if ($pen->contestada) return response()->json(['erro' => 'Ja contestada'], 422);
         $texto = $request->input('texto');
         $pen->update(['contestada' => true, 'contestacao_texto' => $texto, 'contestacao_status' => 'pendente']);
+        SystemEvent::gdp('penalidade.contestada', 'info', 'Penalidade contestada por ' . $user->name, $texto, ['penalidade_id' => $id, 'user_id' => $user->id], 'GdpPenalizacao', $id);
         return response()->json(['ok' => true]);
     }
 

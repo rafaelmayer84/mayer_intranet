@@ -7,6 +7,7 @@ use App\Models\GdpPenalizacao;
 use App\Models\GdpPenalizacaoTipo;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
+use App\Models\SystemEvent;
 
 class GdpPenalizacaoScanner
 {
@@ -1045,6 +1046,10 @@ class GdpPenalizacaoScanner
             'automatica'           => true,
             'contestada'           => false,
         ]);
+
+        // Log de Ocorrencias
+        $userName = DB::table('users')->where('id', $userId)->value('name') ?? 'ID:' . $userId;
+        SystemEvent::gdp('penalidade.criada', 'warning', 'Penalidade: ' . $codigo . ' - ' . $userName, $descricao, ['user_id' => $userId, 'pontos' => $pontos, 'mes' => $this->mes, 'ano' => $this->ano, 'codigo' => $codigo]);
 
         return 1;
     }

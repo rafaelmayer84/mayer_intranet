@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use App\Models\SystemEvent;
 
 /**
  * DataJuriSyncOrchestrator v2.2
@@ -361,6 +362,13 @@ class DataJuriSyncOrchestrator
         DB::table('sync_runs')
             ->where('run_id', $this->runId)
             ->update($update);
+
+        // Registrar no Log de Ocorrencias
+        if ($status === 'completed') {
+            SystemEvent::sistema('sync.concluido', 'info', 'Sync DataJuri concluido', $mensagem, ['run_id' => $this->runId, 'status' => $status]);
+        } else {
+            SystemEvent::sistema('sync.falhou', 'error', 'Sync DataJuri falhou: ' . ($mensagem ?? $status), null, ['run_id' => $this->runId, 'status' => $status]);
+        }
     }
 
     /**
