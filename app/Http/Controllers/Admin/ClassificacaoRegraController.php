@@ -114,7 +114,7 @@ class ClassificacaoRegraController extends Controller
     {
         try {
             $stats = $this->classificacaoService->reclassificarTudo();
-
+            SystemEvent::financeiro('reclassificacao.concluida', 'info', 'Reclassificacao: ' . ($stats['processados'] ?? 0) . ' movimentos', null, $stats);
             return response()->json([
                 'success' => true,
                 'message' => "Reclassificação concluída! {$stats['processados']} movimentos atualizados.",

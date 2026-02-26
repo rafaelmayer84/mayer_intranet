@@ -224,6 +224,7 @@ class ClassificacaoRegrasController extends Controller
     {
         try {
             $stats = $this->classificacaoService->reclassificarMovimentos();
+            SystemEvent::financeiro('reclassificacao.concluida', 'info', 'Reclassificacao: ' . ($stats['reclassificados'] ?? 0) . ' movimentos', null, $stats);
 
             $mensagem = sprintf(
                 "Reclassificação concluída! %d de %d movimentos reclassificados. %d ainda pendentes.",
