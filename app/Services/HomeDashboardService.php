@@ -207,13 +207,13 @@ class HomeDashboardService
         try {
             $tickets = DB::table('nexo_tickets')
                 ->where(function ($q) use ($userId) {
-                    $q->where('responsavel_id', $userId)->orWhere('assigned_to', $userId);
+                    $q->where('responsavel_id', $userId);
                 })
                 ->whereIn('status', ['aberto', 'pendente', 'open', 'pending', 'em_andamento'])
-                ->select('id', 'titulo', 'status', 'prioridade', 'created_at')
+                ->select('id', 'assunto', 'status', 'prioridade', 'created_at')
                 ->orderByDesc('created_at')->limit(8)->get();
             return $tickets->map(fn($t) => [
-                'id' => $t->id, 'titulo' => $t->titulo ?: ('Ticket #' . $t->id),
+                'id' => $t->id, 'titulo' => $t->assunto ?: ('Ticket #' . $t->id),
                 'status' => $t->status, 'prioridade' => $t->prioridade ?? 'normal',
                 'criado_em' => Carbon::parse($t->created_at)->format('d/m H:i'),
             ])->toArray();
