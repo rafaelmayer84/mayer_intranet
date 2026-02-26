@@ -57,7 +57,7 @@ class NexoConversationSyncService
             }
 
             $now = now();
-            $sentAt = \Carbon\Carbon::createFromTimestamp($parsed['timestamp']);
+            $sentAt = \Carbon\Carbon::createFromTimestamp($parsed['timestamp'], config('app.timezone'));
 
             if (!$conversation) {
                 $conversation = WaConversation::create([
@@ -207,8 +207,15 @@ class NexoConversationSyncService
             if (!is_array($msg)) continue;
 
             $providerMsgId = data_get($msg, 'id') ?? data_get($msg, 'message_id');
+            // Fix 26/02: extrair wamid para evitar duplicata webhook vs sync
+            $wamid = data_get($msg, 'data.id') ?? data_get($msg, 'data.message_id');
+
             if ($providerMsgId) {
                 $existingMsg = WaMessage::where('provider_message_id', $providerMsgId)->first();
+                // Se nao achou pelo ID SendPulse, tentar pelo wamid (webhook salva com wamid)
+                if (!$existingMsg && $wamid) {
+                    $existingMsg = WaMessage::where('provider_message_id', $wamid)->first();
+                }
                 if ($existingMsg) {
                     // Fix 18/02: atualizar media_url se estava NULL (webhook salvou sem URL)
                     if (empty($existingMsg->media_url)) {
@@ -368,7 +375,7 @@ class NexoConversationSyncService
         if (is_numeric($raw) && strlen((string) $raw) >= 10) {
             return \Carbon\Carbon::createFromTimestamp((int) $raw, 'UTC')->setTimezone(config('app.timezone'));
         }
-        try { return \Carbon\Carbon::parse($raw); }
+        try { return \Carbon\Carbon::parse($raw, 'UTC')->setTimezone(config('app.timezone')); }
         catch (\Throwable $e) { return now(); }
     }
 
