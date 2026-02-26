@@ -796,6 +796,8 @@ class DataJuriSyncService
                     'data_pagamento' => $this->parseDataBrasileira($conta['dataPagamento'] ?? null),
                     'status' => $conta['status'] ?? null,
                     'descricao' => $conta['descricao'] ?? null,
+                    'origem' => 'datajuri',
+                    'is_stale' => false,
                     'updated_at' => now(),
                 ];
 
