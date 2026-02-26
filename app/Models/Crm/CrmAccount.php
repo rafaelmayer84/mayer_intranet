@@ -47,6 +47,16 @@ class CrmAccount extends Model
         return $this->hasMany(CrmActivity::class, 'account_id');
     }
 
+    public function serviceRequests(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(CrmServiceRequest::class, 'account_id');
+    }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(CrmDocument::class, 'account_id');
+    }
+
     public function events(): HasMany
     {
         return $this->hasMany(CrmEvent::class, 'account_id');

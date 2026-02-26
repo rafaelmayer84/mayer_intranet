@@ -64,6 +64,16 @@ Route::middleware(['auth','modulo:operacional.crm,visualizar'])->prefix('crm')->
     Route::post('/oportunidades/{id}/activities/{activityId}/complete', [CrmOpportunityController::class, 'completeActivity'])->name('opportunities.complete-activity');
     Route::post('/oportunidades/{id}/cadence/{taskId}/complete', [CrmOpportunityController::class, 'completeCadenceTask'])->name('opportunities.complete-cadence');
 
+    // Documentos (upload/delete)
+    Route::post('/accounts/{id}/documents', [CrmAccountController::class, 'uploadDocument'])->name('accounts.upload-document');
+    Route::delete('/accounts/{id}/documents/{docId}', [CrmAccountController::class, 'deleteDocument'])->name('accounts.delete-document');
+
+    // Solicitações Internas (Service Requests)
+    Route::post('/accounts/{id}/service-requests', [\App\Http\Controllers\Crm\CrmServiceRequestController::class, 'store'])->name('service-requests.store');
+    Route::get('/solicitacoes/{id}', [\App\Http\Controllers\Crm\CrmServiceRequestController::class, 'show'])->name('service-requests.show');
+    Route::put('/solicitacoes/{id}', [\App\Http\Controllers\Crm\CrmServiceRequestController::class, 'update'])->name('service-requests.update');
+    Route::post('/solicitacoes/{id}/comments', [\App\Http\Controllers\Crm\CrmServiceRequestController::class, 'addComment'])->name('service-requests.comment');
+
     // Relatórios
     Route::get('/relatorios', [CrmReportsController::class, 'index'])->name('reports');
 });

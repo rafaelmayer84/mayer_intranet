@@ -130,6 +130,15 @@
                         <span class="ml-1 px-1.5 py-0.5 rounded-full text-xs bg-red-100 text-red-600">{{ $contasVencidas->count() }}</span>
                     @endif
                 </button>
+                <button onclick="switchTab('documentos')" data-tab="documentos" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                    📎 Documentos <span class="ml-1 px-1.5 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600">{{ $documents->count() }}</span>
+                </button>
+                <button onclick="switchTab('solicitacoes')" data-tab="solicitacoes" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                    📝 Solicitações
+                    @if($serviceRequests->where('status','!=','concluido')->where('status','!=','cancelado')->count() > 0)
+                        <span class="ml-1 px-1.5 py-0.5 rounded-full text-xs bg-orange-100 text-orange-600">{{ $serviceRequests->where('status','!=','concluido')->where('status','!=','cancelado')->count() }}</span>
+                    @endif
+                </button>
             </nav>
         </div>
     </div>
@@ -667,7 +676,191 @@
 
 {{-- Modal Nova Oportunidade --}}
 <div id="modal-new-opp" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-    <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+        <div id="tab-solicitacoes" class="tab-content hidden">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-lg font-semibold text-[#1B334A]">Solicitações Internas</h2>
+                <button onclick="document.getElementById('form-new-sr').classList.toggle('hidden')" class="px-3 py-1.5 bg-[#385776] text-white rounded-lg text-xs hover:bg-[#1B334A] transition">+ Nova Solicitação</button>
+            </div>
+
+            {{-- Formulário nova solicitação --}}
+            <form id="form-new-sr" method="POST" action="{{ route('crm.service-requests.store', $account->id) }}" class="hidden mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
+                @csrf
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Categoria</label>
+                        <select name="category" required class="w-full border rounded-lg px-3 py-2 text-sm bg-white" onchange="this.form.querySelector('[data-approval-info]').textContent = this.selectedOptions[0]?.dataset?.approval === '1' ? '⚠️ Requer aprovação da diretoria' : ''">
+                            <option value="">Selecione...</option>
+                            @foreach($srCategorias as $key => $cat)
+                                <option value="{{ $key }}" data-approval="{{ $cat['approval'] ? '1' : '0' }}">{{ $cat['label'] }}</option>
+                            @endforeach
+                        </select>
+                        <p data-approval-info class="text-xs text-orange-600 mt-1"></p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Prioridade</label>
+                        <select name="priority" required class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+                            <option value="normal" selected>Normal</option>
+                            <option value="baixa">Baixa</option>
+                            <option value="alta">Alta</option>
+                            <option value="urgente">Urgente</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Atribuir a</label>
+                        <select name="assigned_to_user_id" class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+                            <option value="">Não atribuir agora</option>
+                            @foreach($users as $u)
+                                <option value="{{ $u->id }}">{{ $u->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Assunto</label>
+                    <input type="text" name="subject" required maxlength="255" placeholder="Resumo da solicitação" class="w-full border rounded-lg px-3 py-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Descrição detalhada</label>
+                    <textarea name="description" required maxlength="3000" rows="3" placeholder="Descreva o que precisa ser feito, contexto e prazos" class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+                </div>
+                <div class="flex gap-2">
+                    <button type="submit" class="px-4 py-2 bg-[#385776] text-white rounded-lg text-sm hover:bg-[#1B334A] transition">Criar Solicitação</button>
+                    <button type="button" onclick="document.getElementById('form-new-sr').classList.add('hidden')" class="px-4 py-2 border rounded-lg text-sm text-gray-600">Cancelar</button>
+                </div>
+            </form>
+
+            {{-- Lista de solicitações --}}
+            @if($serviceRequests->count() > 0)
+                <div class="space-y-3">
+                    @foreach($serviceRequests as $sr)
+                        <div class="border rounded-lg p-4 hover:shadow-sm transition {{ $sr->isOpen() ? 'border-l-4 border-l-[#385776]' : 'border-gray-200' }}">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <a href="{{ route('crm.service-requests.show', $sr->id) }}" class="text-sm font-medium text-[#1B334A] hover:underline">
+                                            #{{ $sr->id }} — {{ $sr->subject }}
+                                        </a>
+                                    </div>
+                                    <div class="flex flex-wrap items-center gap-2 text-xs">
+                                        <span class="px-2 py-0.5 rounded-full {{ App\Models\Crm\CrmServiceRequest::statusBadge($sr->status) }}">{{ App\Models\Crm\CrmServiceRequest::statusLabel($sr->status) }}</span>
+                                        <span class="px-2 py-0.5 rounded-full {{ App\Models\Crm\CrmServiceRequest::priorityBadge($sr->priority) }}">{{ ucfirst($sr->priority) }}</span>
+                                        <span class="text-gray-400">{{ $srCategorias[$sr->category]['label'] ?? $sr->category }}</span>
+                                        <span class="text-gray-400">•</span>
+                                        <span class="text-gray-400">por {{ $sr->requestedBy->name ?? '-' }}</span>
+                                        @if($sr->assignedTo)
+                                            <span class="text-gray-400">→ {{ $sr->assignedTo->name }}</span>
+                                        @endif
+                                        <span class="text-gray-400">• {{ $sr->created_at->diffForHumans() }}</span>
+                                    </div>
+                                    @if($sr->requires_approval && $sr->status === 'aguardando_aprovacao')
+                                        <p class="text-xs text-purple-600 mt-1">⚠️ Aguardando aprovação da diretoria</p>
+                                    @endif
+                                </div>
+                                <a href="{{ route('crm.service-requests.show', $sr->id) }}" class="text-xs text-[#385776] hover:underline ml-3">Detalhes →</a>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @else
+                <div class="text-center py-10 text-gray-400">
+                    <p class="text-3xl mb-2">📝</p>
+                    <p class="text-sm">Nenhuma solicitação registrada.</p>
+                    <p class="text-xs mt-1">Clique em "+ Nova Solicitação" para abrir um chamado interno.</p>
+                </div>
+            @endif
+        </div>
+    </div>
+
+    <div id="tab-documentos" class="tab-content hidden">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-lg font-semibold text-[#1B334A]">Documentos ({{ $documents->count() }})</h2>
+                <button onclick="document.getElementById('form-upload-doc').classList.toggle('hidden')" class="px-3 py-1.5 bg-[#385776] text-white rounded-lg text-xs hover:bg-[#1B334A] transition">+ Enviar Documento</button>
+            </div>
+
+            {{-- Formulário de upload --}}
+            <form id="form-upload-doc" method="POST" action="{{ route('crm.accounts.upload-document', $account->id) }}" enctype="multipart/form-data" class="hidden mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
+                @csrf
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Arquivo (PDF, JPG, PNG, DOC)</label>
+                        <input type="file" name="file" required accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">Categoria</label>
+                        <select name="category" required class="w-full border rounded-lg px-3 py-2 text-sm bg-white">
+                            @foreach($docCategorias as $key => $label)
+                                <option value="{{ $key }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Observações (opcional)</label>
+                    <input type="text" name="notes" maxlength="500" placeholder="Descrição breve do documento" class="w-full border rounded-lg px-3 py-2 text-sm">
+                </div>
+                <div class="flex gap-2">
+                    <button type="submit" class="px-4 py-2 bg-[#385776] text-white rounded-lg text-sm hover:bg-[#1B334A] transition">Enviar</button>
+                    <button type="button" onclick="document.getElementById('form-upload-doc').classList.add('hidden')" class="px-4 py-2 border rounded-lg text-sm text-gray-600">Cancelar</button>
+                </div>
+            </form>
+
+            {{-- Lista de documentos --}}
+            @if($documents->count() > 0)
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-gray-200">
+                                <th class="text-left py-2 text-xs font-medium text-gray-500 uppercase">Documento</th>
+                                <th class="text-left py-2 text-xs font-medium text-gray-500 uppercase">Categoria</th>
+                                <th class="text-left py-2 text-xs font-medium text-gray-500 uppercase">Enviado por</th>
+                                <th class="text-left py-2 text-xs font-medium text-gray-500 uppercase">Data</th>
+                                <th class="text-left py-2 text-xs font-medium text-gray-500 uppercase">Tamanho</th>
+                                <th class="text-right py-2 text-xs font-medium text-gray-500 uppercase">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($documents as $doc)
+                                <tr class="border-b border-gray-50 hover:bg-gray-50/50">
+                                    <td class="py-2.5">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-lg">{{ str_contains($doc->mime_type, 'pdf') ? '📄' : (str_contains($doc->mime_type, 'image') ? '🖼️' : '📋') }}</span>
+                                            <div>
+                                                <a href="{{ $doc->url }}" target="_blank" class="text-[#385776] hover:underline font-medium text-xs">{{ $doc->original_name }}</a>
+                                                @if($doc->notes)
+                                                    <p class="text-xs text-gray-400 mt-0.5">{{ $doc->notes }}</p>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="py-2.5"><span class="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">{{ $docCategorias[$doc->category] ?? $doc->category }}</span></td>
+                                    <td class="py-2.5 text-xs text-gray-600">{{ $doc->uploadedBy->name ?? '-' }}</td>
+                                    <td class="py-2.5 text-xs text-gray-500">{{ $doc->created_at->format('d/m/Y H:i') }}</td>
+                                    <td class="py-2.5 text-xs text-gray-500">{{ number_format($doc->size_bytes / 1024, 0, ',', '.') }} KB</td>
+                                    <td class="py-2.5 text-right">
+                                        <a href="{{ $doc->url }}" target="_blank" class="text-xs text-[#385776] hover:underline mr-2">Abrir</a>
+                                        <form method="POST" action="{{ route('crm.accounts.delete-document', [$account->id, $doc->id]) }}" class="inline" onsubmit="return confirm('Remover este documento?')">
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="text-xs text-red-500 hover:underline">Excluir</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @else
+                <div class="text-center py-10 text-gray-400">
+                    <p class="text-3xl mb-2">📎</p>
+                    <p class="text-sm">Nenhum documento enviado.</p>
+                    <p class="text-xs mt-1">Clique em "+ Enviar Documento" para anexar arquivos.</p>
+                </div>
+            @endif
+        </div>
+    </div>
+
+<div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
         <h3 class="text-lg font-semibold text-[#1B334A] mb-4">Nova Oportunidade</h3>
         <form method="POST" action="{{ route('crm.accounts.create-opp', $account->id) }}" class="space-y-3">
             @csrf

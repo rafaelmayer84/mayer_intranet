@@ -152,3 +152,24 @@ Schedule::command('crm:cadence-check')
     ->dailyAt('08:00')
     ->timezone('America/Sao_Paulo')
     ->appendOutputTo(storage_path('logs/cron-crm-cadence.log'));
+
+// CRM Health Score — recalcular diariamente às 06:00 BRT
+Schedule::command('crm:recalc-health')
+    ->dailyAt('06:00')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/cron-crm-health.log'));
+
+// CRM Segmentação IA — batch semanal domingo 05:00 BRT
+Schedule::command('crm:segmentar-batch')
+    ->weeklyOn(0, '05:00')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/cron-crm-segmentacao.log'));
+
+// CRM Notificação contas inativas — diário 09:00 BRT
+Schedule::command('crm:notify-inactive')
+    ->dailyAt('09:00')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/cron-crm-notify.log'));

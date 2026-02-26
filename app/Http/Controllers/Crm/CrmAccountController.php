@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\Log;
 use App\Services\Crm\CrmSegmentationService;
 use App\Services\Crm\CrmCadenceService;
 use App\Services\Crm\CrmHealthScoreService;
+use App\Models\Crm\CrmDocument;
+use Illuminate\Support\Facades\Storage;
 
 class CrmAccountController extends Controller
 {
@@ -76,8 +78,17 @@ class CrmAccountController extends Controller
         // Aging financeiro
         $finSummary = $this->buildFinancialSummary($djContext);
 
+        $documents = CrmDocument::where('account_id', $id)->with('uploadedBy')->latest()->get();
+        $docCategorias = CrmDocument::categorias();
+
+        $serviceRequests = \App\Models\Crm\CrmServiceRequest::where('account_id', $id)
+            ->with(['requestedBy', 'assignedTo'])
+            ->latest()
+            ->get();
+        $srCategorias = \App\Models\Crm\CrmServiceRequest::categorias();
+
         return view('crm.accounts.show', compact(
-            'account', 'timeline', 'djContext', 'commContext', 'users', 'segmentation', 'finSummary'
+            'account', 'timeline', 'djContext', 'commContext', 'users', 'segmentation', 'finSummary', 'documents', 'docCategorias', 'serviceRequests', 'srCategorias'
         ));
     }
 
@@ -540,4 +551,78 @@ class CrmAccountController extends Controller
             default                => ucfirst(str_replace('_', ' ', $event->type)),
         };
     }
+
+
+    /**
+     * POST /crm/accounts/{id}/documents
+     */
+    public function uploadDocument(Request $request, int $id)
+    {
+        $request->validate([
+            'file'     => 'required|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:20480',
+            'category' => 'required|string|max:50',
+            'notes'    => 'nullable|string|max:500',
+        ]);
+
+        $account = \App\Models\Crm\CrmAccount::findOrFail($id);
+        $file = $request->file('file');
+
+        $normalizedName = CrmDocument::normalizarNome(
+            $file->getClientOriginalName(),
+            $request->category,
+            $id
+        );
+
+        $path = $file->storeAs(
+            'crm/documents/' . $id,
+            $normalizedName,
+            'public'
+        );
+
+        $doc = CrmDocument::create([
+            'account_id'         => $id,
+            'uploaded_by_user_id'=> auth()->id(),
+            'category'           => $request->category,
+            'original_name'      => $file->getClientOriginalName(),
+            'normalized_name'    => $normalizedName,
+            'disk_path'          => $path,
+            'mime_type'          => $file->getMimeType(),
+            'size_bytes'         => $file->getSize(),
+            'notes'              => $request->notes,
+        ]);
+
+        // Registrar evento CRM
+        \App\Models\Crm\CrmEvent::create([
+            'account_id'         => $id,
+            'type'               => 'document_uploaded',
+            'payload'            => ['document_id' => $doc->id, 'name' => $normalizedName, 'category' => $request->category],
+            'happened_at'        => now(),
+            'created_by_user_id' => auth()->id(),
+        ]);
+
+        return back()->with('success', 'Documento enviado com sucesso.')->withFragment('documentos');
+    }
+
+    /**
+     * DELETE /crm/accounts/{id}/documents/{docId}
+     */
+    public function deleteDocument(int $id, int $docId)
+    {
+        $doc = CrmDocument::where('account_id', $id)->findOrFail($docId);
+
+        Storage::disk('public')->delete($doc->disk_path);
+
+        \App\Models\Crm\CrmEvent::create([
+            'account_id'         => $id,
+            'type'               => 'document_deleted',
+            'payload'            => ['name' => $doc->normalized_name, 'category' => $doc->category],
+            'happened_at'        => now(),
+            'created_by_user_id' => auth()->id(),
+        ]);
+
+        $doc->delete();
+
+        return back()->with('success', 'Documento removido.')->withFragment('documentos');
+    }
+
 }
