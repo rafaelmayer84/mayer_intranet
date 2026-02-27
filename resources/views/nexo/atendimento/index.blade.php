@@ -13,7 +13,10 @@
 .nova-conversa-modal { background:#fff; border-radius:16px; width:460px; max-width:95vw; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,.2); }
 .nova-conversa-header { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #e5e7eb; }
 .nova-conversa-header h3 { margin:0; font-size:16px; font-weight:700; color:#1B334A; }
-#chat-messages, #inbox-items, #contexto360-panel { scroll-behavior: smooth; }
+#chat-messages, #inbox-items, #contexto360-panel { scroll-behavior: smooth; overscroll-behavior: contain; }
+#nexo-app { height: calc(100vh - 64px) !important; max-height: calc(100vh - 64px) !important; overflow: hidden !important; }
+.nexo-fullscreen-wrapper { height: calc(100vh - 64px) !important; max-height: calc(100vh - 64px) !important; overflow: hidden !important; }
+#nexo-app > div, #nexo-app .flex-1 { min-height: 0; }
 #chat-messages::-webkit-scrollbar, #inbox-items::-webkit-scrollbar, #contexto360-panel::-webkit-scrollbar { width: 6px; }
 #chat-messages::-webkit-scrollbar-thumb, #inbox-items::-webkit-scrollbar-thumb, #contexto360-panel::-webkit-scrollbar-thumb { background: rgba(0,0,0,.15); border-radius: 3px; }
 #chat-messages::-webkit-scrollbar-thumb:hover, #inbox-items::-webkit-scrollbar-thumb:hover, #contexto360-panel::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,.25); }
