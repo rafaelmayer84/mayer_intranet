@@ -193,6 +193,13 @@ class NexoConversationSyncService
 
         if ($messages === null) {
             $newFailCount = $failCount + 1;
+            // Se atingiu limite maximo, desativar sync permanentemente
+            if ($newFailCount >= self::POLL_MAX_FAILS) {
+                $conversation->update(['status' => 'closed']);
+                Cache::forget($failKey);
+                Log::warning("NexoSync: conversa {$conversation->id} fechada permanentemente apos {$newFailCount} falhas consecutivas (contact_id provavelmente inexistente no SendPulse)");
+                return 0;
+            }
             $backoffTtl = $newFailCount * self::POLL_FAIL_BACKOFF;
             Cache::put($failKey, $newFailCount, $backoffTtl);
             Log::warning("NexoSync: API falhou para conversa {$conversation->id}, backoff {$backoffTtl}s (falha #{$newFailCount})");

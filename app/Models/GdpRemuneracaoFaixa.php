@@ -44,4 +44,24 @@ class GdpRemuneracaoFaixa extends Model
 
         return $faixa ? $faixa->percentual_remuneracao : 0.00;
     }
+
+    /**
+     * Dado um score e ciclo_id, retorna a faixa (model) correspondente.
+     */
+    public static function faixaParaScore(int $cicloId, float $score): ?self
+    {
+        $faixa = self::where('ciclo_id', $cicloId)
+            ->where('score_min', '<=', $score)
+            ->where('score_max', '>', $score)
+            ->first();
+
+        if (!$faixa) {
+            $faixa = self::where('ciclo_id', $cicloId)
+                ->where('score_min', '<=', $score)
+                ->orderByDesc('score_min')
+                ->first();
+        }
+
+        return $faixa;
+    }
 }

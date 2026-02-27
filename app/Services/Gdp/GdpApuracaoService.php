@@ -201,7 +201,7 @@ class GdpApuracaoService
                 'score_atendimento'   => $scoresFinaisPorEixo[$this->getEixoId($eixos, 'ATENDIMENTO')] ?? 0,
                 'score_total'         => $scoreFinalGlobal,
                 'total_penalizacoes'  => $scanResult['total_penalizacoes'],
-                'percentual_variavel' => $faixa ? $faixa->percentual : 0,
+                'percentual_variavel' => $faixa ? $faixa->percentual_remuneracao : 0,
                 'updated_at'          => now(),
             ]
         );
