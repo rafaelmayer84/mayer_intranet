@@ -25,24 +25,7 @@ class Identity extends Model
      */
     public static function normalizePhone(?string $phone): ?string
     {
-        if (empty($phone)) {
-            return null;
-        }
-
-        $digits = preg_replace('/\D/', '', $phone);
-
-        // Se começa com +55 ou 55 e tem 12-13 dígitos, já está ok
-        if (strlen($digits) >= 12 && str_starts_with($digits, '55')) {
-            return $digits;
-        }
-
-        // Se tem 10-11 dígitos (DDD + número), adiciona 55
-        if (strlen($digits) >= 10 && strlen($digits) <= 11) {
-            return '55' . $digits;
-        }
-
-        // Retorna como está se não conseguir normalizar
-        return $digits ?: null;
+        return \App\Helpers\PhoneHelper::normalize($phone);
     }
 
     /**

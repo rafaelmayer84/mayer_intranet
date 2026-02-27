@@ -38,13 +38,9 @@ class WaConversation extends Model
     public function scopeUnread($query) { return $query->where('unread_count', '>', 0); }
     public function scopeAssignedTo($query, int $userId) { return $query->where('assigned_user_id', $userId); }
 
-    public static function normalizePhone(string $phone): string
+    public static function normalizePhone(?string $phone): string
     {
-        $digits = preg_replace('/\D/', '', $phone);
-        if (!str_starts_with($digits, '55') && strlen($digits) >= 10 && strlen($digits) <= 11) {
-            $digits = '55' . $digits;
-        }
-        return $digits;
+        return \App\Helpers\PhoneHelper::normalize($phone) ?? preg_replace('/\D/', '', $phone ?? '');
     }
 
     public function getLinkTypeAttribute(): string

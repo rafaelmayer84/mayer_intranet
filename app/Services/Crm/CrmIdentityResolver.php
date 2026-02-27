@@ -197,12 +197,7 @@ class CrmIdentityResolver
 
     public function normalizePhone(?string $phone): ?string
     {
-        if (empty($phone)) return null;
-        $digits = preg_replace('/\D/', '', $phone);
-        if (strlen($digits) === 11) $digits = '55' . $digits;
-        if (strlen($digits) === 10) $digits = '55' . $digits;
-        if (strlen($digits) < 12) return null;
-        return $digits;
+        return \App\Helpers\PhoneHelper::normalize($phone);
     }
 
     public function normalizeEmail(?string $email): ?string

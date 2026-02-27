@@ -280,26 +280,6 @@ class NexoMigrateBackupCommand extends Command
 
     private function normalizePhone(?string $phone): string
     {
-        if (empty($phone)) {
-            return '';
-        }
-
-        // Remover tudo que não é dígito
-        $digits = preg_replace('/\D/', '', $phone);
-
-        // Se tem 10 ou 11 dígitos, assumir Brasil e prefixar 55
-        if (strlen($digits) >= 10 && strlen($digits) <= 11) {
-            $digits = '55' . $digits;
-        }
-
-        // Se veio do contactId tipo "whatsapp_554791314240", extrair número
-        if (empty($digits) && preg_match('/\d+/', $phone, $m)) {
-            $digits = $m[0];
-            if (strlen($digits) >= 10 && strlen($digits) <= 11) {
-                $digits = '55' . $digits;
-            }
-        }
-
-        return $digits;
+        return \App\Helpers\PhoneHelper::normalize($phone) ?? '';
     }
 }

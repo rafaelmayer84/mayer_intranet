@@ -125,13 +125,6 @@ class NexoQaResolverService
      */
     public static function normalizePhone(string $phone): string
     {
-        $phone = preg_replace('/[^0-9]/', '', $phone);
-
-        // Se não começa com 55 e tem 10-11 dígitos (DDD+número), adiciona 55
-        if (!str_starts_with($phone, '55') && strlen($phone) >= 10 && strlen($phone) <= 11) {
-            $phone = '55' . $phone;
-        }
-
-        return $phone;
+        return \App\Helpers\PhoneHelper::normalize($phone) ?? preg_replace('/\D/', '', $phone);
     }
 }
