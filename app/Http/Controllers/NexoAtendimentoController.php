@@ -55,7 +55,7 @@ class NexoAtendimentoController extends Controller
             $conversation->save();
         }
 
-        $messages = WaMessage::where('conversation_id', $id)->orderBy('sent_at', 'asc')->get();
+        $messages = WaMessage::where('conversation_id', $id)->orderBy('sent_at', 'asc')->orderBy('id', 'asc')->get();
         $messages = $this->filterQaMessages($messages);
         return response()->json(['conversation' => $conversation, 'messages' => $messages, 'bot_ativo' => (bool) $conversation->bot_ativo]);
     }
@@ -191,35 +191,74 @@ class NexoAtendimentoController extends Controller
         }
     }
 
-    public function pollMessages(int $id)
+    /**
+     * Poll mensagens — serve APENAS dados locais (zero API externa).
+     * Suporta polling incremental via ?since_id=N
+     * Webhook incoming + enviarMensagem() já gravam tudo no banco.
+     */
+    public function pollMessages(int $id, Request $request)
     {
         $conversation = WaConversation::findOrFail($id);
         $cid = $conversation->id;
-        $uid = auth()->id() ?? 0;
+        $sinceId = (int) $request->input('since_id', 0);
 
-        $throttleKey = "nexo_poll_throttle_{$uid}_{$cid}";
-        if (Cache::has($throttleKey)) {
-            $msgs = $this->filterQaMessages(WaMessage::where('conversation_id', $cid)->orderBy('sent_at', 'asc')->get());
-            return response()->json(['throttled' => true, 'new_count' => 0, 'messages' => $msgs]);
+        if ($sinceId > 0) {
+            // Incremental: apenas mensagens novas
+            $msgs = $this->filterQaMessages(
+                WaMessage::where('conversation_id', $cid)
+                    ->where('id', '>', $sinceId)
+                    ->orderBy('sent_at', 'asc')
+                    ->orderBy('id', 'asc')
+                    ->get()
+            );
+            return response()->json([
+                'incremental' => true,
+                'new_count'   => $msgs->count(),
+                'messages'    => $msgs,
+                'last_id'     => $msgs->last()?->id ?? $sinceId,
+            ]);
         }
 
-        $lock = Cache::lock("nexo_poll_{$cid}", 10);
-        if (!$lock->get()) {
-            $msgs = $this->filterQaMessages(WaMessage::where('conversation_id', $cid)->orderBy('sent_at', 'asc')->get());
-            return response()->json(['throttled' => true, 'new_count' => 0, 'messages' => $msgs]);
+        // Full load (primeira vez)
+        $msgs = $this->filterQaMessages(
+            WaMessage::where('conversation_id', $cid)
+                ->orderBy('sent_at', 'asc')
+                ->orderBy('id', 'asc')
+                ->get()
+        );
+        return response()->json([
+            'incremental' => false,
+            'new_count'   => $msgs->count(),
+            'messages'    => $msgs,
+            'last_id'     => $msgs->last()?->id ?? 0,
+        ]);
+    }
+
+    /**
+     * Force sync manual — operador clica botão quando suspeita que falta mensagem.
+     * Este é o ÚNICO ponto que chama API SendPulse sob demanda.
+     */
+    public function forceSync(int $id)
+    {
+        $conversation = WaConversation::findOrFail($id);
+
+        // Guard: não tentar sync de conversas legadas
+        if (str_starts_with($conversation->contact_id ?? '', 'whatsapp_')) {
+            return response()->json(['success' => false, 'reason' => 'Conversa legada sem contact_id válido']);
         }
 
         try {
-            app(NexoConversationSyncService::class)->syncConversation($conversation);
-            Cache::put($throttleKey, true, 8);
-            $msgs = $this->filterQaMessages(WaMessage::where('conversation_id', $cid)->orderBy('sent_at', 'asc')->get());
-            return response()->json(['throttled' => false, 'new_count' => $msgs->count(), 'messages' => $msgs]);
+            $newCount = app(NexoConversationSyncService::class)->syncConversation($conversation);
+            $msgs = $this->filterQaMessages(
+                WaMessage::where('conversation_id', $conversation->id)
+                    ->orderBy('sent_at', 'asc')
+                    ->orderBy('id', 'asc')
+                    ->get()
+            );
+            return response()->json(['success' => true, 'new_messages' => $newCount, 'messages' => $msgs]);
         } catch (\Throwable $e) {
-            Log::warning('Poll sync error', ['conversa_id' => $cid, 'error' => $e->getMessage()]);
-            $msgs = $this->filterQaMessages(WaMessage::where('conversation_id', $cid)->orderBy('sent_at', 'asc')->get());
-            return response()->json(['throttled' => false, 'new_count' => $msgs->count(), 'messages' => $msgs]);
-        } finally {
-            $lock->release();
+            Log::warning('ForceSync error', ['conversa_id' => $id, 'error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'reason' => $e->getMessage()], 500);
         }
     }
 

@@ -157,6 +157,10 @@
                         <option value="{{ $user->id }}">{{ $user->name }}</option>
                     @endforeach
                 </select>
+                <button id="btn-force-sync" onclick="NexoApp.forceSync()" title="Sincronizar mensagens com SendPulse"
+                    class="text-[12px] px-2.5 py-1.5 rounded-lg border border-gray-200 hover:bg-blue-50 hover:border-blue-300 transition-colors text-gray-500 hover:text-blue-600">
+                    &#x1F504;
+                </button>
                 <button id="chat-toggle-status" onclick="NexoApp.toggleStatus()"
                     class="text-[12px] px-3.5 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors text-gray-600 font-medium">
                     Fechar

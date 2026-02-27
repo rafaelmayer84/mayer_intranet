@@ -144,6 +144,36 @@ const NexoApp = {
         c.scrollTop=c.scrollHeight;
     },
 
+    // ═══ APPEND INCREMENTAL (v2 27/02/2026) ═══
+    appendMessages(msgs){
+        if(!msgs.length)return;
+        const c=document.getElementById('chat-messages');
+        let html='';
+        const lastDateEl=c.querySelector('.nexo-day-sep:last-of-type');
+        let lastDate=lastDateEl?lastDateEl.textContent:'';
+        msgs.forEach(m=>{
+            const md=m.sent_at?m.sent_at.split('T')[0]:'';
+            const fmtD=this.fmtDate(md);
+            if(md&&fmtD!==lastDate){lastDate=fmtD;html+=`<div class="flex justify-center my-4"><span class="nexo-day-sep">${fmtD}</span></div>`}
+            const isIn=parseInt(m.direction)===1;
+            const time=m.sent_at?new Date(m.sent_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'';
+            const hb=(!isIn&&m.is_human)?'<span class="text-[9px] text-[#53bdeb] ml-1">✓✓</span>':'';
+            const bc=isIn?'msg-bubble-in':'msg-bubble-out';
+            const al=isIn?'justify-start':'justify-end';
+            const content=this.renderMsgContent(m);
+            const pid=m.provider_message_id||'';
+            const quoteHtml=this.renderQuote(m);
+            const actionsHtml=pid?`<div class="nexo-msg-actions opacity-0 group-hover/msg:opacity-100 absolute ${isIn?'-right-2':'-left-2'} -top-1 flex gap-0.5 z-10 transition-opacity"><button onclick="NexoApp.startReply(${m.id},'${pid}')" class="w-6 h-6 flex items-center justify-center rounded-full bg-white shadow-md hover:bg-gray-100 text-[#8696a0] hover:text-[#3b4a54] transition-colors" title="Responder"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a5 5 0 015 5v4M3 10l6 6M3 10l6-6"/></svg></button><button onclick="NexoApp.showEmojiPicker(event,${m.id},'${pid}')" class="w-6 h-6 flex items-center justify-center rounded-full bg-white shadow-md hover:bg-gray-100 text-[#8696a0] hover:text-[#3b4a54] transition-colors" title="Reagir"><svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke-width="2"/><path d="M8 14s1.5 2 4 2 4-2 4-2" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="9" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1" fill="currentColor" stroke="none"/></svg></button></div>`:'';
+            html+=`<div class="flex ${al} mb-1" data-pmid="${pid}"><div class="relative group/msg max-w-[75%] lg:max-w-[60%]">${actionsHtml}<div class="${bc} px-3 py-2">${quoteHtml}${content}<p class="text-[10px] text-[#8696a0] text-right mt-1 leading-none select-none">${time}${hb}</p></div></div></div>`;
+        });
+        c.insertAdjacentHTML('beforeend',html);
+        if(!this._lastMsgs)this._lastMsgs=[];
+        this._lastMsgs=this._lastMsgs.concat(msgs);
+        this.lastMsgId=msgs[msgs.length-1].id;
+        this.lastMsgCount=(this._lastMsgs||[]).length;
+        c.scrollTop=c.scrollHeight;
+    },
+
     renderMsgContent(m){
         const type=m.message_type||'text';
         const body=this.esc(m.body||'');
@@ -179,15 +209,36 @@ const NexoApp = {
         }
     },
 
-    // ═══ POLL ═══
+    // ═══ POLL (INCREMENTAL — v2 27/02/2026) ═══
     async poll(cid){
         if(!this.conversaAtual||this.conversaAtual.id!==cid)return;
         try{
-            const j=await this.api(`/nexo/atendimento/conversas/${cid}/poll`);
-            const msgs=j.messages||[];if(!msgs.length)return;
-            const lid=msgs[msgs.length-1].id;
-            if(lid!==this.lastMsgId||msgs.length!==this.lastMsgCount){this.renderMessages(msgs);this.loadConversas(true)}
+            const sinceId=this.lastMsgId||0;
+            const j=await this.api(`/nexo/atendimento/conversas/${cid}/poll?since_id=${sinceId}`);
+            const msgs=j.messages||[];
+            if(!msgs.length)return;
+            if(sinceId>0&&j.incremental){
+                this.appendMessages(msgs);
+                this.loadConversas(true);
+            }else{
+                this.renderMessages(msgs);
+                this.loadConversas(true);
+            }
         }catch(e){console.warn('Poll error:',e)}
+    },
+    // ═══ FORCE SYNC (manual — v2 27/02/2026) ═══
+    async forceSync(){
+        if(!this.conversaAtual)return;
+        const btn=document.getElementById('btn-force-sync');
+        if(btn){btn.disabled=true;btn.textContent='⏳';}
+        try{
+            const j=await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/force-sync`,{method:'POST'});
+            if(j.success&&j.messages){this.renderMessages(j.messages);}
+            if(btn){btn.textContent='✅';setTimeout(()=>{btn.textContent='🔄';btn.disabled=false},2000);}
+        }catch(e){
+            console.error('ForceSync error:',e);
+            if(btn){btn.textContent='❌';setTimeout(()=>{btn.textContent='🔄';btn.disabled=false},2000);}
+        }
     },
 
     // ═══ ENVIAR MENSAGEM ═══
@@ -223,8 +274,11 @@ const NexoApp = {
         this.cancelReply();
         try{
             await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/mensagens`,{method:'POST',body});
-            const j=await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}`);
-            this.renderMessages(j.messages||[]);
+            // v2: poll incremental em vez de re-fetch total
+            const sinceId=this.lastMsgId||0;
+            const j=await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/poll?since_id=${sinceId}`);
+            const msgs=j.messages||[];
+            if(msgs.length){if(sinceId>0&&j.incremental){this.appendMessages(msgs)}else{this.renderMessages(msgs)}}
         }catch(e){console.error('Send error:',e);c.insertAdjacentHTML('beforeend','<p class="text-center text-red-500 text-xs py-1">Erro ao enviar</p>');c.scrollTop=c.scrollHeight}
     },
 
