@@ -1,3 +1,10 @@
+{{--
+╔══════════════════════════════════════════════════════════════╗
+║  NEXO ATENDIMENTO VIEW — VERSÃO ESTÁVEL v2.1               ║
+║  Data: 27/02/2026                                          ║
+║  Status: CONGELADO — NÃO EDITAR SEM AUTORIZAÇÃO            ║
+╚══════════════════════════════════════════════════════════════╝
+--}}
 @extends('layouts.app')
 <style>
 /* Template WhatsApp Modal (17/02/2026) */
@@ -6,6 +13,11 @@
 .nova-conversa-modal { background:#fff; border-radius:16px; width:460px; max-width:95vw; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,.2); }
 .nova-conversa-header { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid #e5e7eb; }
 .nova-conversa-header h3 { margin:0; font-size:16px; font-weight:700; color:#1B334A; }
+#chat-messages, #inbox-items, #contexto360-panel { scroll-behavior: smooth; }
+#chat-messages::-webkit-scrollbar, #inbox-items::-webkit-scrollbar, #contexto360-panel::-webkit-scrollbar { width: 6px; }
+#chat-messages::-webkit-scrollbar-thumb, #inbox-items::-webkit-scrollbar-thumb, #contexto360-panel::-webkit-scrollbar-thumb { background: rgba(0,0,0,.15); border-radius: 3px; }
+#chat-messages::-webkit-scrollbar-thumb:hover, #inbox-items::-webkit-scrollbar-thumb:hover, #contexto360-panel::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,.25); }
+#chat-messages::-webkit-scrollbar-track, #inbox-items::-webkit-scrollbar-track, #contexto360-panel::-webkit-scrollbar-track { background: transparent; }
 .nova-conversa-body { padding:16px 20px; overflow-y:auto; flex:1; }
 .nova-conversa-footer { padding:12px 20px; border-top:1px solid #e5e7eb; display:flex; justify-content:flex-end; gap:10px; }
 .nova-conversa-input { width:100; padding:10px 14px; font-size:14px; border:1px solid #d1d5db; border-radius:10px; outline:none; transition:border-color .2s; }

@@ -1,3 +1,22 @@
+{{--
+╔══════════════════════════════════════════════════════════════╗
+║  NEXO ATENDIMENTO SCRIPTS — VERSÃO ESTÁVEL v2.1            ║
+║  Data: 27/02/2026                                          ║
+║  Status: CONGELADO — NÃO EDITAR SEM AUTORIZAÇÃO            ║
+║                                                             ║
+║  Funcionalidades encapsuladas:                              ║
+║  - Inbox polling (8s) com loadConversas                     ║
+║  - Chat polling incremental (5s) via since_id              ║
+║  - appendMessages (DOM append, zero flicker)                ║
+║  - forceSync (sync manual via botão)                        ║
+║  - AbortController (cancela requests ao trocar conversa)    ║
+║  - sendMessage com poll incremental pós-envio               ║
+║  - Contexto 360, tags, flows, DataJuri                      ║
+║                                                             ║
+║  Extensões devem ser feitas via @include de novo partial    ║
+║  Ex: _nexo_extensoes.blade.php                              ║
+╚══════════════════════════════════════════════════════════════╝
+--}}
 <script>
 // ═══ Tab Switcher ═══
 function switchTab(tab) {
@@ -20,7 +39,7 @@ window.refreshContexto360=function(convId){
 // ═══ NexoApp Core ═══
 const NexoApp = {
     conversas:[],conversaAtual:null,lastMsgId:null,lastMsgCount:0,
-    filters:{status:'',unread:'',minhas:''},searchTerm:'',pollTimer:null,inboxTimer:null,flowsCache:null,
+    filters:{status:'',unread:'',minhas:''},searchTerm:'',pollTimer:null,inboxTimer:null,flowsCache:null,_abortCtrl:null,
     priorityLevels:['normal','alta','urgente','critica'],
     csrf:document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')||'',
 
@@ -30,7 +49,7 @@ const NexoApp = {
         const o={headers:{'Accept':'application/json',...(opts.headers||{})},...opts};
         if(o.body&&typeof o.body==='object'&&!(o.body instanceof FormData)){o.body=JSON.stringify(o.body);o.headers['Content-Type']='application/json'}
         if(o.method&&o.method!=='GET')o.headers['X-CSRF-TOKEN']=this.csrf;
-        const r=await fetch(url,o);if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json();
+        const r=await fetch(url,o);if(!r.ok){if(o.signal?.aborted)throw new DOMException('Aborted','AbortError');throw new Error(`HTTP ${r.status}`)}return r.json();
     },
 
     // ═══ INBOX ═══
@@ -85,12 +104,15 @@ const NexoApp = {
     },
     filterLocal(t){this.searchTerm=t;this.renderInbox()},
 
-    // ═══ SELECT CONVERSA ═══
+    // ═══ SELECT CONVERSA (v2 — abort pending) ═══
     async selectConversa(id){
+        if(this._abortCtrl){try{this._abortCtrl.abort()}catch(e){}}
+        this._abortCtrl=new AbortController();
+        const signal=this._abortCtrl.signal;
         if(this.pollTimer)clearInterval(this.pollTimer);
         this.lastMsgId=null;this.lastMsgCount=0;
         try{
-            const j=await this.api(`/nexo/atendimento/conversas/${id}`);
+            const j=await this.api(`/nexo/atendimento/conversas/${id}`,{signal});
             this.conversaAtual=j.conversation;
             const cv=j.conversation;
             document.getElementById('chat-empty').classList.add('hidden');
@@ -115,7 +137,7 @@ const NexoApp = {
             if(typeof NexoDataJuri!=='undefined')NexoDataJuri.setConversation(id);
             switchTab('contexto');
             this.pollTimer=setInterval(()=>this.poll(id),5000);
-        }catch(e){console.error('Select error:',e)}
+        }catch(e){if(e.name==='AbortError')return;console.error('Select error:',e)}
     },
 
     // ═══ RENDER MENSAGENS COM MÍDIA ═══

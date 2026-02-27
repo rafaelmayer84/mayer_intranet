@@ -286,6 +286,81 @@ class Eval180Controller extends Controller
     }
 
     /**
+     * POST /gdp/batch-eval180
+     * Abre avaliação 180° para TODOS os profissionais elegíveis do mês.
+     */
+    public function batchOpen(Request $request)
+    {
+        $this->authorizeManager();
+
+        $data = $request->validate([
+            'cycle_id' => 'required|integer|exists:gdp_ciclos,id',
+            'period'   => 'required|string|regex:/^\d{4}-\d{2}$/',
+        ]);
+
+        $ciclo = \App\Models\GdpCiclo::findOrFail($data['cycle_id']);
+        $period = $data['period'];
+
+        // Usuários elegíveis
+        $users = User::whereIn('role', ['advogado', 'socio', 'coordenador', 'admin'])
+            ->where('ativo', true)
+            ->whereNotIn('id', [1, 2, 5, 6])
+            ->orderBy('name')
+            ->get();
+
+        $criados = 0;
+        $jaExistiam = 0;
+        $periodoLabel = \Carbon\Carbon::createFromFormat('Y-m', $period)->translatedFormat('F/Y');
+
+        foreach ($users as $user) {
+            $exists = Eval180Form::where('cycle_id', $ciclo->id)
+                ->where('user_id', $user->id)
+                ->where('period', $period)
+                ->exists();
+
+            if ($exists) {
+                $jaExistiam++;
+                continue;
+            }
+
+            Eval180Form::create([
+                'cycle_id'   => $ciclo->id,
+                'user_id'    => $user->id,
+                'period'     => $period,
+                'status'     => 'pending_self',
+                'created_by' => Auth::id(),
+            ]);
+            $criados++;
+
+            try {
+                $user->notify(new Eval180Notification('autoavaliacao_pendente', [
+                    'ciclo_nome'    => $ciclo->nome,
+                    'periodo_label' => $periodoLabel,
+                    'url'           => route('gdp.eval180.me.form', [$ciclo->id, $period]),
+                ]));
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('[Eval180] Notificacao falhou para user ' . $user->id . ': ' . $e->getMessage());
+            }
+        }
+
+        // Audit log
+        DB::table('gdp_audit_log')->insert([
+            'user_id'     => Auth::id(),
+            'entidade'    => 'gdp_eval180_forms',
+            'entidade_id' => 0,
+            'campo'       => 'eval180_batch_open',
+            'valor_novo'  => json_encode(['period' => $period, 'criados' => $criados, 'existentes' => $jaExistiam], JSON_UNESCAPED_UNICODE),
+            'ip'          => $request->ip(),
+            'created_at'  => now(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Avaliações abertas: {$criados} criadas, {$jaExistiam} já existiam.",
+        ]);
+    }
+
+    /**
      * POST /gdp/cycles/{id}/eval180/create
      * Cria avaliação avulsa e notifica avaliado.
      */

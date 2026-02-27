@@ -16,6 +16,7 @@ class Kernel extends ConsoleKernel
         Commands\CronSyncDataJuri::class,
         Commands\CronGdpApurar::class,
         Commands\CronGdpLembreteAcordo::class,
+        Commands\GdpAbrirEval180::class,
         // CronSyncEspoCrm removido em 13/02/2026
     ];
 
@@ -65,6 +66,12 @@ class Kernel extends ConsoleKernel
             ->dailyAt('03:00')
             ->timezone('America/Sao_Paulo')
             ->appendOutputTo(storage_path('logs/cron-crm-health.log'));
+        // GDP Eval180 → dia 1 de cada mes as 08:00 (abre avaliacao do mes anterior)
+        $schedule->command('gdp:abrir-eval180')
+            ->monthlyOn(1, '08:00')
+            ->timezone('America/Sao_Paulo')
+            ->appendOutputTo(storage_path('logs/cron-eval180.log'));
+
         // CRM Notificar contas inativas → diario 08:00
         $schedule->command('crm:notify-inactive')
             ->dailyAt('08:00')

@@ -1046,12 +1046,16 @@ function selectReceptivity(el) {
     var styles = { positiva: 'border-green-500 bg-green-50 text-green-800', neutra: 'border-yellow-500 bg-yellow-50 text-yellow-800', negativa: 'border-red-500 bg-red-50 text-red-800' };
     el.className = 'px-3 py-1.5 rounded-full text-xs font-semibold border-2 ' + styles[val];
 }
+function sanitizeText(str) {
+    if (!str) return str;
+    return str.replace(/[\u200B-\u200D\uFEFF\u00A0]/g, ' ').replace(/[\u201C\u201D]/g, '"').replace(/[\u201E]/g, '"').replace(/[\u2018\u2019]/g, "'").replace(/[\u2013\u2014]/g, '-').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
 function saveVisit(generatePdf) {
     var arrival = document.getElementById('visit_arrival').value;
     var departure = document.getElementById('visit_departure').value;
     var transport = document.getElementById('visit_transport').value;
     var objective = document.getElementById('visit_objective').value;
-    var body = document.getElementById('visit_body').value.trim();
+    var body = sanitizeText(document.getElementById('visit_body').value.trim());
     var visitDate = document.getElementById('visit_date').value;
     if (!arrival || !departure || !transport || !objective || !body) { alert('Preencha os campos obrigatorios: Hora de Chegada, Hora de Saida, Meio de Deslocamento, Objetivo e Relato.'); return; }
     var btn = generatePdf ? document.getElementById('btn-visit-pdf') : document.getElementById('btn-visit-save');
@@ -1060,8 +1064,8 @@ function saveVisit(generatePdf) {
     var payload = {
         type: 'visit', purpose: purposeMap[objective] || 'acompanhamento',
         title: 'Visita Presencial - ' + visitDate, body: body,
-        decisions: document.getElementById('visit_decisions').value.trim() || null,
-        pending_items: document.getElementById('visit_pending').value.trim() || null,
+        decisions: sanitizeText(document.getElementById('visit_decisions').value.trim()) || null,
+        pending_items: sanitizeText(document.getElementById('visit_pending').value.trim()) || null,
         due_at: document.getElementById('visit_next_contact').value || null,
         visit_arrival_time: arrival, visit_departure_time: departure,
         visit_transport: transport,
@@ -1075,13 +1079,26 @@ function saveVisit(generatePdf) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
         body: JSON.stringify(payload)
-    }).then(function(r) { return r.json(); }).then(function(d) {
+    }).then(function(r) {
+        if (!r.ok) { return r.json().then(function(err) { throw err; }); }
+        return r.json();
+    }).then(function(d) {
         if (d.ok) {
             btn.innerHTML = 'Registrado!';
             if (generatePdf) { window.open('{{ url("crm/accounts") }}/{{ $account->id }}/activities/' + d.id + '/pdf', '_blank'); }
             setTimeout(function() { window.location.href = window.location.pathname + '#atividades'; location.reload(); }, 800);
         } else { btn.innerHTML = origText; btn.disabled = false; alert(d.message || 'Erro ao salvar'); }
-    }).catch(function() { btn.innerHTML = origText; btn.disabled = false; alert('Erro de conexao'); });
+    }).catch(function(err) {
+        btn.innerHTML = origText; btn.disabled = false;
+        if (err && err.errors) {
+            var msgs = Object.values(err.errors).flat().join('\n');
+            alert('Erro de validacao:\n' + msgs);
+        } else if (err && err.message) {
+            alert('Erro: ' + err.message);
+        } else {
+            alert('Erro de conexao');
+        }
+    });
 }
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && !document.getElementById('modal-visit').classList.contains('hidden')) closeVisitModal(); });
 document.getElementById('modal-visit').addEventListener('click', function(e) { if (e.target === this) closeVisitModal(); });

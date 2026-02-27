@@ -24,7 +24,12 @@
     {{-- Ações do gestor --}}
     <div class="bg-white rounded-xl shadow-sm border p-4 mb-4">
         <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
             <h3 class="text-sm font-semibold text-gray-700">Criar avaliação avulsa</h3>
+            <button onclick="abrirAvaliacaoMes()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded-lg text-sm transition" title="Abre avaliação para TODOS os profissionais do mês selecionado">
+                🚀 Abrir Avaliação do Mês (Todos)
+            </button>
+        </div>
             <div class="flex gap-3 items-end">
                 <div>
                     <label class="text-xs text-gray-500">Profissional</label>
@@ -147,7 +152,46 @@
 
 @push('scripts')
 <script>
-function criarAvaliacao() {
+function abrirAvaliacaoMes() {
+        const period = document.getElementById('newEvalPeriod').value;
+
+        const mesLabel = new Date(period + '-01').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+
+        const btn = event.target;
+        btn.disabled = true;
+        btn.textContent = '⏳ Abrindo...';
+
+        fetch('{{ url("/gdp/batch-eval180") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                cycle_id: {{ $ciclo->id }},
+                period: period
+            })
+        })
+        .then(r => r.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.textContent = '🚀 Abrir Avaliação do Mês (Todos)';
+            if (data.success) {
+                alert('✅ ' + data.message);
+                location.reload();
+            } else {
+                alert('❌ ' + (data.message || 'Erro ao abrir avaliações.'));
+            }
+        })
+        .catch(() => {
+            btn.disabled = false;
+            btn.textContent = '🚀 Abrir Avaliação do Mês (Todos)';
+            alert('Erro de conexão.');
+        });
+    }
+
+    function criarAvaliacao() {
     const userId = document.getElementById('newEvalUser').value;
     const period = document.getElementById('newEvalPeriod').value;
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;

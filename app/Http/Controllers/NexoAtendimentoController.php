@@ -17,6 +17,18 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * ╔══════════════════════════════════════════════════════════════╗
+ * ║  NEXO ATENDIMENTO CONTROLLER — VERSÃO ESTÁVEL v2.1         ║
+ * ║  Data: 27/02/2026                                          ║
+ * ║  Status: CONGELADO — NÃO EDITAR SEM AUTORIZAÇÃO            ║
+ * ║                                                             ║
+ * ║  Qualquer extensão deve ser feita em:                       ║
+ * ║  - Novo Controller (ex: NexoAtendimentoExtController)       ║
+ * ║  - Novo Service (ex: NexoXxxService)                        ║
+ * ║  - NUNCA editar este arquivo diretamente                    ║
+ * ╚══════════════════════════════════════════════════════════════╝
+ */
 class NexoAtendimentoController extends Controller
 {
     public function index()
@@ -192,9 +204,9 @@ class NexoAtendimentoController extends Controller
     }
 
     /**
-     * Poll mensagens — serve APENAS dados locais (zero API externa).
+     * Poll mensagens — v2.2: sync leve a cada 30s + dados locais incrementais.
+     * Webhook grava incoming. Sync leve captura outgoing do bot.
      * Suporta polling incremental via ?since_id=N
-     * Webhook incoming + enviarMensagem() já gravam tudo no banco.
      */
     public function pollMessages(int $id, Request $request)
     {
@@ -202,8 +214,19 @@ class NexoAtendimentoController extends Controller
         $cid = $conversation->id;
         $sinceId = (int) $request->input('since_id', 0);
 
+        // Sync leve: a cada 30s, captura mensagens outgoing do bot
+        // Não bloqueia se falhar — serve dados locais de qualquer forma
+        $syncKey = "nexo_light_sync_{$cid}";
+        if (!Cache::has($syncKey) && !str_starts_with($conversation->contact_id ?? '', 'whatsapp_')) {
+            Cache::put($syncKey, true, 30);
+            try {
+                app(NexoConversationSyncService::class)->syncConversation($conversation);
+            } catch (\Throwable $e) {
+                Log::warning('Poll light sync error', ['cid' => $cid, 'error' => $e->getMessage()]);
+            }
+        }
+
         if ($sinceId > 0) {
-            // Incremental: apenas mensagens novas
             $msgs = $this->filterQaMessages(
                 WaMessage::where('conversation_id', $cid)
                     ->where('id', '>', $sinceId)
@@ -219,7 +242,6 @@ class NexoAtendimentoController extends Controller
             ]);
         }
 
-        // Full load (primeira vez)
         $msgs = $this->filterQaMessages(
             WaMessage::where('conversation_id', $cid)
                 ->orderBy('sent_at', 'asc')
@@ -706,37 +728,15 @@ class NexoAtendimentoController extends Controller
     }
 
     // === TAGS ===
+    /**
+     * Tags — serve APENAS dados locais (v2 27/02/2026).
+     * Zero chamadas API SendPulse. Tags sincronizadas via webhook/forceSync.
+     */
     public function getTags(int $id)
     {
         $conv = WaConversation::findOrFail($id);
-
-        try {
-            $spService = app(\App\Services\SendPulseWhatsAppService::class);
-            $contactInfo = $spService->getContactInfo($conv->contact_id);
-            $spTags = data_get($contactInfo, 'tags', []);
-
-            if (is_array($spTags) && count($spTags) > 0) {
-                $localTagIds = [];
-                foreach ($spTags as $spTag) {
-                    $tagName = is_array($spTag) ? ($spTag['name'] ?? null) : (is_string($spTag) ? $spTag : null);
-                    $tagId = is_array($spTag) ? ($spTag['id'] ?? null) : null;
-                    if (!$tagName) continue;
-
-                    $waTag = WaTag::updateOrCreate(
-                        ['provider_id' => $tagId ?? md5($tagName)],
-                        ['name' => $tagName]
-                    );
-                    $localTagIds[] = $waTag->id;
-                }
-                $conv->tags()->sync($localTagIds);
-            }
-        } catch (\Throwable $e) {
-            Log::warning("NEXO getTags sync falhou: " . $e->getMessage());
-        }
-
         $tags = $conv->tags()->get(['wa_tags.id', 'wa_tags.name', 'wa_tags.color', 'wa_tags.provider_id']);
         $allTags = WaTag::orderBy('name')->get(['id', 'name', 'color', 'provider_id']);
-
         return response()->json([
             'tags' => $tags,
             'all_tags' => $allTags,

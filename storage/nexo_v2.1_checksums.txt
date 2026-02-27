@@ -1,0 +1,10 @@
+# NEXO ATENDIMENTO — CHECKSUMS VERSÃO ESTÁVEL v2.1
+# Data: 27/02/2026
+# Se algum MD5 mudar, o arquivo foi editado sem autorização.
+#
+# Para verificar: md5sum <arquivo>
+#
+controller=e6420a1114d29f892856f69af8320265  app/Http/Controllers/NexoAtendimentoController.php
+scripts=62308b0f261759d2a4559caaa8735fac  resources/views/nexo/atendimento/partials/_nexo_scripts.blade.php
+view=1c05872f978a8e00da1c1c762a21a7ec  resources/views/nexo/atendimento/index.blade.php
+routes=fde45f78a1b9ad8f1b5768b58b01b976  routes/_nexo_routes.php

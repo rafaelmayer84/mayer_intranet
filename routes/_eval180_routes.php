@@ -39,6 +39,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/gdp/cycles/{id}/eval180/report', [Eval180Controller::class, 'report'])
         ->name('gdp.eval180.report');
 
+    // ── Abrir avaliação batch (todos profissionais do mês) ──
+    Route::post('/gdp/batch-eval180', [Eval180Controller::class, 'batchOpen'])
+        ->name('gdp.eval180.batch-open');
+
     // ── Criar avaliação avulsa + notificar ──
     Route::post('/gdp/cycles/{id}/eval180/create', [Eval180Controller::class, 'createEval'])
         ->name('gdp.eval180.create')->middleware('admin');

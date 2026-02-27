@@ -78,7 +78,11 @@ class NexoConversationSyncService
                     'unread_count'     => $conversation->unread_count + 1,
                 ];
                 if ($conversation->status === 'closed') $updateData['status'] = 'open';
-                if (empty($conversation->contact_id) && !empty($parsed['contact_id'])) $updateData['contact_id'] = $parsed['contact_id'];
+                // SEMPRE atualizar contact_id se webhook trouxer diferente (SendPulse recria contacts)
+                if (!empty($parsed['contact_id']) && $conversation->contact_id !== $parsed['contact_id']) {
+                    $updateData['contact_id'] = $parsed['contact_id'];
+                    \Log::info('NEXO-AUDIT: contact_id atualizado', ['conv_id' => $conversation->id, 'old' => $conversation->contact_id, 'new' => $parsed['contact_id']]);
+                }
                 if (empty($conversation->name) && !empty($parsed['contact_name'])) $updateData['name'] = $parsed['contact_name'];
                 if (empty($conversation->phone) && !empty($phone)) $updateData['phone'] = $phone;
                 $conversation->update($updateData);
@@ -150,6 +154,10 @@ class NexoConversationSyncService
 
     public function syncMessages(WaConversation $conversation, int $limit = 50): int
     {
+        if ($conversation->status === 'closed') {
+            return 0;
+        }
+
         if (empty($conversation->chat_id) && empty($conversation->contact_id)) {
             Log::warning('NexoSync: sem chat_id nem contact_id para sync', ['conversation_id' => $conversation->id]);
             return 0;
