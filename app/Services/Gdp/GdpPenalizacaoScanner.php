@@ -489,7 +489,7 @@ class GdpPenalizacaoScanner
             ->get();
 
         // Obter telefone do proprio usuario para excluir auto-conversas
-        $userPhone = DB::table('users')->where('id', $userId)->value('phone');
+        $userPhone = DB::table('users')->where('id', $userId)->value('telefone');
         $userPhoneSuffix = $userPhone ? substr(preg_replace('/\D/', '', $userPhone), -8) : null;
 
         $count = 0;

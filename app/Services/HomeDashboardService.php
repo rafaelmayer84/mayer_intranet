@@ -47,19 +47,19 @@ class HomeDashboardService
         try {
             $processos = DB::table('processos')
                 ->where(function ($qb) use ($q) {
-                    $qb->where('numero_processo', 'LIKE', $q)
+                    $qb->where('numero', 'LIKE', $q)
                         ->orWhere('titulo', 'LIKE', $q)
-                        ->orWhere('parte_contraria', 'LIKE', $q);
+                        ->orWhere('adverso_nome', 'LIKE', $q);
                 })
-                ->select('id', 'numero_processo', 'titulo', 'status', 'parte_contraria')
+                ->select('id', 'numero', 'titulo', 'status', 'adverso_nome')
                 ->orderByDesc('id')->limit($limit)->get();
             foreach ($processos as $p) {
                 $results[] = [
                     'tipo' => 'processo', 'badge' => 'Processo',
                     'badge_cor' => 'bg-purple-100 text-purple-800',
                     'icon' => 'fa-solid fa-gavel',
-                    'titulo' => $p->numero_processo,
-                    'subtitulo' => mb_substr($p->titulo ?: ($p->parte_contraria ?: ''), 0, 60),
+                    'titulo' => $p->numero,
+                    'subtitulo' => mb_substr($p->titulo ?: ($p->adverso_nome ?: ''), 0, 60),
                     'url' => (function() use ($p) {
                         if (isset($p->cliente_id) && $p->cliente_id) {
                             $cli = \Illuminate\Support\Facades\DB::table('clientes')
@@ -260,7 +260,7 @@ class HomeDashboardService
             $naoLidos = DB::table('avisos')
                 ->leftJoin('avisos_lidos', function ($join) use ($userId) {
                     $join->on('avisos.id', '=', 'avisos_lidos.aviso_id')
-                         ->where('avisos_lidos.user_id', '=', $userId);
+                         ->where('avisos_lidos.usuario_id', '=', $userId);
                 })
                 ->whereNull('avisos_lidos.id')
                 ->select('avisos.id', 'avisos.titulo', 'avisos.prioridade', 'avisos.created_at', 'avisos.destaque')
@@ -270,7 +270,7 @@ class HomeDashboardService
             $total = DB::table('avisos')
                 ->leftJoin('avisos_lidos', function ($join) use ($userId) {
                     $join->on('avisos.id', '=', 'avisos_lidos.aviso_id')
-                         ->where('avisos_lidos.user_id', '=', $userId);
+                         ->where('avisos_lidos.usuario_id', '=', $userId);
                 })
                 ->whereNull('avisos_lidos.id')->count();
 
@@ -302,4 +302,54 @@ class HomeDashboardService
             return ['clientes' => 0, 'processos' => 0, 'oportunidades' => 0, 'leads' => 0];
         }
     }
+
+    public function getSolicitacoes(int $userId): array
+    {
+        try {
+            $abertas = DB::table('crm_service_requests')
+                ->where(function ($q) use ($userId) {
+                    $q->where('requested_by_user_id', $userId)
+                       ->orWhere('assigned_to_user_id', $userId);
+                })
+                ->whereIn('status', ['aberto', 'em_andamento', 'aguardando_aprovacao', 'aprovado'])
+                ->select('id', 'subject', 'category', 'status', 'priority', 'created_at', 'account_id')
+                ->orderByDesc('created_at')
+                ->limit(8)
+                ->get();
+
+            $totalAbertas = DB::table('crm_service_requests')
+                ->where(function ($q) use ($userId) {
+                    $q->where('requested_by_user_id', $userId)
+                       ->orWhere('assigned_to_user_id', $userId);
+                })
+                ->whereIn('status', ['aberto', 'em_andamento', 'aguardando_aprovacao', 'aprovado'])
+                ->count();
+
+            $totalConcluidas = DB::table('crm_service_requests')
+                ->where(function ($q) use ($userId) {
+                    $q->where('requested_by_user_id', $userId)
+                       ->orWhere('assigned_to_user_id', $userId);
+                })
+                ->where('status', 'concluido')
+                ->count();
+
+            return [
+                'total_abertas' => $totalAbertas,
+                'total_concluidas' => $totalConcluidas,
+                'items' => $abertas->map(fn($s) => [
+                    'id' => $s->id,
+                    'subject' => $s->subject ?: ('Solicitacao #' . $s->id),
+                    'category' => $s->category,
+                    'status' => $s->status,
+                    'priority' => $s->priority ?? 'normal',
+                    'criado_em' => Carbon::parse($s->created_at)->format('d/m H:i'),
+                    'account_id' => $s->account_id,
+                ])->toArray(),
+            ];
+        } catch (\Throwable $e) {
+            Log::warning('Home solicitacoes: ' . $e->getMessage());
+            return ['total_abertas' => 0, 'total_concluidas' => 0, 'items' => []];
+        }
+    }
+
 }
