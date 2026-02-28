@@ -533,7 +533,7 @@ class DataJuriSyncOrchestrator
             }
 
             // FIX: campos que nao aceitam string vazia - converter para null
-            if ($value === '' && (
+            if (($value === '' || $value === null) && (
                 str_ends_with($dbField, '_datajuri_id') ||
                 str_ends_with($dbField, '_id_datajuri') ||
                 in_array($dbField, [
@@ -568,7 +568,7 @@ class DataJuriSyncOrchestrator
             'proprietario_id', 'advogado_id',
         ];
         foreach ($integerNullableFields as $field) {
-            if (array_key_exists($field, $data) && $data[$field] === '') {
+            if (array_key_exists($field, $data) && ($data[$field] === '' || $data[$field] === null)) {
                 $data[$field] = null;
             }
         }
@@ -584,6 +584,14 @@ class DataJuriSyncOrchestrator
         foreach ($decimalNotNullFields as $field) {
             if (array_key_exists($field, $data) && ($data[$field] === '' || $data[$field] === null)) {
                 $data[$field] = 0;
+            }
+        }
+
+        // 4a. Campos texto opcionais: string vazia -> null
+        $textNullableFields = ['advogado_nome', 'data_ultimo_andamento', 'data_conclusao'];
+        foreach ($textNullableFields as $field) {
+            if (array_key_exists($field, $data) && $data[$field] === '') {
+                $data[$field] = null;
             }
         }
 
@@ -668,7 +676,7 @@ class DataJuriSyncOrchestrator
                       'plano_conta_id', 'proprietario_id', 'pessoaId', 'planoContaId',
                       'processoId', 'proprietarioId'];
         foreach ($intFields as $field) {
-            if (array_key_exists($field, $data) && $data[$field] === '') {
+            if (array_key_exists($field, $data) && ($data[$field] === '' || $data[$field] === null)) {
                 $data[$field] = null;
             }
         }
