@@ -92,7 +92,30 @@ class CrmServiceRequestController extends Controller
         $users = User::orderBy('name')->get(['id', 'name']);
         $categorias = CrmServiceRequest::categorias();
 
-        return view('crm.service-requests.show', compact('sr', 'users', 'categorias'));
+        // Timeline: events + comments
+        $events = \DB::table('crm_events')
+            ->where('type', 'LIKE', 'service_request%')
+            ->whereRaw("JSON_EXTRACT(payload, '$.sr_id') = ?", [$id])
+            ->get()
+            ->map(fn($e) => (object)[
+                'kind'       => 'event',
+                'type'       => $e->type,
+                'payload'    => json_decode($e->payload, true),
+                'user_id'    => $e->created_by_user_id,
+                'created_at' => $e->happened_at,
+            ]);
+        $comments = $sr->comments->map(fn($c) => (object)[
+            'kind'        => 'comment',
+            'type'        => $c->is_internal ? 'internal_note' : 'comment',
+            'payload'     => ['body' => $c->body],
+            'user_id'     => $c->user_id,
+            'user_name'   => $c->user->name ?? '-',
+            'created_at'  => $c->created_at->format('Y-m-d H:i:s'),
+        ]);
+        $timeline = $events->concat($comments)->sortBy('created_at')->values();
+        $userNames = \App\Models\User::pluck('name', 'id');
+
+        return view('crm.service-requests.show', compact('sr', 'users', 'categorias', 'timeline', 'userNames'));
     }
 
     /**

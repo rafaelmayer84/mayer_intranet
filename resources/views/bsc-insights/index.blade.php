@@ -156,7 +156,7 @@
     {{-- Last run info --}}
     @if($lastRun)
     <div class="mb-6 px-4 py-2 bg-gray-50/80 border border-gray-100 rounded-xl text-xs text-gray-400 flex items-center justify-between">
-        <span>🕐 {{ $snapshotDate->timezone('America/Sao_Paulo')->format('d/m/Y H:i') }} · {{ $lastRun->model }} · {{ $lastRun->total_tokens }} tokens · ${{ number_format($lastRun->estimated_cost_usd, 4) }}</span>
+        <span>🕐 {{ $snapshotDate->timezone('America/Sao_Paulo')->format('d/m/Y H:i') }} · {{ $lastRun->model }} · {{ $lastRun->input_tokens + $lastRun->output_tokens }} tokens · ${{ number_format($lastRun->estimated_cost_usd, 4) }}</span>
         <span>Run #{{ $lastRun->id }}</span>
     </div>
     @endif
@@ -223,7 +223,7 @@
                     </div>
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
                         @foreach($cards[$universo] as $cIdx => $card)
-                            @include('bsc-insights._card', ['card' => $card, 'delay' => ($uIdx * 3 + $cIdx) * 80])
+                            @include('bsc-insights._card', ['card' => $card, 'delay' => ($uIdx * 3 + $cIdx) * 80, 'universo' => $universo])
                         @endforeach
                     </div>
                 </div>

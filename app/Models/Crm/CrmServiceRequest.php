@@ -11,6 +11,8 @@ class CrmServiceRequest extends Model
         'account_id', 'category', 'subject', 'description', 'priority', 'status',
         'requested_by_user_id', 'assigned_to_user_id', 'approved_by_user_id',
         'requires_approval', 'resolution_notes', 'assigned_at', 'approved_at', 'resolved_at',
+        'sla_deadline', 'sla_hours', 'sla_complexity', 'sla_justification', 'sla_analyzed_at',
+        'desired_deadline', 'cost_center', 'estimated_value', 'impact', 'attachments', 'ai_triage',
     ];
 
     protected $casts = [
@@ -18,6 +20,11 @@ class CrmServiceRequest extends Model
         'assigned_at' => 'datetime',
         'approved_at' => 'datetime',
         'resolved_at' => 'datetime',
+        'sla_deadline' => 'datetime',
+        'sla_analyzed_at' => 'datetime',
+        'desired_deadline' => 'date',
+        'attachments' => 'array',
+        'ai_triage' => 'array',
     ];
 
     public function account()
@@ -63,7 +70,14 @@ class CrmServiceRequest extends Model
             'solicitacao_ti'       => ['label' => 'Solicitação de TI', 'approval' => false],
             'solicitacao_financeiro' => ['label' => 'Solicitação Financeira', 'approval' => false],
             'solicitacao_rh'       => ['label' => 'Solicitação de RH', 'approval' => false],
-            'outra'                => ['label' => 'Outra Solicitação', 'approval' => false],
+            'outra'                => ['label' => 'Outra Solicitacao', 'approval' => false],
+            // Categorias operacionais (sem vinculo obrigatorio com cliente)
+            'compra_materiais'     => ['label' => 'Compra de Materiais', 'approval' => true],
+            'manutencao'           => ['label' => 'Manutencao/Reparos', 'approval' => false],
+            'suprimentos'          => ['label' => 'Suprimentos de Escritorio', 'approval' => false],
+            'infraestrutura_ti'    => ['label' => 'Infraestrutura de TI', 'approval' => false],
+            'servicos_terceiros'   => ['label' => 'Contratacao de Servicos', 'approval' => true],
+            'logistica'            => ['label' => 'Logistica/Entregas', 'approval' => false],
         ];
     }
 
@@ -122,5 +136,26 @@ class CrmServiceRequest extends Model
             'urgente' => 'bg-red-100 text-red-700',
             default => 'bg-gray-100 text-gray-600',
         };
+    }
+
+    public function isSlaExpired(): bool
+    {
+        return $this->sla_deadline && now()->gt($this->sla_deadline) && $this->isOpen();
+    }
+
+    public function slaRemainingHours(): ?float
+    {
+        if (!$this->sla_deadline) return null;
+        if (!$this->isOpen()) return null;
+        return round(now()->diffInMinutes($this->sla_deadline, false) / 60, 1);
+    }
+
+    public function isOperacional(): bool
+    {
+        return in_array($this->category, [
+            'compra_materiais', 'manutencao', 'suprimentos',
+            'infraestrutura_ti', 'servicos_terceiros', 'logistica',
+            'solicitacao_ti', 'solicitacao_financeiro', 'solicitacao_rh',
+        ]);
     }
 }

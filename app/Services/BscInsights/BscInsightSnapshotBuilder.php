@@ -68,30 +68,21 @@ class BscInsightSnapshotBuilder
             $meses = $this->seriesMensal();
             $receitaPF = [];
             $receitaPJ = [];
+            $receitaTotal = [];
             $despesas  = [];
             $deducoes  = [];
-
-            foreach ($meses as $m) {
-                $base = DB::table('movimentos')
-                    ->whereYear('data', $m['ano'])
-                    ->whereMonth('data', $m['mes']);
-
-                $calc = app(FinanceiroCalculatorService::class);
-                $dre = $calc->dre($m['ano'], $m['mes']);
-                $receitaPF[$m['key']] = $dre['receita_pf'];
-                $receitaPJ[$m['key']] = $dre['receita_pj'];
-                $despesas[$m['key']]  = -$dre['despesas'];
-                $deducoes[$m['key']]  = -$dre['deducoes'];
-            }
-
-            $receitaTotal = [];
-            foreach ($meses as $m) {
-                $receitaTotal[$m['key']] = $dre['receita_total'];
-            }
-
             $resultado = [];
+
+            $calc = app(FinanceiroCalculatorService::class);
+
             foreach ($meses as $m) {
-                $resultado[$m['key']] = $receitaTotal[$m['key']] + $despesas[$m['key']] + $deducoes[$m['key']];
+                $dre = $calc->dre($m['ano'], $m['mes']);
+                $receitaPF[$m['key']]    = $dre['receita_pf'];
+                $receitaPJ[$m['key']]    = $dre['receita_pj'];
+                $receitaTotal[$m['key']] = $dre['receita_total'];
+                $despesas[$m['key']]     = $dre['despesas'];
+                $deducoes[$m['key']]     = $dre['deducoes'];
+                $resultado[$m['key']]    = $dre['resultado'];
             }
 
             $lastKey = end($meses)['key'];
@@ -181,8 +172,9 @@ class BscInsightSnapshotBuilder
             $novosClientesMensal = [];
             foreach ($this->seriesMensal() as $m) {
                 $novosClientesMensal[$m['key']] = DB::table('clientes')
-                    ->whereYear('created_at', $m['ano'])
-                    ->whereMonth('created_at', $m['mes'])
+                    ->whereNotNull('data_primeiro_contato')
+                    ->whereYear('data_primeiro_contato', $m['ano'])
+                    ->whereMonth('data_primeiro_contato', $m['mes'])
                     ->count();
             }
 
@@ -448,10 +440,15 @@ class BscInsightSnapshotBuilder
 
             $horasMensal = [];
             foreach ($this->seriesMensal() as $m) {
-                $horasMensal[$m['key']] = (float) DB::table('horas_trabalhadas_datajuri')
+                // duracao_original é VARCHAR 'HH:MM' — converter para horas decimais
+                $minutos = (int) DB::table('horas_trabalhadas_datajuri')
                     ->whereYear('data', $m['ano'])
                     ->whereMonth('data', $m['mes'])
-                    ->sum('total_hora_trabalhada');
+                    ->whereNotNull('duracao_original')
+                    ->where('duracao_original', '!=', '')
+                    ->selectRaw("SUM(CAST(SUBSTRING_INDEX(duracao_original, ':', 1) AS UNSIGNED) * 60 + CAST(SUBSTRING_INDEX(duracao_original, ':', -1) AS UNSIGNED)) as total_min")
+                    ->value('total_min');
+                $horasMensal[$m['key']] = round($minutos / 60, 2);
             }
 
             $valorMensal = [];
@@ -463,13 +460,19 @@ class BscInsightSnapshotBuilder
             }
 
             $porProprietario = DB::table('horas_trabalhadas_datajuri')
-                ->select('proprietario_id', DB::raw('SUM(total_hora_trabalhada) as horas'), DB::raw('COUNT(*) as registros'))
+                ->select(
+                    'proprietario_id',
+                    DB::raw("SUM(CAST(SUBSTRING_INDEX(duracao_original, ':', 1) AS UNSIGNED) * 60 + CAST(SUBSTRING_INDEX(duracao_original, ':', -1) AS UNSIGNED)) as total_min"),
+                    DB::raw('COUNT(*) as registros')
+                )
                 ->whereNotNull('proprietario_id')
+                ->whereNotNull('duracao_original')
+                ->where('duracao_original', '!=', '')
                 ->groupBy('proprietario_id')
-                ->orderByDesc('horas')
+                ->orderByDesc('total_min')
                 ->limit(10)
                 ->get()
-                ->map(fn($r) => ['proprietario_id' => $r->proprietario_id, 'horas' => (float) $r->horas, 'registros' => $r->registros])
+                ->map(fn($r) => ['proprietario_id' => $r->proprietario_id, 'horas' => round((float) $r->total_min / 60, 2), 'registros' => $r->registros])
                 ->toArray();
 
             return [

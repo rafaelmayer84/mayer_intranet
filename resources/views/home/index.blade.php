@@ -304,6 +304,74 @@
             @endif
         </div>
 
+
+        {{-- Solicitacoes CRM --}}
+        <div class="rounded-2xl bg-white border border-gray-100 p-5">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center">
+                        <i class="fa-solid fa-clipboard-list text-violet-500 text-sm"></i>
+                    </div>
+                    <h3 class="font-bold text-sm" style="color: #1B334A;">Solicitacoes</h3>
+                    @if($solicitacoes['total_abertas'] > 0)
+                    <span class="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-full bg-violet-100 text-violet-700 text-[10px] font-black">{{ $solicitacoes['total_abertas'] }}</span>
+                    @endif
+                </div>
+                <a href="{{ url('/crm') }}" class="text-[11px] font-bold uppercase tracking-wider hover:underline" style="color: #385776;">CRM &rarr;</a>
+            </div>
+
+            {{-- Contadores --}}
+            <div class="flex items-center gap-3 mb-4">
+                <div class="flex-1 text-center py-2 rounded-xl bg-violet-50">
+                    <span class="block text-lg font-black text-violet-700">{{ $solicitacoes['total_abertas'] }}</span>
+                    <span class="text-[10px] text-violet-500 font-medium">Abertas</span>
+                </div>
+                <div class="flex-1 text-center py-2 rounded-xl bg-gray-50">
+                    <span class="block text-lg font-black text-gray-500">{{ $solicitacoes['total_concluidas'] }}</span>
+                    <span class="text-[10px] text-gray-400 font-medium">Concluidas</span>
+                </div>
+            </div>
+
+            @if(count($solicitacoes['items']) > 0)
+            <div class="space-y-1.5 max-h-48 overflow-y-auto">
+                @foreach($solicitacoes['items'] as $sr)
+                <a href="{{ url('/crm/solicitacoes/' . $sr['id']) }}" class="flex items-center gap-3 p-2.5 rounded-xl hover:bg-violet-50/50 transition">
+                    <span class="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-black
+                        @if($sr['priority'] === 'urgente') bg-red-100 text-red-600
+                        @elseif($sr['priority'] === 'alta') bg-orange-100 text-orange-600
+                        @else bg-violet-100 text-violet-500 @endif">#{{ $sr['id'] }}</span>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs font-semibold text-gray-800 truncate">{{ $sr['subject'] }}</p>
+                        <p class="text-[10px] text-gray-400">{{ $sr['criado_em'] }}</p>
+                    </div>
+                    @php
+                        $sBadge = match($sr['status']) {
+                            'aberto' => 'bg-blue-50 text-blue-600',
+                            'em_andamento' => 'bg-yellow-50 text-yellow-600',
+                            'aguardando_aprovacao' => 'bg-purple-50 text-purple-600',
+                            'aprovado' => 'bg-green-50 text-green-600',
+                            default => 'bg-gray-50 text-gray-500',
+                        };
+                        $sLabel = match($sr['status']) {
+                            'aberto' => 'Aberto',
+                            'em_andamento' => 'Andamento',
+                            'aguardando_aprovacao' => 'Aprovacao',
+                            'aprovado' => 'Aprovado',
+                            default => $sr['status'],
+                        };
+                    @endphp
+                    <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-md {{ $sBadge }}">{{ $sLabel }}</span>
+                </a>
+                @endforeach
+            </div>
+            @else
+            <div class="text-center py-5">
+                <div class="w-10 h-10 mx-auto mb-2 rounded-xl bg-emerald-50 flex items-center justify-center"><i class="fa-solid fa-check text-emerald-400"></i></div>
+                <p class="text-xs text-gray-300">Nenhuma solicitacao aberta</p>
+            </div>
+            @endif
+        </div>
+
         {{-- Atalhos Rapidos --}}
         <div class="rounded-2xl bg-white border border-gray-100 p-5">
             <div class="flex items-center gap-2.5 mb-4">

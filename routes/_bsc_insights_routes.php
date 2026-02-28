@@ -17,4 +17,7 @@ Route::middleware(['auth','modulo:resultados.bsc-insights,visualizar'])->group(f
 
     Route::post('/bsc-insights/generate', [BscInsightsController::class, 'generate'])
         ->name('bsc-insights.generate');
+
+    Route::get('/bsc-insights/status/{runId}', [BscInsightsController::class, 'status'])
+        ->name('bsc-insights.status');
 });

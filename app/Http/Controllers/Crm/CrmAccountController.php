@@ -541,7 +541,7 @@ class CrmAccountController extends Controller
                             ->where('conversation_id', $wa->id)
                             ->orderByDesc('created_at')
                             ->limit(20)
-                            ->get(['id', 'direction', 'body', 'type', 'status', 'created_at'])
+                            ->get(['id', 'direction', 'body', 'message_type', 'created_at'])
                             ->reverse()
                             ->values()
                             ->toArray();

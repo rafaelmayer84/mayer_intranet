@@ -26,6 +26,7 @@ class HomeController extends Controller
         $resumoFinanceiro = $this->service->getResumoFinanceiro();
         $avisos           = $this->service->getAvisosNaoLidos($userId);
         $volumetria       = $this->service->getVolumetria();
+        $solicitacoes     = $this->service->getSolicitacoes($userId);
 
         $hora = (int) now()->format('H');
         if ($hora < 12) $saudacao = 'Bom dia';
@@ -37,7 +38,7 @@ class HomeController extends Controller
         return view('home.index', compact(
             'user', 'saudacao', 'primeiroNome',
             'gdpScore', 'alertasCrm', 'ticketsAbertos',
-            'resumoFinanceiro', 'avisos', 'volumetria'
+            'resumoFinanceiro', 'avisos', 'volumetria', 'solicitacoes'
         ));
     }
 

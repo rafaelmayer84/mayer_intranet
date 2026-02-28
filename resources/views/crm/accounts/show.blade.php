@@ -544,7 +544,7 @@
                     <div class="flex {{ $isIncoming ? 'justify-start' : 'justify-end' }}">
                         <div class="max-w-[80%] rounded-lg px-3 py-2 text-sm {{ $isIncoming ? 'bg-gray-100 text-gray-800' : 'bg-[#385776] text-white' }}">
                             @if($msg->body)<p>{{ \Illuminate\Support\Str::limit($msg->body, 300) }}</p>@endif
-                            @if($msg->type !== 'text')<span class="text-xs opacity-60">[{{ $msg->type }}]</span>@endif
+                            @if($msg->message_type !== 'text')<span class="text-xs opacity-60">[{{ $msg->message_type }}]</span>@endif
                             <p class="text-xs {{ $isIncoming ? 'text-gray-400' : 'text-blue-200' }} mt-1">{{ \Carbon\Carbon::parse($msg->created_at)->format('d/m H:i') }}</p>
                         </div>
                     </div>
