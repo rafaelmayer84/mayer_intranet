@@ -443,7 +443,6 @@ class DataJuriSyncService
                 $data = [
                     'datajuri_id' => $datajuriId,
                     'nome' => $pessoa['nome'] ?? null,
-                    'documento' => $pessoa['numeroDocumento'] ?? null,
                     'cpf_cnpj' => $pessoa['numeroDocumento'] ?? null,
                     'cpf' => $pessoa['cpf'] ?? null,
                     'cnpj' => $pessoa['cnpj'] ?? null,
