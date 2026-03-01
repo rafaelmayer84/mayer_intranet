@@ -20,6 +20,9 @@ class JustusMessage extends Model
         'style_version',
         'citations',
         'metadata',
+            'feedback',
+        'feedback_note',
+        'feedback_at',
     ];
 
     protected $casts = [

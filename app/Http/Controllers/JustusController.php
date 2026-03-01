@@ -327,6 +327,53 @@ class JustusController extends Controller
         return response()->json(['success' => true, 'message' => 'Configuração salva.']);
     }
 
+    public function messageFeedback(Request $request, int $conversationId, int $messageId)
+    {
+        $request->validate([
+            'feedback' => 'required|in:positive,negative',
+            'note' => 'nullable|string|max:500',
+        ]);
+
+        $user = Auth::user();
+        $message = JustusMessage::whereHas('conversation', function ($q) use ($user) {
+            $q->where('user_id', $user->id);
+        })->where('id', $messageId)
+          ->where('conversation_id', $conversationId)
+          ->where('role', 'assistant')
+          ->firstOrFail();
+
+        $message->update([
+            'feedback' => $request->input('feedback'),
+            'feedback_note' => $request->input('note'),
+            'feedback_at' => now(),
+        ]);
+
+        return response()->json(['success' => true]);
+    }
+
+    public function adminFeedbackReport()
+    {
+        $this->authorizeAdmin();
+
+        $stats = [
+            'total' => JustusMessage::where('role', 'assistant')->whereNotNull('feedback')->count(),
+            'positive' => JustusMessage::where('role', 'assistant')->where('feedback', 'positive')->count(),
+            'negative' => JustusMessage::where('role', 'assistant')->where('feedback', 'negative')->count(),
+        ];
+
+        $negatives = JustusMessage::where('role', 'assistant')
+            ->where('feedback', 'negative')
+            ->with(['conversation:id,title,mode,type,user_id', 'conversation.user:id,name'])
+            ->orderByDesc('feedback_at')
+            ->limit(50)
+            ->get(['id', 'conversation_id', 'content', 'feedback_note', 'feedback_at', 'model_used', 'input_tokens', 'output_tokens']);
+
+        return response()->json([
+            'stats' => $stats,
+            'negatives' => $negatives,
+        ]);
+    }
+
     private function authorizeAdmin(): void
     {
         if (!in_array(auth()->user()->role, ['admin'])) {

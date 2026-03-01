@@ -429,6 +429,7 @@ function justusApp() {
                 if (result.success && result.message) {
                     const msg = result.message;
                     const mdHtml = (typeof marked !== 'undefined' && marked.parse) ? marked.parse(msg.content || '') : this.esc(msg.content || '').replace(/\n/g, '<br>');
+                    const feedbackHtml = msg.role === 'assistant' ? `<div class="mt-2 flex items-center gap-2"><button onclick="sendFeedback(${msg.conversation_id || ''}, ${msg.id}, 'positive', this)" class="p-1 rounded text-gray-300 hover:text-green-500 hover:bg-green-50 transition-all" title="Boa resposta"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/></svg></button><button onclick="sendFeedback(${msg.conversation_id || ''}, ${msg.id}, 'negative', this)" class="p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all" title="Resposta ruim"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018c.163 0 .326.02.485.06L17 4m-7 10v2a2 2 0 002 2h.095c.5 0 .905-.405.905-.905 0-.714.211-1.412.608-2.006L17 13V4m-7 10h2m5-6h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5"/></svg></button></div>` : '';
                     const tokensInfo = msg.input_tokens ? `<div class="mt-3 pt-2 border-t border-gray-50 text-[10px] text-gray-300 flex items-center gap-3"><span>${(msg.input_tokens+msg.output_tokens).toLocaleString()} tokens</span><span>R$ ${parseFloat(msg.cost_brl).toFixed(4).replace('.',',')}</span></div>` : '';
 
                     chat.insertAdjacentHTML('beforeend', `
@@ -442,6 +443,7 @@ function justusApp() {
                                     <span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#f0f2f5;color:#6b7280;">${msg.model_used || ''}</span>
                                 </div>
                                 <div class="prose prose-sm max-w-none text-gray-700 justus-md">${mdHtml}</div>
+                                ${feedbackHtml}
                                 ${tokensInfo}
                             </div>
                         </div>`);
@@ -584,4 +586,24 @@ function renderMarkdown(el) {
 </div>
 </template>
 
+<script>
+async function sendFeedback(convId, msgId, type, btn) {
+    if (!convId) convId = window.location.search.match(/c=(\d+)/)?.[1];
+    if (!convId || !msgId) return;
+    const parent = btn.parentElement;
+    parent.querySelectorAll('button').forEach(b => b.disabled = true);
+    try {
+        const res = await fetch(`/justus/${convId}/messages/${msgId}/feedback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'Accept': 'application/json' },
+            body: JSON.stringify({ feedback: type }),
+        });
+        if (res.ok) {
+            btn.classList.remove('text-gray-300');
+            if (type === 'positive') { btn.classList.add('bg-green-100', 'text-green-600'); }
+            else { btn.classList.add('bg-red-100', 'text-red-600'); }
+        }
+    } catch (e) { parent.querySelectorAll('button').forEach(b => b.disabled = false); }
+}
+</script>
 @endsection

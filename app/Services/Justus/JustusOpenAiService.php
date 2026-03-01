@@ -147,6 +147,11 @@ class JustusOpenAiService
 
             $this->budget->recordUsage($userId, $inputTokens, $outputTokens, $costBrl);
 
+            // Auto-gerar titulo na primeira mensagem
+            if ($conversation->messages()->where('role', 'assistant')->count() === 1 && $conversation->title === 'Nova Analise') {
+                $this->generateTitle($conversation, $userMessage, $content);
+            }
+
             SystemEvent::sistema('justus', 'info', 'JUSTUS: Resposta gerada', null, ['conversation_id' => $conversation->id, 'model' => $model, 'cost' => $costBrl]);
 
             return [
@@ -161,6 +166,37 @@ class JustusOpenAiService
             SystemEvent::sistema('justus', 'error', 'JUSTUS: Erro OpenAI', null, ['conversation_id' => $conversation->id]);
 
             return ['success' => false, 'error' => 'Erro interno: ' . $e->getMessage(), 'blocked' => false];
+        }
+    }
+
+    private function generateTitle(JustusConversation $conversation, string $userMessage, string $assistantResponse): void
+    {
+        try {
+            $apiKey = config('justus.openai_api_key');
+            $snippet = mb_substr($userMessage, 0, 300);
+            $respSnippet = mb_substr($assistantResponse, 0, 200);
+
+            $response = Http::withToken($apiKey)
+                ->timeout(15)
+                ->post('https://api.openai.com/v1/chat/completions', [
+                    'model' => 'gpt-5-mini',
+                    'messages' => [
+                        ['role' => 'system', 'content' => 'Gere um titulo curto (maximo 6 palavras) para esta conversa juridica. Sem aspas, sem pontuacao final. O titulo deve identificar rapidamente o caso. Exemplos: Rescisao Indireta Gerente Varejista, Execucao Fiscal Empresa X, Revisao Contratual Locacao Comercial, Honorarios Sucumbencia Excesso Execucao.'],
+                        ['role' => 'user', 'content' => "Pergunta: {$snippet}
+Resposta: {$respSnippet}"],
+                    ],
+                    'max_completion_tokens' => 30,
+                ]);
+
+            if ($response->successful()) {
+                $title = trim($response->json('choices.0.message.content') ?? '');
+                $title = str_replace(['"', "'", '.', '!', '?'], '', $title);
+                if (!empty($title) && mb_strlen($title) <= 60) {
+                    $conversation->update(['title' => $title]);
+                }
+            }
+        } catch (\Exception $e) {
+            Log::warning('JUSTUS: Falha ao gerar titulo', ['error' => $e->getMessage()]);
         }
     }
 

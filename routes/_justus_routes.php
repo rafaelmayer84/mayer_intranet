@@ -15,8 +15,11 @@ Route::middleware(['auth'])->prefix('justus')->name('justus.')->group(function (
     Route::get('/{conversation}/attachment-status/{attachment}', [JustusController::class, 'checkAttachmentStatus'])->name('attachment.status');
     Route::delete('/{conversation}', [JustusController::class, 'destroyConversation'])->name('conversations.destroy');
 
+    Route::post('/{conversation}/messages/{message}/feedback', [JustusController::class, 'messageFeedback'])->name('message.feedback');
+
     // Admin routes
     Route::get('/admin/config', [JustusController::class, 'adminConfig'])->name('admin.config');
     Route::put('/admin/guides/{guide}', [JustusController::class, 'adminUpdateGuide'])->name('admin.guides.update');
+    Route::get('/admin/feedback', [JustusController::class, 'adminFeedbackReport'])->name('admin.feedback');
 
 });
