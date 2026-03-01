@@ -83,26 +83,4 @@ return [
     */
     'queue_name' => env('JUSTUS_QUEUE_NAME', 'justus'),
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | Jurisprudencia STJ (Dados Abertos CKAN)
-    |--------------------------------------------------------------------------
-    */
-    'stj_ckan_base_url' => 'https://dadosabertos.web.stj.jus.br',
-    'stj_datasets' => [
-        'espelhos-de-acordaos-corte-especial',
-        'espelhos-de-acordaos-primeira-secao',
-        'espelhos-de-acordaos-segunda-secao',
-        'espelhos-de-acordaos-terceira-secao',
-        'espelhos-de-acordaos-primeira-turma',
-        'espelhos-de-acordaos-segunda-turma',
-        'espelhos-de-acordaos-terceira-turma',
-        'espelhos-de-acordaos-quarta-turma',
-        'espelhos-de-acordaos-quinta-turma',
-        'espelhos-de-acordaos-sexta-turma',
-    ],
-    'stj_max_results_prompt' => (int) env('JUSTUS_STJ_MAX_RESULTS', 5),
-    'stj_sync_timeout' => (int) env('JUSTUS_STJ_SYNC_TIMEOUT', 300),
-
 ];

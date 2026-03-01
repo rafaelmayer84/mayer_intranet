@@ -15,13 +15,11 @@ class JustusOpenAiService
     private JustusBudgetService $budget;
     private JustusClaudeService $claude;
     private JustusRagService $rag;
-    private JustusJurisprudenciaService $jurisprudencia;
 
-    public function __construct(JustusBudgetService $budget, JustusRagService $rag, JustusJurisprudenciaService $jurisprudencia)
+    public function __construct(JustusBudgetService $budget, JustusRagService $rag)
     {
         $this->budget = $budget;
         $this->rag = $rag;
-        $this->jurisprudencia = $jurisprudencia;
     }
 
     public function sendMessage(JustusConversation $conversation, string $userMessage): array

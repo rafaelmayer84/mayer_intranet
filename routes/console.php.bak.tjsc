@@ -149,22 +149,6 @@ Schedule::call(function () {
   ->withoutOverlapping();
 
 // Processar fila de jobs a cada 5 minutos (Hostinger não suporta queue:work permanente)
-
-// ===== JUSTUS: Sync jurisprudência =====
-// STJ via CKAN — diário 04:00 BRT
-Schedule::command('justus:sync-stj')
-    ->dailyAt('04:00')
-    ->timezone('America/Sao_Paulo')
-    ->withoutOverlapping()
-    ->appendOutputTo(storage_path('logs/cron-justus-stj.log'));
-
-// TJSC via scraping — diário 04:30 BRT (último mês + mês atual)
-Schedule::command('justus:sync-tjsc --meses-atras=1 --ps=50')
-    ->dailyAt('04:30')
-    ->timezone('America/Sao_Paulo')
-    ->withoutOverlapping()
-    ->appendOutputTo(storage_path('logs/cron-justus-tjsc.log'));
-
 Schedule::command('queue:work --stop-when-empty --max-time=55 --tries=3')
     ->everyFiveMinutes()
     ->timezone('America/Sao_Paulo')
