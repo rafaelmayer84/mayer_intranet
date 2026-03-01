@@ -251,3 +251,4 @@ require __DIR__ . '/_sisrh_routes.php';
 
 require __DIR__.'/_ocorrencias_routes.php';
 require __DIR__.'/_home_routes.php';
+require_once __DIR__.'/_justus_routes.php';

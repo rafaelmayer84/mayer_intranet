@@ -290,13 +290,42 @@ function doGenerate(force) {
     })
     .then(data => {
         if (!data || !data.success) return;
-        showToast(`🧠 ${data.meta.total_cards} insights gerados`, 'success');
+        if (data.async) {
+            showToast('🔄 Analise em andamento... aguarde.', 'success');
+            pollStatus(data.run_id);
+            return;
+        }
+        showToast(`🧠 ${data.meta?.total_cards ?? '?'} insights gerados`, 'success');
         if (data.summary) renderSummary(data.summary);
-        renderCards(data.cards);
+        if (data.cards) renderCards(data.cards);
         updateTabCounts();
     })
     .catch(err => showToast(err.message || 'Erro inesperado', 'error'))
     .finally(resetBtn);
+}
+
+function pollStatus(runId) {
+    const interval = setInterval(() => {
+        fetch(`/bsc-insights/status/${runId}`, { headers: { 'Accept': 'application/json' } })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'success') {
+                clearInterval(interval);
+                showToast(`🧠 ${data.meta?.total_cards ?? '?'} insights gerados`, 'success');
+                if (data.summary) renderSummary(data.summary);
+                if (data.cards) renderCards(data.cards);
+                updateTabCounts();
+                resetBtn();
+            } else if (data.status === 'failed') {
+                clearInterval(interval);
+                showToast(data.error || 'Falha na geracao', 'error');
+                resetBtn();
+            } else {
+                document.getElementById('btn-text').textContent = data.message || 'Processando...';
+            }
+        })
+        .catch(() => { clearInterval(interval); resetBtn(); });
+    }, 3000);
 }
 
 function resetBtn() {

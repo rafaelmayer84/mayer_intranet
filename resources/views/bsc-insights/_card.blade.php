@@ -1,6 +1,6 @@
 {{--
-    BSC Insight Card v2 — Compatible with BscInsightCardV2 model
-    Vars: $card (BscInsightCardV2), $delay (int ms), $universo (string, from parent loop)
+    BSC Insight Card v2 — Visual Premium com formatação humanizada
+    Vars: $card (BscInsightCardV2), $delay (int ms), $universo (string)
 --}}
 @php
     $sev = strtoupper($card->severidade ?? 'info');
@@ -13,15 +13,114 @@
         'PROCESSOS_INTERNOS' => ['⚡','📁','⏱️','⚙️','📌','🔧'],
         'TIMES_EVOLUCAO' => ['🏆','⏰','💬','📱','🎓','👤'],
     ];
-    // $universo vem do loop pai (index.blade.php)
     $uKey = $universo ?? 'FINANCEIRO';
     $icons = $universoIcons[$uKey] ?? $universoIcons['FINANCEIRO'];
     $icon = $icons[$loop->index % count($icons)];
     $conf = $card->confidence ?? 50;
     $impact = $card->impact_score ?? 0;
-    $evidences = $card->evidencias; // accessor retorna array
-    $mainValue = $evidences[0]['valor'] ?? null;
-    $mainLabel = $evidences[0]['metrica'] ?? null;
+    $evidences = $card->evidencias;
+
+    // Detectar tipo pelo nome da métrica
+    $detectType = function($metrica) {
+        $m = strtolower((string) $metrica);
+        if (preg_match('/var_pct|_pct|percent|taxa_|margem|win_rate|conversao|concentracao/', $m)) return 'pct';
+        if (preg_match('/receita|despesa|resultado|inadimpl|vencid|pipeline|valor|burn|custo|salario|lucro|pagamento|alugu/', $m)) return 'money';
+        if (preg_match('/hora|hours/', $m)) return 'hours';
+        return 'count';
+    };
+
+    // Formatar número por tipo
+    $fmtNum = function($num, $type) {
+        $num = (float) $num;
+        if ($type === 'money') return 'R$ ' . number_format($num, 2, ',', '.');
+        if ($type === 'pct') return number_format($num, 1, ',', '.') . '%';
+        if ($type === 'hours') return number_format($num, 1, ',', '.') . 'h';
+        if ($num == (int) $num) return number_format($num, 0, ',', '.');
+        return number_format($num, 2, ',', '.');
+    };
+
+    // Formatar valor com contexto da métrica
+    $formatVal = function($v, $metrica = '') use ($detectType, $fmtNum) {
+        if (!is_string($v) && !is_numeric($v)) return $v;
+        $v = (string) $v;
+        if (preg_match('/R\$|%|\bh\b|processo|lead|cliente|conversa|mensag|registro/i', $v)) return $v;
+        if (str_contains($v, '{') || $v === '[]') return $v;
+        $type = $detectType($metrica);
+        if (is_numeric($v)) return $fmtNum($v, $type);
+        if (preg_match('/^(\d{4}-\d{2}):\s*([\d.-]+)$/', trim($v), $m)) {
+            try { $mesLabel = \Carbon\Carbon::createFromFormat('Y-m', $m[1])->translatedFormat('M/y'); } catch(\Throwable $e) { $mesLabel = $m[1]; }
+            return $mesLabel . ': ' . $fmtNum($m[2], $type);
+        }
+        if (preg_match_all('/([\w_.]+):\s*([\d.,]+)/', $v, $ms, PREG_SET_ORDER) && count($ms) >= 2) {
+            $parts = [];
+            foreach ($ms as $match) {
+                $num = (float) str_replace(',', '.', $match[2]);
+                $label = ucfirst(trim(str_replace('_', ' ', preg_replace('/\b(id|pct)\b/i', '', $match[1]))));
+                $parts[] = $label . ': ' . ($num == (int)$num ? number_format($num, 0, ',', '.') : number_format($num, 1, ',', '.'));
+            }
+            return implode(' | ', array_slice($parts, 0, 3));
+        }
+        return $v;
+    };
+
+    // Humanizar nome de métrica técnica
+    $humanizeMetric = function($m) {
+        if (!is_string($m)) return $m;
+        if (!str_contains($m, '.') && !str_contains($m, '_')) return $m;
+        $map = [
+            'finance.receita_total_mensal' => 'Receita Total',
+            'finance.resultado_mensal' => 'Resultado Mensal',
+            'finance.despesas_mensal' => 'Despesas',
+            'finance.margem_liquida_pct' => 'Margem Líquida',
+            'finance.top5_planos_despesa' => 'Maiores Despesas',
+            'inadimplencia.total_vencido' => 'Inadimplência Total',
+            'inadimplencia.aging_buckets' => 'Aging',
+            'inadimplencia.top5_devedores' => 'Maiores Devedores',
+            'processos.ativos' => 'Processos Ativos',
+            'processos.total' => 'Total de Processos',
+            'processos.sem_movimentacao_90d' => 'Processos Parados (90d)',
+            'processos.novos_mensal' => 'Novos Processos',
+            'processos.encerrados_mensal' => 'Processos Encerrados',
+            'processos.encerrados' => 'Processos Encerrados',
+            'processos.por_area' => 'Processos por Área',
+            'clientes.total_clientes' => 'Total de Clientes',
+            'clientes.novos_clientes_mensal' => 'Novos Clientes',
+            'clientes.clientes_por_area' => 'Clientes por Área',
+            'crm.total_accounts' => 'Contas CRM',
+            'crm.oportunidades' => 'Oportunidades',
+            'leads.total' => 'Total de Leads',
+            'leads.leads_mensal' => 'Leads por Mês',
+            'leads.por_status' => 'Leads por Status',
+            'horas.horas_mensal' => 'Horas Trabalhadas',
+            'horas.por_proprietario' => 'Horas por Profissional',
+            'horas.total_registros' => 'Registros de Horas',
+            'horas.valor_mensal' => 'Valor Faturável',
+            'atendimento.mensagens_mensal' => 'Mensagens',
+            'atendimento.conversas_mensal' => 'Conversas',
+            'atendimento.total_mensagens' => 'Total Mensagens',
+            'gdp.snapshots' => 'GDP Snapshots',
+            'gdp.resultados' => 'GDP Resultados',
+        ];
+        if (isset($map[$m])) return $map[$m];
+        $clean = preg_replace('/^metricas_derivadas\./', '', $m);
+        if (isset($map[$clean])) return $map[$clean];
+        // Remover indices [0], [1] etc e tentar novamente
+        $noIdx = preg_replace('/\[\d+\].*$/', '', $m);
+        if (isset($map[$noIdx])) return $map[$noIdx];
+        $noIdx2 = preg_replace('/^metricas_derivadas\./', '', $noIdx);
+        if (isset($map[$noIdx2])) return $map[$noIdx2];
+        // Remover prefixo de periodo (ex: finance.receita_total_mensal.2026-01)
+        $noPeriod = preg_replace('/\.\d{4}-\d{2}$/', '', $m);
+        if (isset($map[$noPeriod])) return $map[$noPeriod];
+        $noPeriod2 = preg_replace('/^metricas_derivadas\./', '', $noPeriod);
+        if (isset($map[$noPeriod2])) return $map[$noPeriod2];
+        $parts = explode('.', $m);
+        $last = end($parts);
+        return ucfirst(str_replace('_', ' ', $last));
+    };
+
+    $mainValue = isset($evidences[0]['valor']) ? $formatVal($evidences[0]['valor'], $evidences[0]['metrica'] ?? '') : null;
+    $mainLabel = isset($evidences[0]['metrica']) ? $humanizeMetric($evidences[0]['metrica']) : null;
     $circumference = 2 * 3.14159 * 14;
     $offset = $circumference - ($conf / 100) * $circumference;
     $ringColor = $conf >= 70 ? '#10b981' : ($conf >= 40 ? '#f59e0b' : '#ef4444');
@@ -47,7 +146,7 @@
                 </div>
 
                 @if($mainValue)
-                <div class="metric-value">{{ $mainValue }}</div>
+                <div class="metric-value">{!! e($mainValue) !!}</div>
                 <div class="text-xs text-gray-400 mb-2">{{ $mainLabel }}</div>
                 @endif
 
@@ -61,8 +160,8 @@
         <div class="mt-3 flex flex-wrap gap-2">
             @foreach(array_slice($evidences, 1, 3) as $ev)
             <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/70 border border-gray-100 text-xs">
-                <span class="text-gray-400">{{ $ev['metrica'] ?? '' }}</span>
-                <span class="font-bold text-gray-700">{{ $ev['valor'] ?? '' }}</span>
+                <span class="text-gray-400">{{ $humanizeMetric($ev['metrica'] ?? '') }}</span>
+                <span class="font-bold text-gray-700">{!! e($formatVal($ev['valor'] ?? '', $ev['metrica'] ?? '')) !!}</span>
                 @if(!empty($ev['variacao']))
                 <span class="text-gray-400">({{ $ev['variacao'] }})</span>
                 @endif

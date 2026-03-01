@@ -68,8 +68,8 @@ class BscOpenAiClient
             throw new \RuntimeException("OpenAI content vazio (reasoning={$reasoningTokens}, output={$outputTokens}). Modelo '{$this->model}' gastando budget em raciocinio.");
         }
 
-        $costIn  = config('bsc_insights.cost_per_1m_input_tokens', 0.40);
-        $costOut = config('bsc_insights.cost_per_1m_output_tokens', 1.60);
+        $costIn  = config('bsc_insights.cost_per_1m_input_tokens', 10.00);
+        $costOut = config('bsc_insights.cost_per_1m_output_tokens', 30.00);
         $cost = round(($inputTokens / 1_000_000) * $costIn + ($outputTokens / 1_000_000) * $costOut, 5);
 
         Log::info('BscOpenAiClient: OK', ['model'=>$this->model,'in'=>$inputTokens,'out'=>$outputTokens,'reasoning'=>$reasoningTokens,'cost'=>$cost,'ms'=>$durationMs]);

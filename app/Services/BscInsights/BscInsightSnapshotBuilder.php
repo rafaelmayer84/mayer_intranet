@@ -5,6 +5,7 @@ namespace App\Services\BscInsights;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Services\FinanceiroCalculatorService;
 
 class BscInsightSnapshotBuilder
 {
@@ -117,52 +118,72 @@ class BscInsightSnapshotBuilder
         return $this->safe('inadimplencia', function () {
             $hoje = Carbon::now()->toDateString();
 
+            // Inadimplencia real: apenas "Nao lancado", vencido, sem pagamento, data < 2030 (exclui datas ficticias)
             $vencidas = DB::table('contas_receber')
-                ->where('status', '!=', 'Excluido')
+                ->where('status', 'Não lançado')
                 ->whereNull('data_pagamento')
-                ->where('data_vencimento', '<', $hoje);
+                ->whereNotNull('data_vencimento')
+                ->where('data_vencimento', '<', $hoje)
+                ->where('data_vencimento', '<', '2030-01-01');
 
-            $totalVencido   = (float) (clone $vencidas)->sum('valor');
-            $qtdVencidas    = (clone $vencidas)->count();
-            $diasMedioAtraso = (int) (clone $vencidas)
-                ->selectRaw('AVG(DATEDIFF(CURDATE(), data_vencimento)) as media')
-                ->value('media');
+            $totalVencido = (float) $vencidas->sum('valor');
+            $qtdVencidas  = (int) $vencidas->count();
 
             // Aging buckets
             $aging = [
-                '0_30'   => (float) (clone $vencidas)->whereRaw('DATEDIFF(CURDATE(), data_vencimento) BETWEEN 1 AND 30')->sum('valor'),
-                '31_60'  => (float) (clone $vencidas)->whereRaw('DATEDIFF(CURDATE(), data_vencimento) BETWEEN 31 AND 60')->sum('valor'),
-                '61_90'  => (float) (clone $vencidas)->whereRaw('DATEDIFF(CURDATE(), data_vencimento) BETWEEN 61 AND 90')->sum('valor'),
-                '91_180' => (float) (clone $vencidas)->whereRaw('DATEDIFF(CURDATE(), data_vencimento) BETWEEN 91 AND 180')->sum('valor'),
-                '180+'   => (float) (clone $vencidas)->whereRaw('DATEDIFF(CURDATE(), data_vencimento) > 180')->sum('valor'),
+                '0_30'   => 0,
+                '31_60'  => 0,
+                '61_90'  => 0,
+                '91_180' => 0,
+                '180+'   => 0,
             ];
 
-            $top5Devedores = DB::table('contas_receber')
-                ->select('cliente', DB::raw('SUM(valor) as total'), DB::raw('COUNT(*) as qtd'))
-                ->where('status', '!=', 'Excluido')
+            $registros = DB::table('contas_receber')
+                ->where('status', 'Não lançado')
                 ->whereNull('data_pagamento')
+                ->whereNotNull('data_vencimento')
                 ->where('data_vencimento', '<', $hoje)
+                ->where('data_vencimento', '<', '2030-01-01')
+                ->select('valor', 'data_vencimento')
+                ->get();
+
+            foreach ($registros as $r) {
+                $dias = Carbon::parse($r->data_vencimento)->diffInDays(Carbon::now());
+                $val  = (float) $r->valor;
+                if ($dias <= 30)      $aging['0_30']   += $val;
+                elseif ($dias <= 60)  $aging['31_60']  += $val;
+                elseif ($dias <= 90)  $aging['61_90']  += $val;
+                elseif ($dias <= 180) $aging['91_180'] += $val;
+                else                  $aging['180+']   += $val;
+            }
+
+            // Top 5 devedores
+            $top5 = DB::table('contas_receber')
+                ->where('status', 'Não lançado')
+                ->whereNull('data_pagamento')
+                ->whereNotNull('data_vencimento')
+                ->where('data_vencimento', '<', $hoje)
+                ->where('data_vencimento', '<', '2030-01-01')
+                ->select('cliente', DB::raw('SUM(valor) as total'), DB::raw('COUNT(*) as qtd'))
                 ->groupBy('cliente')
                 ->orderByDesc('total')
                 ->limit(5)
                 ->get()
-                ->map(fn($r) => ['cliente' => $r->cliente ?? '(Sem cliente)', 'total' => (float) $r->total, 'qtd' => $r->qtd])
+                ->map(fn($r) => [
+                    'cliente' => $r->cliente,
+                    'total'   => round((float) $r->total, 2),
+                    'qtd'     => (int) $r->qtd,
+                ])
                 ->toArray();
 
             return [
-                'total_vencido'     => $totalVencido,
-                'qtd_vencidas'      => $qtdVencidas,
-                'dias_medio_atraso' => $diasMedioAtraso,
-                'aging_buckets'     => $aging,
-                'top5_devedores'    => $top5Devedores,
-                'total_contas'      => DB::table('contas_receber')->count(),
+                'total_vencido'  => round($totalVencido, 2),
+                'qtd_vencidas'   => $qtdVencidas,
+                'aging_buckets'  => array_map(fn($v) => round($v, 2), $aging),
+                'top5_devedores' => $top5,
             ];
         });
     }
-
-    // ========================================================================
-    // BLOCO: CLIENTES
-    // ========================================================================
 
     private function blocoClientes(): array
     {
@@ -276,8 +297,8 @@ class BscInsightSnapshotBuilder
     {
         return $this->safe('processos', function () {
             $total = DB::table('processos')->count();
-            $ativos = DB::table('processos')->where('status', 'Em andamento')->count();
-            $encerrados = DB::table('processos')->where('status', 'Encerrado')->count();
+            $ativos = DB::table('processos')->where('status', 'Ativo')->count();
+            $encerrados = DB::table('processos')->whereIn('status', ['Encerrado'])->count();
 
             $porArea = DB::table('processos')
                 ->select('area_atuacao', DB::raw('COUNT(*) as qtd'))
@@ -297,14 +318,14 @@ class BscInsightSnapshotBuilder
                 ->mapWithKeys(fn($r) => [$r->status ?? 'null' => $r->qtd])
                 ->toArray();
 
-            // Processos sem movimentação nos últimos 90 dias
+            // Processos sem movimentação nos últimos 90 dias (via fases_processo)
             $semMovimentacao = DB::table('processos')
-                ->where('status', 'Em andamento')
+                ->where('processos.status', 'Ativo')
                 ->whereNotExists(function ($q) {
                     $q->select(DB::raw(1))
-                      ->from('andamentos_fase')
-                      ->whereColumn('andamentos_fase.processo_id_datajuri', 'processos.datajuri_id')
-                      ->where('andamentos_fase.created_at', '>=', Carbon::now()->subDays(90));
+                      ->from('fases_processo')
+                      ->whereColumn('fases_processo.processo_id_datajuri', 'processos.datajuri_id')
+                      ->where('fases_processo.data_ultimo_andamento', '>=', Carbon::now()->subDays(90)->toDateString());
                 })
                 ->count();
 

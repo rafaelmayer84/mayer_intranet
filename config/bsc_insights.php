@@ -6,14 +6,14 @@ return [
     'openai_model'    => env('BSC_INSIGHTS_OPENAI_MODEL', 'gpt-4.1-mini'),
     'openai_model_heavy' => env('BSC_INSIGHTS_OPENAI_MODEL_HEAVY', null),
     'openai_max_tokens'  => (int) env('BSC_INSIGHTS_MAX_TOKENS', 16000),
-    'openai_timeout'     => (int) env('BSC_INSIGHTS_TIMEOUT', 120),
+    'openai_timeout'     => (int) env('BSC_INSIGHTS_TIMEOUT', 300),
 
     // ── Custos (por 1M tokens) ──
     'cost_per_1m_input_tokens'  => (float) env('BSC_INSIGHTS_COST_INPUT', 0.40),
     'cost_per_1m_output_tokens' => (float) env('BSC_INSIGHTS_COST_OUTPUT', 1.60),
 
     // ── Budget ──
-    'ai_monthly_limit_usd'   => (float) env('AI_MONTHLY_LIMIT_USD', 10.00),
+    'ai_monthly_limit_usd'   => (float) env('AI_MONTHLY_LIMIT_USD', 50.00),
     'max_estimated_cost_usd' => 0.60,
 
     // ── Comportamento ──
