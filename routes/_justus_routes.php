@@ -15,6 +15,7 @@ Route::middleware(['auth'])->prefix('justus')->name('justus.')->group(function (
     Route::get('/{conversation}/attachment-status/{attachment}', [JustusController::class, 'checkAttachmentStatus'])->name('attachment.status');
     Route::delete('/{conversation}', [JustusController::class, 'destroyConversation'])->name('conversations.destroy');
 
+    Route::get('/{conversation}/messages/{message}/document', [JustusController::class, 'downloadDocument'])->name('message.document');
     Route::post('/{conversation}/messages/{message}/feedback', [JustusController::class, 'messageFeedback'])->name('message.feedback');
 
     // Admin routes

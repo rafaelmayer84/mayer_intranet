@@ -8,10 +8,12 @@ use App\Models\JustusStyleGuide;
 use App\Models\SystemEvent;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use App\Services\Justus\JustusClaudeService;
 
 class JustusOpenAiService
 {
     private JustusBudgetService $budget;
+    private JustusClaudeService $claude;
     private JustusRagService $rag;
 
     public function __construct(JustusBudgetService $budget, JustusRagService $rag)
@@ -147,6 +149,57 @@ class JustusOpenAiService
 
             $this->budget->recordUsage($userId, $inputTokens, $outputTokens, $costBrl);
 
+            // Pipeline Claude: avaliar se precisa redação jurídica
+            $claudeDocPath = null;
+            if ($this->claude->isAvailable() && $this->claude->needsClaudeRedaction($content, $conversation->type)) {
+                $caseContext = [];
+                $profile = $conversation->profile;
+                if ($profile) {
+                    $caseContext = [
+                        'autor' => $profile->autor ?? '',
+                        'reu' => $profile->reu ?? '',
+                        'cnj' => $profile->numero_cnj ?? '',
+                        'vara' => $profile->vara ?? '',
+                    ];
+                }
+
+                $claudeResult = $this->claude->redraft($content, $conversation->type, $caseContext);
+
+                if ($claudeResult['success']) {
+                    // Gerar DOCX
+                    $docPath = $this->generateDocx($claudeResult['content'], $conversation);
+
+                    // Salvar mensagem Claude como segunda resposta
+                    $claudeMsg = $conversation->messages()->create([
+                        'role' => 'assistant',
+                        'content' => '📄 Peça jurídica redigida por Claude e disponível para download. Custo da redação: R$ ' . number_format($claudeResult['cost_brl'], 4, ',', '.'),
+                        'model_used' => $claudeResult['model'],
+                        'input_tokens' => $claudeResult['input_tokens'],
+                        'output_tokens' => $claudeResult['output_tokens'],
+                        'cost_brl' => $claudeResult['cost_brl'],
+                        'metadata' => json_encode([
+                            'pipeline' => 'claude_redaction',
+                            'doc_path' => $docPath,
+                            'cost_usd' => $claudeResult['cost_usd'],
+                        ]),
+                    ]);
+
+                    // Registrar custo Claude no budget
+                    $this->budget->recordUsage($userId, $claudeResult['input_tokens'], $claudeResult['output_tokens'], $claudeResult['cost_brl']);
+                    $claudeDocPath = $docPath;
+
+                    Log::info('JUSTUS Claude: Peça gerada', [
+                        'conversation_id' => $conversation->id,
+                        'model' => $claudeResult['model'],
+                        'tokens' => $claudeResult['input_tokens'] + $claudeResult['output_tokens'],
+                        'cost_brl' => $claudeResult['cost_brl'],
+                        'doc' => $docPath,
+                    ]);
+                } else {
+                    Log::warning('JUSTUS Claude: Falha na redação', ['error' => $claudeResult['error']]);
+                }
+            }
+
             // Auto-gerar titulo na primeira mensagem
             if ($conversation->messages()->where('role', 'assistant')->count() === 1 && $conversation->title === 'Nova Analise') {
                 $this->generateTitle($conversation, $userMessage, $content);
@@ -159,6 +212,7 @@ class JustusOpenAiService
                 'message' => $assistantMsg,
                 'tokens' => ['input' => $inputTokens, 'output' => $outputTokens],
                 'cost_brl' => $costBrl,
+                'claude_doc' => $claudeDocPath,
             ];
         } catch (\Exception $e) {
             Log::error('JUSTUS OpenAI Exception', ['error' => $e->getMessage(), 'conversation_id' => $conversation->id]);
@@ -166,6 +220,76 @@ class JustusOpenAiService
             SystemEvent::sistema('justus', 'error', 'JUSTUS: Erro OpenAI', null, ['conversation_id' => $conversation->id]);
 
             return ['success' => false, 'error' => 'Erro interno: ' . $e->getMessage(), 'blocked' => false];
+        }
+    }
+
+    private function generateDocx(string $content, JustusConversation $conversation): ?string
+    {
+        try {
+            $dir = storage_path('app/public/justus');
+            if (!is_dir($dir)) {
+                mkdir($dir, 0755, true);
+            }
+
+            $filename = 'justus_peca_' . $conversation->id . '_' . date('Ymd_His') . '.docx';
+            $path = $dir . '/' . $filename;
+
+            $phpWord = new \PhpOffice\PhpWord\PhpWord();
+            $phpWord->getDefaultFontName('Times New Roman');
+            $phpWord->getDefaultFontSize(12);
+
+            $section = $phpWord->addSection([
+                'marginTop' => \PhpOffice\PhpWord\Shared\Converter::cmToTwip(3),
+                'marginBottom' => \PhpOffice\PhpWord\Shared\Converter::cmToTwip(2),
+                'marginLeft' => \PhpOffice\PhpWord\Shared\Converter::cmToTwip(3),
+                'marginRight' => \PhpOffice\PhpWord\Shared\Converter::cmToTwip(1.5),
+            ]);
+
+            // Processar conteudo markdown -> DOCX
+            $lines = explode("
+", $content);
+            foreach ($lines as $line) {
+                $trimmed = trim($line);
+                if (empty($trimmed)) {
+                    $section->addTextBreak();
+                    continue;
+                }
+
+                // Títulos em CAPS (DOS FATOS, DO DIREITO, etc.)
+                if (preg_match('/^(#{1,3}\s+)?([A-ZÁÀÂÃÉÈÊÍÏÓÔÕÚÇ\s\-–—\.]+)$/', $trimmed, $m) && mb_strlen($trimmed) < 80) {
+                    $title = trim($m[2] ?? $trimmed);
+                    $section->addText($title, ['bold' => true, 'size' => 13, 'name' => 'Times New Roman'], ['alignment' => 'center', 'spaceBefore' => 240, 'spaceAfter' => 120]);
+                    continue;
+                }
+
+                // Parágrafos normais com negrito inline
+                $textRun = $section->addTextRun(['alignment' => 'both', 'lineHeight' => 1.5, 'spaceAfter' => 120, 'indent' => \PhpOffice\PhpWord\Shared\Converter::cmToTwip(2)]);
+                $parts = preg_split('/(\*\*[^*]+\*\*)/', $trimmed, -1, PREG_SPLIT_DELIM_CAPTURE);
+                foreach ($parts as $part) {
+                    if (preg_match('/^\*\*(.+)\*\*$/', $part, $bm)) {
+                        $textRun->addText($bm[1], ['bold' => true, 'size' => 12, 'name' => 'Times New Roman']);
+                    } else {
+                        $textRun->addText($part, ['size' => 12, 'name' => 'Times New Roman']);
+                    }
+                }
+            }
+
+            // Disclaimer AD003
+            $section->addTextBreak(2);
+            $section->addText(
+                '[REVISÃO OBRIGATÓRIA: Este conteúdo foi gerado por IA e deve ser integralmente revisado pelo advogado responsável — Normativo AD003]',
+                ['italic' => true, 'size' => 9, 'color' => '999999', 'name' => 'Times New Roman'],
+                ['alignment' => 'center']
+            );
+
+            $writer = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007');
+            $writer->save($path);
+
+            return 'justus/' . $filename;
+
+        } catch (\Exception $e) {
+            Log::error('JUSTUS DOCX: Erro ao gerar', ['error' => $e->getMessage()]);
+            return null;
         }
     }
 

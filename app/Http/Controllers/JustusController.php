@@ -109,6 +109,12 @@ class JustusController extends Controller
             ->where('user_id', $user->id)
             ->firstOrFail();
 
+        // Limite de turnos por conversa
+        $userTurnCount = $conversation->messages()->where('role', 'user')->count();
+        if ($userTurnCount >= 10) {
+            return response()->json(['success' => false, 'error' => 'Limite de 10 mensagens atingido nesta conversa. Crie uma nova análise.'], 429);
+        }
+
         $openAiService = app(JustusOpenAiService::class);
         $result = $openAiService->sendMessage($conversation, $request->input('message'));
 
@@ -325,6 +331,30 @@ class JustusController extends Controller
         SystemEvent::sistema('justus', 'info', "JUSTUS Admin: Style guide '{$guide->name}' atualizado", null, ['guide_id' => $guide->id]);
 
         return response()->json(['success' => true, 'message' => 'Configuração salva.']);
+    }
+
+    public function downloadDocument(int $conversationId, int $messageId)
+    {
+        $user = Auth::user();
+        $message = JustusMessage::whereHas('conversation', function ($q) use ($user) {
+            $q->where('user_id', $user->id);
+        })->where('id', $messageId)
+          ->where('conversation_id', $conversationId)
+          ->firstOrFail();
+
+        $metadata = json_decode($message->metadata ?? '{}', true);
+        $docPath = $metadata['doc_path'] ?? null;
+
+        if (!$docPath) {
+            abort(404, 'Documento não encontrado');
+        }
+
+        $fullPath = storage_path('app/public/' . $docPath);
+        if (!file_exists($fullPath)) {
+            abort(404, 'Arquivo não encontrado');
+        }
+
+        return response()->download($fullPath, basename($docPath));
     }
 
     public function messageFeedback(Request $request, int $conversationId, int $messageId)

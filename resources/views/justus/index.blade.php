@@ -196,7 +196,7 @@
                         class="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all flex-shrink-0 mb-0.5" title="Enviar PDF">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
                     </button>
-                    <textarea x-model="messageText" placeholder="Pergunte sobre o processo, solicite uma analise ou peca..."
+                    <textarea x-model="messageText" @keydown.enter.prevent="if(!$event.shiftKey && messageText.trim()) sendMessage()" placeholder="Pergunte sobre o processo, solicite uma analise ou peca..."
                         class="flex-1 px-2 py-2 text-sm border-0 outline-none bg-transparent resize-none"
                         style="min-height:44px;max-height:120px;"
                         :disabled="sending"
@@ -429,6 +429,8 @@ function justusApp() {
                 if (result.success && result.message) {
                     const msg = result.message;
                     const mdHtml = (typeof marked !== 'undefined' && marked.parse) ? marked.parse(msg.content || '') : this.esc(msg.content || '').replace(/\n/g, '<br>');
+                    const docMeta = msg.metadata ? (typeof msg.metadata === 'string' ? JSON.parse(msg.metadata) : msg.metadata) : {};
+                    const docBtnHtml = (msg.role === 'assistant' && docMeta.doc_path) ? `<div class="mt-3 mb-2"><a href="/justus/${msg.conversation_id || window.location.search.match(/c=(\d+)/)?.[1]}/messages/${msg.id}/document" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white hover:shadow-lg" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Baixar Peca (DOCX)</a><span class="ml-2 text-[10px] text-purple-400">Redigida por Claude</span></div>` : '';
                     const feedbackHtml = msg.role === 'assistant' ? `<div class="mt-2 flex items-center gap-2"><button onclick="sendFeedback(${msg.conversation_id || ''}, ${msg.id}, 'positive', this)" class="p-1 rounded text-gray-300 hover:text-green-500 hover:bg-green-50 transition-all" title="Boa resposta"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/></svg></button><button onclick="sendFeedback(${msg.conversation_id || ''}, ${msg.id}, 'negative', this)" class="p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all" title="Resposta ruim"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018c.163 0 .326.02.485.06L17 4m-7 10v2a2 2 0 002 2h.095c.5 0 .905-.405.905-.905 0-.714.211-1.412.608-2.006L17 13V4m-7 10h2m5-6h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5"/></svg></button></div>` : '';
                     const tokensInfo = msg.input_tokens ? `<div class="mt-3 pt-2 border-t border-gray-50 text-[10px] text-gray-300 flex items-center gap-3"><span>${(msg.input_tokens+msg.output_tokens).toLocaleString()} tokens</span><span>R$ ${parseFloat(msg.cost_brl).toFixed(4).replace('.',',')}</span></div>` : '';
 
@@ -443,6 +445,7 @@ function justusApp() {
                                     <span class="text-[10px] px-1.5 py-0.5 rounded-full" style="background:#f0f2f5;color:#6b7280;">${msg.model_used || ''}</span>
                                 </div>
                                 <div class="prose prose-sm max-w-none text-gray-700 justus-md">${mdHtml}</div>
+                                ${docBtnHtml}
                                 ${feedbackHtml}
                                 ${tokensInfo}
                             </div>

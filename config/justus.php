@@ -29,6 +29,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Anthropic Claude Configuration
+    |--------------------------------------------------------------------------
+    */
+    'anthropic_api_key' => env('JUSTUS_ANTHROPIC_API_KEY'),
+    'claude_model' => env('JUSTUS_CLAUDE_MODEL', 'claude-sonnet-4-5-20250929'),
+    'claude_pricing' => [
+        'input_per_million_usd' => (float) env('JUSTUS_CLAUDE_PRICING_INPUT', 3.00),
+        'output_per_million_usd' => (float) env('JUSTUS_CLAUDE_PRICING_OUTPUT', 15.00),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Pricing per 1M tokens (BRL) — atualizar conforme tabela OpenAI
     |--------------------------------------------------------------------------
     */
