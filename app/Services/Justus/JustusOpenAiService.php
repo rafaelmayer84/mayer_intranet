@@ -185,7 +185,7 @@ class JustusOpenAiService
                         ['role' => 'user', 'content' => "Pergunta: {$snippet}
 Resposta: {$respSnippet}"],
                     ],
-                    'max_completion_tokens' => 30,
+                    'max_completion_tokens' => 150,
                 ]);
 
             if ($response->successful()) {
