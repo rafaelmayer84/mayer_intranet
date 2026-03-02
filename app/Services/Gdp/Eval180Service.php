@@ -471,13 +471,13 @@ class Eval180Service
     {
         try {
             DB::table('gdp_audit_log')->insert([
-                'user_id'    => auth()->id() ?? 0,
-                'acao'       => "eval180_{$action}",
-                'entidade'   => 'gdp_eval180_forms',
-                'entidade_id' => $formId,
-                'payload'    => json_encode($payload, JSON_UNESCAPED_UNICODE),
-                'ip'         => request()->ip() ?? '0.0.0.0',
-                'created_at' => now(),
+                'user_id'      => auth()->id() ?? 0,
+                'entidade'     => 'gdp_eval180_forms',
+                'entidade_id'  => $formId,
+                'campo'        => "eval180_{$action}",
+                'valor_novo'   => json_encode($payload, JSON_UNESCAPED_UNICODE),
+                'ip'           => request()->ip() ?? '0.0.0.0',
+                'created_at'   => now(),
             ]);
         } catch (\Throwable $e) {
             Log::warning('[Eval180] Audit log falhou: ' . $e->getMessage());

@@ -564,7 +564,7 @@ class DataJuriSyncService
                     'localidade' => $fase['localidade'] ?? null,
                     'instancia' => $fase['instancia'] ?? null,
                     'data' => $this->parseDataBrasileira($fase['data'] ?? null),
-                    'fase_atual' => ($fase['faseAtual'] ?? 'Não') === 'Sim',
+                    'fase_atual' => (($fase['faseAtual'] ?? 'Não') === 'Sim') ? 1 : 0,
                     'dias_fase_ativa' => (int) ($fase['diasFaseAtiva'] ?? 0),
                     'data_ultimo_andamento' => $this->parseDataBrasileira($fase['dataUltimoAndamento'] ?? null),
                     'proprietario_nome' => $fase['proprietario.nome'] ?? null,
