@@ -116,7 +116,7 @@ class JustusOpenAiService
             $payload = [
                 'model' => $model,
                 'messages' => $messages,
-                'max_completion_tokens' => 4096,
+                'max_completion_tokens' => 16384,
                 'temperature' => 0.3,
             ];
 
@@ -135,8 +135,33 @@ class JustusOpenAiService
             }
 
             $data = $response->json();
+            $finishReason = $data['choices'][0]['finish_reason'] ?? 'unknown';
             $content = $data['choices'][0]['message']['content'] ?? '';
             $usage = $data['usage'] ?? [];
+            $reasoningTokens = $usage['completion_tokens_details']['reasoning_tokens'] ?? 0;
+
+            // Validar content vazio (reasoning pode consumir todo o budget de tokens)
+            if (empty(trim($content))) {
+                Log::error('JUSTUS: Content vazio na resposta OpenAI', [
+                    'conversation_id' => $conversation->id,
+                    'finish_reason' => $finishReason,
+                    'reasoning_tokens' => $reasoningTokens,
+                    'completion_tokens' => $usage['completion_tokens'] ?? 0,
+                    'prompt_tokens' => $usage['prompt_tokens'] ?? 0,
+                ]);
+
+                SystemEvent::sistema('justus', 'warning', 'JUSTUS: Resposta vazia da IA', null, [
+                    'conversation_id' => $conversation->id,
+                    'finish_reason' => $finishReason,
+                    'reasoning_tokens' => $reasoningTokens,
+                ]);
+
+                return [
+                    'success' => false,
+                    'error' => 'A IA processou a solicitação mas não gerou resposta visível (tokens de raciocínio: ' . $reasoningTokens . ', finish: ' . $finishReason . '). Tente reformular a pergunta de forma mais específica.',
+                    'blocked' => false,
+                ];
+            }
 
             $inputTokens = $usage['prompt_tokens'] ?? 0;
             $outputTokens = $usage['completion_tokens'] ?? 0;
