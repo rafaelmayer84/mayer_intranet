@@ -3,7 +3,7 @@
 use App\Http\Controllers\JustusController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth'])->prefix('justus')->name('justus.')->group(function () {
+Route::middleware(['auth','modulo:operacional.justus'])->prefix('justus')->name('justus.')->group(function () {
 
     Route::get('/', [JustusController::class, 'index'])->name('index');
     Route::post('/conversations', [JustusController::class, 'createConversation'])->name('conversations.create');

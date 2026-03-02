@@ -260,6 +260,7 @@
                     </a>
 
                                 <!-- JUSTUS - Assistente Jurídico IA -->
+                @if(Auth::user()->role === "admin" || Auth::user()->podeAcessar("operacional.justus"))
                 <a href="{{ url('/justus') }}"
                    class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg transition-colors {{ request()->is('justus*') ? 'nav-link-active' : '' }}"
                    data-tooltip="JUSTUS">
@@ -268,6 +269,7 @@
                     </svg>
                     <span class="menu-text">JUSTUS</span>
                 </a>
+                @endif
 
                 <!-- 2) RESULTADOS! (colapsável) -->
                 <div class="menu-group">
