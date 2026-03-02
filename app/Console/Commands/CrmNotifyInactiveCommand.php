@@ -4,7 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Crm\CrmAccount;
 use App\Models\User;
-use App\Models\Aviso;
+use App\Models\NotificationIntranet;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -77,28 +77,29 @@ class CrmNotifyInactiveCommand extends Command
             $body .= "\n\n**Contas que precisam de atenção:**\n{$listItems}{$extra}";
             $body .= "\n\nAcesse o CRM → Carteira para registrar suas interações.";
 
-            // Verificar se já existe aviso do mesmo tipo hoje para este advogado
-            $existing = Aviso::where('criado_por', 0)
-                ->where('titulo', 'LIKE', '%CRM: Atenção%')
+            // Verificar se já existe notificação do mesmo tipo hoje para este advogado
+            $existing = NotificationIntranet::where('user_id', $lawyer->id)
+                ->where('titulo', 'LIKE', '%CRM: Aten%')
                 ->where('created_at', '>=', now()->startOfDay())
-                ->whereRaw("descricao LIKE ?", ['%' . $lawyer->name . '%'])
                 ->exists();
 
             if ($existing) {
                 continue;
             }
 
-            Aviso::create([
-                'titulo'      => '⚠️ CRM: Atenção necessária — ' . $lawyer->name,
-                'descricao'   => $body,
-                'categoria_id' => 2,
-                'prioridade'  => $critical > 0 ? 'alta' : 'media',
-                'status'      => 'ativo',
-                'data_inicio' => now(),
-                'data_fim'    => now()->addDays(2),
-                'destaque'    => $critical > 0,
-                'criado_por'  => 1,
-            ]);
+            // Resumo conciso para o sininho
+            $resumo = $stale->count() . ' conta(s) sem interação há 15+ dias.';
+            if ($overdue > 0) $resumo .= ' ' . $overdue . ' follow-up(s) vencido(s).';
+            if ($critical > 0) $resumo .= ' ' . $critical . ' em saúde crítica.';
+
+            NotificationIntranet::enviar(
+                $lawyer->id,
+                'CRM: Atenção necessária',
+                $resumo,
+                '/crm/carteira',
+                $critical > 0 ? 'danger' : 'warning',
+                'alert-triangle'
+            );
 
             $notified++;
             $this->info("  → {$lawyer->name}: {$stale->count()} contas inativas");
