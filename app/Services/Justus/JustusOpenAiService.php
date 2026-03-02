@@ -17,11 +17,12 @@ class JustusOpenAiService
     private JustusRagService $rag;
     private JustusJurisprudenciaService $jurisprudencia;
 
-    public function __construct(JustusBudgetService $budget, JustusRagService $rag, JustusJurisprudenciaService $jurisprudencia)
+    public function __construct(JustusBudgetService $budget, JustusRagService $rag, JustusJurisprudenciaService $jurisprudencia, JustusClaudeService $claude)
     {
         $this->budget = $budget;
         $this->rag = $rag;
         $this->jurisprudencia = $jurisprudencia;
+        $this->claude = $claude;
     }
 
     public function sendMessage(JustusConversation $conversation, string $userMessage): array
@@ -75,7 +76,18 @@ class JustusOpenAiService
             $typeContext .= "ATENÇÃO: Esta é uma solicitação de PEÇA PROCESSUAL. Antes de redigir, confirme seu entendimento com o advogado.\n";
         }
 
-        $fullSystemPrompt = $behaviorRules . "\n\n" . $ad003 . "\n\n" . $systemPrompt . "\n\n" . $typeContext . $profileContext . "\n\n" . $ragContext;
+        // Buscar jurisprudência relevante (STJ + TJSC)
+        $jurisResult = $this->jurisprudencia->searchForPrompt($conversation, $userMessage);
+        $jurisContext = $jurisResult['context'] ?? '';
+        if ($jurisResult['found']) {
+            \Illuminate\Support\Facades\Log::info('JUSTUS: Jurisprudência injetada', [
+                'conversation_id' => $conversation->id,
+                'count' => $jurisResult['count'],
+                'refs' => $jurisResult['references'],
+            ]);
+        }
+
+        $fullSystemPrompt = $behaviorRules . "\n\n" . $ad003 . "\n\n" . $systemPrompt . "\n\n" . $typeContext . $profileContext . "\n\n" . $ragContext . $jurisContext;
         $messages = [
             ['role' => 'system', 'content' => $fullSystemPrompt],
         ];
@@ -203,7 +215,7 @@ class JustusOpenAiService
             }
 
             // Auto-gerar titulo na primeira mensagem
-            if ($conversation->messages()->where('role', 'assistant')->count() === 1 && $conversation->title === 'Nova Analise') {
+            if ($conversation->messages()->where('role', 'assistant')->count() === 1 && str_starts_with($conversation->title, 'Nova Anal')) {
                 $this->generateTitle($conversation, $userMessage, $content);
             }
 

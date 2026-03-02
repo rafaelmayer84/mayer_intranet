@@ -259,6 +259,16 @@
                         <span class="menu-text">Manuais Normativos</span>
                     </a>
 
+                                <!-- JUSTUS - Assistente Jurídico IA -->
+                <a href="{{ url('/justus') }}"
+                   class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg transition-colors {{ request()->is('justus*') ? 'nav-link-active' : '' }}"
+                   data-tooltip="JUSTUS">
+                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                    </svg>
+                    <span class="menu-text">JUSTUS</span>
+                </a>
+
                 <!-- 2) RESULTADOS! (colapsável) -->
                 <div class="menu-group">
                     <button onclick="toggleSubmenu('resultados')" class="nav-link w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors {{ request()->is('visao-gerencial*') || request()->is('clientes-mercado*') || request()->is('processos-internos*') || request()->is('resultados/bsc/processos-internos*') || request()->is('times-evolucao*') || request()->is('bsc-insights*') ? 'nav-link-active' : '' }}" data-tooltip="RESULTADOS!">
