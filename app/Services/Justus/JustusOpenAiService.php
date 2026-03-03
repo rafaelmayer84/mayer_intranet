@@ -61,14 +61,20 @@ class JustusOpenAiService
         $profile = $conversation->processProfile;
         $profileContext = '';
         if ($profile) {
-            $profileContext = "\n\nDADOS DO PROCESSO:\n";
-            $profileContext .= "Número CNJ: " . ($profile->numero_cnj ?: '[dado não localizado nos autos]') . "\n";
-            $profileContext .= "Fase: " . ($profile->fase_atual ?: '[dado não localizado nos autos]') . "\n";
-            $profileContext .= "Autor: " . ($profile->autor ?: '[dado não localizado nos autos]') . "\n";
-            $profileContext .= "Réu: " . ($profile->reu ?: '[dado não localizado nos autos]') . "\n";
-            $profileContext .= "Objetivo: " . ($profile->objetivo_analise ?: '[não definido]') . "\n";
-            $profileContext .= "Tese Principal: " . ($profile->tese_principal ?: '[não definida]') . "\n";
-            $profileContext .= "Limites: " . ($profile->limites_restricoes ?: '[nenhum definido]') . "\n";
+            $fields = [];
+            if ($profile->numero_cnj) $fields[] = "Número CNJ: {$profile->numero_cnj}";
+            if ($profile->classe) $fields[] = "Classe: {$profile->classe}";
+            if ($profile->orgao) $fields[] = "Órgão: {$profile->orgao}";
+            if ($profile->autor) $fields[] = "Autor/Exequente: {$profile->autor}";
+            if ($profile->reu) $fields[] = "Réu/Executado: {$profile->reu}";
+            if ($profile->relator_vara) $fields[] = "Vara/Relator: {$profile->relator_vara}";
+            if ($profile->fase_atual) $fields[] = "Fase: {$profile->fase_atual}";
+            if ($profile->tese_principal) $fields[] = "Tese Principal: {$profile->tese_principal}";
+            if ($profile->objetivo_analise) $fields[] = "Objetivo: {$profile->objetivo_analise}";
+            if ($profile->limites_restricoes) $fields[] = "Limites: {$profile->limites_restricoes}";
+            if (!empty($fields)) {
+                $profileContext = "\n\nDADOS DO PROCESSO:\n" . implode("\n", $fields) . "\n";
+            }
         }
 
         $typeContext = "Tipo de análise: " . ($conversation->type_label ?? 'Análise') . "\n";
@@ -187,6 +193,11 @@ class JustusOpenAiService
             ]);
 
             $this->budget->recordUsage($userId, $inputTokens, $outputTokens, $costBrl);
+
+            // Auto-rename: se titulo ainda eh 'Nova Analise', renomear
+            if (in_array($conversation->title, ['Nova Análise', 'Nova Analise', null, ''])) {
+                $this->autoRenameConversation($conversation, $profile, $userMessage);
+            }
 
             // Pipeline Claude: avaliar se precisa redação jurídica
             $claudeDocPath = null;
@@ -375,5 +386,62 @@ Resposta: {$respSnippet}"],
             }
         }
         return $citations;
+    }
+
+    private function autoRenameConversation(JustusConversation $conversation, $profile, string $userMessage): void
+    {
+        try {
+            if ($profile && $profile->numero_cnj) {
+                $parts = [];
+                if ($profile->classe) {
+                    $abrev = [
+                        'Execução de Título Extrajudicial' => 'Exec. Título',
+                        'Cumprimento de Sentença' => 'Cumpr. Sentença',
+                        'Ação de Cobrança' => 'Cobrança',
+                        'Reclamação Trabalhista' => 'Recl. Trabalhista',
+                        'Ação Indenizatória' => 'Indenizatória',
+                    ];
+                    $classeShort = $abrev[$profile->classe] ?? mb_substr($profile->classe, 0, 25);
+                    $parts[] = $classeShort;
+                }
+                $parts[] = $profile->numero_cnj;
+                if ($profile->reu) {
+                    $nomes = explode(' ', trim($profile->reu));
+                    if (count($nomes) > 1) {
+                        $parts[] = $nomes[0] . ' ' . end($nomes);
+                    } else {
+                        $parts[] = $nomes[0];
+                    }
+                }
+                $title = implode(' — ', $parts);
+                $conversation->update(['title' => mb_substr($title, 0, 255)]);
+                return;
+            }
+
+            $apiKey = config('justus.openai_api_key');
+            if (empty($apiKey)) return;
+
+            $msgPreview = mb_substr($userMessage, 0, 500);
+            $response = \Illuminate\Support\Facades\Http::withToken($apiKey)
+                ->timeout(15)
+                ->post('https://api.openai.com/v1/chat/completions', [
+                    'model' => config('justus.model_economico', 'gpt-5-mini'),
+                    'messages' => [
+                        ['role' => 'user', 'content' => "Gere um titulo curto (max 60 caracteres) para esta analise juridica. Responda APENAS o titulo, sem aspas, sem explicacao.\n\nMensagem: {$msgPreview}"],
+                    ],
+                    'max_completion_tokens' => 50,
+                ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                $title = trim($data['choices'][0]['message']['content'] ?? '');
+                $title = trim($title, '"\' ');
+                if (!empty($title) && mb_strlen($title) <= 255) {
+                    $conversation->update(['title' => $title]);
+                }
+            }
+        } catch (\Exception $e) {
+            Log::warning('JUSTUS: auto-rename falhou', ['error' => $e->getMessage()]);
+        }
     }
 }

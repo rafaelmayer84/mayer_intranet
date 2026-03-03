@@ -460,9 +460,16 @@ class JustusController extends Controller
             if ($profile->objetivo_analise) $searchTerms[] = $profile->objetivo_analise;
         }
 
-        // Se não há termos do profile, usar título da conversa
+        // Se nao ha termos do profile, usar primeira mensagem do usuario
         if (empty($searchTerms)) {
-            $searchTerms[] = $conversation->title ?? 'direito civil';
+            $firstMsg = $conversation->messages()->where('role', 'user')->orderBy('id')->value('content');
+            if ($firstMsg) {
+                // Extrair termos relevantes da mensagem (max 200 chars)
+                $searchTerms[] = mb_substr($firstMsg, 0, 200);
+            } else {
+                // Sem mensagem e sem profile = nao buscar
+                return response()->json(['success' => true, 'results' => []]);
+            }
         }
 
         $query = implode(' ', $searchTerms);

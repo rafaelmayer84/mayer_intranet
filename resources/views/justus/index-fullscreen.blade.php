@@ -318,7 +318,7 @@
             {{-- Info bar --}}
             <div class="px-4 py-1.5 text-[10px] text-gray-400 flex items-center gap-4 border-t flex-shrink-0" style="background:rgba(255,255,255,0.7);">
                 <span>{{ $activeConversation->type_label }}</span>
-                <span>{{ number_format($activeConversation->total_input_tokens + $activeConversation->total_output_tokens) }} tokens</span>
+                <span><span id="justus-token-count">{{ number_format($activeConversation->total_input_tokens + $activeConversation->total_output_tokens) }}</span> tokens</span>
                 <span>R$ {{ number_format($activeConversation->total_cost_brl, 2, ',', '.') }}</span>
             </div>
 

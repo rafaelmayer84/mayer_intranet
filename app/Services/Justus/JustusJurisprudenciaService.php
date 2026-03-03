@@ -29,9 +29,14 @@ class JustusJurisprudenciaService
             }
         }
 
-        // Inferir área do direito pelo tipo de processo se possível
+        // Se profile nao tem dados essenciais E mensagem eh instrucao generica, nao buscar
+        $hasProfileContext = $profile && ($profile->classe || $profile->tese_principal || $profile->objetivo_analise);
+        
+        // Inferir area do direito se possivel
         $area = null;
-        // Não filtrar por área por default — deixar fulltext encontrar o melhor match
+        if ($profile && $profile->orgao) {
+            $area = JustusJurisprudencia::inferAreaDireito($profile->orgao);
+        }
 
         $results = JustusJurisprudencia::searchRelevant($searchQuery, $maxResults, $area);
 
@@ -85,7 +90,21 @@ class JustusJurisprudenciaService
         $orgao = $juris->orgao_julgador ?? '';
         $data = $juris->data_decisao ?? 'data n/d';
         $ementa = trim($juris->ementa ?? '');
-        return "{$ref}, Rel. Min. {$relator}, {$orgao}, j. {$data}\nEMENTA: {$ementa}";
+        $tribunal = strtoupper($juris->tribunal ?? '');
+        $relTitle = self::relatorTitle($tribunal);
+        return "{$ref}, {$relTitle} {$relator}, {$orgao}, j. {$data}\nEMENTA: {$ementa}";
+    }
+
+    private static function relatorTitle(string $tribunal): string
+    {
+        return match($tribunal) {
+            'STJ', 'STF' => 'Rel. Min.',
+            'TJSC', 'TJSP', 'TJRJ', 'TJRS', 'TJPR', 'TJMG' => 'Rel. Des.',
+            'TRF4', 'TRF1', 'TRF2', 'TRF3', 'TRF5' => 'Rel. Des. Federal',
+            'TRT12', 'TRT1', 'TRT2', 'TRT3', 'TRT4', 'TRT9', 'TRT15' => 'Rel. Des.',
+            'TST' => 'Rel. Min.',
+            default => 'Rel.',
+        };
     }
 
     /**
@@ -94,7 +113,9 @@ class JustusJurisprudenciaService
     private static function formatShortRef($juris): string
     {
         $data = $juris->data_decisao ?? '';
-        return ($juris->sigla_classe ?? '') . ' ' . ($juris->numero_registro ?? '') . ', Rel. Min. ' . ($juris->relator ?? '') . ', ' . ($juris->orgao_julgador ?? '') . ', j. ' . $data;
+        $tribunal = strtoupper($juris->tribunal ?? '');
+        $relTitle = self::relatorTitle($tribunal);
+        return ($juris->sigla_classe ?? '') . ' ' . ($juris->numero_registro ?? '') . ', ' . $relTitle . ' ' . ($juris->relator ?? '') . ', ' . ($juris->orgao_julgador ?? '') . ', j. ' . $data;
     }
 
     /**
