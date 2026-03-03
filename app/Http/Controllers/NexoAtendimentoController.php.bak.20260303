@@ -123,6 +123,29 @@ class NexoAtendimentoController extends Controller
                 'sent_at' => now(),
             ]);
 
+            // Auto-assumir: desativar bot + atribuir operador ao enviar msg humana
+            if ($conversation->bot_ativo) {
+                $conversation->update([
+                    'bot_ativo' => false,
+                    'assigned_user_id' => auth()->id(),
+                    'assigned_at' => now(),
+                ]);
+                if ($conversation->contact_id) {
+                    try {
+                        $spService->pausarAutomacao($conversation->contact_id);
+                        \Log::info('NEXO: bot pausado automaticamente ao enviar mensagem', ['conv_id' => $id, 'user' => auth()->user()->name]);
+                    } catch (\Throwable $e) {
+                        \Log::warning('NEXO: falha ao pausar bot no auto-assumir', ['error' => $e->getMessage()]);
+                    }
+                }
+            } elseif (empty($conversation->assigned_user_id)) {
+                // Atribuir operador mesmo se bot ja estava desativado
+                $conversation->update([
+                    'assigned_user_id' => auth()->id(),
+                    'assigned_at' => now(),
+                ]);
+            }
+
             if (!$conversation->first_response_at) $conversation->first_response_at = now();
             if (!$conversation->assigned_user_id) $conversation->assigned_user_id = auth()->id();
             $conversation->last_message_at = now();

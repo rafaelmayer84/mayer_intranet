@@ -475,7 +475,7 @@ class JustusController extends Controller
         $query = implode(' ', $searchTerms);
 
         try {
-            $results = \App\Models\JustusJurisprudencia::searchRelevant($query, 5);
+            $results = \App\Models\JustusJurisprudencia::searchRelevant($query, 5, $area);
 
             $formatted = $results->map(function ($r) {
                 $ementa = $r->ementa ?? '';

@@ -170,6 +170,8 @@ const NexoApp = {
     appendMessages(msgs){
         if(!msgs.length)return;
         const c=document.getElementById('chat-messages');
+        // v2.4: se msgs incluem historicas (sent_at < ultima msg visivel), re-render ordenado
+        if(this._lastMsgs&&this._lastMsgs.length&&msgs.some(m=>m.sent_at&&this._lastMsgs.length&&m.sent_at<this._lastMsgs[this._lastMsgs.length-1].sent_at)){this._lastMsgs=this._lastMsgs.concat(msgs);this._lastMsgs.sort((a,b)=>(a.sent_at||'').localeCompare(b.sent_at||''));this.renderMessages(this._lastMsgs);return}
         let html='';
         const lastDateEl=c.querySelector('.nexo-day-sep:last-of-type');
         let lastDate=lastDateEl?lastDateEl.textContent:'';
