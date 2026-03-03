@@ -379,66 +379,50 @@ class JustusProcessPdfJob implements ShouldQueue
             []
         );
 
-        // === FIRST PASS: Regex (custo zero) ===
+        // Regex apenas para CNJ (formato universal, confiavel)
         if (preg_match('/\d{7}[\-\.]\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/', $fullText, $m)) {
             $profile->numero_cnj = $m[0];
+            $profile->save();
         }
-        if (preg_match('/(?:AUTOR|AUTORA|EXEQUENTE|REQUERENTE|RECLAMANTE|APELANTE|AGRAVANTE|IMPETRANTE)\s*[:\-]?\s*(.+?)(?:\n|$)/i', $fullText, $m)) {
-            $profile->autor = trim($m[1]);
-        }
-        if (preg_match('/(?:R[EÉ]U|R[EÉ]|EXECUTAD[OA]|REQUERID[OA]|RECLAMAD[OA]|APELAD[OA]|AGRAVAD[OA]|IMPETRAD[OA])\s*[:\-]?\s*(.+?)(?:\n|$)/i', $fullText, $m)) {
-            $profile->reu = trim($m[1]);
-        }
-        if (preg_match('/(?:CLASSE|A[CÇ][AÃ]O|NATUREZA)\s*[:\-]?\s*(.+?)(?:\n|$)/i', $fullText, $m)) {
-            $profile->classe = trim($m[1]);
-        }
-        if (preg_match('/(?:VARA|TURMA|C[AÂ]MARA|SE[CÇ][AÃ]O|JUIZADO)\s*[:\-]?\s*(.+?)(?:\n|$)/i', $fullText, $m)) {
-            $profile->relator_vara = trim($m[1]);
-        }
-        if (preg_match('/(?:INTIMA[CÇ][AÃ]O|PUBLICA[CÇ][AÃ]O)\s*[:\-]?\s*(\d{2}\/\d{2}\/\d{4})/i', $fullText, $m)) {
-            try {
-                $profile->data_intimacao = \Carbon\Carbon::createFromFormat('d/m/Y', $m[1])->toDateString();
-            } catch (\Exception $e) {}
-        }
-        $profile->save();
 
-        // === SECOND PASS: IA para campos vazios (gpt-5-mini) ===
-        $emptyFields = [];
-        if (empty($profile->classe)) $emptyFields[] = 'classe';
-        if (empty($profile->autor)) $emptyFields[] = 'autor';
-        if (empty($profile->reu)) $emptyFields[] = 'reu';
-        if (empty($profile->relator_vara)) $emptyFields[] = 'relator_vara';
-        if (empty($profile->fase_atual)) $emptyFields[] = 'fase_atual';
-        if (empty($profile->tese_principal)) $emptyFields[] = 'tese_principal';
-        if (empty($profile->objetivo_analise)) $emptyFields[] = 'objetivo_analise';
-        if (empty($profile->orgao)) $emptyFields[] = 'orgao';
-
-        if (!empty($emptyFields)) {
-            $this->extractProfileViaAI($profile, $fullText, $emptyFields);
-        }
+        // IA para TODOS os outros campos (regex eh fragil para formatos variados)
+        $this->extractProfileViaAI($profile, $fullText);
     }
 
-    private function extractProfileViaAI(JustusProcessProfile $profile, string $text, array $emptyFields): void
+    private function extractProfileViaAI(JustusProcessProfile $profile, string $text): void
     {
         $apiKey = config('justus.openai_api_key');
-        if (empty($apiKey)) return;
+        if (empty($apiKey)) {
+            \Illuminate\Support\Facades\Log::warning('JUSTUS Profile AI: API key vazia');
+            return;
+        }
 
+        // Usar ate 8000 chars das primeiras paginas
         $truncated = mb_substr($text, 0, 8000);
-        $fieldsList = implode(', ', $emptyFields);
 
-        $prompt = "Analise o texto abaixo de um processo judicial brasileiro e extraia APENAS os seguintes campos em formato JSON: {$fieldsList}.\n\n";
-        $prompt .= "Regras:\n";
-        $prompt .= "- classe: tipo da acao (ex: Execucao de Titulo Extrajudicial, Acao de Cobranca, Reclamacao Trabalhista)\n";
-        $prompt .= "- autor: nome completo do autor/exequente/requerente/reclamante\n";
-        $prompt .= "- reu: nome completo do reu/executado/requerido/reclamado\n";
-        $prompt .= "- relator_vara: vara ou orgao julgador (ex: 1a Vara Civel de Itajai, 3a Turma Recursal)\n";
-        $prompt .= "- fase_atual: fase processual (ex: execucao, conhecimento, recursal, cumprimento de sentenca)\n";
-        $prompt .= "- tese_principal: tese central do caso em uma frase curta\n";
-        $prompt .= "- objetivo_analise: o que se busca no processo (ex: cobranca de honorarios, indenizacao por danos)\n";
-        $prompt .= "- orgao: tribunal ou juizado (ex: TJSC, TRT12, STJ, JEC de Itajai)\n";
-        $prompt .= "- Se nao encontrar um campo, use null.\n";
-        $prompt .= "- Responda APENAS o JSON, sem markdown, sem explicacao.\n\n";
-        $prompt .= "TEXTO DO PROCESSO:\n{$truncated}";
+        $prompt = <<<PROMPT
+Voce eh um assistente juridico. Analise o texto abaixo extraido de um processo judicial brasileiro.
+Extraia as informacoes em formato JSON com EXATAMENTE estas chaves:
+
+{
+  "classe": "tipo da acao processual (ex: Execucao de Titulo Extrajudicial, Acao de Cobranca, Cumprimento de Sentenca)",
+  "autor": "nome completo do autor, exequente, requerente ou reclamante",
+  "reu": "nome completo do reu, executado, requerido ou reclamado",
+  "relator_vara": "vara, juizado ou orgao julgador (ex: Juizado Especial Civel da Comarca de Itajai)",
+  "fase_atual": "fase processual atual (ex: execucao, conhecimento, recursal, cumprimento de sentenca)",
+  "tese_principal": "tese central ou objeto do caso em uma frase curta",
+  "objetivo_analise": "o que se busca no processo (ex: cobranca de honorarios advocaticios, indenizacao por danos morais)",
+  "orgao": "tribunal ou sistema (ex: TJSC, TRT12, STJ, JEC de Itajai)"
+}
+
+Regras:
+- Se nao encontrar um campo no texto, use null
+- Responda SOMENTE o JSON, sem markdown, sem crases, sem explicacao
+- Nao invente dados que nao estejam no texto
+
+TEXTO DO PROCESSO:
+{$truncated}
+PROMPT;
 
         try {
             $response = \Illuminate\Support\Facades\Http::withToken($apiKey)
@@ -448,28 +432,47 @@ class JustusProcessPdfJob implements ShouldQueue
                     'messages' => [
                         ['role' => 'user', 'content' => $prompt],
                     ],
-                    'max_completion_tokens' => 500,
+                    'max_completion_tokens' => 2000,
                 ]);
 
             if (!$response->successful()) {
-                \Illuminate\Support\Facades\Log::warning('JUSTUS Profile AI: API error', ['status' => $response->status()]);
+                \Illuminate\Support\Facades\Log::warning('JUSTUS Profile AI: HTTP ' . $response->status(), [
+                    'body' => mb_substr($response->body(), 0, 500),
+                ]);
                 return;
             }
 
             $data = $response->json();
-            $raw = $data['choices'][0]['message']['content'] ?? '';
-            $raw = preg_replace('/^```json\s*|```$/m', '', trim($raw));
-            $parsed = json_decode($raw, true);
+            $raw = trim($data['choices'][0]['message']['content'] ?? '');
 
+            \Illuminate\Support\Facades\Log::info('JUSTUS Profile AI: resposta raw', [
+                'conversation_id' => $profile->conversation_id,
+                'raw_length' => strlen($raw),
+                'raw_preview' => mb_substr($raw, 0, 300),
+                'finish_reason' => $data['choices'][0]['finish_reason'] ?? 'unknown',
+                'usage' => json_encode($data['usage'] ?? []),
+            ]);
+
+            if (empty($raw)) {
+                \Illuminate\Support\Facades\Log::warning('JUSTUS Profile AI: resposta vazia');
+                return;
+            }
+
+            // Limpar possivel markdown
+            $raw = preg_replace('/^```(?:json)?\s*/m', '', $raw);
+            $raw = preg_replace('/```$/m', '', $raw);
+            $raw = trim($raw);
+
+            $parsed = json_decode($raw, true);
             if (!is_array($parsed)) {
-                \Illuminate\Support\Facades\Log::warning('JUSTUS Profile AI: JSON invalido', ['raw' => $raw]);
+                \Illuminate\Support\Facades\Log::warning('JUSTUS Profile AI: JSON invalido', ['raw' => mb_substr($raw, 0, 500)]);
                 return;
             }
 
             $fillable = ['classe', 'autor', 'reu', 'relator_vara', 'fase_atual', 'tese_principal', 'objetivo_analise', 'orgao'];
             $filled = 0;
             foreach ($fillable as $field) {
-                if (!empty($parsed[$field]) && empty($profile->$field)) {
+                if (isset($parsed[$field]) && $parsed[$field] !== null && trim($parsed[$field]) !== '') {
                     $profile->$field = trim($parsed[$field]);
                     $filled++;
                 }
@@ -477,12 +480,13 @@ class JustusProcessPdfJob implements ShouldQueue
 
             if ($filled > 0) {
                 $profile->save();
-                \Illuminate\Support\Facades\Log::info('JUSTUS Profile AI: preenchidos ' . $filled . ' campos', [
+                \Illuminate\Support\Facades\Log::info('JUSTUS Profile AI: ' . $filled . ' campos preenchidos', [
                     'conversation_id' => $profile->conversation_id,
-                    'campos' => array_keys(array_filter($parsed)),
+                    'campos' => array_intersect_key($parsed, array_flip($fillable)),
                 ]);
             }
 
+            // Registrar custo
             $usage = $data['usage'] ?? [];
             if (!empty($usage)) {
                 \App\Models\SystemEvent::sistema('justus', 'info', 'JUSTUS: Profile AI extraction', null, [
@@ -497,3 +501,4 @@ class JustusProcessPdfJob implements ShouldQueue
         }
     }
 }
+
