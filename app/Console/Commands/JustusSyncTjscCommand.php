@@ -32,6 +32,9 @@ class JustusSyncTjscCommand extends Command
 
     public function handle(): int
     {
+        // Usar banco separado do tribunal
+        \App\Models\JustusJurisprudencia::setTribunalConnection('TJSC');
+
         $this->cookieFile = tempnam(sys_get_temp_dir(), 'tjsc_');
         $dryRun = $this->option('dry-run');
         $force = $this->option('force');
@@ -60,7 +63,7 @@ class JustusSyncTjscCommand extends Command
         $this->info("Pulados: {$this->skipped}");
         $this->info("Erros: {$this->errors}");
         $this->info("Requests HTTP: {$this->requestCount}");
-        $total = JustusJurisprudencia::where('tribunal', 'TJSC')->count();
+        $total = DB::connection(\App\Models\JustusJurisprudencia::connectionForTribunal('TJSC'))->table('justus_jurisprudencia')->where('tribunal', 'TJSC')->count();
         $this->info("Total TJSC na base: {$total}");
 
         @unlink($this->cookieFile);
@@ -383,7 +386,7 @@ class JustusSyncTjscCommand extends Command
                     continue;
                 }
 
-                $existing = JustusJurisprudencia::where('tribunal', 'TJSC')
+                $existing = DB::connection(\App\Models\JustusJurisprudencia::connectionForTribunal('TJSC'))->table('justus_jurisprudencia')->where('tribunal', 'TJSC')
                     ->where('external_id', $ac['external_id'])
                     ->first();
 

@@ -8,6 +8,13 @@
     </svg>
     <span>SISTEMA EM FASE DE HOMOLOGAÇÃO — Funcionalidades em validação. Resultados devem ser conferidos antes do uso.</span>
 </div>
+<style>
+    /* JUSTUS: override layout padding para ocupar 100% da viewport */
+    #main-content { overflow: hidden !important; display: flex !important; flex-direction: column !important; }
+    #main-content > .p-4.md\:p-8 { padding: 0 !important; flex: 1 !important; min-height: 0 !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; }
+    #main-content > #notification-bar + .p-4.md\:p-8,
+    #main-content .p-4.md\:p-8 { padding: 0 !important; flex: 1 !important; min-height: 0 !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; }
+</style>
 <div x-data="justusApp()" x-init="init()" class="flex flex-col" style="height:100%;overflow:hidden;">
 
     {{-- ===== HEADER PREMIUM ===== --}}

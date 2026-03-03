@@ -54,6 +54,46 @@ return [
             'strict' => false,
         ],
 
+
+        'justus_tjsc' => [
+            'driver' => 'mysql',
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '3306'),
+            'database' => env('DB_JUSTUS_TJSC_DATABASE'),
+            'username' => env('DB_JUSTUS_TJSC_USERNAME'),
+            'password' => env('DB_JUSTUS_TJSC_PASSWORD'),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => true,
+        ],
+
+        'justus_stj' => [
+            'driver' => 'mysql',
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '3306'),
+            'database' => env('DB_JUSTUS_STJ_DATABASE'),
+            'username' => env('DB_JUSTUS_STJ_USERNAME'),
+            'password' => env('DB_JUSTUS_STJ_PASSWORD'),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => true,
+        ],
+
+        'justus_falcao' => [
+            'driver' => 'mysql',
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '3306'),
+            'database' => env('DB_JUSTUS_FALCAO_DATABASE'),
+            'username' => env('DB_JUSTUS_FALCAO_USERNAME'),
+            'password' => env('DB_JUSTUS_FALCAO_PASSWORD'),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => true,
+        ],
+
         'sqlite' => [
             'driver' => 'sqlite',
             'url' => env('DB_URL'),

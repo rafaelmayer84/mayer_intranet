@@ -24,28 +24,79 @@ class JustusJurisprudencia extends Model
         'acordaos_similares' => 'array',
     ];
 
+    /**
+     * Mapeamento tribunal -> conexao do banco
+     */
+    private static array $tribunalConnections = [
+        'TJSC' => 'justus_tjsc',
+        'STJ'  => 'justus_stj',
+        // 'FALCAO' => 'justus_falcao', // habilitar quando tiver dados
+    ];
+
+    /**
+     * Retorna a conexao correta para um tribunal
+     */
+    public static function connectionForTribunal(string $tribunal): string
+    {
+        return self::$tribunalConnections[strtoupper($tribunal)] ?? 'mysql';
+    }
+
+    /**
+     * Seta a conexao default do Model para o banco do tribunal.
+     * Usado pelos Commands de sync para direcionar INSERTs.
+     */
+    public static function setTribunalConnection(string $tribunal): void
+    {
+        $conn = self::connectionForTribunal($tribunal);
+        $instance = new static;
+        $instance->setConnection($conn);
+        // Guardar para que novas instancias usem esta conexao
+        static::$resolvedConnection = $conn;
+    }
+
+    private static ?string $resolvedConnection = null;
+
+    public function getConnectionName()
+    {
+        return static::$resolvedConnection ?? parent::getConnectionName();
+    }
+
+    /**
+     * Retorna nova instancia do model apontando para o banco do tribunal
+     */
+    public static function onTribunal(string $tribunal): \Illuminate\Database\Eloquent\Builder
+    {
+        $conn = self::connectionForTribunal($tribunal);
+        return (new static)->setConnection($conn)->newQuery();
+    }
+
+    /**
+     * Retorna todas as conexoes de tribunais configuradas
+     */
+    public static function allTribunalConnections(): array
+    {
+        return self::$tribunalConnections;
+    }
+
     // Mapeamento orgao_julgador -> area_direito
     public static function inferAreaDireito(string $orgao): ?string
     {
         $orgaoUpper = mb_strtoupper($orgao);
         if (str_contains($orgaoUpper, 'PRIMEIRA TURMA') || str_contains($orgaoUpper, 'SEGUNDA TURMA') || str_contains($orgaoUpper, 'PRIMEIRA SEÇÃO')) {
-            return 'tributario'; // Direito Público/Tributário
+            return 'tributario';
         }
         if (str_contains($orgaoUpper, 'TERCEIRA TURMA') || str_contains($orgaoUpper, 'QUARTA TURMA') || str_contains($orgaoUpper, 'SEGUNDA SEÇÃO')) {
-            return 'civil'; // Direito Privado/Civil
+            return 'civil';
         }
         if (str_contains($orgaoUpper, 'QUINTA TURMA') || str_contains($orgaoUpper, 'SEXTA TURMA') || str_contains($orgaoUpper, 'TERCEIRA SEÇÃO')) {
-            return 'penal'; // Direito Penal
+            return 'penal';
         }
         if (str_contains($orgaoUpper, 'CORTE ESPECIAL')) {
-            return 'civil'; // Transversal, default civil
+            return 'civil';
         }
         return null;
     }
 
-    /**
-     * Inferência de área do direito para TJSC
-     */
     public static function inferAreaDireitoTjsc(string $orgao): ?string
     {
         $orgaoUpper = mb_strtoupper($orgao);
@@ -58,7 +109,7 @@ class JustusJurisprudencia extends Model
     }
 
     /**
-     * Busca FULLTEXT com relevância
+     * Busca FULLTEXT com relevancia em TODOS os bancos de tribunais
      */
     public static function searchRelevant(string $query, int $limit = 5, ?string $area = null): Collection
     {
@@ -68,30 +119,57 @@ class JustusJurisprudencia extends Model
         }
 
         $matchExpr = implode(' ', $keywords);
+        $allResults = collect();
 
-        $q = self::query()
-            ->whereRaw('MATCH(ementa) AGAINST(? IN BOOLEAN MODE)', [$matchExpr])
-            ->selectRaw('*, MATCH(ementa) AGAINST(? IN BOOLEAN MODE) as relevance', [$matchExpr]);
+        // Buscar em cada banco de tribunal
+        foreach (self::$tribunalConnections as $tribunal => $conn) {
+            try {
+                $results = DB::connection($conn)
+                    ->table('justus_jurisprudencia')
+                    ->whereRaw('MATCH(ementa) AGAINST(? IN BOOLEAN MODE)', [$matchExpr])
+                    ->selectRaw('*, MATCH(ementa) AGAINST(? IN BOOLEAN MODE) as relevance', [$matchExpr])
+                    ->when($area, fn($q) => $q->where('area_direito', $area))
+                    ->orderByDesc('relevance')
+                    ->orderByDesc('data_decisao')
+                    ->limit($limit)
+                    ->get();
 
-        if ($area) {
-            $q->where('area_direito', $area);
+                // Adicionar tribunal_source para rastreabilidade
+                $results->each(fn($r) => $r->tribunal_source = $tribunal);
+                $allResults = $allResults->merge($results);
+            } catch (\Exception $e) {
+                \Log::warning("Justus: falha ao buscar jurisprudencia em {$tribunal}: " . $e->getMessage());
+            }
         }
 
-        return $q->orderByDesc('relevance')
-            ->orderByDesc('data_decisao')
-            ->limit($limit)
-            ->get();
+        // Tambem buscar no banco principal (para tribunais ainda nao migrados)
+        try {
+            $mainResults = DB::connection('mysql')
+                ->table('justus_jurisprudencia')
+                ->whereRaw('MATCH(ementa) AGAINST(? IN BOOLEAN MODE)', [$matchExpr])
+                ->selectRaw('*, MATCH(ementa) AGAINST(? IN BOOLEAN MODE) as relevance', [$matchExpr])
+                ->when($area, fn($q) => $q->where('area_direito', $area))
+                ->orderByDesc('relevance')
+                ->orderByDesc('data_decisao')
+                ->limit($limit)
+                ->get();
+
+            $mainResults->each(fn($r) => $r->tribunal_source = 'PRINCIPAL');
+            $allResults = $allResults->merge($mainResults);
+        } catch (\Exception $e) {
+            // Tabela pode estar vazia no principal, OK
+        }
+
+        // Ordenar por relevancia global e limitar
+        return $allResults->sortByDesc('relevance')->take($limit)->values();
     }
 
-    /**
-     * Formata resultado para injeção no prompt
-     */
     public function toPromptFormat(): string
     {
         $ref = $this->sigla_classe . ' ' . $this->numero_registro;
         $relator = $this->relator;
         $orgao = $this->orgao_julgador;
-        $data = $this->data_decisao ? $this->data_decisao->format('d/m/Y') : 'data n/d';
+        $data = $this->data_decisao ? (is_string($this->data_decisao) ? $this->data_decisao : $this->data_decisao->format('d/m/Y')) : 'data n/d';
         $ementa = trim($this->ementa);
 
         return "{$ref}, Rel. Min. {$relator}, {$orgao}, j. {$data}\nEMENTA: {$ementa}";
@@ -116,12 +194,9 @@ class JustusJurisprudencia extends Model
         return array_values(array_unique(array_slice($words, 0, 10)));
     }
 
-    /**
-     * Referência curta para citação
-     */
     public function getShortRefAttribute(): string
     {
-        $data = $this->data_decisao ? $this->data_decisao->format('d/m/Y') : '';
+        $data = $this->data_decisao ? (is_string($this->data_decisao) ? $this->data_decisao : $this->data_decisao->format('d/m/Y')) : '';
         return "{$this->sigla_classe} {$this->numero_registro}, Rel. Min. {$this->relator}, {$this->orgao_julgador}, j. {$data}";
     }
 }

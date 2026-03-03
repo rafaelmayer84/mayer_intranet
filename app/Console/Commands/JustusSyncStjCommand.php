@@ -19,6 +19,9 @@ class JustusSyncStjCommand extends Command
 
     public function handle(): int
     {
+        // Usar banco separado do tribunal
+        \App\Models\JustusJurisprudencia::setTribunalConnection('STJ');
+
         $datasets = config('justus.stj_datasets', []);
         $specificDataset = $this->option('dataset');
         $force = $this->option('force');
@@ -135,7 +138,7 @@ class JustusSyncStjCommand extends Command
         $this->info("Atualizados: {$this->updated}");
         $this->info("Pulados: {$this->skipped}");
         $this->info("Erros: {$this->errors}");
-        $this->info("Total na base: " . JustusJurisprudencia::count());
+        $this->info("Total na base STJ: " . DB::connection(\App\Models\JustusJurisprudencia::connectionForTribunal('STJ'))->table('justus_jurisprudencia')->count());
 
         Log::info('justus:sync-stj concluído', [
             'imported' => $this->imported,
@@ -223,7 +226,7 @@ class JustusSyncStjCommand extends Command
                     $this->updated++;
                 } else {
                     $record['created_at'] = now();
-                    DB::table('justus_jurisprudencia')->insert($record);
+                    DB::connection(\App\Models\JustusJurisprudencia::connectionForTribunal('STJ'))->table('justus_jurisprudencia')->insert($record);
                     $this->imported++;
                 }
             } catch (\Exception $e) {

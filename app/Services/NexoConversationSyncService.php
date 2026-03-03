@@ -283,6 +283,8 @@ class NexoConversationSyncService
                 'media_caption'       => $media['caption'],
                 'raw_payload'         => $this->safePayloadForStorage($msg),
                 'sent_at'             => $sentAt,
+                'created_at'          => $sentAt,
+                'updated_at'          => $sentAt,
             ]);
 
             $newCount++;

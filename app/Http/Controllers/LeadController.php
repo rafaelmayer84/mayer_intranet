@@ -265,9 +265,14 @@ class LeadController extends Controller
 
         if (data_get($event, 'title') === 'incoming_message') {
             // Validar por IP do SendPulse (SendPulse nao envia X-Webhook-Secret)
-            $allowedIps = ["188.40.60.215", "188.40.60.216", "188.40.60.217"];
-            if (!in_array($request->ip(), $allowedIps)) {
-                \Log::warning("Nexo webhook: IP nao autorizado", ["ip" => $request->ip()]);
+            $sendpulseRanges = ['185.23.85.', '185.23.86.', '185.23.87.', '91.229.95.', '178.32.', '2a02:4780:', '188.40.'];
+            $clientIp = $request->ip();
+            $ipAllowed = false;
+            foreach ($sendpulseRanges as $range) {
+                if (str_starts_with($clientIp, $range)) { $ipAllowed = true; break; }
+            }
+            if (!$ipAllowed) {
+                \Log::warning("Nexo webhook: IP nao autorizado", ["ip" => $clientIp]);
                 return response()->json(["error" => "Forbidden"], 403);
             }
 

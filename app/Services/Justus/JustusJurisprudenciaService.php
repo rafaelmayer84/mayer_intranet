@@ -48,7 +48,7 @@ class JustusJurisprudenciaService
             'found' => true,
             'count' => $results->count(),
             'context' => $this->buildPromptContext($results),
-            'references' => $results->map(fn($r) => $r->short_ref)->toArray(),
+            'references' => $results->map(fn($r) => self::formatShortRef($r))->toArray(),
         ];
     }
 
@@ -57,14 +57,14 @@ class JustusJurisprudenciaService
      */
     private function buildPromptContext(Collection $results): string
     {
-        $context = "\n\n[JURISPRUDÊNCIA STJ — REFERÊNCIAS VERIFICADAS]\n";
-        $context .= "As ementas abaixo são reais, extraídas do Portal de Dados Abertos do STJ (dadosabertos.web.stj.jus.br). ";
+        $context = "\n\n[JURISPRUDÊNCIA — REFERÊNCIAS VERIFICADAS]\n";
+        $context .= "As ementas abaixo são reais, extraídas de bases oficiais (STJ, TJSC e outros tribunais). ";
         $context .= "Use APENAS estas referências ao citar jurisprudência. NÃO invente números de acórdãos, ementas ou decisões que não estejam listadas aqui.\n\n";
 
         foreach ($results as $i => $juris) {
             $num = $i + 1;
             $context .= "--- Referência #{$num} ---\n";
-            $context .= $juris->toPromptFormat();
+            $context .= self::formatForPrompt($juris);
             $context .= "\n\n";
         }
 
@@ -76,20 +76,95 @@ class JustusJurisprudenciaService
     }
 
     /**
+     * Formata registro (stdClass ou Model) para injecao no prompt
+     */
+    private static function formatForPrompt($juris): string
+    {
+        $ref = ($juris->sigla_classe ?? '') . ' ' . ($juris->numero_registro ?? '');
+        $relator = $juris->relator ?? '';
+        $orgao = $juris->orgao_julgador ?? '';
+        $data = $juris->data_decisao ?? 'data n/d';
+        $ementa = trim($juris->ementa ?? '');
+        return "{$ref}, Rel. Min. {$relator}, {$orgao}, j. {$data}\nEMENTA: {$ementa}";
+    }
+
+    /**
+     * Formata referencia curta (stdClass ou Model)
+     */
+    private static function formatShortRef($juris): string
+    {
+        $data = $juris->data_decisao ?? '';
+        return ($juris->sigla_classe ?? '') . ' ' . ($juris->numero_registro ?? '') . ', Rel. Min. ' . ($juris->relator ?? '') . ', ' . ($juris->orgao_julgador ?? '') . ', j. ' . $data;
+    }
+
+    /**
      * Retorna estatísticas da base de jurisprudência.
      */
     public function getStats(): array
     {
+        $totalGeral = 0;
+        $porTribunal = [];
+        $porArea = [];
+        $porOrgao = [];
+        $maisRecente = null;
+        $maisAntigo = null;
+
+        // Consultar cada banco de tribunal
+        $connections = JustusJurisprudencia::allTribunalConnections();
+        $connections['PRINCIPAL'] = 'mysql'; // incluir banco principal
+
+        foreach ($connections as $tribunal => $conn) {
+            try {
+                $db = \DB::connection($conn);
+                $count = $db->table('justus_jurisprudencia')->count();
+                if ($count === 0) continue;
+
+                $totalGeral += $count;
+
+                // Por tribunal
+                $tribunais = $db->table('justus_jurisprudencia')
+                    ->selectRaw('tribunal, COUNT(*) as total')
+                    ->groupBy('tribunal')->pluck('total', 'tribunal')->toArray();
+                foreach ($tribunais as $t => $v) {
+                    $porTribunal[$t] = ($porTribunal[$t] ?? 0) + $v;
+                }
+
+                // Por area
+                $areas = $db->table('justus_jurisprudencia')
+                    ->selectRaw('area_direito, COUNT(*) as total')
+                    ->groupBy('area_direito')->pluck('total', 'area_direito')->toArray();
+                foreach ($areas as $a => $v) {
+                    $porArea[$a] = ($porArea[$a] ?? 0) + $v;
+                }
+
+                // Por orgao (top 20)
+                $orgaos = $db->table('justus_jurisprudencia')
+                    ->selectRaw('orgao_julgador, COUNT(*) as total')
+                    ->groupBy('orgao_julgador')->orderByDesc('total')
+                    ->limit(20)->pluck('total', 'orgao_julgador')->toArray();
+                foreach ($orgaos as $o => $v) {
+                    $porOrgao[$o] = ($porOrgao[$o] ?? 0) + $v;
+                }
+
+                // Datas
+                $maxDate = $db->table('justus_jurisprudencia')->max('data_decisao');
+                $minDate = $db->table('justus_jurisprudencia')->min('data_decisao');
+                if ($maxDate && (!$maisRecente || $maxDate > $maisRecente)) $maisRecente = $maxDate;
+                if ($minDate && (!$maisAntigo || $minDate < $maisAntigo)) $maisAntigo = $minDate;
+            } catch (\Exception $e) {
+                \Log::warning("Justus stats: falha em {$tribunal}: " . $e->getMessage());
+            }
+        }
+
+        arsort($porOrgao);
+
         return [
-            'total' => JustusJurisprudencia::count(),
-            'por_tribunal' => JustusJurisprudencia::selectRaw('tribunal, COUNT(*) as total')
-                ->groupBy('tribunal')->pluck('total', 'tribunal')->toArray(),
-            'por_area' => JustusJurisprudencia::selectRaw('area_direito, COUNT(*) as total')
-                ->groupBy('area_direito')->pluck('total', 'area_direito')->toArray(),
-            'por_orgao' => JustusJurisprudencia::selectRaw('orgao_julgador, COUNT(*) as total')
-                ->groupBy('orgao_julgador')->orderByDesc('total')->pluck('total', 'orgao_julgador')->toArray(),
-            'mais_recente' => JustusJurisprudencia::max('data_decisao'),
-            'mais_antigo' => JustusJurisprudencia::min('data_decisao'),
+            'total' => $totalGeral,
+            'por_tribunal' => $porTribunal,
+            'por_area' => $porArea,
+            'por_orgao' => $porOrgao,
+            'mais_recente' => $maisRecente,
+            'mais_antigo' => $maisAntigo,
         ];
     }
 }
