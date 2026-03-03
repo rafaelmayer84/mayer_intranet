@@ -7,6 +7,8 @@ use App\Models\JustusDocumentPage;
 use App\Models\JustusConversation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use App\Services\Justus\JustusEmbeddingService;
+use App\Models\JustusRagFeedback;
 
 class JustusRagService
 {
@@ -22,10 +24,54 @@ class JustusRagService
             return collect();
         }
 
+        // Tentar busca por embedding primeiro (semantica)
+        $embeddingService = app(JustusEmbeddingService::class);
+        $primaryAttachment = $attachmentIds->first();
+        $hasEmbeddings = JustusDocumentChunk::where('attachment_id', $primaryAttachment)
+            ->whereNotNull('embedding')
+            ->exists();
+
+        if ($hasEmbeddings) {
+            $feedbackAdj = JustusRagFeedback::getAdjustmentsForAttachment($primaryAttachment);
+            $isIntegral = $this->isIntegralAnalysis($query);
+
+            if ($isIntegral) {
+                // Analise integral: metade semantica, metade distribuida
+                $semanticSlots = intdiv($maxChunks, 2);
+                $coverageSlots = $maxChunks - $semanticSlots;
+
+                $semantic = $embeddingService->searchSimilarChunks($query, $primaryAttachment, $semanticSlots, $feedbackAdj);
+                $semanticIds = $semantic->pluck('id');
+
+                $distributed = JustusDocumentChunk::where('attachment_id', $primaryAttachment)
+                    ->whereNotIn('id', $semanticIds)
+                    ->orderBy('page_start')
+                    ->get();
+
+                $step = max(1, intdiv($distributed->count(), $coverageSlots));
+                $coverageChunks = collect();
+                for ($i = 0; $i < $distributed->count() && $coverageChunks->count() < $coverageSlots; $i += $step) {
+                    $coverageChunks->push($distributed[$i]);
+                }
+
+                $allIds = $semanticIds->merge($coverageChunks->pluck('id'))->unique();
+                return JustusDocumentChunk::whereIn('id', $allIds)->orderBy('page_start')->get();
+            }
+
+            // Busca semantica padrao
+            $results = $embeddingService->searchSimilarChunks($query, $primaryAttachment, $maxChunks, $feedbackAdj);
+            if ($results->isNotEmpty()) {
+                // Recarregar ordenado por pagina para manter contexto cronologico
+                return JustusDocumentChunk::whereIn('id', $results->pluck('id'))
+                    ->orderBy('page_start')
+                    ->get();
+            }
+        }
+
+        // Fallback: fulltext (chunks sem embedding ou embedding search falhou)
         $keywords = $this->extractKeywords($query);
         $isIntegralRequest = $this->isIntegralAnalysis($query);
 
-        // Se nao ha keywords ou eh pedido de analise integral, usar selecao hibrida
         if (empty($keywords) || $isIntegralRequest) {
             return $this->hybridSelection($attachmentIds, $keywords, $maxChunks);
         }

@@ -45,6 +45,7 @@ class JustusOpenAiService
         ]);
 
         $chunks = $this->rag->retrieveRelevantChunks($conversation, $userMessage);
+        $usedChunkIds = $chunks->pluck('id')->toArray();
         $attachmentId = $conversation->attachments()->where('processing_status', 'completed')->value('id');
         $ragContext = $this->rag->buildContextFromChunks($chunks, $attachmentId);
 
@@ -183,6 +184,7 @@ class JustusOpenAiService
                 'model_used' => $model,
                 'style_version' => $styleVersion,
                 'citations' => $this->extractCitations($content),
+                'metadata' => json_encode(['chunk_ids' => $usedChunkIds]),
             ]);
 
             $conversation->increment('total_input_tokens', $inputTokens);

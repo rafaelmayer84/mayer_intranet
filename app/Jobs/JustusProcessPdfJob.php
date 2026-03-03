@@ -13,6 +13,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use App\Services\Justus\JustusEmbeddingService;
 use Illuminate\Support\Facades\Storage;
 
 class JustusProcessPdfJob implements ShouldQueue
@@ -141,6 +142,16 @@ class JustusProcessPdfJob implements ShouldQueue
             ]);
 
             $this->tryExtractProcessProfile($attachment, $pageTexts);
+
+            // Gerar embeddings para busca semantica
+            try {
+                $embeddingService = app(JustusEmbeddingService::class);
+                $embeddedCount = $embeddingService->embedAllChunks($attachment->id);
+                Log::info("JUSTUS: {$embeddedCount} chunks embeddados", ['attachment_id' => $attachment->id]);
+            } catch (\Exception $e) {
+                Log::warning('JUSTUS: Embedding falhou (nao-critico)', ['error' => $e->getMessage()]);
+                // Nao-critico: RAG faz fallback para fulltext
+            }
 
             SystemEvent::sistema('justus', 'info', 'JUSTUS: PDF processado', null, ['attachment_id' => $attachment->id, 'pages' => $totalPages]);
 
