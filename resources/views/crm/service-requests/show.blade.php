@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'Chamado #' . $sr->id)
+@section('title', 'Chamado ' . $sr->protocolo)
 
 @section('content')
 <div class="max-w-5xl mx-auto px-4 py-6">
@@ -18,7 +18,7 @@
         <div class="px-6 py-5 border-b border-gray-50" style="background: linear-gradient(135deg, #f8fafc, #f1f5f9);">
             <div class="flex items-start justify-between">
                 <div>
-                    <h1 class="text-xl font-bold text-[#1B334A]">#{{ $sr->id }} — {{ $sr->subject }}</h1>
+                    <h1 class="text-xl font-bold text-[#1B334A]">{{ $sr->protocolo }} — {{ $sr->subject }}</h1>
                     @if($sr->account_id && $sr->account)
                         <p class="text-sm text-gray-500 mt-1"><i class="fa-solid fa-building text-xs mr-1"></i> <a href="{{ route('crm.accounts.show', $sr->account_id) }}" class="text-[#385776] hover:underline">{{ $sr->account->name }}</a></p>
                     @else
@@ -67,13 +67,13 @@
             @endif
 
             <div class="mt-4 pt-4 border-t border-gray-50">
-                <p class="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Descricao</p>
+                <p class="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Descrição</p>
                 <p class="text-sm text-gray-700 whitespace-pre-line">{{ $sr->description }}</p>
             </div>
 
             @if($sr->resolution_notes)
             <div class="mt-4 pt-4 border-t border-gray-50">
-                <p class="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Resolucao</p>
+                <p class="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Resolução</p>
                 <p class="text-sm text-gray-700 whitespace-pre-line">{{ $sr->resolution_notes }}</p>
             </div>
             @endif
@@ -137,14 +137,14 @@
 
             {{-- Acoes --}}
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                <h3 class="text-sm font-bold text-[#1B334A] mb-3"><i class="fa-solid fa-sliders mr-1.5 text-gray-400"></i> Acoes</h3>
-                <form method="POST" action="{{ route('chamados.update', $sr->id) }}" class="space-y-3">
+                <h3 class="text-sm font-bold text-[#1B334A] mb-3"><i class="fa-solid fa-sliders mr-1.5 text-gray-400"></i> Ações</h3>
+                <form method="POST" action="{{ route('chamados.update', $sr->id) }}" enctype="multipart/form-data" class="space-y-3">
                     @csrf @method('PUT')
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div>
                             <label class="block text-xs text-gray-500 mb-1">Status</label>
                             <select name="status" class="w-full border rounded-xl px-3 py-2 text-sm">
-                                @foreach(['aberto','em_andamento','aguardando_aprovacao','aprovado','rejeitado','concluido','cancelado'] as $st)
+                                @foreach(['aberto','em_andamento','aguardando_aprovacao','aprovado','rejeitado','concluido','cancelado','devolvido'] as $st)
                                     <option value="{{ $st }}" {{ $sr->status === $st ? 'selected' : '' }}>{{ App\Models\Crm\CrmServiceRequest::statusLabel($st) }}</option>
                                 @endforeach
                             </select>
@@ -169,7 +169,11 @@
                     </div>
                     <div>
                         <label class="block text-xs text-gray-500 mb-1">Notas de resolucao</label>
-                        <textarea name="resolution_notes" rows="2" class="w-full border rounded-xl px-3 py-2 text-sm" placeholder="Descreva o que foi feito">{{ $sr->resolution_notes }}</textarea>
+                        <textarea name="resolution_notes" rows="5" class="w-full border rounded-xl px-3 py-2 text-sm resize-y" placeholder="Descreva o que foi feito ou o motivo da devolução">{{ $sr->resolution_notes }}</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">Anexar arquivo</label>
+                        <input type="file" name="action_attachments[]" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100 transition">
                     </div>
                     <button type="submit" class="px-5 py-2 text-sm font-medium text-white rounded-xl transition" style="background: linear-gradient(135deg, #385776, #1B334A);">Salvar</button>
                 </form>
@@ -177,7 +181,7 @@
 
             {{-- Comentarios --}}
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-                <h3 class="text-sm font-bold text-[#1B334A] mb-4"><i class="fa-solid fa-comments mr-1.5 text-gray-400"></i> Comentarios ({{ $sr->comments->count() }})</h3>
+                <h3 class="text-sm font-bold text-[#1B334A] mb-4"><i class="fa-solid fa-comments mr-1.5 text-gray-400"></i> Comentários ({{ $sr->comments->count() }})</h3>
                 @foreach($sr->comments as $comment)
                     <div class="border-b border-gray-50 py-3 {{ $comment->is_internal ? 'bg-yellow-50/50 -mx-2 px-2 rounded-lg' : '' }}">
                         <div class="flex items-center gap-2 mb-1">
@@ -188,17 +192,34 @@
                             @endif
                         </div>
                         <p class="text-sm text-gray-600 whitespace-pre-line">{{ $comment->body }}</p>
+                        @if($comment->attachments && count($comment->attachments) > 0)
+                            <div class="flex flex-wrap gap-1.5 mt-1.5">
+                                @foreach($comment->attachments as $att)
+                                    <a href="{{ asset('storage/' . $att) }}" target="_blank" class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-50 border text-[10px] text-gray-500 hover:bg-gray-100 transition">
+                                        <i class="fa-solid fa-paperclip text-gray-400"></i> {{ basename($att) }}
+                                    </a>
+                                @endforeach
+                            </div>
+                        @endif
                     </div>
                 @endforeach
-                <form method="POST" action="{{ route('chamados.comment', $sr->id) }}" class="mt-4 space-y-2">
+                <form method="POST" action="{{ route('chamados.comment', $sr->id) }}" enctype="multipart/form-data" class="mt-4 space-y-2">
                     @csrf
-                    <textarea name="body" required rows="2" maxlength="3000" placeholder="Adicionar comentario..." class="w-full border rounded-xl px-3 py-2 text-sm"></textarea>
-                    <div class="flex items-center justify-between">
-                        <label class="flex items-center gap-1.5 text-xs text-gray-500">
-                            <input type="checkbox" name="is_internal" value="1" class="rounded"> Nota interna
-                        </label>
+                    <textarea name="body" required rows="4" maxlength="3000" placeholder="Adicionar comentário..." class="w-full border rounded-xl px-3 py-2 text-sm resize-y"></textarea>
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div class="flex items-center gap-4">
+                            <label class="flex items-center gap-1.5 text-xs text-gray-500">
+                                <input type="checkbox" name="is_internal" value="1" class="rounded"> Nota interna
+                            </label>
+                            <label class="flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer hover:text-gray-700 transition">
+                                <i class="fa-solid fa-paperclip"></i>
+                                <span>Anexar arquivo</span>
+                                <input type="file" name="attachments[]" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip" class="hidden" onchange="document.getElementById('anexo-names').textContent = Array.from(this.files).map(f => f.name).join(', ')">
+                            </label>
+                        </div>
                         <button type="submit" class="px-4 py-2 text-sm font-medium text-white rounded-xl transition" style="background: linear-gradient(135deg, #385776, #1B334A);">Comentar</button>
                     </div>
+                    <p id="anexo-names" class="text-[10px] text-gray-400 mt-1"></p>
                 </form>
             </div>
         </div>

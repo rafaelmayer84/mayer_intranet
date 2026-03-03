@@ -167,8 +167,8 @@
 
                 {{-- LINHA 5: Descricao --}}
                 <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1.5">Descricao detalhada <span class="text-red-400">*</span></label>
-                    <textarea name="description" required maxlength="3000" rows="4" placeholder="Descreva o que precisa ser feito, contexto relevante, prazos e qualquer informacao adicional" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#385776] focus:ring-1 focus:ring-[#385776] transition"></textarea>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1.5">Descrição detalhada <span class="text-red-400">*</span></label>
+                    <textarea name="description" required maxlength="3000" rows="6" placeholder="Descreva o que precisa ser feito, contexto relevante, prazos e qualquer informacao adicional" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#385776] focus:ring-1 focus:ring-[#385776] transition"></textarea>
                     <p class="text-xs text-gray-300 mt-1">Quanto mais detalhes, mais precisa sera a triagem e o prazo.</p>
                 </div>
             </div>
@@ -187,7 +187,7 @@
     <form method="GET" class="flex flex-wrap items-center gap-3 mb-4">
         <select name="status" onchange="this.form.submit()" class="border rounded-xl px-3 py-2 text-xs bg-white">
             <option value="">Todos os status</option>
-            @foreach(['aberto','em_andamento','aguardando_aprovacao','aprovado','rejeitado','concluido','cancelado'] as $st)
+            @foreach(['aberto','em_andamento','aguardando_aprovacao','aprovado','rejeitado','concluido','cancelado','devolvido'] as $st)
                 <option value="{{ $st }}" {{ request('status') === $st ? 'selected' : '' }}>{{ \App\Models\Crm\CrmServiceRequest::statusLabel($st) }}</option>
             @endforeach
         </select>
@@ -217,7 +217,7 @@
                             @if($sr->priority === 'urgente') bg-red-100 text-red-600
                             @elseif($sr->priority === 'alta') bg-orange-100 text-orange-600
                             @elseif($sr->priority === 'normal') bg-violet-100 text-violet-600
-                            @else bg-gray-100 text-gray-400 @endif">#{{ $sr->id }}</span>
+                            @else bg-gray-100 text-gray-400 @endif">{{ $sr->protocolo }}</span>
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-2 mb-0.5">
                                 <span class="text-sm font-semibold text-gray-800 truncate">{{ $sr->subject }}</span>

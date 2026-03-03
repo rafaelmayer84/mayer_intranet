@@ -126,6 +126,6 @@ class ChamadosController extends Controller
             }
         })->afterResponse();
 
-        return back()->with('success', 'Chamado #' . $sr->id . ' registrado.');
+        return back()->with('success', 'Chamado ' . $sr->protocolo . ' registrado.');
     }
 }

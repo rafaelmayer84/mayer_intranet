@@ -74,7 +74,7 @@ const NexoApp = {
         if(s)list=list.filter(x=>(x.name||'').toLowerCase().includes(s)||(x.phone||'').includes(s));
         if(!list.length){c.innerHTML='';em.classList.remove('hidden');return}
         em.classList.add('hidden');
-        c.innerHTML=list.map(x=>this.inboxItem(x)).join('');
+        const newHtml=list.map(x=>this.inboxItem(x)).join('');if(c._lastHtml===newHtml)return;c._lastHtml=newHtml;c.innerHTML=newHtml;
     },
 
     inboxItem(c){

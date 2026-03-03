@@ -28,9 +28,10 @@ class JustusJurisprudencia extends Model
      * Mapeamento tribunal -> conexao do banco
      */
     private static array $tribunalConnections = [
-        'TJSC' => 'justus_tjsc',
-        'STJ'  => 'justus_stj',
-        // 'FALCAO' => 'justus_falcao', // habilitar quando tiver dados
+        'TJSC'  => 'justus_tjsc',
+        'STJ'   => 'justus_stj',
+        'TRT12' => 'justus_falcao',
+        'TRF4'  => 'justus_falcao'
     ];
 
     /**

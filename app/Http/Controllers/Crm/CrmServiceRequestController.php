@@ -74,9 +74,9 @@ class CrmServiceRequestController extends Controller
         }
 
         // Notificação sistema (sininho)
-        $this->createBellNotification($sr, 'Nova solicitação: ' . $sr->subject);
+        $this->createBellNotification($sr, 'Nova solicitação ' . $sr->protocolo . ': ' . $sr->subject);
 
-        return back()->with('success', 'Solicitação #' . $sr->id . ' criada com sucesso.')->withFragment('solicitacoes');
+        return back()->with('success', 'Solicitação ' . $sr->protocolo . ' criada com sucesso.')->withFragment('solicitacoes');
     }
 
     /**
@@ -126,7 +126,7 @@ class CrmServiceRequestController extends Controller
         $sr = CrmServiceRequest::findOrFail($id);
 
         $request->validate([
-            'status'              => 'nullable|in:aberto,em_andamento,aguardando_aprovacao,aprovado,rejeitado,concluido,cancelado',
+            'status'              => 'nullable|in:aberto,em_andamento,aguardando_aprovacao,aprovado,rejeitado,concluido,cancelado,devolvido',
             'assigned_to_user_id' => 'nullable|exists:users,id',
             'resolution_notes'    => 'nullable|string|max:3000',
             'priority'            => 'nullable|in:baixa,normal,alta,urgente',
@@ -145,12 +145,20 @@ class CrmServiceRequestController extends Controller
 
             if ($request->status === 'concluido') {
                 $updates['resolved_at'] = now();
+            }
+
+            // Salvar notas de resolução em qualquer mudança de status
+            if ($request->filled('resolution_notes')) {
                 $updates['resolution_notes'] = $request->resolution_notes;
             }
 
             if ($request->status === 'aguardando_aprovacao') {
                 // Notificar sócios/admin
                 $this->notifyApprovers($sr);
+            }
+
+            if ($request->status === 'devolvido') {
+                $this->notifyDevolvido($sr, $request->resolution_notes);
             }
 
             if (in_array($request->status, ['aprovado', 'rejeitado'])) {
@@ -182,7 +190,25 @@ class CrmServiceRequestController extends Controller
 
             if (isset($updates['status']) && $updates['status'] !== $oldStatus) {
                 $label = CrmServiceRequest::statusLabel($updates['status']);
-                $this->createBellNotification($sr, "Solicitação #{$sr->id} → {$label}");
+                $this->createBellNotification($sr, "Solicitação {$sr->protocolo} → {$label}");
+            }
+        }
+
+        // Se enviou anexos na ação, criar comentário automático com os arquivos
+        if ($request->hasFile('action_attachments')) {
+            $attachPaths = [];
+            foreach ($request->file('action_attachments') as $file) {
+                $attachPaths[] = $file->store('chamados/comments', 'public');
+            }
+            if (!empty($attachPaths)) {
+                $statusLabel = isset($updates['status']) ? CrmServiceRequest::statusLabel($updates['status']) : 'atualização';
+                CrmServiceRequestComment::create([
+                    'service_request_id' => $id,
+                    'user_id'            => auth()->id(),
+                    'body'               => 'Anexo(s) adicionado(s) na ' . $statusLabel . '.' . ($request->filled('resolution_notes') ? "\n\n" . $request->resolution_notes : ''),
+                    'is_internal'        => false,
+                    'attachments'        => $attachPaths,
+                ]);
             }
         }
 
@@ -195,17 +221,26 @@ class CrmServiceRequestController extends Controller
     public function addComment(Request $request, int $id)
     {
         $request->validate([
-            'body'        => 'required|string|max:3000',
-            'is_internal' => 'nullable|boolean',
+            'body'           => 'required|string|max:3000',
+            'is_internal'    => 'nullable|boolean',
+            'attachments.*'  => 'nullable|file|max:10240',
         ]);
 
         $sr = CrmServiceRequest::findOrFail($id);
+
+        $attachmentPaths = [];
+        if ($request->hasFile('attachments')) {
+            foreach ($request->file('attachments') as $file) {
+                $attachmentPaths[] = $file->store('chamados/comments', 'public');
+            }
+        }
 
         CrmServiceRequestComment::create([
             'service_request_id' => $id,
             'user_id'            => auth()->id(),
             'body'               => $request->body,
             'is_internal'        => $request->boolean('is_internal'),
+            'attachments'        => !empty($attachmentPaths) ? $attachmentPaths : null,
         ]);
 
         return back()->with('success', 'Comentário adicionado.');
@@ -228,7 +263,7 @@ class CrmServiceRequestController extends Controller
             Mail::raw(
                 "Olá {$assignedUser->name},\n\n" .
                 "Uma nova solicitação foi atribuída a você:\n\n" .
-                "Solicitação: #{$sr->id}\n" .
+                "Solicitação: {$sr->protocolo}\n" .
                 "Cliente: {$account->name}\n" .
                 "Categoria: {$catLabel}\n" .
                 "Assunto: {$sr->subject}\n" .
@@ -238,7 +273,7 @@ class CrmServiceRequestController extends Controller
                 "— RESULTADOS! Intranet",
                 function ($message) use ($assignedUser, $sr) {
                     $message->to($assignedUser->email)
-                            ->subject("[Solicitação #{$sr->id}] {$sr->subject}");
+                            ->subject("[Solicitação {$sr->protocolo}] {$sr->subject}");
                 }
             );
         } catch (\Exception $e) {
@@ -261,7 +296,7 @@ class CrmServiceRequestController extends Controller
                 Mail::raw(
                     "Olá {$approver->name},\n\n" .
                     "A seguinte solicitação requer sua aprovação:\n\n" .
-                    "Solicitação: #{$sr->id}\n" .
+                    "Solicitação: {$sr->protocolo}\n" .
                     "Categoria: {$catLabel}\n" .
                     "Assunto: {$sr->subject}\n" .
                     "Prioridade: {$sr->priority}\n\n" .
@@ -269,7 +304,7 @@ class CrmServiceRequestController extends Controller
                     "— RESULTADOS! Intranet",
                     function ($message) use ($approver, $sr) {
                         $message->to($approver->email)
-                                ->subject("[APROVAÇÃO] Solicitação #{$sr->id} — {$sr->subject}");
+                                ->subject("[APROVAÇÃO] Solicitação {$sr->protocolo} — {$sr->subject}");
                     }
                 );
             }
@@ -297,4 +332,46 @@ class CrmServiceRequestController extends Controller
             Log::warning('[CRM] Falha ao criar notificação bell: ' . $e->getMessage());
         }
     }
+
+    /**
+     * Notificar solicitante que o chamado foi devolvido para complementação
+     */
+    private function notifyDevolvido(CrmServiceRequest $sr, ?string $motivo = null)
+    {
+        try {
+            $requester = User::find($sr->requested_by_user_id);
+            if (!$requester || !$requester->email) return;
+
+            $account = $sr->account ?? CrmAccount::find($sr->account_id);
+            $accountName = $account ? $account->name : 'Interno';
+            $categorias = CrmServiceRequest::categorias();
+            $catLabel = $categorias[$sr->category]['label'] ?? $sr->category;
+            $motivoTexto = $motivo ? "\n\nMotivo da devolução:\n{$motivo}" : '';
+            $operador = auth()->user()->name;
+
+            Mail::raw(
+                "Olá {$requester->name},\n\n" .
+                "Sua solicitação foi devolvida para complementação:\n\n" .
+                "Protocolo: {$sr->protocolo}\n" .
+                "Cliente: {$accountName}\n" .
+                "Categoria: {$catLabel}\n" .
+                "Assunto: {$sr->subject}\n" .
+                "Devolvido por: {$operador}" .
+                $motivoTexto . "\n\n" .
+                "Por favor, acesse o sistema e adicione as informações solicitadas.\n\n" .
+                "— RESULTADOS! Intranet",
+                function ($message) use ($requester, $sr) {
+                    $message->to($requester->email)
+                            ->subject("[DEVOLVIDO] {$sr->protocolo} — {$sr->subject}");
+                }
+            );
+
+            // Notificação sininho
+            $this->createBellNotification($sr, "Chamado {$sr->protocolo} devolvido para complementação por {$operador}");
+
+        } catch (\Exception $e) {
+            Log::warning('[CRM] Falha ao notificar devolução: ' . $e->getMessage());
+        }
+    }
+
 }

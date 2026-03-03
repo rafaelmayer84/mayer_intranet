@@ -8,7 +8,7 @@ class CrmServiceRequest extends Model
     protected $table = 'crm_service_requests';
 
     protected $fillable = [
-        'account_id', 'category', 'subject', 'description', 'priority', 'status',
+        'account_id', 'protocolo', 'category', 'subject', 'description', 'priority', 'status',
         'requested_by_user_id', 'assigned_to_user_id', 'approved_by_user_id',
         'requires_approval', 'resolution_notes', 'assigned_at', 'approved_at', 'resolved_at',
         'sla_deadline', 'sla_hours', 'sla_complexity', 'sla_justification', 'sla_analyzed_at',
@@ -26,6 +26,21 @@ class CrmServiceRequest extends Model
         'attachments' => 'array',
         'ai_triage' => 'array',
     ];
+
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function ($model) {
+            if (empty($model->protocolo)) {
+                do {
+                    $code = 'SIATE-' . strtoupper(substr(md5(uniqid(mt_rand(), true)), 0, 6));
+                } while (static::where('protocolo', $code)->exists());
+                $model->protocolo = $code;
+            }
+        });
+    }
 
     public function account()
     {
@@ -96,7 +111,7 @@ class CrmServiceRequest extends Model
 
     public function isOpen(): bool
     {
-        return in_array($this->status, ['aberto', 'em_andamento', 'aguardando_aprovacao']);
+        return in_array($this->status, ['aberto', 'em_andamento', 'aguardando_aprovacao', 'devolvido']);
     }
 
     public static function statusLabel(string $status): string
@@ -109,6 +124,7 @@ class CrmServiceRequest extends Model
             'rejeitado' => 'Rejeitado',
             'concluido' => 'Concluído',
             'cancelado' => 'Cancelado',
+            'devolvido' => 'Devolvido',
             default => $status,
         };
     }
@@ -123,6 +139,7 @@ class CrmServiceRequest extends Model
             'rejeitado' => 'bg-red-100 text-red-700',
             'concluido' => 'bg-gray-100 text-gray-600',
             'cancelado' => 'bg-gray-100 text-gray-400',
+            'devolvido' => 'bg-amber-100 text-amber-700',
             default => 'bg-gray-100 text-gray-600',
         };
     }

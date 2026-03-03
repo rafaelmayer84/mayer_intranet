@@ -121,7 +121,7 @@
             </div>
             <div class="flex-1 overflow-y-auto">
                 @forelse($conversations as $conv)
-                <a href="{{ route('justus.index', ['c' => $conv->id]) }}"
+                <a href="{{ url('/justus/app?c=' . $conv->id) }}"
                    class="group block mx-2 mb-1 px-3 py-3 rounded-xl transition-all duration-200 {{ ($activeConversation && $activeConversation->id === $conv->id) ? 'shadow-md' : 'hover:bg-gray-50' }}"
                    style="{{ ($activeConversation && $activeConversation->id === $conv->id) ? 'background:linear-gradient(135deg,#eef2ff,#e8eef4);border-left:3px solid #385776;' : '' }}"
                    x-show="!searchQuery || '{{ strtolower($conv->title ?? '') }}'.includes(searchQuery.toLowerCase())">
