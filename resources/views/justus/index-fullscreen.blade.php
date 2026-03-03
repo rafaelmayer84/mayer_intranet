@@ -105,7 +105,7 @@
         {{-- === COL ESQUERDA: Conversas === --}}
         <div class="flex flex-col flex-shrink-0 bg-white/80" style="width:280px;backdrop-filter:blur(20px);border-right:1px solid rgba(0,0,0,0.06);">
             <div class="p-3">
-                <button @click="showNewModal = true"
+                <button @click="\$dispatch('open-new-modal')"
                     class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-white font-semibold text-sm transition-all duration-300 hover:shadow-lg hover:scale-[1.02]"
                     style="background:linear-gradient(135deg,#1B334A,#385776);">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
@@ -361,7 +361,7 @@
                     <h2 class="text-2xl font-bold mb-2" style="color:#1B334A;">JUSTUS</h2>
                     <p class="text-sm text-gray-500 mb-1">Assistente jurídico com inteligência artificial</p>
                     <p class="text-xs text-gray-400 mb-8">Analise processos, redija peças e calcule prazos com IA</p>
-                    <button @click="showNewModal = true"
+                    <button @click="\$dispatch('open-new-modal')"
                         class="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-white font-semibold text-sm transition-all duration-300 hover:shadow-xl hover:scale-105"
                         style="background:linear-gradient(135deg,#1B334A,#385776);box-shadow:0 10px 30px rgba(27,51,74,0.3);">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
@@ -758,7 +758,7 @@ function justusApp() {
                         this.uploadState = 'done';
                         this.uploadPagesInfo = (data.total_pages || 0) + ' páginas processadas';
                         // Reload após 2s para atualizar sidebar de insights
-                        setTimeout(() => window.location.reload(), 2000);
+                        setTimeout(() => { window.location.href = '/justus/app?c={{ \$activeConversation ? \$activeConversation->id : "" }}'; }, 2000);
                     } else if (data.status === 'failed') {
                         clearInterval(this.pollTimer);
                         this.uploadState = 'error';
@@ -915,7 +915,7 @@ async function createNewConversation(mode, type) {
         });
         const data = await resp.json();
         if (data.success && data.conversation_id) {
-            window.location.href = '/justus?c=' + data.conversation_id;
+            window.location.href = '/justus/app?c=' + data.conversation_id;
         } else if (data.redirect) {
             window.location.href = data.redirect;
         } else {
@@ -929,7 +929,7 @@ function deleteConversation(id) {
         method: 'DELETE',
         headers: { 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'Accept': 'application/json' },
     }).then(r => r.json()).then(data => {
-        if (data.success) window.location.href = '/justus';
+        if (data.success) window.location.href = '/justus/app';
         else alert(data.error || 'Erro ao excluir');
     }).catch(e => alert('Erro: ' + e.message));
 }
