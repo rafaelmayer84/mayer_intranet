@@ -69,6 +69,39 @@ class JustusController extends Controller
         ));
     }
 
+    public function app(Request $request)
+    {
+        // Mesma logica do index, mas renderiza na view fullscreen (nova aba)
+        $user = Auth::user();
+        $conversationId = $request->query('c');
+        $conversations = JustusConversation::where('user_id', $user->id)
+            ->where('status', '!=', 'archived')
+            ->withCount('messages')
+            ->orderByDesc('updated_at')
+            ->get();
+        $activeConversation = null;
+        $messages = collect();
+        $profile = null;
+        $attachments = collect();
+        $approval = null;
+        if ($conversationId) {
+            $activeConversation = JustusConversation::where('id', $conversationId)
+                ->where('user_id', $user->id)
+                ->first();
+            if ($activeConversation) {
+                $messages = $activeConversation->messages()->orderBy('id')->get();
+                $profile = $activeConversation->processProfile;
+                $attachments = $activeConversation->attachments()->orderByDesc('created_at')->get();
+                $approval = $activeConversation->approvals()->latest()->first();
+            }
+        }
+        $budget = $this->budgetService->canProceed($user->id);
+        return view('justus.index-fullscreen', compact(
+            'conversations', 'activeConversation', 'messages',
+            'profile', 'attachments', 'approval', 'budget'
+        ));
+    }
+
     public function createConversation(Request $request)
     {
         $request->validate([
@@ -402,6 +435,67 @@ class JustusController extends Controller
             'stats' => $stats,
             'negatives' => $negatives,
         ]);
+    }
+
+
+    public function jurisprudenciaInsights(int $conversationId)
+    {
+        $user = Auth::user();
+        $conversation = JustusConversation::where('id', $conversationId)
+            ->where('user_id', $user->id)
+            ->firstOrFail();
+
+        $profile = $conversation->processProfile;
+        $attachment = $conversation->attachments()->where('processing_status', 'completed')->first();
+
+        if (!$profile && !$attachment) {
+            return response()->json(['success' => true, 'results' => []]);
+        }
+
+        // Construir query de busca baseada nos dados do processo
+        $searchTerms = [];
+        if ($profile) {
+            if ($profile->classe) $searchTerms[] = $profile->classe;
+            if ($profile->tese_principal) $searchTerms[] = $profile->tese_principal;
+            if ($profile->objetivo_analise) $searchTerms[] = $profile->objetivo_analise;
+        }
+
+        // Se não há termos do profile, usar título da conversa
+        if (empty($searchTerms)) {
+            $searchTerms[] = $conversation->title ?? 'direito civil';
+        }
+
+        $query = implode(' ', $searchTerms);
+
+        try {
+            $results = \App\Models\JustusJurisprudencia::searchRelevant($query, 5);
+
+            $formatted = $results->map(function ($r) {
+                $ementa = $r->ementa ?? '';
+                // Resumir ementa para painel lateral (max 200 chars)
+                if (mb_strlen($ementa) > 200) {
+                    $ementa = mb_substr($ementa, 0, 200) . '...';
+                }
+                $data = null;
+                if ($r->data_decisao) {
+                    $data = is_string($r->data_decisao) ? $r->data_decisao : $r->data_decisao->format('d/m/Y');
+                }
+                return [
+                    'tribunal' => $r->tribunal_source ?? $r->tribunal ?? 'N/D',
+                    'sigla_classe' => $r->sigla_classe ?? '',
+                    'numero_registro' => $r->numero_registro ?? $r->numero_processo ?? '',
+                    'relator' => $r->relator ?? '',
+                    'orgao_julgador' => $r->orgao_julgador ?? '',
+                    'data_decisao' => $data,
+                    'ementa_resumida' => $ementa,
+                ];
+            })->values()->toArray();
+
+            return response()->json(['success' => true, 'results' => $formatted]);
+        } catch (\Exception $e) {
+            Log::warning('JUSTUS: Erro ao buscar jurisprudencia para insights', ['error' => $e->getMessage()]);
+            return response()->json(['success' => true, 'results' => []]);
+        }
     }
 
     private function authorizeAdmin(): void

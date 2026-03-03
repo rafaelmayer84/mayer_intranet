@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['auth','modulo:operacional.justus'])->prefix('justus')->name('justus.')->group(function () {
 
     Route::get('/', [JustusController::class, 'index'])->name('index');
+    Route::get('/app', [JustusController::class, 'app'])->name('app');
     Route::post('/conversations', [JustusController::class, 'createConversation'])->name('conversations.create');
     Route::post('/{conversation}/message', [JustusController::class, 'sendMessage'])->name('message.send');
     Route::post('/{conversation}/upload', [JustusController::class, 'upload'])->name('upload');
@@ -13,6 +14,7 @@ Route::middleware(['auth','modulo:operacional.justus'])->prefix('justus')->name(
     Route::post('/{conversation}/profile', [JustusController::class, 'updateProfile'])->name('profile.update');
     Route::post('/{conversation}/approve', [JustusController::class, 'approve'])->name('approve');
     Route::get('/{conversation}/attachment-status/{attachment}', [JustusController::class, 'checkAttachmentStatus'])->name('attachment.status');
+    Route::get('/{conversation}/jurisprudencia-insights', [JustusController::class, 'jurisprudenciaInsights'])->name('jurisprudencia.insights');
     Route::delete('/{conversation}', [JustusController::class, 'destroyConversation'])->name('conversations.destroy');
 
     Route::get('/{conversation}/messages/{message}/document', [JustusController::class, 'downloadDocument'])->name('message.document');

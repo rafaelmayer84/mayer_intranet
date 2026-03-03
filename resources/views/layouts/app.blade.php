@@ -261,7 +261,7 @@
 
                                 <!-- JUSTUS - Assistente Jurídico IA -->
                 @if(Auth::user()->role === "admin" || Auth::user()->podeAcessar("operacional.justus"))
-                <a href="{{ url('/justus') }}"
+                <a href="{{ url('/justus/app') }}" target="_blank"
                    class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg transition-colors {{ request()->is('justus*') ? 'nav-link-active' : '' }}"
                    data-tooltip="JUSTUS">
                     <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
