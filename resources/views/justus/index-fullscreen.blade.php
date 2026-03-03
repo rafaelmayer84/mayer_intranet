@@ -939,6 +939,13 @@ function openNewAnalysisModal() {
         + '<option value="analise_estrategica">An\u00e1lise Estrat\u00e9gica</option>'
         + '<option value="analise_completa">An\u00e1lise Completa</option>'
         + '<option value="peca">Projeto de Pe\u00e7a</option>'
+        + '</select></div>'
+        + '<div style="margin-bottom:1rem;"><label style="font-size:0.75rem;font-weight:600;color:#374151;display:block;margin-bottom:0.5rem;">Prompt Programado (opcional)</label>'
+        + '<select id="jm-prompt-select" onchange="applyPromptTemplate()" style="width:100%;border:1px solid #e5e7eb;border-radius:0.75rem;padding:0.625rem 0.75rem;font-size:0.875rem;outline:none;">'
+        + '<option value="">— Escrever prompt livre —</option>'
+        + '</select></div>'
+        + '<div style="margin-bottom:1rem;"><label style="font-size:0.75rem;font-weight:600;color:#374151;display:block;margin-bottom:0.5rem;">Mensagem Inicial</label>'
+        + '<textarea id="jm-initial-msg" rows="5" placeholder="Descreva o que deseja analisar..." style="width:100%;border:1px solid #e5e7eb;border-radius:0.75rem;padding:0.625rem 0.75rem;font-size:0.875rem;outline:none;resize:vertical;"></textarea>'
         + '<option value="higiene_autos">Higiene de Autos</option>'
         + '<option value="calculo_prazo">C\u00e1lculo de Prazo</option>'
         + '</select></div></div>'
@@ -968,7 +975,62 @@ function selectJmMode(btn, mode) {
     });
 }
 
-async function submitNewAnalysis() {
+async var jmPromptTemplates = [];
+
+    function loadPromptTemplates() {
+        fetch('/justus/prompt-templates')
+            .then(r => r.json())
+            .then(data => {
+                jmPromptTemplates = data;
+                var sel = document.getElementById('jm-prompt-select');
+                if (!sel) return;
+                sel.innerHTML = '<option value="">— Escrever prompt livre —</option>';
+                var currentCategory = '';
+                data.forEach(function(t) {
+                    if (t.category !== currentCategory) {
+                        if (currentCategory !== '') sel.innerHTML += '</optgroup>';
+                        var catLabel = {execucao:'Execução',analise_pecas:'Análise de Peças',geral:'Geral'}[t.category] || t.category;
+                        sel.innerHTML += '<optgroup label="' + catLabel + '">';
+                        currentCategory = t.category;
+                    }
+                    sel.innerHTML += '<option value="' + t.id + '">' + t.label + '</option>';
+                });
+                if (currentCategory !== '') sel.innerHTML += '</optgroup>';
+            })
+            .catch(e => console.log('Prompts nao carregados:', e));
+    }
+
+    function applyPromptTemplate() {
+        var sel = document.getElementById('jm-prompt-select');
+        var textarea = document.getElementById('jm-initial-msg');
+        var modeButtons = document.querySelectorAll('.jm-mode-btn');
+        var typeSelect = document.getElementById('jm-type-select');
+        if (!sel || !sel.value) return;
+        var tmpl = jmPromptTemplates.find(t => t.id == sel.value);
+        if (!tmpl) return;
+        textarea.value = tmpl.prompt_text;
+        // Setar modo
+        if (tmpl.mode) {
+            modeButtons.forEach(function(btn) {
+                if (btn.dataset.mode === tmpl.mode) {
+                    selectJmMode(btn, tmpl.mode);
+                }
+            });
+        }
+        // Setar tipo
+        if (tmpl.type && typeSelect) {
+            typeSelect.value = tmpl.type;
+        }
+    }
+
+    // Carregar prompts ao abrir modal
+    var origOpenModal = window.openNewAnalysisModal;
+    window.openNewAnalysisModal = function() {
+        origOpenModal();
+        loadPromptTemplates();
+    };
+
+    function submitNewAnalysis() {
     var btn = document.getElementById('jm-submit-btn');
     btn.textContent = 'Criando...';
     btn.disabled = true;

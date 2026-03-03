@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\JustusConversation;
 use App\Models\JustusAttachment;
+use App\Models\JustusPromptTemplate;
 use App\Models\JustusMessage;
 use App\Models\JustusProcessProfile;
 use App\Models\JustusApproval;
@@ -412,6 +413,16 @@ class JustusController extends Controller
         ]);
 
         return response()->json(['success' => true]);
+    }
+
+    public function promptTemplates()
+    {
+        $templates = JustusPromptTemplate::where('is_active', true)
+            ->orderBy('category')
+            ->orderBy('sort_order')
+            ->get(['id', 'category', 'label', 'description', 'mode', 'type', 'prompt_text']);
+
+        return response()->json($templates);
     }
 
     public function adminFeedbackReport()
