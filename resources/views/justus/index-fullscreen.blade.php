@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Montserrat', system-ui, sans-serif; height: 100vh; overflow: hidden; background: #f0f2f5; }
@@ -105,7 +106,7 @@
         {{-- === COL ESQUERDA: Conversas === --}}
         <div class="flex flex-col flex-shrink-0 bg-white/80" style="width:280px;backdrop-filter:blur(20px);border-right:1px solid rgba(0,0,0,0.06);">
             <div class="p-3">
-                <button @click="showNewModal = true"
+                <button onclick="openNewAnalysisModal()"
                     class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-white font-semibold text-sm transition-all duration-300 hover:shadow-lg hover:scale-[1.02]"
                     style="background:linear-gradient(135deg,#1B334A,#385776);">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
@@ -361,7 +362,7 @@
                     <h2 class="text-2xl font-bold mb-2" style="color:#1B334A;">JUSTUS</h2>
                     <p class="text-sm text-gray-500 mb-1">Assistente jurídico com inteligência artificial</p>
                     <p class="text-xs text-gray-400 mb-8">Analise processos, redija peças e calcule prazos com IA</p>
-                    <button @click="showNewModal = true"
+                    <button onclick="openNewAnalysisModal()"
                         class="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-white font-semibold text-sm transition-all duration-300 hover:shadow-xl hover:scale-105"
                         style="background:linear-gradient(135deg,#1B334A,#385776);box-shadow:0 10px 30px rgba(27,51,74,0.3);">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
@@ -589,57 +590,6 @@
         @endif
     </div>
 
-</div>
-
-{{-- ===== MODAL NOVA ANALISE ===== --}}
-<div x-data="{ showNewModal: false, newMode: 'consultor', newType: 'analise_estrategica', creating: false }"
-     @keydown.escape.window="showNewModal = false"
-     x-on:open-new-modal.window="showNewModal = true">
-<template x-if="showNewModal">
-<div class="fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);" @click.self="showNewModal = false">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" @click.stop>
-        <div class="px-6 py-4 border-b border-gray-100" style="background:linear-gradient(135deg,#1B334A,#385776);">
-            <h3 class="text-base font-bold text-white">Nova Análise</h3>
-            <p class="text-xs text-white/60 mt-0.5">Selecione o modo e o tipo de análise</p>
-        </div>
-        <div class="p-6 space-y-5">
-            <div>
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Modo de Operação</label>
-                <div class="grid grid-cols-2 gap-3">
-                    <button @click="newMode = 'consultor'" :class="newMode === 'consultor' ? 'ring-2 ring-blue-500 bg-blue-50' : 'bg-gray-50 hover:bg-gray-100'" class="p-3 rounded-xl text-left transition-all">
-                        <div class="text-sm font-bold" :class="newMode === 'consultor' ? 'text-blue-700' : 'text-gray-700'">Consultor</div>
-                        <div class="text-[10px] mt-1" :class="newMode === 'consultor' ? 'text-blue-500' : 'text-gray-400'">Análise de casos, pareceres, diagnósticos</div>
-                    </button>
-                    <button @click="newMode = 'assessor'" :class="newMode === 'assessor' ? 'ring-2 ring-emerald-500 bg-emerald-50' : 'bg-gray-50 hover:bg-gray-100'" class="p-3 rounded-xl text-left transition-all">
-                        <div class="text-sm font-bold" :class="newMode === 'assessor' ? 'text-emerald-700' : 'text-gray-700'">Assessor</div>
-                        <div class="text-[10px] mt-1" :class="newMode === 'assessor' ? 'text-emerald-500' : 'text-gray-400'">Processos, peças, cálculos, execução</div>
-                    </button>
-                </div>
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Tipo de Análise</label>
-                <select x-model="newType" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
-                    <option value="analise_estrategica">Análise Estratégica</option>
-                    <option value="analise_completa">Análise Completa</option>
-                    <option value="peca">Projeto de Peça</option>
-                    <option value="higiene_autos">Higiene de Autos</option>
-                    <option value="calculo_prazo">Cálculo de Prazo</option>
-                </select>
-            </div>
-        </div>
-        <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3 bg-gray-50/50">
-            <button @click="showNewModal = false" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition">Cancelar</button>
-            <button @click="showNewModal = false; createNewConversation(newMode, newType)" :disabled="creating"
-                class="px-5 py-2 rounded-xl text-white text-sm font-semibold transition-all hover:shadow-lg"
-                style="background:linear-gradient(135deg,#1B334A,#385776);"
-                :class="{'opacity-50 cursor-wait': creating}">
-                <span x-text="creating ? 'Criando...' : 'Criar'"></span>
-            </button>
-        </div>
-    </div>
-</div>
-</template>
-</div>
 
 <style>
     @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
@@ -654,6 +604,9 @@ function justusApp() {
         messageText: '',
         sending: false,
         showNewModal: false,
+        newMode: 'consultor',
+        newType: 'analise_estrategica',
+        creating: false,
 
         // Upload state
         uploadState: 'idle', // idle, uploading, processing, done, error
@@ -957,6 +910,94 @@ async function sendFeedback(convId, msgId, type, btn) {
         }
     } catch (e) { parent.querySelectorAll('button').forEach(b => b.disabled = false); }
 }
+
+function openNewAnalysisModal() {
+    // Remove modal anterior se existir
+    var old = document.getElementById('justus-new-modal');
+    if (old) old.remove();
+
+    var overlay = document.createElement('div');
+    overlay.id = 'justus-new-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);';
+    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+
+    overlay.innerHTML = '<div style="background:white;border-radius:1rem;box-shadow:0 25px 50px rgba(0,0,0,0.25);width:100%;max-width:28rem;margin:1rem;overflow:hidden;" onclick="event.stopPropagation()">'
+        + '<div style="padding:1rem 1.5rem;border-bottom:1px solid #f3f4f6;background:linear-gradient(135deg,#1B334A,#385776);">'
+        + '<h3 style="font-size:1rem;font-weight:700;color:white;margin:0;">Nova An\u00e1lise</h3>'
+        + '<p style="font-size:0.7rem;color:rgba(255,255,255,0.6);margin:0.25rem 0 0;">Selecione o modo e o tipo de an\u00e1lise</p>'
+        + '</div>'
+        + '<div style="padding:1.5rem;">'
+        + '<div style="margin-bottom:1.25rem;">'
+        + '<label style="display:block;font-size:0.65rem;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">Modo de Opera\u00e7\u00e3o</label>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;" id="jm-mode-grid">'
+        + '<button type="button" onclick="selectJmMode(this,\u0027consultor\u0027)" class="jm-mode-btn jm-mode-active" data-mode="consultor" style="padding:0.75rem;border-radius:0.75rem;text-align:left;border:2px solid #3b82f6;background:#eff6ff;cursor:pointer;"><div style="font-size:0.875rem;font-weight:700;color:#1d4ed8;">Consultor</div><div style="font-size:0.625rem;margin-top:0.25rem;color:#3b82f6;">An\u00e1lise de casos, pareceres</div></button>'
+        + '<button type="button" onclick="selectJmMode(this,\u0027assessor\u0027)" class="jm-mode-btn" data-mode="assessor" style="padding:0.75rem;border-radius:0.75rem;text-align:left;border:2px solid #e5e7eb;background:#f9fafb;cursor:pointer;"><div style="font-size:0.875rem;font-weight:700;color:#374151;">Assessor</div><div style="font-size:0.625rem;margin-top:0.25rem;color:#9ca3af;">Pe\u00e7as, c\u00e1lculos, execu\u00e7\u00e3o</div></button>'
+        + '</div></div>'
+        + '<div>'
+        + '<label style="display:block;font-size:0.65rem;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">Tipo de An\u00e1lise</label>'
+        + '<select id="jm-type-select" style="width:100%;border:1px solid #e5e7eb;border-radius:0.75rem;padding:0.625rem 0.75rem;font-size:0.875rem;outline:none;">'
+        + '<option value="analise_estrategica">An\u00e1lise Estrat\u00e9gica</option>'
+        + '<option value="analise_completa">An\u00e1lise Completa</option>'
+        + '<option value="peca">Projeto de Pe\u00e7a</option>'
+        + '<option value="higiene_autos">Higiene de Autos</option>'
+        + '<option value="calculo_prazo">C\u00e1lculo de Prazo</option>'
+        + '</select></div></div>'
+        + '<div style="padding:1rem 1.5rem;border-top:1px solid #f3f4f6;display:flex;justify-content:flex-end;gap:0.75rem;background:rgba(249,250,251,0.5);">'
+        + '<button type="button" onclick="document.getElementById(\u0027justus-new-modal\u0027).remove()" style="padding:0.5rem 1rem;font-size:0.875rem;color:#6b7280;background:none;border:none;cursor:pointer;">Cancelar</button>'
+        + '<button type="button" onclick="submitNewAnalysis()" id="jm-submit-btn" style="padding:0.5rem 1.25rem;border-radius:0.75rem;color:white;font-size:0.875rem;font-weight:600;border:none;cursor:pointer;background:linear-gradient(135deg,#1B334A,#385776);">Criar</button>'
+        + '</div></div>';
+
+    document.body.appendChild(overlay);
+    document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape') { var m = document.getElementById('justus-new-modal'); if (m) m.remove(); document.removeEventListener('keydown', esc); }});
+}
+
+var jmSelectedMode = 'consultor';
+function selectJmMode(btn, mode) {
+    jmSelectedMode = mode;
+    var btns = document.querySelectorAll('#jm-mode-grid button');
+    btns.forEach(function(b) {
+        if (b.dataset.mode === mode) {
+            b.style.border = '2px solid ' + (mode === 'consultor' ? '#3b82f6' : '#10b981');
+            b.style.background = mode === 'consultor' ? '#eff6ff' : '#ecfdf5';
+            b.querySelector('div').style.color = mode === 'consultor' ? '#1d4ed8' : '#047857';
+        } else {
+            b.style.border = '2px solid #e5e7eb';
+            b.style.background = '#f9fafb';
+            b.querySelector('div').style.color = '#374151';
+        }
+    });
+}
+
+async function submitNewAnalysis() {
+    var btn = document.getElementById('jm-submit-btn');
+    btn.textContent = 'Criando...';
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    var type = document.getElementById('jm-type-select').value;
+    try {
+        var resp = await fetch('/justus/conversations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'Accept': 'application/json' },
+            body: JSON.stringify({ title: 'Nova An\u00e1lise', type: type, mode: jmSelectedMode })
+        });
+        var data = await resp.json();
+        if (data.success && data.conversation_id) {
+            window.location.href = '/justus/app?c=' + data.conversation_id;
+        } else {
+            alert(data.error || 'Erro ao criar');
+            btn.textContent = 'Criar';
+            btn.disabled = false;
+            btn.style.opacity = '1';
+        }
+    } catch(e) {
+        alert('Erro: ' + e.message);
+        btn.textContent = 'Criar';
+        btn.disabled = false;
+        btn.style.opacity = '1';
+    }
+}
+
+
 </script>
 
 </body>
