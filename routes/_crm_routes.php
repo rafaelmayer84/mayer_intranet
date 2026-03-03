@@ -25,6 +25,7 @@ Route::middleware(['auth','modulo:operacional.crm,visualizar'])->prefix('crm')->
     Route::get('/leads', [CrmLeadsController::class, 'index'])->name('leads');
     Route::post('/leads/{id}/status', [CrmLeadsController::class, 'updateStatus'])->name('leads.status');
     Route::post('/leads/{id}/assign', [CrmLeadsController::class, 'assignOwner'])->name('leads.assign');
+    Route::post('/leads/manual', [CrmLeadsController::class, 'storeManual'])->name('leads.store-manual');
 
     // Carteira
     Route::get('/carteira', [CrmCarteiraController::class, 'index'])->name('carteira');

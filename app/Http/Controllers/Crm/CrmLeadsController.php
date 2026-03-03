@@ -154,4 +154,103 @@ class CrmLeadsController extends Controller
         $account->update(['owner_user_id' => $request->owner_user_id]);
         return response()->json(['ok' => true]);
     }
+
+    /**
+     * POST /crm/leads/manual
+     * Cadastra lead manual e promove ao CRM no mesmo fluxo.
+     */
+    public function storeManual(Request $request)
+    {
+        $request->validate([
+            'nome'            => 'required|string|max:255',
+            'telefone'        => 'nullable|string|max:30',
+            'email'           => 'nullable|email|max:255',
+            'area_interesse'  => 'nullable|string|max:255',
+            'resumo_demanda'  => 'nullable|string|max:2000',
+            'origem_canal'    => 'required|in:relacionamento,indicacao,telefone,presencial',
+            'owner_user_id'   => 'required|exists:users,id',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            // 1) Criar lead na tabela leads (mesmo formato dos automaticos)
+            $lead = Lead::create([
+                'nome'                  => $request->nome,
+                'telefone'              => $request->telefone,
+                'email'                 => $request->email,
+                'area_interesse'        => $request->area_interesse,
+                'resumo_demanda'        => $request->resumo_demanda,
+                'origem_canal'          => $request->origem_canal,
+                'status'                => 'novo',
+                'intencao_contratar'    => 'alta',
+                'data_entrada'          => now(),
+            ]);
+
+            // 2) Criar crm_account como prospect
+            $account = CrmAccount::create([
+                'kind'          => 'prospect',
+                'name'          => $lead->nome,
+                'email'         => $lead->email,
+                'phone_e164'    => $lead->telefone ? preg_replace('/\D/', '', $lead->telefone) : null,
+                'lifecycle'     => 'onboarding',
+                'owner_user_id' => $request->owner_user_id,
+                'last_touch_at' => now(),
+                'notes'         => 'Lead manual (' . $request->origem_canal . '). Area: ' . ($lead->area_interesse ?: 'N/A') . '. Demanda: ' . \Illuminate\Support\Str::limit($lead->resumo_demanda ?: '', 200),
+            ]);
+
+            // 3) Criar oportunidade
+            $firstStage = \App\Models\Crm\CrmStage::orderBy('order')->first();
+            $opp = \App\Models\Crm\CrmOpportunity::create([
+                'account_id'    => $account->id,
+                'stage_id'      => $firstStage ? $firstStage->id : null,
+                'title'         => $lead->area_interesse ? $lead->area_interesse . ' - ' . $lead->nome : 'Oportunidade - ' . $lead->nome,
+                'area'          => $lead->area_interesse,
+                'type'          => 'new_business',
+                'source'        => $request->origem_canal,
+                'lead_source'   => 'manual',
+                'status'        => 'open',
+                'owner_user_id' => $request->owner_user_id,
+                'tipo_demanda'  => null,
+            ]);
+
+            // 4) Vincular lead ao account
+            $lead->update([
+                'crm_account_id' => $account->id,
+                'status'         => 'convertido',
+            ]);
+
+            // 5) Evento CRM
+            CrmEvent::create([
+                'account_id'         => $account->id,
+                'type'               => 'lead_promoted',
+                'payload'            => ['lead_id' => $lead->id, 'opportunity_id' => $opp->id, 'source' => 'manual'],
+                'happened_at'        => now(),
+                'created_by_user_id' => auth()->id(),
+            ]);
+
+            // 6) Task primeiro contato
+            try {
+                (new \App\Services\Crm\CrmProactiveService())->criarTaskPrimeiroContato(
+                    $account->id, $account->name, $request->owner_user_id
+                );
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('[CrmProactive] Falha task primeiro contato manual: ' . $e->getMessage());
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'ok'             => true,
+                'lead_id'        => $lead->id,
+                'account_id'     => $account->id,
+                'opportunity_id' => $opp->id,
+                'message'        => 'Lead manual criado e promovido ao CRM.',
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            \Illuminate\Support\Facades\Log::error('Erro ao criar lead manual', ['error' => $e->getMessage()]);
+            return response()->json(['ok' => false, 'error' => 'Erro interno: ' . $e->getMessage()], 500);
+        }
+    }
+
 }

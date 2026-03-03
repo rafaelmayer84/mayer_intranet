@@ -11,6 +11,7 @@
         <div class="flex gap-2">
             <a href="{{ route('leads.index') }}" class="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition">Central de Leads</a>
             <a href="{{ route('crm.pipeline') }}" class="px-3 py-2 bg-[#385776] text-white rounded-lg text-sm hover:bg-[#1B334A] transition">Oportunidades</a>
+            <button onclick="document.getElementById('modalLeadManual').classList.remove('hidden')" class="px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition">+ Novo Lead</button>
         </div>
     </div>
 
@@ -157,6 +158,64 @@
     <div class="mt-4">{{ $results->links() }}</div>
 </div>
 
+
+<!-- Modal Lead Manual -->
+<div id="modalLeadManual" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50" onclick="if(event.target===this)this.classList.add('hidden')">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+        <div class="bg-[#385776] px-6 py-4 flex items-center justify-between">
+            <h2 class="text-white font-semibold text-lg">Novo Lead Manual</h2>
+            <button onclick="document.getElementById('modalLeadManual').classList.add('hidden')" class="text-white/70 hover:text-white text-xl">&times;</button>
+        </div>
+        <div class="p-6 space-y-4">
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Nome *</label>
+                <input type="text" id="ml_nome" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Nome completo do lead">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Telefone</label>
+                    <input type="text" id="ml_telefone" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="(XX) XXXXX-XXXX">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Email</label>
+                    <input type="text" id="ml_email" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="email@exemplo.com">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Origem *</label>
+                    <select id="ml_origem" class="w-full border rounded-lg px-3 py-2 text-sm">
+                        <option value="relacionamento">Relacionamento</option>
+                        <option value="indicacao">Indicação</option>
+                        <option value="telefone">Telefone</option>
+                        <option value="presencial">Presencial</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1">Responsável *</label>
+                    <select id="ml_owner" class="w-full border rounded-lg px-3 py-2 text-sm">
+                        @foreach($users as $u)
+                            <option value="{{ $u->id }}">{{ $u->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Área de Interesse</label>
+                <input type="text" id="ml_area" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Ex: Trabalhista, Cível, Família...">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">Resumo da Demanda</label>
+                <textarea id="ml_resumo" rows="3" class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Descreva brevemente a demanda do lead..."></textarea>
+            </div>
+        </div>
+        <div class="bg-gray-50 px-6 py-4 flex justify-end gap-2">
+            <button onclick="document.getElementById('modalLeadManual').classList.add('hidden')" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancelar</button>
+            <button onclick="salvarLeadManual()" id="btnSalvarLead" class="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 font-medium">Salvar e Promover ao CRM</button>
+        </div>
+    </div>
+</div>
+
 @push('scripts')
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
@@ -173,6 +232,47 @@ function promoverLead(leadId) {
         else { alert(d.error || 'Erro ao promover.'); }
     })
     .catch(e => alert('Erro: ' + e.message));
+}
+
+function salvarLeadManual() {
+    const nome = document.getElementById('ml_nome').value.trim();
+    if (!nome) { alert('Nome é obrigatório.'); return; }
+
+    const btn = document.getElementById('btnSalvarLead');
+    btn.disabled = true;
+    btn.textContent = 'Salvando...';
+
+    const payload = {
+        nome: nome,
+        telefone: document.getElementById('ml_telefone').value.trim() || null,
+        email: document.getElementById('ml_email').value.trim() || null,
+        origem_canal: document.getElementById('ml_origem').value,
+        owner_user_id: document.getElementById('ml_owner').value,
+        area_interesse: document.getElementById('ml_area').value.trim() || null,
+        resumo_demanda: document.getElementById('ml_resumo').value.trim() || null,
+    };
+
+    fetch('{{ url("/crm/leads/manual") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.ok) {
+            alert('Lead criado e promovido ao CRM! Account #' + d.account_id);
+            location.reload();
+        } else {
+            alert(d.error || 'Erro ao salvar lead.');
+            btn.disabled = false;
+            btn.textContent = 'Salvar e Promover ao CRM';
+        }
+    })
+    .catch(e => {
+        alert('Erro: ' + e.message);
+        btn.disabled = false;
+        btn.textContent = 'Salvar e Promover ao CRM';
+    });
 }
 </script>
 @endpush
