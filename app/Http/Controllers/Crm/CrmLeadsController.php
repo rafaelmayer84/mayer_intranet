@@ -182,7 +182,7 @@ class CrmLeadsController extends Controller
                 'resumo_demanda'        => $request->resumo_demanda,
                 'origem_canal'          => $request->origem_canal,
                 'status'                => 'novo',
-                'intencao_contratar'    => 'alta',
+                'intencao_contratar'    => 'sim',
                 'data_entrada'          => now(),
             ]);
 
@@ -235,6 +235,21 @@ class CrmLeadsController extends Controller
                 );
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('[CrmProactive] Falha task primeiro contato manual: ' . $e->getMessage());
+            }
+
+            // 7) Notificar advogado responsavel
+            if ((int) $request->owner_user_id !== auth()->id()) {
+                DB::table('notifications_intranet')->insert([
+                    'user_id'    => $request->owner_user_id,
+                    'tipo'       => 'lead',
+                    'titulo'     => 'Novo lead atribuido a voce',
+                    'mensagem'   => auth()->user()->name . ' cadastrou o lead ' . $lead->nome . ' (' . $request->origem_canal . ')' . ($lead->area_interesse ? ' - ' . $lead->area_interesse : ''),
+                    'link'       => url('/crm/accounts/' . $account->id),
+                    'icone'      => 'user-plus',
+                    'lida'       => 0,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
             }
 
             DB::commit();
