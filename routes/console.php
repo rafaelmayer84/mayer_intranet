@@ -118,6 +118,18 @@ Schedule::command('gdp:apurar')->dailyAt('06:00');
 
 
 
+// GDP Lembrete Acordo pendente → diário 09:00 BRT
+Schedule::command('cron:gdp-lembrete-acordo')
+    ->dailyAt('09:00')
+    ->timezone('America/Sao_Paulo')
+    ->appendOutputTo(storage_path('logs/cron-gdp-lembrete.log'));
+
+// GDP Eval180 → dia 1 de cada mês às 08:00 (abre avaliação do mês anterior)
+Schedule::command('gdp:abrir-eval180')
+    ->monthlyOn(1, '08:00')
+    ->timezone('America/Sao_Paulo')
+    ->appendOutputTo(storage_path('logs/cron-eval180.log'));
+
 // Limpeza audit_logs > 90 dias (diario as 03:00)
 use App\Models\AuditLog;
 use App\Models\SystemEvent;
