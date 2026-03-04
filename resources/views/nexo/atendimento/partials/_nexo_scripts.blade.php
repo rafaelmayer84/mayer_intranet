@@ -170,6 +170,8 @@ const NexoApp = {
     appendMessages(msgs){
         if(!msgs.length)return;
         const c=document.getElementById('chat-messages');
+        // v2.7: remover msgs fantasma (ampulheta) antes de append
+        document.querySelectorAll('.nexo-ghost-msg').forEach(el=>el.remove());
         // v2.5: dedup — filtrar msgs que ja estao renderizadas
         const existingIds=new Set((this._lastMsgs||[]).map(m=>m.id));
         msgs=msgs.filter(m=>!existingIds.has(m.id));
@@ -295,7 +297,7 @@ const NexoApp = {
         inp.value='';inp.style.height='auto';
         const c=document.getElementById('chat-messages');
         const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-        c.insertAdjacentHTML('beforeend',`<div class="flex justify-end mb-1"><div class="msg-bubble-out px-3 py-2 max-w-[75%] lg:max-w-[60%] opacity-70"><p class="text-[13px] text-[#111b21] whitespace-pre-wrap break-words">${this.esc(text)}</p><p class="text-[10px] text-[#667781] text-right mt-0.5">⏳ ${now}</p></div></div>`);
+        c.insertAdjacentHTML('beforeend',`<div class="flex justify-end mb-1 nexo-ghost-msg"><div class="msg-bubble-out px-3 py-2 max-w-[75%] lg:max-w-[60%] opacity-70"><p class="text-[13px] text-[#111b21] whitespace-pre-wrap break-words">${this.esc(text)}</p><p class="text-[10px] text-[#667781] text-right mt-0.5">⏳ ${now}</p></div></div>`);
         c.scrollTop=c.scrollHeight;
         const body={text};
         if(this.replyTo&&this.replyTo.provider_message_id){body.reply_to_message_id=this.replyTo.provider_message_id}
