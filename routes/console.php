@@ -212,3 +212,23 @@ Schedule::command('justus:sync-trf4 --meses-atras=1 --ps=10 --tipo=1')
     ->timezone('America/Sao_Paulo')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/cron-justus-trf4.log'));
+
+// EVIDENTIA - Chunk + Embed novos acordaos (diario 03:30 BRT)
+Schedule::command('evidentia:chunk --limit=5000')
+    ->dailyAt('03:30')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/cron-evidentia-chunk.log'));
+
+Schedule::command('evidentia:embed --sync --limit=2000')
+    ->dailyAt('04:00')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/cron-evidentia-embed.log'));
+
+// EVIDENTIA - Worker de fila (a cada 5 min)
+Schedule::command('queue:work database --queue=evidentia --timeout=120 --tries=2 --stop-when-empty')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/cron-evidentia-queue.log'));
+

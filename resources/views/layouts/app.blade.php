@@ -271,6 +271,21 @@
                 </a>
                 @endif
 
+                
+                <!-- EVIDENTIA - Busca Inteligente de Jurisprudencia -->
+                @if(Auth::user()->role === "admin" || Auth::user()->podeAcessar("operacional.justus"))
+                <a href="{{ route('evidentia.index') }}"
+                   class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg transition-colors {{ request()->is('evidentia*') ? 'nav-link-active' : '' }}"
+                   data-tooltip="EVIDENTIA">
+                    <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 200 200">
+                        <polygon points="100,8 185,52 185,148 100,192 15,148 15,52" fill="currentColor" opacity="0.9"/>
+                        <g transform="translate(62,48)"><rect x="0" y="0" width="16" height="104" rx="3" fill="#FFFFFF"/><rect x="0" y="0" width="72" height="16" rx="3" fill="#FFFFFF"/><rect x="0" y="44" width="60" height="16" rx="3" fill="#FFFFFF"/><rect x="0" y="88" width="72" height="16" rx="3" fill="#FFFFFF"/></g>
+                        <path d="M157,38 L159.5,47.5 L169,50 L159.5,52.5 L157,62 L154.5,52.5 L145,50 L154.5,47.5 Z" fill="#F5C842" opacity="0.95"/>
+                    </svg>
+                    <span class="menu-text">EVIDENTIA</span>
+                </a>
+                @endif
+
                 <!-- 2) RESULTADOS! (colapsável) -->
                 <div class="menu-group">
                     <button onclick="toggleSubmenu('resultados')" class="nav-link w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors {{ request()->is('visao-gerencial*') || request()->is('clientes-mercado*') || request()->is('processos-internos*') || request()->is('resultados/bsc/processos-internos*') || request()->is('times-evolucao*') || request()->is('bsc-insights*') ? 'nav-link-active' : '' }}" data-tooltip="RESULTADOS!">
