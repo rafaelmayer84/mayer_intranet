@@ -708,15 +708,31 @@ PROMPT;
         if (empty(trim($nome))) return true;
         $lower = mb_strtolower(trim($nome));
         $patterns = [
-            'vara ', 'tribunal', 'comarca', 'juízo', 'juizo',
+            'vara ', 'vara,', '1ª vara', '2ª vara', '3ª vara', '4ª vara',
+            'tribunal', 'comarca', 'juízo', 'juizo', 'juizado',
             'fórum', 'forum', 'cartório', 'cartorio', 'serventia',
             'secretaria da', 'gabinete', 'defensoria', 'ministério público',
             'ministerio publico', 'procuradoria', 'delegacia',
             'sala de audiência', 'sala de audiencia',
+            'oficial de justiça', 'oficial de justica',
+            'poder judiciário', 'poder judiciario',
+            'conselho tutelar', 'detran', 'receita federal',
+            'inss ', 'cras ', 'creas ', 'procon',
+            'polícia civil', 'policia civil', 'polícia militar', 'policia militar',
+            'corpo de bombeiros', 'samu ', 'upa ',
+            'prefeitura', 'câmara municipal', 'camara municipal',
+            'pje', 'eproc', 'projudi', 'esaj',
         ];
         foreach ($patterns as $p) {
             if (str_contains($lower, $p)) return true;
         }
+
+        // Nomes que são apenas números ou códigos (robôs, sistemas)
+        if (preg_match('/^[\d\s\-\.\(\)\+]+$/', trim($nome))) return true;
+
+        // Nomes com número de processo judicial (ex: 0001234-56.2025.8.24.0033)
+        if (preg_match('/\d{7}-\d{2}\.\d{4}/', $nome)) return true;
+
         return false;
     }
 
@@ -796,6 +812,21 @@ PROMPT;
             // ========== FILTRO 2: Nome lixo (varas, tribunais, robôs) ==========
             if ($this->isNomeLixo($nome)) {
                 Log::info('processLead: nome filtrado como lixo', ['nome' => $nome, 'telefone' => $telefone]);
+                return null;
+            }
+
+            // ========== FILTRO 2b: Telefone institucional (blacklist) ==========
+            $blacklistPhones = [
+                '554733986287',  // 2a Delegacia Itajai
+                '554732619425',  // 1a Vara Criminal Itajai
+                '554733444600',  // Forum Itajai
+                '554733444601',  // Forum Itajai (2)
+                '554733411600',  // Comarca Itajai
+            ];
+            if (in_array($telefoneNorm, $blacklistPhones) || in_array($telefoneClean, $blacklistPhones)) {
+                Log::info('processLead: telefone institucional bloqueado (blacklist)', [
+                    'telefone' => $telefoneNorm, 'nome' => $nome
+                ]);
                 return null;
             }
 
