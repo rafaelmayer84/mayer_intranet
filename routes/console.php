@@ -113,8 +113,12 @@ Schedule::command('nexo:verificar-os')
     ->timezone('America/Sao_Paulo')
     ->appendOutputTo(storage_path('logs/cron-nexo-os.log'));
 
-// GDP Apuracao diaria (scores + penalizacoes)
-Schedule::command('gdp:apurar')->dailyAt('06:00');
+// GDP Apuracao diaria — todos os meses abertos do ciclo (00:30 BRT, apos syncs DataJuri)
+Schedule::command('gdp:apurar')
+    ->dailyAt('00:30')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/cron-gdp-apuracao.log'));
 
 
 
