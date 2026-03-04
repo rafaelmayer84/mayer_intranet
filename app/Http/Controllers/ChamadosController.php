@@ -117,6 +117,44 @@ class ChamadosController extends Controller
             ]);
         }
 
+        // Notificação sininho para admins/coordenadores sobre novo chamado
+        $adminIds = \App\Models\User::whereIn('role', ['admin', 'socio', 'coordenador'])->pluck('id');
+        foreach ($adminIds as $adminId) {
+            if ($adminId === auth()->id()) continue;
+            \App\Models\NotificationIntranet::enviar(
+                $adminId,
+                'Novo chamado ' . $sr->protocolo,
+                $sr->subject . ' — ' . ucfirst($sr->priority),
+                '/chamados/' . $sr->id,
+                'info',
+                'bell'
+            );
+        }
+
+        // Notificação e-mail ao atribuído (se houver)
+        if ($sr->assigned_to_user_id) {
+            $assignedUser = \App\Models\User::find($sr->assigned_to_user_id);
+            if ($assignedUser && $assignedUser->email) {
+                try {
+                    \Illuminate\Support\Facades\Mail::raw(
+                        "Olá {$assignedUser->name},\n\n" .
+                        "Um novo chamado foi atribuído a você:\n\n" .
+                        "Protocolo: {$sr->protocolo}\n" .
+                        "Assunto: {$sr->subject}\n" .
+                        "Prioridade: {$sr->priority}\n\n" .
+                        "Acesse o sistema para mais detalhes.\n\n" .
+                        "— RESULTADOS! Intranet",
+                        function ($message) use ($assignedUser, $sr) {
+                            $message->to($assignedUser->email)
+                                    ->subject("[Chamado {$sr->protocolo}] {$sr->subject}");
+                        }
+                    );
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::warning('[SIATE] Falha ao enviar e-mail: ' . $e->getMessage());
+                }
+            }
+        }
+
         // Triagem IA silenciosa (async)
         dispatch(function () use ($sr) {
             try {

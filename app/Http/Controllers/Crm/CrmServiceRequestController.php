@@ -259,23 +259,36 @@ class CrmServiceRequestController extends Controller
             $requester = $sr->requestedBy ?? User::find($sr->requested_by_user_id);
             $categorias = CrmServiceRequest::categorias();
             $catLabel = $categorias[$sr->category]['label'] ?? $sr->category;
+            $prazo = $sr->sla_deadline ? \Carbon\Carbon::parse($sr->sla_deadline)->format('d/m/Y H:i') : 'A definir';
+            $prazoDesejado = $sr->desired_deadline ? \Carbon\Carbon::parse($sr->desired_deadline)->format('d/m/Y') : '—';
+            $descricao = nl2br(e($sr->description));
+            $link = url('/chamados/' . $sr->id);
 
-            Mail::raw(
-                "Olá {$assignedUser->name},\n\n" .
-                "Uma nova solicitação foi atribuída a você:\n\n" .
-                "Solicitação: {$sr->protocolo}\n" .
-                "Cliente: {$account->name}\n" .
-                "Categoria: {$catLabel}\n" .
-                "Assunto: {$sr->subject}\n" .
-                "Prioridade: {$sr->priority}\n" .
-                "Solicitante: {$requester->name}\n\n" .
-                "Acesse o sistema para mais detalhes.\n\n" .
-                "— RESULTADOS! Intranet",
-                function ($message) use ($assignedUser, $sr) {
-                    $message->to($assignedUser->email)
-                            ->subject("[Solicitação {$sr->protocolo}] {$sr->subject}");
-                }
+            $html = $this->buildEmailHtml(
+                destinatario: $assignedUser->name,
+                titulo: 'Chamado atribuído a você',
+                subtitulo: 'Você recebeu uma nova solicitação para resolver.',
+                cor: '#385776',
+                protocolo: $sr->protocolo,
+                campos: [
+                    'Assunto'       => $sr->subject,
+                    'Categoria'     => $catLabel,
+                    'Prioridade'    => ucfirst($sr->priority),
+                    'Impacto'       => $sr->impact ? ucfirst($sr->impact) : '—',
+                    'Cliente'       => $account ? $account->name : 'Interno',
+                    'Solicitante'   => $requester ? $requester->name : '—',
+                    'Prazo SLA'     => $prazo,
+                    'Prazo desejado'=> $prazoDesejado,
+                ],
+                descricao: $sr->description,
+                link: $link,
+                labelLink: 'Abrir Chamado'
             );
+
+            Mail::html($html, function ($message) use ($assignedUser, $sr) {
+                $message->to($assignedUser->email)
+                        ->subject("[SIATE {$sr->protocolo}] Chamado atribuído: {$sr->subject}");
+            });
         } catch (\Exception $e) {
             Log::warning('[CRM] Falha ao notificar atribuído: ' . $e->getMessage());
         }
@@ -288,25 +301,39 @@ class CrmServiceRequestController extends Controller
     {
         try {
             $approvers = User::whereIn('role', ['admin', 'socio'])->get();
+            $categorias = CrmServiceRequest::categorias();
+            $catLabel = $categorias[$sr->category]['label'] ?? $sr->category;
+            $requester = $sr->requestedBy ?? User::find($sr->requested_by_user_id);
+            $account = $sr->account ?? CrmAccount::find($sr->account_id);
+            $link = url('/chamados/' . $sr->id);
+
             foreach ($approvers as $approver) {
                 if (!$approver->email) continue;
-                $categorias = CrmServiceRequest::categorias();
-                $catLabel = $categorias[$sr->category]['label'] ?? $sr->category;
 
-                Mail::raw(
-                    "Olá {$approver->name},\n\n" .
-                    "A seguinte solicitação requer sua aprovação:\n\n" .
-                    "Solicitação: {$sr->protocolo}\n" .
-                    "Categoria: {$catLabel}\n" .
-                    "Assunto: {$sr->subject}\n" .
-                    "Prioridade: {$sr->priority}\n\n" .
-                    "Acesse o sistema para aprovar ou rejeitar.\n\n" .
-                    "— RESULTADOS! Intranet",
-                    function ($message) use ($approver, $sr) {
-                        $message->to($approver->email)
-                                ->subject("[APROVAÇÃO] Solicitação {$sr->protocolo} — {$sr->subject}");
-                    }
+                $html = $this->buildEmailHtml(
+                    destinatario: $approver->name,
+                    titulo: 'Aprovação necessária',
+                    subtitulo: 'O chamado abaixo requer sua aprovação para prosseguir.',
+                    cor: '#b45309',
+                    protocolo: $sr->protocolo,
+                    campos: [
+                        'Assunto'     => $sr->subject,
+                        'Categoria'   => $catLabel,
+                        'Prioridade'  => ucfirst($sr->priority),
+                        'Impacto'     => $sr->impact ? ucfirst($sr->impact) : '—',
+                        'Cliente'     => $account ? $account->name : 'Interno',
+                        'Solicitante' => $requester ? $requester->name : '—',
+                        'Valor est.'  => $sr->estimated_value ? 'R$ ' . number_format($sr->estimated_value, 2, ',', '.') : '—',
+                    ],
+                    descricao: $sr->description,
+                    link: $link,
+                    labelLink: 'Aprovar / Rejeitar'
                 );
+
+                Mail::html($html, function ($message) use ($approver, $sr) {
+                    $message->to($approver->email)
+                            ->subject("[APROVAÇÃO SIATE] {$sr->protocolo} — {$sr->subject}");
+                });
             }
         } catch (\Exception $e) {
             Log::warning('[CRM] Falha ao notificar aprovadores: ' . $e->getMessage());
@@ -316,22 +343,37 @@ class CrmServiceRequestController extends Controller
     /**
      * Criar notificação no sininho
      */
-    private function createBellNotification(CrmServiceRequest $sr, string $message)
-    {
-        try {
-            if (class_exists(SystemEvent::class)) {
-                SystemEvent::crm('service_request', 'info', $message, null, [
-                    'sr_id'      => $sr->id,
-                    'account_id' => $sr->account_id,
-                    'category'   => $sr->category,
-                    'status'     => $sr->status,
-                    'notify_user_id' => $sr->assigned_to_user_id,
-                ]);
-            }
-        } catch (\Exception $e) {
-            Log::warning('[CRM] Falha ao criar notificação bell: ' . $e->getMessage());
-        }
-    }
+     private function createBellNotification(CrmServiceRequest $sr, string $message)
+     {
+         try {
+             $link = '/chamados/' . $sr->id;
+             $recipients = collect();
+
+             if ($sr->assigned_to_user_id) {
+                 $recipients->push($sr->assigned_to_user_id);
+             }
+             if ($sr->requested_by_user_id && $sr->requested_by_user_id !== $sr->assigned_to_user_id) {
+                 $recipients->push($sr->requested_by_user_id);
+             }
+             if ($recipients->isEmpty()) {
+                 $adminIds = \App\Models\User::whereIn('role', ['admin', 'socio', 'coordenador'])->pluck('id');
+                 $recipients = $adminIds;
+             }
+
+             foreach ($recipients->unique() as $userId) {
+                 \App\Models\NotificationIntranet::enviar(
+                     $userId,
+                     'Chamado ' . $sr->protocolo,
+                     $message,
+                     $link,
+                     'info',
+                     'bell'
+                 );
+             }
+         } catch (\Exception $e) {
+             Log::warning('[CRM] Falha ao criar notificação bell: ' . $e->getMessage());
+         }
+     }
 
     /**
      * Notificar solicitante que o chamado foi devolvido para complementação
@@ -343,30 +385,34 @@ class CrmServiceRequestController extends Controller
             if (!$requester || !$requester->email) return;
 
             $account = $sr->account ?? CrmAccount::find($sr->account_id);
-            $accountName = $account ? $account->name : 'Interno';
             $categorias = CrmServiceRequest::categorias();
             $catLabel = $categorias[$sr->category]['label'] ?? $sr->category;
-            $motivoTexto = $motivo ? "\n\nMotivo da devolução:\n{$motivo}" : '';
             $operador = auth()->user()->name;
+            $link = url('/chamados/' . $sr->id);
 
-            Mail::raw(
-                "Olá {$requester->name},\n\n" .
-                "Sua solicitação foi devolvida para complementação:\n\n" .
-                "Protocolo: {$sr->protocolo}\n" .
-                "Cliente: {$accountName}\n" .
-                "Categoria: {$catLabel}\n" .
-                "Assunto: {$sr->subject}\n" .
-                "Devolvido por: {$operador}" .
-                $motivoTexto . "\n\n" .
-                "Por favor, acesse o sistema e adicione as informações solicitadas.\n\n" .
-                "— RESULTADOS! Intranet",
-                function ($message) use ($requester, $sr) {
-                    $message->to($requester->email)
-                            ->subject("[DEVOLVIDO] {$sr->protocolo} — {$sr->subject}");
-                }
+            $html = $this->buildEmailHtml(
+                destinatario: $requester->name,
+                titulo: 'Chamado devolvido para complementação',
+                subtitulo: 'Seu chamado foi devolvido. Acesse o sistema e adicione as informações solicitadas.',
+                cor: '#dc2626',
+                protocolo: $sr->protocolo,
+                campos: [
+                    'Assunto'      => $sr->subject,
+                    'Categoria'    => $catLabel,
+                    'Cliente'      => $account ? $account->name : 'Interno',
+                    'Devolvido por'=> $operador,
+                    'Motivo'       => $motivo ?: '—',
+                ],
+                descricao: null,
+                link: $link,
+                labelLink: 'Complementar Chamado'
             );
 
-            // Notificação sininho
+            Mail::html($html, function ($message) use ($requester, $sr) {
+                $message->to($requester->email)
+                        ->subject("[DEVOLVIDO] SIATE {$sr->protocolo} — {$sr->subject}");
+            });
+
             $this->createBellNotification($sr, "Chamado {$sr->protocolo} devolvido para complementação por {$operador}");
 
         } catch (\Exception $e) {
@@ -374,4 +420,81 @@ class CrmServiceRequestController extends Controller
         }
     }
 
+
+    private function buildEmailHtml(
+        string $destinatario,
+        string $titulo,
+        string $subtitulo,
+        string $cor,
+        string $protocolo,
+        array $campos,
+        ?string $descricao,
+        string $link,
+        string $labelLink
+    ): string {
+        $linhas = '';
+        foreach ($campos as $label => $valor) {
+            $linhas .= "<tr>
+                <td style='padding:8px 12px;font-size:13px;color:#6b7280;white-space:nowrap;border-bottom:1px solid #f3f4f6;'>{$label}</td>
+                <td style='padding:8px 12px;font-size:13px;color:#111827;font-weight:500;border-bottom:1px solid #f3f4f6;'>" . e($valor) . "</td>
+            </tr>";
+        }
+
+        $descricaoHtml = '';
+        if ($descricao) {
+            $descricaoHtml = "<div style='margin-top:24px;'>
+                <p style='margin:0 0 8px;font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;'>Descrição</p>
+                <div style='background:#f9fafb;border-left:3px solid {$cor};padding:12px 16px;border-radius:0 8px 8px 0;font-size:13px;color:#374151;line-height:1.6;'>" . nl2br(e($descricao)) . "</div>
+            </div>";
+        }
+
+        return "<!DOCTYPE html>
+<html>
+<head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'></head>
+<body style='margin:0;padding:0;background:#f3f4f6;font-family:Georgia,serif;'>
+<table width='100%' cellpadding='0' cellspacing='0' style='background:#f3f4f6;padding:32px 16px;'>
+  <tr><td align='center'>
+    <table width='600' cellpadding='0' cellspacing='0' style='max-width:600px;width:100%;'>
+
+      {{-- Cabeçalho --}}
+      <tr><td style='background:{$cor};border-radius:12px 12px 0 0;padding:28px 32px;'>
+        <p style='margin:0 0 4px;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.65);'>SIATE · Mayer Advogados</p>
+        <h1 style='margin:0;font-size:22px;font-weight:700;color:#ffffff;line-height:1.3;'>{$titulo}</h1>
+        <p style='margin:8px 0 0;font-size:13px;color:rgba(255,255,255,.8);'>{$subtitulo}</p>
+      </td></tr>
+
+      {{-- Corpo --}}
+      <tr><td style='background:#ffffff;padding:28px 32px;'>
+        <p style='margin:0 0 20px;font-size:14px;color:#374151;'>Olá, <strong>" . e($destinatario) . "</strong>.</p>
+
+        {{-- Badge protocolo --}}
+        <div style='margin-bottom:20px;'>
+          <span style='display:inline-block;background:" . $cor . "18;color:{$cor};font-size:12px;font-weight:700;letter-spacing:.08em;padding:4px 12px;border-radius:6px;border:1px solid " . $cor . "33;'>{$protocolo}</span>
+        </div>
+
+        {{-- Tabela de campos --}}
+        <table width='100%' cellpadding='0' cellspacing='0' style='border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:8px;'>
+          {$linhas}
+        </table>
+
+        {$descricaoHtml}
+
+        {{-- CTA --}}
+        <div style='margin-top:28px;text-align:center;'>
+          <a href='{$link}' style='display:inline-block;background:{$cor};color:#ffffff;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px;text-decoration:none;letter-spacing:.02em;'>{$labelLink} →</a>
+        </div>
+      </td></tr>
+
+      {{-- Rodapé --}}
+      <tr><td style='background:#f9fafb;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:16px 32px;text-align:center;'>
+        <p style='margin:0;font-size:11px;color:#9ca3af;'>Este e-mail foi gerado automaticamente pelo <strong>RESULTADOS! Intranet</strong> · Mayer Albanez Sociedade de Advogados</p>
+        <p style='margin:4px 0 0;font-size:11px;color:#9ca3af;'>Não responda este e-mail. Acesse o sistema para interagir com o chamado.</p>
+      </td></tr>
+
+    </table>
+  </td></tr>
+</table>
+</body>
+</html>";
+    }
 }
