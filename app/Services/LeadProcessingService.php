@@ -620,6 +620,89 @@ PROMPT;
         return trim($cidade);
     }
 
+    /**
+     * Normalizar telefone para formato E.164 brasileiro: 55 + DDD + numero (so digitos)
+     */
+    public static function normalizePhoneE164(string $phone): string
+    {
+        $digits = preg_replace('/[^0-9]/', '', $phone);
+        if (strlen($digits) < 10) return $digits;
+
+        // Remover 55 duplicado no inicio (ex: 5555479...)
+        if (preg_match('/^5555(\\d{10,11})$/', $digits, $m)) {
+            $digits = '55' . $m[1];
+        }
+
+        // Se comeca com 55 e tem 12-13 digitos, ja esta ok
+        if (preg_match('/^55\\d{10,11}$/', $digits)) {
+            return $digits;
+        }
+
+        // Se tem 10-11 digitos (DDD + numero), prefixar 55
+        if (preg_match('/^\\d{10,11}$/', $digits)) {
+            return '55' . $digits;
+        }
+
+        return $digits;
+    }
+
+    /**
+     * Verificar se telefone pertence a cliente existente (DataJuri ou CRM)
+     */
+    private function isClienteExistente(string $phoneNorm): ?array
+    {
+        $suffix8 = substr($phoneNorm, -8);
+        $variants = [$phoneNorm];
+        if (str_starts_with($phoneNorm, '55') && strlen($phoneNorm) >= 12) {
+            $variants[] = substr($phoneNorm, 2);
+            $variants[] = '+' . $phoneNorm;
+        }
+
+        // 1) clientes (DataJuri)
+        $cliente = \DB::table('clientes')
+            ->where(function ($q) use ($variants, $suffix8) {
+                $q->whereIn('telefone_normalizado', $variants);
+                $q->orWhere('celular', 'LIKE', '%' . $suffix8 . '%');
+            })
+            ->whereNull('deleted_at')
+            ->first(['id', 'nome', 'datajuri_id']);
+
+        if ($cliente) {
+            return ['source' => 'clientes', 'id' => $cliente->id, 'nome' => $cliente->nome, 'datajuri_id' => $cliente->datajuri_id];
+        }
+
+        // 2) crm_accounts
+        $crm = \DB::table('crm_accounts')
+            ->where(function ($q) use ($variants, $suffix8) {
+                foreach ($variants as $v) {
+                    $q->orWhere('phone_e164', $v)->orWhere('phone_e164', '+' . $v);
+                }
+                $q->orWhere('phone_e164', 'LIKE', '%' . $suffix8);
+            })
+            ->whereIn('lifecycle', ['ativo', 'contato_inicial', 'onboarding'])
+            ->first(['id', 'name', 'lifecycle']);
+
+        if ($crm) {
+            return ['source' => 'crm_accounts', 'id' => $crm->id, 'nome' => $crm->name, 'lifecycle' => $crm->lifecycle];
+        }
+
+        // 3) crm_identities
+        $ident = \DB::table('crm_identities')
+            ->where('kind', 'phone')
+            ->where(function ($q) use ($variants, $suffix8) {
+                $q->whereIn('value_norm', $variants);
+                $q->orWhere('value_norm', 'LIKE', '%' . $suffix8);
+            })
+            ->first(['id', 'account_id']);
+
+        if ($ident) {
+            $name = \DB::table('crm_accounts')->where('id', $ident->account_id)->value('name') ?? '?';
+            return ['source' => 'crm_identities', 'id' => $ident->account_id, 'nome' => $name];
+        }
+
+        return null;
+    }
+
     private function isNomeLixo(string $nome): bool
     {
         if (empty(trim($nome))) return true;
@@ -690,7 +773,7 @@ PROMPT;
 
             Log::info('Dados extraidos', [
                 'contact_id' => $contactId, 'bot_id' => $botId,
-                'nome' => $nome, 'telefone' => $telefone,
+                'nome' => $nome, 'telefone' => $telefoneNorm,
                 'variables' => $variables, 'tags' => $tags
             ]);
 
@@ -705,6 +788,10 @@ PROMPT;
                 Log::info('processLead: telefone vazio/invalido, ignorando', ['telefone' => $telefone]);
                 return null;
             }
+
+            // ========== NORMALIZACAO E.164 ==========
+            $telefoneNorm = self::normalizePhoneE164($telefone);
+            Log::info('processLead: telefone normalizado', ['raw' => $telefone, 'norm' => $telefoneNorm]);
 
             // ========== FILTRO 2: Nome lixo (varas, tribunais, robôs) ==========
             if ($this->isNomeLixo($nome)) {
@@ -729,25 +816,40 @@ PROMPT;
                 $tags = array_unique(array_merge($tags, $fluxo['tags']));
             }
 
+            // ========== FILTRO 4: Cliente ja existente no CRM/DataJuri? ==========
+            $clienteExistente = $this->isClienteExistente($telefoneNorm);
+            if ($clienteExistente) {
+                Log::info('processLead: BLOQUEADO - telefone pertence a cliente existente', [
+                    'telefone' => $telefoneNorm, 'nome_lead' => $nome, 'cliente' => $clienteExistente,
+                ]);
+                return null;
+            }
+
             // ========== IDEMPOTÊNCIA ATÔMICA (com lock DB) ==========
-            $lockKey = 'lead_process_' . $telefoneClean;
+            $lockKey = 'lead_process_' . $telefoneNorm;
             $lock = \Illuminate\Support\Facades\Cache::lock($lockKey, 30);
 
             if (!$lock->get()) {
                 Log::info('processLead: lock ativo, ignorando duplicata', ['telefone' => $telefone]);
-                return Lead::where('telefone', $telefone)->first();
+                return Lead::where('telefone', $telefoneNorm)->orWhere('telefone', $telefone)->first();
             }
 
             try {
-                $existingLead = Lead::where('telefone', $telefone)->first();
+                $existingLead = Lead::where('telefone', $telefoneNorm)->orWhere('telefone', $telefone)->orWhere('telefone', $telefoneClean)->first();
 
                 if ($existingLead) {
-                    if (empty($existingLead->contact_id) && !empty($contactId)) {
-                        $existingLead->contact_id = $contactId;
-                        $existingLead->timestamps = false;
-                        $existingLead->save();
+                    $updates = [];
+                    if ($existingLead->telefone !== $telefoneNorm) {
+                        $updates['telefone'] = $telefoneNorm;
                     }
-                    Log::info('Lead ja existe', ['lead_id' => $existingLead->id]);
+                    if (empty($existingLead->contact_id) && !empty($contactId)) {
+                        $updates['contact_id'] = $contactId;
+                    }
+                    if (!empty($updates)) {
+                        $existingLead->timestamps = false;
+                        $existingLead->update($updates);
+                    }
+                    Log::info('Lead ja existe', ['lead_id' => $existingLead->id, 'telefone_norm' => isset($updates['telefone'])]);
                     $lock->release();
                     return $existingLead;
                 }
@@ -796,7 +898,7 @@ PROMPT;
                 Log::warning('Sem mensagens, criando lead sem IA');
                 $lead = Lead::create([
                     'nome' => $nome,
-                    'telefone' => $telefone,
+                    'telefone' => $telefoneNorm,
                     'contact_id' => $contactId,
                     'area_interesse' => $area ?: 'não identificado',
                     'cidade' => $cidade,
@@ -835,7 +937,7 @@ PROMPT;
             // Criar lead com todos os campos de marketing jurídico
             $lead = Lead::create([
                 'nome' => $nome,
-                'telefone' => $telefone,
+                'telefone' => $telefoneNorm,
                 'contact_id' => $contactId,
                 'area_interesse' => $area ?: 'não identificado',
                 'sub_area' => $aiResult['sub_area'] ?? '',
