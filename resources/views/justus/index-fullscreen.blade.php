@@ -106,6 +106,10 @@
         {{-- === COL ESQUERDA: Conversas === --}}
         <div class="flex flex-col flex-shrink-0 bg-white/80" style="width:280px;backdrop-filter:blur(20px);border-right:1px solid rgba(0,0,0,0.06);">
             <div class="p-3">
+                @if(auth()->user()->is_admin)
+                <a href="{{ route('justus.admin.config') }}" class="text-xs text-gray-400 hover:text-gray-600 mb-2 block" title="Administração">⚙ Admin</a>
+                @endif
+
                 <button onclick="openNewAnalysisModal()"
                     class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-white font-semibold text-sm transition-all duration-300 hover:shadow-lg hover:scale-[1.02]"
                     style="background:linear-gradient(135deg,#1B334A,#385776);">

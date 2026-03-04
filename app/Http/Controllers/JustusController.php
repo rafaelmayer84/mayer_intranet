@@ -346,7 +346,22 @@ class JustusController extends Controller
             'budget_user_max' => config('justus.budget_user_max'),
             'model_default' => config('justus.model_default'),
         ];
-        return view('justus.admin', compact('guides', 'budget', 'config'));
+        $conversations = JustusConversation::with(['user:id,name', 'processProfile'])
+            ->withCount('messages')
+            ->orderByDesc('updated_at')
+            ->limit(50)
+            ->get();
+
+        $templates = \App\Models\JustusPromptTemplate::where('is_active', true)
+            ->orderBy('category')->orderBy('sort_order')->get();
+
+        $feedbackStats = [
+            'total' => JustusMessage::where('role', 'assistant')->whereNotNull('feedback')->count(),
+            'positive' => JustusMessage::where('role', 'assistant')->where('feedback', 'positive')->count(),
+            'negative' => JustusMessage::where('role', 'assistant')->where('feedback', 'negative')->count(),
+        ];
+
+        return view('justus.admin', compact('guides', 'budget', 'config', 'conversations', 'templates', 'feedbackStats'));
     }
 
     public function adminUpdateGuide(Request $request, int $guideId)
