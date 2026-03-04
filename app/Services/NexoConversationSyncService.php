@@ -293,6 +293,29 @@ class NexoConversationSyncService
                 $body = $media['caption'];
             }
 
+            // v2.6: dedup msg humana local vs sync
+            // enviarMensagem grava com pmid=NULL, sync traz com pmid e prefixo de nome
+            if ($direction === 2 && $providerMsgId) {
+                $localDupe = WaMessage::where('conversation_id', $conversation->id)
+                    ->where('direction', 2)
+                    ->where('is_human', true)
+                    ->whereNull('provider_message_id')
+                    ->whereBetween('sent_at', [
+                        $sentAt->copy()->subSeconds(5),
+                        $sentAt->copy()->addSeconds(5),
+                    ])
+                    ->first();
+                if ($localDupe) {
+                    // Atualizar o registro local com o provider_message_id do sync
+                    $localDupe->update(['provider_message_id' => $providerMsgId]);
+                    \Log::info('NEXO-SYNC: dedup humana local', [
+                        'conv_id' => $conversation->id, 'msg_id' => $localDupe->id, 'pmid' => $providerMsgId
+                    ]);
+                    $newCount++;
+                    continue;
+                }
+            }
+
             WaMessage::create([
                 'conversation_id'     => $conversation->id,
                 'provider_message_id' => $providerMsgId,
