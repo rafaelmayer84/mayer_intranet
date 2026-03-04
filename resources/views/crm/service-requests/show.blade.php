@@ -138,12 +138,12 @@
             {{-- Acoes --}}
             <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
                 <h3 class="text-sm font-bold text-[#1B334A] mb-3"><i class="fa-solid fa-sliders mr-1.5 text-gray-400"></i> Ações</h3>
-                <form method="POST" action="{{ route('chamados.update', $sr->id) }}" enctype="multipart/form-data" class="space-y-3">
+                <form id="form-acoes" method="POST" action="{{ route('chamados.update', $sr->id) }}" enctype="multipart/form-data" class="space-y-3">
                     @csrf @method('PUT')
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <div>
                             <label class="block text-xs text-gray-500 mb-1">Status</label>
-                            <select name="status" class="w-full border rounded-xl px-3 py-2 text-sm">
+                            <select id="sel-status" name="status" class="w-full border rounded-xl px-3 py-2 text-sm">
                                 @foreach(['aberto','em_andamento','aguardando_aprovacao','aprovado','rejeitado','concluido','cancelado','devolvido'] as $st)
                                     <option value="{{ $st }}" {{ $sr->status === $st ? 'selected' : '' }}>{{ App\Models\Crm\CrmServiceRequest::statusLabel($st) }}</option>
                                 @endforeach
@@ -167,16 +167,40 @@
                             </select>
                         </div>
                     </div>
-                    <div>
-                        <label class="block text-xs text-gray-500 mb-1">Notas de resolucao</label>
-                        <textarea name="resolution_notes" rows="5" class="w-full border rounded-xl px-3 py-2 text-sm resize-y" placeholder="Descreva o que foi feito ou o motivo da devolução">{{ $sr->resolution_notes }}</textarea>
-                    </div>
-                    <div>
-                        <label class="block text-xs text-gray-500 mb-1">Anexar arquivo</label>
-                        <input type="file" name="action_attachments[]" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100 transition">
-                    </div>
-                    <button type="submit" class="px-5 py-2 text-sm font-medium text-white rounded-xl transition" style="background: linear-gradient(135deg, #385776, #1B334A);">Salvar</button>
+                    <button type="button" id="btn-salvar-acao" class="px-5 py-2 text-sm font-medium text-white rounded-xl transition" style="background: linear-gradient(135deg, #385776, #1B334A);">Salvar</button>
+
+                    {{-- Campos de resolução ocultos — preenchidos pelo modal --}}
+                    <textarea name="resolution_notes" id="hidden-notes" class="hidden"></textarea>
+                    <input type="file" name="action_attachments[]" id="hidden-files" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip" class="hidden">
                 </form>
+            </div>
+
+            {{-- Modal de Resolução --}}
+            <div id="modal-resolucao" class="fixed inset-0 z-50 hidden items-center justify-center" style="background:rgba(0,0,0,0.45);">
+                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between" style="background:linear-gradient(135deg,#f8fafc,#f1f5f9)">
+                        <div>
+                            <h3 class="text-base font-bold text-[#1B334A]" id="modal-titulo">Finalizar chamado</h3>
+                            <p class="text-xs text-gray-400 mt-0.5" id="modal-subtitulo">Descreva o que foi feito antes de confirmar.</p>
+                        </div>
+                        <button onclick="fecharModal()" class="text-gray-400 hover:text-gray-600 transition text-lg leading-none">✕</button>
+                    </div>
+                    <div class="p-6 space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Notas <span id="modal-obrig" class="text-red-400">*</span></label>
+                            <textarea id="modal-notes" rows="5" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#385776] focus:ring-1 focus:ring-[#385776] transition resize-y" placeholder="Descreva o que foi feito, o motivo ou as observações relevantes..."></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1.5">Anexos <span class="text-gray-300 font-normal">(opcional)</span></label>
+                            <input type="file" id="modal-files" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip"
+                                class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100 transition">
+                        </div>
+                    </div>
+                    <div class="px-6 py-4 border-t border-gray-100 flex justify-between items-center bg-gray-50">
+                        <button onclick="fecharModal()" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 transition">Cancelar</button>
+                        <button onclick="confirmarModal()" id="btn-confirmar" class="px-6 py-2.5 text-sm font-medium text-white rounded-xl transition hover:shadow-lg" style="background:linear-gradient(135deg,#385776,#1B334A);">Confirmar</button>
+                    </div>
+                </div>
             </div>
 
             {{-- Comentarios --}}
@@ -295,4 +319,69 @@
         </div>
     </div>
 </div>
+@push('scripts')
+<script>
+const statusesComModal = ['concluido','rejeitado','cancelado','devolvido'];
+const titulosModal = {
+    concluido: { titulo: 'Concluir chamado', sub: 'Descreva o que foi feito para resolver o chamado.', obrig: true },
+    rejeitado:  { titulo: 'Rejeitar chamado',  sub: 'Informe o motivo da rejeição.',                   obrig: true },
+    cancelado:  { titulo: 'Cancelar chamado',  sub: 'Informe o motivo do cancelamento.',               obrig: true },
+    devolvido:  { titulo: 'Devolver chamado',  sub: 'Informe o que precisa ser complementado.',        obrig: true },
+};
+
+document.getElementById('btn-salvar-acao').addEventListener('click', function () {
+    const status = document.getElementById('sel-status').value;
+    if (statusesComModal.includes(status)) {
+        abrirModal(status);
+    } else {
+        document.getElementById('form-acoes').submit();
+    }
+});
+
+function abrirModal(status) {
+    const cfg = titulosModal[status] || { titulo: 'Confirmar ação', sub: '', obrig: false };
+    document.getElementById('modal-titulo').textContent = cfg.titulo;
+    document.getElementById('modal-subtitulo').textContent = cfg.sub;
+    document.getElementById('modal-obrig').style.display = cfg.obrig ? 'inline' : 'none';
+    document.getElementById('modal-notes').value = '';
+    document.getElementById('modal-resolucao').classList.remove('hidden');
+    document.getElementById('modal-resolucao').classList.add('flex');
+    document.getElementById('modal-notes').focus();
+}
+
+function fecharModal() {
+    document.getElementById('modal-resolucao').classList.add('hidden');
+    document.getElementById('modal-resolucao').classList.remove('flex');
+}
+
+function confirmarModal() {
+    const notes = document.getElementById('modal-notes').value.trim();
+    const status = document.getElementById('sel-status').value;
+    const obrig = titulosModal[status]?.obrig ?? false;
+    if (obrig && !notes) {
+        document.getElementById('modal-notes').classList.add('border-red-400');
+        document.getElementById('modal-notes').focus();
+        return;
+    }
+    // Transferir notas para o campo oculto
+    document.getElementById('hidden-notes').value = notes;
+
+    // Transferir arquivos para o input oculto via DataTransfer
+    const modalFiles = document.getElementById('modal-files').files;
+    if (modalFiles.length > 0) {
+        const dt = new DataTransfer();
+        for (let i = 0; i < modalFiles.length; i++) dt.items.add(modalFiles[i]);
+        document.getElementById('hidden-files').files = dt.files;
+    }
+
+    fecharModal();
+    document.getElementById('form-acoes').submit();
+}
+
+// Fechar modal clicando fora
+document.getElementById('modal-resolucao').addEventListener('click', function(e) {
+    if (e.target === this) fecharModal();
+});
+</script>
+@endpush
 @endsection

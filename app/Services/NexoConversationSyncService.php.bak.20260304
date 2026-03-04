@@ -54,29 +54,6 @@ class NexoConversationSyncService
             $conversation = WaConversation::where('contact_id', $parsed['contact_id'])->first();
             if (!$conversation && $phone) {
                 $conversation = WaConversation::where('phone', $phone)->first();
-
-                // Fix v2.5: busca por variantes do telefone (nono digito)
-                // Ex: webhook manda 554799156367, banco tem 5547999156367
-                if (!$conversation && strlen($phone) >= 12) {
-                    $ddd = substr($phone, 2, 2); // ex: 47
-                    $numero = substr($phone, 4);  // ex: 99156367
-
-                    if (strlen($numero) === 8) {
-                        // Falta o 9: tentar com 9 prefixado
-                        $variant = '55' . $ddd . '9' . $numero;
-                        $conversation = WaConversation::where('phone', $variant)->first();
-                    } elseif (strlen($numero) === 9 && $numero[0] === '9') {
-                        // Tem o 9: tentar sem ele
-                        $variant = '55' . $ddd . substr($numero, 1);
-                        $conversation = WaConversation::where('phone', $variant)->first();
-                    }
-
-                    if ($conversation) {
-                        \Log::info('NEXO-AUDIT: phone lookup por variante', [
-                            'original' => $phone, 'variante' => $variant, 'conv_id' => $conversation->id
-                        ]);
-                    }
-                }
             }
 
             $now = now();

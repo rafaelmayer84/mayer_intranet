@@ -535,7 +535,7 @@ const NexoApp = {
         }catch(e){console.error(e);alert('Erro ao promover lead')}
     },
     async assignResponsavel(uid){if(!this.conversaAtual)return;try{await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/assign`,{method:'PATCH',body:{user_id:uid||null}});this.loadConversas(true)}catch(e){console.error(e)}},
-    async toggleStatus(){if(!this.conversaAtual)return;const ns=this.conversaAtual.status==='open'?'closed':'open';if(ns==='closed'&&!confirm('Ao fechar, o cliente sai da lista de conversas abertas.\nSe ele enviar nova mensagem, a conversa reabrirá automaticamente.\n\nDeseja fechar esta conversa?'))return;try{await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/status`,{method:'PATCH',body:{status:ns}});this.selectConversa(this.conversaAtual.id)}catch(e){console.error(e)}},
+    async toggleStatus(){if(!this.conversaAtual)return;const ns=this.conversaAtual.status==='open'?'closed':'open';try{await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/status`,{method:'PATCH',body:{status:ns}});this.selectConversa(this.conversaAtual.id)}catch(e){console.error(e)}},
 
     // ═══ CATEGORY + TAGS ═══
     async updateCategory(val){
