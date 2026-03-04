@@ -345,7 +345,7 @@ class NexoGerencialService
             $slaEstourado = 0;
             $tempos = [];
             foreach ($convsJanela as $c) {
-                if ($c->first_response_at) {
+                if (!empty($c->first_response_at ?? null)) {
                     $segs = Carbon::parse($c->first_response_at)->diffInSeconds(Carbon::parse($c->created_at));
                     $tempos[] = $segs;
                     if ($segs <= ($this->slaMinutos * 60)) {
@@ -617,7 +617,7 @@ class NexoGerencialService
     private function formatarConversaDrill(object $c): array
     {
         $tempoResp = null;
-        if ($c->first_response_at) {
+        if (!empty($c->first_response_at ?? null)) {
             $segs = Carbon::parse($c->first_response_at)->diffInSeconds(Carbon::parse($c->created_at));
             $tempoResp = $this->formatarTempo($segs);
         }

@@ -463,12 +463,23 @@ class JustusController extends Controller
             return response()->json(['success' => true, 'results' => []]);
         }
 
-        // Construir query de busca baseada nos dados do processo
+        // Construir query inteligente baseada no profile
         $searchTerms = [];
+        $area = null;
         if ($profile) {
             if ($profile->classe) $searchTerms[] = $profile->classe;
             if ($profile->tese_principal) $searchTerms[] = $profile->tese_principal;
             if ($profile->objetivo_analise) $searchTerms[] = $profile->objetivo_analise;
+            if ($profile->orgao) {
+                $orgaoLower = mb_strtolower($profile->orgao);
+                if (str_contains($orgaoLower, 'trt') || str_contains($orgaoLower, 'trabalh')) {
+                    $area = 'trabalhista';
+                } elseif (str_contains($orgaoLower, 'criminal') || str_contains($orgaoLower, 'penal')) {
+                    $area = 'penal';
+                } else {
+                    $area = 'civil';
+                }
+            }
         }
 
         // Se nao ha termos do profile, usar primeira mensagem do usuario

@@ -2,7 +2,7 @@
 @section('title', 'SIATE')
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 py-6">
+<div class="w-full px-6 py-6">
 
     {{-- Header --}}
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
@@ -213,11 +213,13 @@
             <div class="divide-y divide-gray-50">
                 @foreach($chamados as $sr)
                     <a href="{{ url('/chamados/' . $sr->id) }}" class="flex items-center gap-4 px-5 py-4 hover:bg-gray-50/50 transition group">
-                        <span class="w-10 h-10 rounded-xl flex items-center justify-center text-xs font-black flex-shrink-0
-                            @if($sr->priority === 'urgente') bg-red-100 text-red-600
-                            @elseif($sr->priority === 'alta') bg-orange-100 text-orange-600
-                            @elseif($sr->priority === 'normal') bg-violet-100 text-violet-600
-                            @else bg-gray-100 text-gray-400 @endif">{{ $sr->protocolo }}</span>
+                        <div class="flex-shrink-0 w-36">
+                            <span class="inline-block px-2 py-1 rounded-lg text-[10px] font-black tracking-wide
+                                @if($sr->priority === 'urgente') bg-red-100 text-red-600
+                                @elseif($sr->priority === 'alta') bg-orange-100 text-orange-600
+                                @elseif($sr->priority === 'normal') bg-violet-100 text-violet-600
+                                @else bg-gray-100 text-gray-500 @endif">{{ $sr->protocolo }}</span>
+                        </div>
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-2 mb-0.5">
                                 <span class="text-sm font-semibold text-gray-800 truncate">{{ $sr->subject }}</span>

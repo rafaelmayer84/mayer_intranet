@@ -76,7 +76,7 @@ class JustusSyncStjCommand extends Command
                 $this->info("  Resources JSON encontrados: " . count($jsonResources));
 
                 // 3. Identificar quais já foram importados
-                $importedResources = DB::table('justus_jurisprudencia')
+                $importedResources = DB::connection(\App\Models\JustusJurisprudencia::connectionForTribunal('STJ'))->table('justus_jurisprudencia')
                     ->where('fonte_dataset', $datasetName)
                     ->distinct()
                     ->pluck('fonte_resource')
@@ -147,7 +147,7 @@ class JustusSyncStjCommand extends Command
             'errors' => $this->errors,
         ]);
 
-        return $this->errors > 0 ? 1 : 0;
+        return ($this->errors > 0 && $this->imported === 0) ? 1 : 0;
     }
 
     private function processAcordaos(array $acordaos, string $datasetName, string $resourceName): void
@@ -174,7 +174,7 @@ class JustusSyncStjCommand extends Command
             $areaDireito = JustusJurisprudencia::inferAreaDireito($orgao);
 
             $record = [
-                'stj_id' => $stjId,
+                'external_id' => $stjId,
                 'tribunal' => 'STJ',
                 'numero_processo' => $ac['numeroProcesso'] ?? null,
                 'numero_registro' => $ac['numeroRegistro'] ?? null,
@@ -217,11 +217,11 @@ class JustusSyncStjCommand extends Command
         foreach ($batch as $record) {
             try {
                 $record = $this->truncateFields($record);
-                $existing = DB::table('justus_jurisprudencia')->where('stj_id', $record['stj_id'])->exists();
+                $existing = DB::connection(\App\Models\JustusJurisprudencia::connectionForTribunal('STJ'))->table('justus_jurisprudencia')->where('external_id', $record['external_id'])->exists();
 
                 if ($existing) {
-                    DB::table('justus_jurisprudencia')
-                        ->where('stj_id', $record['stj_id'])
+                    DB::connection(\App\Models\JustusJurisprudencia::connectionForTribunal('STJ'))->table('justus_jurisprudencia')
+                        ->where('external_id', $record['external_id'])
                         ->update($record);
                     $this->updated++;
                 } else {
@@ -240,7 +240,7 @@ class JustusSyncStjCommand extends Command
         $limits = [
             'sigla_classe' => 80, 'classe_padronizada' => 80, 'tipo_decisao' => 50,
             'relator' => 100, 'orgao_julgador' => 80, 'data_publicacao' => 100,
-            'area_direito' => 30, 'tribunal' => 10, 'stj_id' => 20,
+            'area_direito' => 30, 'tribunal' => 10, 'external_id' => 60,
         ];
         foreach ($limits as $field => $max) {
             if (!empty($record[$field]) && mb_strlen($record[$field]) > $max) {

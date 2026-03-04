@@ -912,7 +912,6 @@ async function sendFeedback(convId, msgId, type, btn) {
 }
 
 function openNewAnalysisModal() {
-    // Remove modal anterior se existir
     var old = document.getElementById('justus-new-modal');
     if (old) old.remove();
 
@@ -921,40 +920,54 @@ function openNewAnalysisModal() {
     overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);backdrop-filter:blur(4px);';
     overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
 
-    overlay.innerHTML = '<div style="background:white;border-radius:1rem;box-shadow:0 25px 50px rgba(0,0,0,0.25);width:100%;max-width:28rem;margin:1rem;overflow:hidden;" onclick="event.stopPropagation()">'
-        + '<div style="padding:1rem 1.5rem;border-bottom:1px solid #f3f4f6;background:linear-gradient(135deg,#1B334A,#385776);">'
-        + '<h3 style="font-size:1rem;font-weight:700;color:white;margin:0;">Nova An\u00e1lise</h3>'
-        + '<p style="font-size:0.7rem;color:rgba(255,255,255,0.6);margin:0.25rem 0 0;">Selecione o modo e o tipo de an\u00e1lise</p>'
-        + '</div>'
-        + '<div style="padding:1.5rem;">'
-        + '<div style="margin-bottom:1.25rem;">'
-        + '<label style="display:block;font-size:0.65rem;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">Modo de Opera\u00e7\u00e3o</label>'
-        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;" id="jm-mode-grid">'
-        + '<button type="button" onclick="selectJmMode(this,\u0027consultor\u0027)" class="jm-mode-btn jm-mode-active" data-mode="consultor" style="padding:0.75rem;border-radius:0.75rem;text-align:left;border:2px solid #3b82f6;background:#eff6ff;cursor:pointer;"><div style="font-size:0.875rem;font-weight:700;color:#1d4ed8;">Consultor</div><div style="font-size:0.625rem;margin-top:0.25rem;color:#3b82f6;">An\u00e1lise de casos, pareceres</div></button>'
-        + '<button type="button" onclick="selectJmMode(this,\u0027assessor\u0027)" class="jm-mode-btn" data-mode="assessor" style="padding:0.75rem;border-radius:0.75rem;text-align:left;border:2px solid #e5e7eb;background:#f9fafb;cursor:pointer;"><div style="font-size:0.875rem;font-weight:700;color:#374151;">Assessor</div><div style="font-size:0.625rem;margin-top:0.25rem;color:#9ca3af;">Pe\u00e7as, c\u00e1lculos, execu\u00e7\u00e3o</div></button>'
-        + '</div></div>'
-        + '<div>'
-        + '<label style="display:block;font-size:0.65rem;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">Tipo de An\u00e1lise</label>'
-        + '<select id="jm-type-select" style="width:100%;border:1px solid #e5e7eb;border-radius:0.75rem;padding:0.625rem 0.75rem;font-size:0.875rem;outline:none;">'
-        + '<option value="analise_estrategica">An\u00e1lise Estrat\u00e9gica</option>'
-        + '<option value="analise_completa">An\u00e1lise Completa</option>'
-        + '<option value="peca">Projeto de Pe\u00e7a</option>'
-        + '</select></div>'
-        + '<div style="margin-bottom:1rem;"><label style="font-size:0.75rem;font-weight:600;color:#374151;display:block;margin-bottom:0.5rem;">Prompt Programado (opcional)</label>'
-        + '<select id="jm-prompt-select" onchange="applyPromptTemplate()" style="width:100%;border:1px solid #e5e7eb;border-radius:0.75rem;padding:0.625rem 0.75rem;font-size:0.875rem;outline:none;">'
-        + '<option value="">— Escrever prompt livre —</option>'
-        + '</select></div>'
-        + '<div style="margin-bottom:1rem;"><label style="font-size:0.75rem;font-weight:600;color:#374151;display:block;margin-bottom:0.5rem;">Mensagem Inicial</label>'
-        + '<textarea id="jm-initial-msg" rows="5" placeholder="Descreva o que deseja analisar..." style="width:100%;border:1px solid #e5e7eb;border-radius:0.75rem;padding:0.625rem 0.75rem;font-size:0.875rem;outline:none;resize:vertical;"></textarea>'
-        + '<option value="higiene_autos">Higiene de Autos</option>'
-        + '<option value="calculo_prazo">C\u00e1lculo de Prazo</option>'
-        + '</select></div></div>'
-        + '<div style="padding:1rem 1.5rem;border-top:1px solid #f3f4f6;display:flex;justify-content:flex-end;gap:0.75rem;background:rgba(249,250,251,0.5);">'
-        + '<button type="button" onclick="document.getElementById(\u0027justus-new-modal\u0027).remove()" style="padding:0.5rem 1rem;font-size:0.875rem;color:#6b7280;background:none;border:none;cursor:pointer;">Cancelar</button>'
-        + '<button type="button" onclick="submitNewAnalysis()" id="jm-submit-btn" style="padding:0.5rem 1.25rem;border-radius:0.75rem;color:white;font-size:0.875rem;font-weight:600;border:none;cursor:pointer;background:linear-gradient(135deg,#1B334A,#385776);">Criar</button>'
-        + '</div></div>';
+    var html = '<div style="background:white;border-radius:1rem;box-shadow:0 25px 50px rgba(0,0,0,0.25);width:100%;max-width:28rem;margin:1rem;overflow:hidden;" onclick="event.stopPropagation()">';
+    html += '<div style="padding:1rem 1.5rem;border-bottom:1px solid #f3f4f6;background:linear-gradient(135deg,#1B334A,#385776);">';
+    html += '<h3 style="font-size:1rem;font-weight:700;color:white;margin:0;">Nova An\u00e1lise</h3>';
+    html += '<p style="font-size:0.7rem;color:rgba(255,255,255,0.6);margin:0.25rem 0 0;">Selecione o modo e tipo de an\u00e1lise</p>';
+    html += '</div>';
+    html += '<div style="padding:1.5rem;">';
 
+    // Modo
+    html += '<div style="margin-bottom:1.25rem;">';
+    html += '<label style="display:block;font-size:0.65rem;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">Modo de Opera\u00e7\u00e3o</label>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;" id="jm-mode-grid">';
+    html += '<button type="button" onclick="selectJmMode(this,\u0027consultor\u0027)" class="jm-mode-btn jm-mode-active" data-mode="consultor" style="padding:0.75rem;border-radius:0.75rem;text-align:left;border:2px solid #3b82f6;background:#eff6ff;cursor:pointer;"><div style="font-size:0.875rem;font-weight:700;color:#1d4ed8;">Consultor</div><div style="font-size:0.625rem;margin-top:0.25rem;color:#3b82f6;">An\u00e1lise de casos, pareceres</div></button>';
+    html += '<button type="button" onclick="selectJmMode(this,\u0027assessor\u0027)" class="jm-mode-btn" data-mode="assessor" style="padding:0.75rem;border-radius:0.75rem;text-align:left;border:2px solid #e5e7eb;background:#f9fafb;cursor:pointer;"><div style="font-size:0.875rem;font-weight:700;color:#374151;">Assessor</div><div style="font-size:0.625rem;margin-top:0.25rem;color:#9ca3af;">Pe\u00e7as, c\u00e1lculos, execu\u00e7\u00e3o</div></button>';
+    html += '</div></div>';
+
+    // Tipo
+    html += '<div style="margin-bottom:1.25rem;">';
+    html += '<label style="display:block;font-size:0.65rem;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">Tipo de An\u00e1lise</label>';
+    html += '<select id="jm-type-select" style="width:100%;border:1px solid #e5e7eb;border-radius:0.75rem;padding:0.625rem 0.75rem;font-size:0.875rem;outline:none;">';
+    html += '<option value="analise_estrategica">An\u00e1lise Estrat\u00e9gica</option>';
+    html += '<option value="analise_completa">An\u00e1lise Completa</option>';
+    html += '<option value="peca">Projeto de Pe\u00e7a</option>';
+    html += '</select></div>';
+
+    // Prompt programado
+    html += '<div style="margin-bottom:1.25rem;">';
+    html += '<label style="display:block;font-size:0.65rem;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">Prompt Programado (opcional)</label>';
+    html += '<select id="jm-prompt-select" onchange="applyPromptTemplate()" style="width:100%;border:1px solid #e5e7eb;border-radius:0.75rem;padding:0.625rem 0.75rem;font-size:0.875rem;outline:none;">';
+    html += '<option value="">\u2014 Escrever prompt livre \u2014</option>';
+    html += '</select></div>';
+
+    // Mensagem inicial
+    html += '<div style="margin-bottom:0.5rem;">';
+    html += '<label style="display:block;font-size:0.65rem;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">Mensagem Inicial</label>';
+    html += '<textarea id="jm-initial-msg" rows="4" placeholder="Descreva o que deseja analisar..." style="width:100%;border:1px solid #e5e7eb;border-radius:0.75rem;padding:0.625rem 0.75rem;font-size:0.875rem;outline:none;resize:vertical;"></textarea>';
+    html += '</div>';
+
+    html += '</div>';
+
+    // Botoes
+    html += '<div style="padding:1rem 1.5rem;border-top:1px solid #f3f4f6;display:flex;justify-content:flex-end;gap:0.75rem;background:rgba(249,250,251,0.5);">';
+    html += '<button type="button" onclick="document.getElementById(\u0027justus-new-modal\u0027).remove()" style="padding:0.5rem 1rem;font-size:0.875rem;color:#6b7280;background:none;border:none;cursor:pointer;">Cancelar</button>';
+    html += '<button type="button" onclick="submitNewAnalysis()" id="jm-submit-btn" style="padding:0.5rem 1.25rem;border-radius:0.75rem;color:white;font-size:0.875rem;font-weight:600;border:none;cursor:pointer;background:linear-gradient(135deg,#1B334A,#385776);">Criar</button>';
+    html += '</div></div>';
+
+    overlay.innerHTML = html;
     document.body.appendChild(overlay);
+    loadPromptTemplates();
     document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape') { var m = document.getElementById('justus-new-modal'); if (m) m.remove(); document.removeEventListener('keydown', esc); }});
 }
 
@@ -975,7 +988,7 @@ function selectJmMode(btn, mode) {
     });
 }
 
-async var jmPromptTemplates = [];
+var jmPromptTemplates = [];
 
     function loadPromptTemplates() {
         fetch('/justus/prompt-templates')
@@ -1023,14 +1036,9 @@ async var jmPromptTemplates = [];
         }
     }
 
-    // Carregar prompts ao abrir modal
-    var origOpenModal = window.openNewAnalysisModal;
-    window.openNewAnalysisModal = function() {
-        origOpenModal();
-        loadPromptTemplates();
-    };
+    // Carregar prompts ao abrir modal automaticamente
 
-    function submitNewAnalysis() {
+    async function submitNewAnalysis() {
     var btn = document.getElementById('jm-submit-btn');
     btn.textContent = 'Criando...';
     btn.disabled = true;

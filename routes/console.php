@@ -232,7 +232,7 @@ Schedule::command('evidentia:chunk --limit=5000')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/cron-evidentia-chunk.log'));
 
-Schedule::command('evidentia:embed --sync --limit=2000')
+Schedule::command('evidentia:embed --sync --limit=10000')
     ->dailyAt('04:00')
     ->timezone('America/Sao_Paulo')
     ->withoutOverlapping()

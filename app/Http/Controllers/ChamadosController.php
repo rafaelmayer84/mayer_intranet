@@ -106,6 +106,7 @@ class ChamadosController extends Controller
             'cost_center'          => $request->cost_center,
             'estimated_value'      => $request->estimated_value,
             'impact'               => $request->impact,
+            'attachments'          => !empty($attachmentPaths) ? $attachmentPaths : null,
         ]);
 
         // Auto-aprovação se admin/sócio
