@@ -532,6 +532,8 @@ class JustusController extends Controller
                     'orgao_julgador' => $r->orgao_julgador ?? '',
                     'data_decisao' => $data,
                     'ementa_resumida' => $ementa,
+                    'ementa_completa' => $r->ementa ?? '',
+                    'numero_processo' => $r->numero_processo ?? '',
                 ];
             })->values()->toArray();
 

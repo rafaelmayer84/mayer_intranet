@@ -437,7 +437,8 @@ PROMPT;
 
         try {
             $response = \Illuminate\Support\Facades\Http::withToken($apiKey)
-                ->timeout(30)
+                ->timeout(60)
+                ->retry(2, 5000)
                 ->post('https://api.openai.com/v1/chat/completions', [
                     'model' => config('justus.model_economico', 'gpt-5-mini'),
                     'messages' => [

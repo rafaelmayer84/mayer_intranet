@@ -544,7 +544,7 @@
                                     <span class="text-[9px] px-1.5 py-0.5 rounded font-bold text-white" :style="'background:' + (juris.tribunal === 'STJ' ? '#1e40af' : juris.tribunal === 'TJSC' ? '#15803d' : juris.tribunal === 'TRF4' ? '#9333ea' : '#b45309')" x-text="juris.tribunal"></span>
                                     <span class="text-[10px] font-semibold" style="color:#1B334A;" x-text="juris.sigla_classe + ' ' + juris.numero_registro"></span>
                                 </div>
-                                <p class="text-[10px] text-gray-500 leading-relaxed line-clamp-3" x-text="juris.ementa_resumida"></p>
+                                <p class="text-[10px] text-gray-500 leading-relaxed line-clamp-3 cursor-pointer hover:text-gray-700" x-text="juris.ementa_resumida" @click="showJurisDetail(juris)" title="Clique para ver ementa completa"></p>
                                 <div class="flex items-center gap-2 mt-1.5 text-[9px] text-gray-400">
                                     <span x-text="juris.relator ? 'Rel. ' + juris.relator : ''"></span>
                                     <span x-text="juris.data_decisao || ''"></span>
@@ -834,6 +834,28 @@ function insightsPanel() {
             @endif
         },
 
+        showJurisDetail(juris) {
+            var t = (juris.tribunal||'').toUpperCase();
+            var rl = (t==='STJ'||t==='STF'||t==='TST')?'Rel. Min.':(t.startsWith('TRF')?'Rel. Des. Federal':'Rel. Des.');
+            var hdr = (juris.sigla_classe||'')+' '+(juris.numero_processo||juris.numero_registro||'');
+            var meta = rl+' '+(juris.relator||'')+' | '+(juris.orgao_julgador||'')+' | j. '+(juris.data_decisao||'');
+            var ov = document.createElement('div');
+            ov.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);';
+            ov.onclick = function(e){ if(e.target===ov) ov.remove(); };
+            ov.innerHTML = '<div style="background:white;border-radius:1rem;box-shadow:0 25px 50px rgba(0,0,0,0.3);width:90%;max-width:700px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;" onclick="event.stopPropagation()">'
+                +'<div style="padding:1rem 1.5rem;border-bottom:1px solid #e5e7eb;background:linear-gradient(135deg,#1B334A,#385776);flex-shrink:0;">'
+                +'<div style="display:flex;justify-content:space-between;align-items:start;">'
+                +'<div><h3 style="font-size:0.95rem;font-weight:700;color:white;margin:0;">'+hdr+'</h3>'
+                +'<p style="font-size:0.7rem;color:rgba(255,255,255,0.7);margin:0.25rem 0 0;">'+meta+'</p></div>'
+                +'<button onclick="this.closest([].find.call(document.querySelectorAll(\x27[style*=fixed]\x27),function(x){return x.style.zIndex==99999})).remove()" style="color:rgba(255,255,255,0.6);background:none;border:none;font-size:1.5rem;cursor:pointer;line-height:1;">&times;</button>'
+                +'</div></div>'
+                +'<div style="padding:1.5rem;overflow-y:auto;flex:1;">'
+                +'<p style="font-size:0.8rem;font-weight:600;color:#374151;margin:0 0 0.5rem;">EMENTA</p>'
+                +'<p style="font-size:0.8rem;color:#4b5563;line-height:1.6;white-space:pre-wrap;">'+(juris.ementa_completa||juris.ementa_resumida||'')+'</p>'
+                +'</div></div>';
+            document.body.appendChild(ov);
+            document.addEventListener('keydown',function esc(e){if(e.key==='Escape'){ov.remove();document.removeEventListener('keydown',esc);}});
+        },
         async loadJurisprudencia() {
             if (this.jurisLoaded || this.jurisLoading) return;
             this.jurisLoading = true;
