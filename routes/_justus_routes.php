@@ -24,6 +24,9 @@ Route::middleware(['auth','modulo:operacional.justus'])->prefix('justus')->name(
     Route::get('/admin/config', [JustusController::class, 'adminConfig'])->name('admin.config');
     Route::put('/admin/guides/{guide}', [JustusController::class, 'adminUpdateGuide'])->name('admin.guides.update');
     Route::get('/prompt-templates', [JustusController::class, 'promptTemplates'])->name('prompt.templates');
+    Route::get('/admin/audit', [JustusController::class, 'adminAudit'])->name('admin.audit');
+    Route::get('/admin/audit/{conversation}', [JustusController::class, 'adminAuditConversation'])->name('admin.audit.conversation');
+    Route::put('/admin/templates/{template}', [JustusController::class, 'adminUpdateTemplate'])->name('admin.template.update');
     Route::get('/admin/feedback', [JustusController::class, 'adminFeedbackReport'])->name('admin.feedback');
 
 });

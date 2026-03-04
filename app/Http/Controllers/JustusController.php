@@ -544,6 +544,83 @@ class JustusController extends Controller
         }
     }
 
+    public function adminAudit(Request $request)
+    {
+        $this->authorizeAdmin();
+
+        $conversations = JustusConversation::with(['user:id,name', 'processProfile'])
+            ->withCount('messages')
+            ->orderByDesc('updated_at')
+            ->limit(50)
+            ->get();
+
+        $templates = \App\Models\JustusPromptTemplate::where('is_active', true)
+            ->orderBy('category')->orderBy('sort_order')->get();
+
+        $feedbackStats = [
+            'total' => JustusMessage::where('role', 'assistant')->whereNotNull('feedback')->count(),
+            'positive' => JustusMessage::where('role', 'assistant')->where('feedback', 'positive')->count(),
+            'negative' => JustusMessage::where('role', 'assistant')->where('feedback', 'negative')->count(),
+        ];
+
+        return view('justus.admin-audit', compact('conversations', 'templates', 'feedbackStats'));
+    }
+
+    public function adminAuditConversation(int $conversationId)
+    {
+        $this->authorizeAdmin();
+
+        $conversation = JustusConversation::with(['user:id,name', 'processProfile', 'attachments'])
+            ->findOrFail($conversationId);
+
+        $messages = $conversation->messages()
+            ->orderBy('id')
+            ->get()
+            ->map(function ($m) {
+                $meta = json_decode($m->metadata ?? '{}', true);
+                return [
+                    'id' => $m->id,
+                    'role' => $m->role,
+                    'content' => $m->content,
+                    'model_used' => $m->model_used,
+                    'input_tokens' => $m->input_tokens,
+                    'output_tokens' => $m->output_tokens,
+                    'cost_brl' => $m->cost_brl,
+                    'feedback' => $m->feedback,
+                    'feedback_note' => $m->feedback_note,
+                    'chunk_ids' => $meta['chunk_ids'] ?? [],
+                    'rag_chunks_count' => $meta['rag_chunks_count'] ?? null,
+                    'juris_injected' => $meta['juris_injected'] ?? false,
+                    'profile_fields' => $meta['profile_fields'] ?? [],
+                    'system_prompt_length' => $meta['system_prompt_length'] ?? null,
+                    'debug_prompt' => $meta['debug_prompt'] ?? null,
+                    'created_at' => $m->created_at->format('d/m H:i'),
+                ];
+            });
+
+        return response()->json([
+            'conversation' => $conversation,
+            'messages' => $messages,
+            'profile' => $conversation->processProfile,
+        ]);
+    }
+
+    public function adminUpdateTemplate(Request $request, int $templateId)
+    {
+        $this->authorizeAdmin();
+
+        $request->validate([
+            'label' => 'required|string|max:100',
+            'prompt_text' => 'required|string',
+            'is_active' => 'boolean',
+        ]);
+
+        $template = \App\Models\JustusPromptTemplate::findOrFail($templateId);
+        $template->update($request->only(['label', 'description', 'prompt_text', 'mode', 'type', 'category', 'is_active']));
+
+        return response()->json(['success' => true]);
+    }
+
     private function authorizeAdmin(): void
     {
         if (!in_array(auth()->user()->role, ['admin'])) {
