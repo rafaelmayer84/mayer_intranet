@@ -455,38 +455,26 @@ class CrmServiceRequestController extends Controller
 <table width='100%' cellpadding='0' cellspacing='0' style='background:#f3f4f6;padding:32px 16px;'>
   <tr><td align='center'>
     <table width='600' cellpadding='0' cellspacing='0' style='max-width:600px;width:100%;'>
-
-      {{-- Cabeçalho --}}
-      <tr><td style='background:{$cor};border-radius:12px 12px 0 0;padding:28px 32px;'>
+<tr><td style='background:{$cor};border-radius:12px 12px 0 0;padding:28px 32px;'>
         <p style='margin:0 0 4px;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.65);'>SIATE · Mayer Advogados</p>
         <h1 style='margin:0;font-size:22px;font-weight:700;color:#ffffff;line-height:1.3;'>{$titulo}</h1>
         <p style='margin:8px 0 0;font-size:13px;color:rgba(255,255,255,.8);'>{$subtitulo}</p>
       </td></tr>
-
-      {{-- Corpo --}}
-      <tr><td style='background:#ffffff;padding:28px 32px;'>
+<tr><td style='background:#ffffff;padding:28px 32px;'>
         <p style='margin:0 0 20px;font-size:14px;color:#374151;'>Olá, <strong>" . e($destinatario) . "</strong>.</p>
-
-        {{-- Badge protocolo --}}
-        <div style='margin-bottom:20px;'>
+<div style='margin-bottom:20px;'>
           <span style='display:inline-block;background:" . $cor . "18;color:{$cor};font-size:12px;font-weight:700;letter-spacing:.08em;padding:4px 12px;border-radius:6px;border:1px solid " . $cor . "33;'>{$protocolo}</span>
         </div>
-
-        {{-- Tabela de campos --}}
-        <table width='100%' cellpadding='0' cellspacing='0' style='border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:8px;'>
+<table width='100%' cellpadding='0' cellspacing='0' style='border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:8px;'>
           {$linhas}
         </table>
 
         {$descricaoHtml}
-
-        {{-- CTA --}}
-        <div style='margin-top:28px;text-align:center;'>
+<div style='margin-top:28px;text-align:center;'>
           <a href='{$link}' style='display:inline-block;background:{$cor};color:#ffffff;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px;text-decoration:none;letter-spacing:.02em;'>{$labelLink} →</a>
         </div>
       </td></tr>
-
-      {{-- Rodapé --}}
-      <tr><td style='background:#f9fafb;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:16px 32px;text-align:center;'>
+<tr><td style='background:#f9fafb;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:16px 32px;text-align:center;'>
         <p style='margin:0;font-size:11px;color:#9ca3af;'>Este e-mail foi gerado automaticamente pelo <strong>RESULTADOS! Intranet</strong> · Mayer Albanez Sociedade de Advogados</p>
         <p style='margin:4px 0 0;font-size:11px;color:#9ca3af;'>Não responda este e-mail. Acesse o sistema para interagir com o chamado.</p>
       </td></tr>
