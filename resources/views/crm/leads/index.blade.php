@@ -220,6 +220,10 @@
 <script>
 const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
 function promoverLead(leadId) {
+    const btn = event.currentTarget;
+    btn.disabled = true;
+    btn.textContent = '...';
+    btn.classList.add('opacity-50', 'cursor-not-allowed');
     if (!confirm('Promover este lead para o pipeline CRM?')) return;
     fetch('/nexo/atendimento/leads/' + leadId + '/promover-crm', {
         method: 'POST',
@@ -229,7 +233,7 @@ function promoverLead(leadId) {
     .then(r => r.json())
     .then(d => {
         if (d.ok) { alert('Lead promovido! Account #' + d.account_id); location.reload(); }
-        else { alert(d.error || 'Erro ao promover.'); }
+        else { alert(d.error || 'Erro ao promover.'); btn.disabled = false; btn.textContent = 'CRM'; btn.classList.remove('opacity-50','cursor-not-allowed'); }
     })
     .catch(e => alert('Erro: ' + e.message));
 }

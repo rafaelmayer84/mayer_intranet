@@ -791,7 +791,8 @@ class NexoAtendimentoController extends Controller
      */
     public function promoverLeadCrm(Request $request, int $leadId)
     {
-        $lead = \App\Models\Lead::findOrFail($leadId);
+        // Lock de linha para evitar promoção duplicada concorrente
+        $lead = \App\Models\Lead::lockForUpdate()->findOrFail($leadId);
 
         if ($lead->crm_account_id) {
             return response()->json(['success' => false, 'error' => 'Lead ja promovido ao CRM'], 422);
