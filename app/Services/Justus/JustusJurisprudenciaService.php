@@ -6,6 +6,7 @@ use App\Models\JustusJurisprudencia;
 use App\Models\JustusConversation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use App\Services\Evidentia\EvidentiaSearchService;
 
 class JustusJurisprudenciaService
 {
@@ -17,9 +18,11 @@ class JustusJurisprudenciaService
     {
         $maxResults = config('justus.stj_max_results_prompt', 5);
 
-        // Construir query combinada: mensagem do usuário + contexto do processo
+        // Construir query combinada
         $searchQuery = $userMessage;
         $profile = $conversation->processProfile;
+        $filters = [];
+
         if ($profile) {
             if ($profile->tese_principal) {
                 $searchQuery .= ' ' . $profile->tese_principal;
@@ -27,34 +30,69 @@ class JustusJurisprudenciaService
             if ($profile->objetivo_analise) {
                 $searchQuery .= ' ' . $profile->objetivo_analise;
             }
+            // Inferir area do direito para filtro
+            if ($profile->orgao) {
+                $orgaoLower = mb_strtolower($profile->orgao);
+                if (str_contains($orgaoLower, 'trt') || str_contains($orgaoLower, 'trabalh')) {
+                    $filters['area_direito'] = 'trabalhista';
+                } elseif (str_contains($orgaoLower, 'criminal') || str_contains($orgaoLower, 'penal')) {
+                    $filters['area_direito'] = 'penal';
+                } else {
+                    $filters['area_direito'] = 'civil';
+                }
+            }
         }
 
-        // Se profile nao tem dados essenciais E mensagem eh instrucao generica, nao buscar
-        $hasProfileContext = $profile && ($profile->classe || $profile->tese_principal || $profile->objetivo_analise);
-        
-        // Inferir area do direito se possivel
-        $area = null;
-        if ($profile && $profile->orgao) {
-            $area = JustusJurisprudencia::inferAreaDireito($profile->orgao);
-        }
+        // Usar Evidentia para busca inteligente
+        try {
+            $evidentia = app(EvidentiaSearchService::class);
+            $search = $evidentia->search($searchQuery, $filters, $maxResults, $conversation->user_id);
 
-        $results = JustusJurisprudencia::searchRelevant($searchQuery, $maxResults, $area);
+            if (!$search->results || $search->results->isEmpty()) {
+                return ['found' => false, 'count' => 0, 'context' => '', 'references' => []];
+            }
 
-        if ($results->isEmpty()) {
+            // Converter resultados do Evidentia para o formato do JUSTUS
+            $evResults = $search->results()->orderBy('final_rank')->get();
+            $formatted = [];
+            foreach ($evResults as $er) {
+                // Buscar dados completos do acórdão
+                $dbConfig = config('evidentia.tribunal_databases.' . $er->tribunal);
+                if (!$dbConfig) continue;
+                $juris = \DB::connection($dbConfig['connection'])
+                    ->table($dbConfig['table'])
+                    ->where('id', $er->jurisprudence_id)
+                    ->first();
+                if (!$juris) continue;
+                $formatted[] = $juris;
+            }
+
+            if (empty($formatted)) {
+                return ['found' => false, 'count' => 0, 'context' => '', 'references' => []];
+            }
+
             return [
-                'found' => false,
-                'count' => 0,
-                'context' => '',
-                'references' => [],
+                'found' => true,
+                'count' => count($formatted),
+                'context' => $this->buildPromptContext(collect($formatted)),
+                'references' => collect($formatted)->map(fn($r) => self::formatShortRef($r))->toArray(),
+            ];
+        } catch (\Exception $e) {
+            Log::warning('JUSTUS: Evidentia search failed, fallback to legacy', ['error' => $e->getMessage()]);
+
+            // Fallback: busca legacy
+            $area = $filters['area_direito'] ?? null;
+            $results = JustusJurisprudencia::searchRelevant($searchQuery, $maxResults, $area);
+            if ($results->isEmpty()) {
+                return ['found' => false, 'count' => 0, 'context' => '', 'references' => []];
+            }
+            return [
+                'found' => true,
+                'count' => $results->count(),
+                'context' => $this->buildPromptContext($results),
+                'references' => $results->map(fn($r) => self::formatShortRef($r))->toArray(),
             ];
         }
-
-        return [
-            'found' => true,
-            'count' => $results->count(),
-            'context' => $this->buildPromptContext($results),
-            'references' => $results->map(fn($r) => self::formatShortRef($r))->toArray(),
-        ];
     }
 
     /**

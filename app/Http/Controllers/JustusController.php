@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\JustusConversation;
 use App\Models\JustusAttachment;
 use App\Models\JustusPromptTemplate;
+use App\Services\Evidentia\EvidentiaSearchService;
 use App\Models\JustusMessage;
 use App\Models\JustusProcessProfile;
 use App\Models\JustusApproval;
@@ -497,7 +498,21 @@ class JustusController extends Controller
         $query = implode(' ', $searchTerms);
 
         try {
-            $results = \App\Models\JustusJurisprudencia::searchRelevant($query, 5, $area);
+            // Usar Evidentia para busca inteligente
+            $filters = [];
+            if ($area) $filters['area_direito'] = $area;
+            $evidentia = app(EvidentiaSearchService::class);
+            $evSearch = $evidentia->search($query, $filters, 5, $user->id);
+            $evResults = $evSearch->results ? $evSearch->results()->orderBy('final_rank')->get() : collect();
+
+            // Converter para formato do painel
+            $results = collect();
+            foreach ($evResults as $er) {
+                $dbConfig = config('evidentia.tribunal_databases.' . $er->tribunal);
+                if (!$dbConfig) continue;
+                $juris = \DB::connection($dbConfig['connection'])->table($dbConfig['table'])->where('id', $er->jurisprudence_id)->first();
+                if ($juris) $results->push($juris);
+            }
 
             $formatted = $results->map(function ($r) {
                 $ementa = $r->ementa ?? '';
