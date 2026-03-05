@@ -68,3 +68,10 @@ Route::prefix('nexo/autoatendimento')->group(function () {
 });
 // --- NEXO QA: Webhook de Respostas de Pesquisa ---
 Route::post('/webhooks/sendpulse/nexo-qa', [\App\Http\Controllers\Api\NexoQaWebhookController::class, 'handle'])->name('webhooks.sendpulse.nexo-qa');
+
+// NEXO: servir media para SendPulse (sem auth - URL publica)
+Route::get('/nexo/media/{filename}', function (string $filename) {
+    $path = storage_path('app/public/nexo/media/' . $filename);
+    if (!file_exists($path)) abort(404);
+    return response()->file($path);
+})->where('filename', '[a-zA-Z0-9._-]+');

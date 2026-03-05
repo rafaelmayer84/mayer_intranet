@@ -555,7 +555,7 @@ class NexoAtendimentoController extends Controller
         // Salvar arquivo
         $filename = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '', $file->getClientOriginalName());
         $path = $file->storeAs('public/nexo/media', $filename);
-        $publicUrl = url('storage/nexo/media/' . $filename);
+        $publicUrl = url('api/nexo/media/' . $filename);
 
         try {
             $spService = app(\App\Services\SendPulseWhatsAppService::class);
