@@ -16,6 +16,10 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
+
+// ── Painel Gerencial CRM ──
+Route::get('/crm/painel', [\App\Http\Controllers\CrmPainelController::class, 'index'])->name('crm.painel');
+
 Route::middleware(['auth','modulo:operacional.crm,visualizar'])->prefix('crm')->name('crm.')->group(function () {
 
     // Dashboard (home CRM)

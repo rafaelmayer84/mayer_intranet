@@ -475,6 +475,7 @@
                             <svg class="w-3 h-3 transition-transform" :class="crmOpen ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                         </button>
                         <div x-show="crmOpen" x-transition class="ml-4 mt-1 space-y-0.5">
+                            <li><a href="{{ url('/crm/painel') }}" class="nav-link {{ request()->is('crm/painel*') ? 'active' : '' }}"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg> Painel</a></li>
                             <a href="{{ route('crm.dashboard') }}" class="block px-3 py-1 text-xs rounded-lg hover:bg-gray-100 {{ request()->routeIs('crm.dashboard') ? 'text-[#385776] font-medium' : 'text-gray-400' }}">Meu CRM</a>
                             <a href="{{ route('crm.leads') }}" class="block px-3 py-1 text-xs rounded-lg hover:bg-gray-100 {{ request()->routeIs('crm.leads') ? 'text-[#385776] font-medium' : 'text-gray-400' }}">Leads</a>
                             <a href="{{ route('crm.pipeline') }}" class="block px-3 py-1 text-xs rounded-lg hover:bg-gray-100 {{ request()->routeIs('crm.pipeline') ? 'text-[#385776] font-medium' : 'text-gray-400' }}">Oportunidades</a>
