@@ -43,7 +43,17 @@ const NexoApp = {
     priorityLevels:['normal','alta','urgente','critica'],
     csrf:document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')||'',
 
-    init(){this.loadConversas();this.inboxTimer=setInterval(()=>this.loadConversas(true),8000)},
+    init(){
+        this.loadConversas();
+        this.inboxTimer=setInterval(()=>this.loadConversas(true),8000);
+        // v2.7: abrir conversa ou nova conversa via query params (CRM integration)
+        const urlP=new URLSearchParams(window.location.search);
+        const qConv=urlP.get('conversation');
+        const qPhone=urlP.get('phone');
+        if(qConv){setTimeout(()=>this.selectConversa(parseInt(qConv)),600)}
+        else if(qPhone){setTimeout(()=>{abrirNovaConversaModal(qPhone,urlP.get('name')||'')},600)}
+        if(qConv||qPhone){window.history.replaceState({},'',window.location.pathname)}
+    },
 
     async api(url,opts={}){
         const o={headers:{'Accept':'application/json',...(opts.headers||{})},...opts};

@@ -473,10 +473,10 @@ function enviarTemplateSelecionado() {
 let ncTemplates = [];
 let ncTplSelecionado = null;
 
-function abrirNovaConversaModal() {
+function abrirNovaConversaModal(prefillPhone, prefillName) {
     ncTplSelecionado = null;
-    document.getElementById('ncTelefone').value = '';
-    document.getElementById('ncNomeContato').value = '';
+    document.getElementById('ncTelefone').value = prefillPhone || '';
+    document.getElementById('ncNomeContato').value = prefillName || '';
     document.getElementById('ncBtnEnviar').disabled = true;
     document.getElementById('ncTemplateList').innerHTML = '';
     document.getElementById('ncTemplateLoading').style.display = 'block';
