@@ -301,6 +301,28 @@ const NexoApp = {
         if(!confirm('Devolver esta conversa ao bot automatico?'))return;
         try{await this.api('/nexo/atendimento/conversas/'+this.conversaAtual.id+'/devolver-bot',{method:'POST'});this.conversaAtual.bot_ativo=true;this.toggleBotUI(true);this.loadConversas(true)}catch(e){alert('Erro: '+e.message)}
     },
+    openFileDialog(){document.getElementById('nexo-file-input').click()},
+    async handleFileSelect(input){
+        if(!input.files||!input.files[0]||!this.conversaAtual)return;
+        const file=input.files[0];
+        if(file.size>16*1024*1024){alert('Arquivo muito grande (max 16MB)');input.value='';return}
+        const caption=prompt('Legenda (opcional):','');
+        const c=document.getElementById('chat-messages');
+        const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+        c.insertAdjacentHTML('beforeend',`<div class="flex justify-end mb-1 nexo-ghost-msg"><div class="msg-bubble-out px-3 py-2 max-w-[75%] opacity-70"><p class="text-[13px]">\u{1F4CE} ${file.name}</p><p class="text-[10px] text-[#667781] text-right mt-0.5">\u23F3 ${now}</p></div></div>`);
+        c.scrollTop=c.scrollHeight;
+        const fd=new FormData();fd.append('file',file);if(caption)fd.append('caption',caption);
+        try{
+            const r=await fetch(`/nexo/atendimento/conversas/${this.conversaAtual.id}/media`,{method:'POST',headers:{'X-CSRF-TOKEN':this.csrf,'Accept':'application/json'},body:fd});
+            const j=await r.json();
+            if(!j.success){alert('Erro: '+(j.error||'Falha ao enviar'));return}
+            const sinceId=this.lastMsgId||0;
+            const poll=await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/poll?since_id=${sinceId}`);
+            const msgs=poll.messages||[];
+            if(msgs.length){if(sinceId>0&&poll.incremental){this.appendMessages(msgs)}else{this.renderMessages(msgs)}}
+        }catch(e){console.error('Media error:',e);alert('Erro ao enviar arquivo')}
+        finally{input.value=''}
+    },
     async sendMessage(){
         if(!this.conversaAtual)return;
         const inp=document.getElementById('chat-input'),text=inp.value.trim();if(!text)return;
