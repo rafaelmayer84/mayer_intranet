@@ -301,7 +301,54 @@ const NexoApp = {
         if(!confirm('Devolver esta conversa ao bot automatico?'))return;
         try{await this.api('/nexo/atendimento/conversas/'+this.conversaAtual.id+'/devolver-bot',{method:'POST'});this.conversaAtual.bot_ativo=true;this.toggleBotUI(true);this.loadConversas(true)}catch(e){alert('Erro: '+e.message)}
     },
+    _recorder:null,_recChunks:[],_recStart:null,_recInterval:null,
     openFileDialog(){document.getElementById('nexo-file-input').click()},
+    async toggleRecording(){
+        if(this._recorder&&this._recorder.state==='recording'){
+            this._recorder.stop();return;
+        }
+        if(!this.conversaAtual){alert('Selecione uma conversa');return}
+        try{
+            const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+            this._recChunks=[];
+            this._recorder=new MediaRecorder(stream,{mimeType:'audio/webm;codecs=opus'});
+            this._recorder.ondataavailable=e=>{if(e.data.size>0)this._recChunks.push(e.data)};
+            this._recorder.onstop=async()=>{
+                stream.getTracks().forEach(t=>t.stop());
+                clearInterval(this._recInterval);
+                document.getElementById('nexo-mic-btn').classList.remove('bg-red-500','text-white','animate-pulse');
+                document.getElementById('nexo-mic-btn').classList.add('bg-gray-100','text-gray-500');
+                document.getElementById('nexo-rec-timer').classList.add('hidden');
+                const blob=new Blob(this._recChunks,{type:'audio/webm'});
+                if(blob.size<1000){return}
+                const file=new File([blob],'audio_'+Date.now()+'.webm',{type:'audio/webm'});
+                const c=document.getElementById('chat-messages');
+                const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+                c.insertAdjacentHTML('beforeend',`<div class="flex justify-end mb-1 nexo-ghost-msg"><div class="msg-bubble-out px-3 py-2 max-w-[75%] opacity-70"><p class="text-[13px]">\u{1F3A4} Enviando audio...</p><p class="text-[10px] text-[#667781] text-right mt-0.5">\u23F3 ${now}</p></div></div>`);
+                c.scrollTop=c.scrollHeight;
+                const fd=new FormData();fd.append('file',file);
+                try{
+                    const r=await fetch(`/nexo/atendimento/conversas/${this.conversaAtual.id}/media`,{method:'POST',headers:{'X-CSRF-TOKEN':this.csrf,'Accept':'application/json'},body:fd});
+                    const j=await r.json();
+                    if(!j.success){alert('Erro: '+(j.error||'Falha ao enviar audio'));return}
+                    const sinceId=this.lastMsgId||0;
+                    const poll=await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/poll?since_id=${sinceId}`);
+                    const msgs=poll.messages||[];
+                    if(msgs.length){if(sinceId>0&&poll.incremental){this.appendMessages(msgs)}else{this.renderMessages(msgs)}}
+                }catch(e){console.error('Audio send error:',e);alert('Erro ao enviar audio')}
+            };
+            this._recorder.start(250);
+            this._recStart=Date.now();
+            document.getElementById('nexo-mic-btn').classList.remove('bg-gray-100','text-gray-500');
+            document.getElementById('nexo-mic-btn').classList.add('bg-red-500','text-white','animate-pulse');
+            const timer=document.getElementById('nexo-rec-timer');
+            timer.classList.remove('hidden');
+            this._recInterval=setInterval(()=>{
+                const s=Math.floor((Date.now()-this._recStart)/1000);
+                timer.textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+            },500);
+        }catch(e){alert('Permissao de microfone negada ou nao disponivel')}
+    },
     async handleFileSelect(input){
         if(!input.files||!input.files[0]||!this.conversaAtual)return;
         const file=input.files[0];

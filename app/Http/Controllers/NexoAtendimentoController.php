@@ -548,7 +548,7 @@ class NexoAtendimentoController extends Controller
             'application/pdf' => 'document', 'application/msword' => 'document',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'document',
             'application/vnd.ms-excel' => 'document', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'document',
-            'audio/mpeg' => 'audio', 'audio/ogg' => 'audio', 'audio/wav' => 'audio', 'audio/mp4' => 'audio',
+            'audio/mpeg' => 'audio', 'audio/ogg' => 'audio', 'audio/wav' => 'audio', 'audio/mp4' => 'audio', 'audio/webm' => 'audio', 'video/webm' => 'audio',
         ];
         $waType = $typeMap[$mime] ?? 'document';
 
