@@ -230,6 +230,7 @@
                     class="flex-1 resize-none px-4 py-3 text-[14px] bg-[#f8f9fb] border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#1e3a5f]/15 focus:border-[#1e3a5f]/30 focus:bg-white max-h-32 leading-relaxed transition-all"
                     onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();NexoApp.sendMessage()}"
                     oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,128)+'px'"></textarea>
+                <input type="file" id="nexo-file-input" class="hidden" accept="image/jpeg,image/png,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,audio/mpeg,audio/ogg,audio/wav" onchange="NexoApp.handleFileSelect(this)">
                 <button onclick="NexoApp.openFileDialog()" title="Enviar imagem, documento ou áudio"
                     class="flex-shrink-0 w-11 h-11 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-700 flex items-center justify-center transition-all active:scale-95">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
