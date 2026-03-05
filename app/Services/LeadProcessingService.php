@@ -789,7 +789,7 @@ PROMPT;
 
             Log::info('Dados extraidos', [
                 'contact_id' => $contactId, 'bot_id' => $botId,
-                'nome' => $nome, 'telefone' => $telefoneNorm,
+                'nome' => $nome, 'telefone' => $telefone,
                 'variables' => $variables, 'tags' => $tags
             ]);
 
