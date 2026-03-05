@@ -2,7 +2,9 @@
 
 @section('title', 'Painel CRM')
 
-@push('styles')
+
+
+@section('content')
 <style>
     .painel-header {
         background: linear-gradient(135deg, #1B334A 0%, #385776 50%, #4A7A9B 100%);
@@ -29,8 +31,8 @@
         background: rgba(255,255,255,0.02);
         border-radius: 50%;
     }
-    .painel-header h1 { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
-    .painel-header p { opacity: 0.7; margin: 6px 0 0; font-size: 0.9rem; }
+    .painel-header h1 { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; margin: 0; color: #ffffff; }
+    .painel-header p { opacity: 0.7; margin: 6px 0 0; font-size: 0.9rem; color: #ffffff; }
 
     /* ── Mega Cards ── */
     .mega-card {
@@ -217,10 +219,72 @@
         color: #94A3B8; font-size: 0.9rem;
     }
     .empty-state svg { width: 48px; height: 48px; opacity: 0.3; margin: 0 auto 12px; }
-</style>
-@endpush
 
-@section('content')
+    /* ── AI Insights ── */
+    .ai-digest-card {
+        background: linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #334155 100%);
+        border-radius: 14px;
+        padding: 28px;
+        color: #E2E8F0;
+        position: relative;
+        overflow: hidden;
+    }
+    .ai-digest-card::before {
+        content: '';
+        position: absolute;
+        top: -30px; right: -30px;
+        width: 160px; height: 160px;
+        background: rgba(99,102,241,0.08);
+        border-radius: 50%;
+    }
+    .ai-digest-card .ai-badge {
+        display: inline-flex; align-items: center; gap: 6px;
+        font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.1em; color: #818CF8;
+        margin-bottom: 12px;
+    }
+    .ai-digest-card .ai-title {
+        font-size: 1.15rem; font-weight: 700; color: #F8FAFC;
+        margin-bottom: 14px; line-height: 1.3;
+    }
+    .ai-digest-card .ai-body {
+        font-size: 0.85rem; line-height: 1.7; color: #CBD5E1;
+    }
+    .ai-digest-card .ai-body p { margin-bottom: 10px; }
+    .ai-digest-card .ai-actions {
+        margin-top: 18px; padding-top: 16px;
+        border-top: 1px solid rgba(255,255,255,0.08);
+    }
+    .ai-digest-card .ai-action-item {
+        display: flex; align-items: flex-start; gap: 8px;
+        font-size: 0.82rem; color: #A5B4FC;
+        margin-bottom: 8px;
+    }
+    .ai-digest-card .ai-action-item::before {
+        content: '→'; color: #6366F1; font-weight: 700; flex-shrink: 0;
+    }
+    .ai-digest-card .ai-meta {
+        margin-top: 16px; font-size: 0.7rem; color: #64748B;
+    }
+    .ai-empty {
+        text-align: center; padding: 40px;
+        background: #F8FAFC; border-radius: 14px;
+        border: 2px dashed #E2E8F0;
+    }
+    .ai-empty-icon { font-size: 2rem; margin-bottom: 10px; }
+    .ai-empty p { color: #94A3B8; font-size: 0.85rem; margin: 0; }
+    .btn-generate-digest {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 10px 20px; border-radius: 10px;
+        background: linear-gradient(135deg, #4F46E5, #6366F1);
+        color: white; font-size: 0.82rem; font-weight: 600;
+        border: none; cursor: pointer; margin-top: 14px;
+        transition: opacity 0.2s;
+    }
+    .btn-generate-digest:hover { opacity: 0.9; }
+    .btn-generate-digest:disabled { opacity: 0.5; cursor: not-allowed; }
+
+</style>
 <div style="max-width: 1280px; margin: 0 auto; padding: 24px;">
 
     {{-- ══════ HEADER ══════ --}}
@@ -490,4 +554,88 @@
     </div>
 
 </div>
+
+    {{-- ══════ SEÇÃO 5 — INTELIGÊNCIA ARTIFICIAL ══════ --}}
+    <div class="mega-card" style="margin-bottom: 28px;">
+        <div class="section-title">
+            <span class="section-icon" style="background: linear-gradient(135deg, #4F46E5, #6366F1);">🤖</span>
+            Inteligência Artificial CRM
+            <span class="section-count">gpt-5-mini</span>
+        </div>
+
+        @if(isset($aiDigest) && $aiDigest)
+            <div class="ai-digest-card">
+                <div class="ai-badge">✦ Weekly Digest — Prioridade {{ $aiDigest->priority }}</div>
+                <div class="ai-title">{{ $aiDigest->titulo }}</div>
+                <div class="ai-body">
+                    @foreach(explode("\n", $aiDigest->insight_text) as $paragrafo)
+                        @if(trim($paragrafo))
+                            <p>{{ trim($paragrafo) }}</p>
+                        @endif
+                    @endforeach
+                </div>
+
+                @if($aiDigest->action_suggested)
+                    <div class="ai-actions">
+                        @foreach(explode("\n", $aiDigest->action_suggested) as $action)
+                            @if(trim($action))
+                                <div class="ai-action-item">{{ trim($action) }}</div>
+                            @endif
+                        @endforeach
+                    </div>
+                @endif
+
+                <div class="ai-meta">
+                    Gerado em {{ $aiDigest->created_at->timezone('America/Sao_Paulo')->format('d/m/Y H:i') }}
+                </div>
+            </div>
+
+            <div style="margin-top: 14px; text-align: right;">
+                <button class="btn-generate-digest" onclick="gerarDigest()" id="btn-digest">
+                    ↻ Gerar Novo Digest
+                </button>
+            </div>
+        @else
+            <div class="ai-empty">
+                <div class="ai-empty-icon">🤖</div>
+                <p>Nenhum digest gerado ainda.</p>
+                <button class="btn-generate-digest" onclick="gerarDigest()" id="btn-digest">
+                    ✦ Gerar Primeiro Digest Semanal
+                </button>
+            </div>
+        @endif
+    </div>
+
+    <script>
+    function gerarDigest() {
+        const btn = document.getElementById('btn-digest');
+        btn.disabled = true;
+        btn.textContent = '⏳ Gerando com IA...';
+
+        fetch('{{ url("/crm/painel/generate-digest") }}', {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                'Accept': 'application/json'
+            }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert('Erro: ' + (data.error || 'Falha ao gerar digest'));
+                btn.disabled = false;
+                btn.textContent = '↻ Tentar novamente';
+            }
+        })
+        .catch(err => {
+            alert('Erro de conexão: ' + err.message);
+            btn.disabled = false;
+            btn.textContent = '↻ Tentar novamente';
+        });
+    }
+    </script>
+
+
 @endsection

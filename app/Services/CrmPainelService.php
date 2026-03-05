@@ -268,14 +268,14 @@ class CrmPainelService
                 $q->where('contas_receber.is_stale', false)
                   ->orWhereNull('contas_receber.is_stale');
             })
-            ->whereNotNull('contas_receber.dataVencimento')
-            ->whereDate('contas_receber.dataVencimento', '<', Carbon::today())
+            ->whereNotNull('contas_receber.data_vencimento')
+            ->whereDate('contas_receber.data_vencimento', '<', Carbon::today())
             ->select(
                 'clientes.nome as cliente_nome',
                 'clientes.datajuri_id',
                 DB::raw('COUNT(*) as titulos_vencidos'),
                 DB::raw('SUM(contas_receber.valor) as total_vencido'),
-                DB::raw('MIN(contas_receber.dataVencimento) as vencimento_mais_antigo')
+                DB::raw('MIN(contas_receber.data_vencimento) as vencimento_mais_antigo')
             )
             ->groupBy('clientes.nome', 'clientes.datajuri_id')
             ->orderByDesc(DB::raw('SUM(contas_receber.valor)'))
@@ -296,11 +296,8 @@ class CrmPainelService
 
         // 4d) Leads quentes sem ação
         $leadsQuentes = DB::table('leads')
-            ->where('classificacao_potencial', 'alto')
-            ->where(function ($q) {
-                $q->where('status', 'novo')
-                  ->orWhere('status', 'qualificado');
-            })
+            ->where('potencial_honorarios', 'alto')
+            ->where('status', 'novo')
             ->select('id', 'nome', 'area_interesse', 'potencial_honorarios', 'data_entrada', 'status')
             ->orderBy('data_entrada')
             ->limit(10)

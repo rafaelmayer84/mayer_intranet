@@ -467,7 +467,8 @@ class JustusSyncTrf4Command extends Command
                     continue;
                 }
 
-                $existing = JustusJurisprudencia::where('external_id', $record['external_id'])
+                $existing = JustusJurisprudencia::onTribunal('TRF4')
+                    ->where('external_id', $record['external_id'])
                     ->where('tribunal', 'TRF4')
                     ->first();
 
@@ -480,7 +481,9 @@ class JustusSyncTrf4Command extends Command
                     $existing->update($record);
                     $this->updated++;
                 } else {
-                    JustusJurisprudencia::create($record);
+                    $j = new JustusJurisprudencia($record);
+                    $j->setConnection('justus_falcao');
+                    $j->save();
                     $this->imported++;
                 }
             } catch (\Throwable $e) {

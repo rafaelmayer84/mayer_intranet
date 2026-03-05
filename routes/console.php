@@ -229,15 +229,22 @@ Schedule::command('justus:sync-trf4 --meses-atras=1 --ps=10 --tipo=1')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/cron-justus-trf4.log'));
 
+// TRT12 via API Falcao — diario 05:30 BRT (ultimos 7 dias)
+Schedule::command('justus:sync-trt12 --modo=recentes --max-paginas=20')
+    ->dailyAt('05:30')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/cron-justus-trt12.log'));
+
 // EVIDENTIA - Chunk + Embed novos acordaos (diario 03:30 BRT)
 Schedule::command('evidentia:chunk --limit=5000')
-    ->dailyAt('03:30')
+    ->dailyAt('06:00')
     ->timezone('America/Sao_Paulo')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/cron-evidentia-chunk.log'));
 
 Schedule::command('evidentia:embed --sync --limit=10000')
-    ->dailyAt('04:00')
+    ->dailyAt('06:30')
     ->timezone('America/Sao_Paulo')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/cron-evidentia-embed.log'));
@@ -247,4 +254,12 @@ Schedule::command('queue:work database --queue=evidentia --timeout=120 --tries=2
     ->everyFiveMinutes()
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/cron-evidentia-queue.log'));
+
+
+// CRM AI Weekly Digest — Segunda-feira 07:00 BRT
+Schedule::command('crm:generate-insights --type=weekly')
+    ->weeklyOn(1, '07:00')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/crm-ai-insights.log'));
 

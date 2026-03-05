@@ -21,8 +21,6 @@ Route::middleware(['auth','modulo:operacional.crm,visualizar'])->prefix('crm')->
 
     // ── Painel Gerencial CRM ──
     Route::get('/painel', [\App\Http\Controllers\CrmPainelController::class, 'index'])->name('painel');
-    Route::post('/painel/generate-digest', [\App\Http\Controllers\CrmPainelController::class, 'generateDigest'])->name('painel.generate-digest');
-    Route::post('/painel/account-action/{accountId}', [\App\Http\Controllers\CrmPainelController::class, 'generateAccountAction'])->name('painel.account-action');
 
     // Dashboard (home CRM)
     Route::get('/', [CrmDashboardController::class, 'index'])->name('dashboard');
