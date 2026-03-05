@@ -11,6 +11,7 @@ Route::middleware(['auth', 'user.active'])->group(function () {
         Route::get('/conversas', [NexoAtendimentoController::class, 'conversas'])->name('nexo.atendimento.conversas');
         Route::get('/conversas/{id}', [NexoAtendimentoController::class, 'conversa'])->name('nexo.atendimento.conversa')->whereNumber('id');
         Route::post('/conversas/{id}/mensagens', [NexoAtendimentoController::class, 'enviarMensagem'])->name('nexo.atendimento.enviar')->whereNumber('id');
+        Route::post('/conversas/{id}/media', [NexoAtendimentoController::class, 'enviarMedia'])->name('nexo.atendimento.enviar-media')->whereNumber('id');
         Route::get('/conversas/{id}/poll', [NexoAtendimentoController::class, 'pollMessages'])->name('nexo.atendimento.poll')->whereNumber('id');
         Route::post('/conversas/{id}/force-sync', [NexoAtendimentoController::class, 'forceSync'])->name('nexo.atendimento.force-sync')->whereNumber('id');
         Route::patch('/conversas/{id}/assign', [NexoAtendimentoController::class, 'assignUser'])->name('nexo.atendimento.assign')->whereNumber('id');

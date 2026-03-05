@@ -531,6 +531,89 @@ class NexoAtendimentoController extends Controller
         }
     }
 
+    public function enviarMedia(Request $request, int $id)
+    {
+        $request->validate([
+            'file' => 'required|file|max:16384', // 16MB max
+            'caption' => 'nullable|string|max:1024',
+        ]);
+
+        $conversation = WaConversation::findOrFail($id);
+        $file = $request->file('file');
+        $mime = $file->getMimeType();
+
+        // Determinar tipo WhatsApp
+        $typeMap = [
+            'image/jpeg' => 'image', 'image/png' => 'image', 'image/webp' => 'image',
+            'application/pdf' => 'document', 'application/msword' => 'document',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'document',
+            'application/vnd.ms-excel' => 'document', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'document',
+            'audio/mpeg' => 'audio', 'audio/ogg' => 'audio', 'audio/wav' => 'audio', 'audio/mp4' => 'audio',
+        ];
+        $waType = $typeMap[$mime] ?? 'document';
+
+        // Salvar arquivo
+        $filename = time() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '', $file->getClientOriginalName());
+        $path = $file->storeAs('public/nexo/media', $filename);
+        $publicUrl = url('storage/nexo/media/' . $filename);
+
+        try {
+            $spService = app(\App\Services\SendPulseWhatsAppService::class);
+            $user = auth()->user();
+            $operatorName = ($user->role === 'admin' && !empty($user->operator_alias)) ? $user->operator_alias : $user->name;
+            $caption = $request->input('caption');
+            $captionToSend = $caption ? "*{$operatorName}*\n{$caption}" : "*{$operatorName}*";
+
+            $result = $spService->sendMediaByContact(
+                $conversation->contact_id, $waType, $publicUrl,
+                $captionToSend, $file->getClientOriginalName()
+            );
+
+            if (!($result['success'] ?? false) && $conversation->phone) {
+                \Log::info('NEXO: fallback sendMediaByPhone', ['conv_id' => $id]);
+                $result = $spService->sendMediaByPhone(
+                    $conversation->phone, $waType, $publicUrl,
+                    $captionToSend, $file->getClientOriginalName()
+                );
+            }
+
+            if (!($result['success'] ?? false)) {
+                return response()->json(['success' => false, 'error' => $result['error'] ?? 'Falha ao enviar mídia'], 502);
+            }
+
+            $message = WaMessage::create([
+                'conversation_id' => $id,
+                'direction' => WaMessage::DIRECTION_OUTGOING,
+                'is_human' => true,
+                'message_type' => $waType,
+                'body' => $caption ?? '',
+                'media_url' => $publicUrl,
+                'media_mime_type' => $mime,
+                'media_filename' => $file->getClientOriginalName(),
+                'media_caption' => $caption,
+                'user_id' => auth()->id(),
+                'sent_at' => now(),
+            ]);
+
+            // Auto-assumir (mesmo codigo do enviarMensagem)
+            if ($conversation->bot_ativo) {
+                $conversation->update(['bot_ativo' => false, 'assigned_user_id' => auth()->id(), 'assigned_at' => now()]);
+                if ($conversation->contact_id) {
+                    try { $spService->pausarAutomacao($conversation->contact_id); } catch (\Throwable $e) {}
+                }
+            } elseif (empty($conversation->assigned_user_id)) {
+                $conversation->update(['assigned_user_id' => auth()->id(), 'assigned_at' => now()]);
+            }
+            $conversation->last_message_at = now();
+            $conversation->save();
+
+            return response()->json(['success' => true, 'message' => $message]);
+        } catch (\Throwable $e) {
+            \Log::error('NEXO: erro enviar media', ['conv_id' => $id, 'error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'error' => 'Falha ao enviar mídia.'], 500);
+        }
+    }
+
     public function runFlow(Request $request, int $id)
     {
         $request->validate(['flow_id' => 'required|string']);

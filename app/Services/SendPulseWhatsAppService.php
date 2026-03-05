@@ -165,6 +165,34 @@ class SendPulseWhatsAppService
         ]);
     }
 
+    // ═══ ENVIO DE MIDIA v2.8 ═══
+
+    public function sendMediaByContact(string $contactId, string $type, string $url, ?string $caption = null, ?string $filename = null): array
+    {
+        $media = ['link' => $url];
+        if ($caption) $media['caption'] = $caption;
+        if ($filename && $type === 'document') $media['filename'] = $filename;
+
+        return $this->apiPost("/whatsapp/contacts/send", [
+            'contact_id' => $contactId,
+            'bot_id'     => $this->botId,
+            'message'    => ['type' => $type, $type => $media],
+        ]);
+    }
+
+    public function sendMediaByPhone(string $phone, string $type, string $url, ?string $caption = null, ?string $filename = null): array
+    {
+        $media = ['link' => $url];
+        if ($caption) $media['caption'] = $caption;
+        if ($filename && $type === 'document') $media['filename'] = $filename;
+
+        return $this->apiPost("/whatsapp/contacts/sendByPhone", [
+            'bot_id' => $this->botId,
+            'phone'  => $phone,
+            'message' => ['type' => $type, $type => $media],
+        ]);
+    }
+
     /**
      * Enviar reação emoji a uma mensagem.
      */
@@ -493,11 +521,15 @@ class SendPulseWhatsAppService
      */
     public function pausarAutomacao(string $contactId): bool
     {
-        $result = $this->setContactVariable($contactId, 'atendimento_humano', 'sim');
-        if (!$result['success']) {
-            Log::warning('SendPulse: falha ao setar atendimento_humano', ['contact_id' => $contactId, 'error' => $result['error']]);
+        $r1 = $this->setContactVariable($contactId, 'atendimento_humano', 'sim');
+        $r2 = $this->setContactVariable($contactId, 'sessao_ativa', 'sim');
+        if (!$r1['success']) {
+            Log::warning('SendPulse: falha ao setar atendimento_humano', ['contact_id' => $contactId, 'error' => $r1['error']]);
         }
-        return $result['success'] ?? false;
+        if (!$r2['success']) {
+            Log::warning('SendPulse: falha ao setar sessao_ativa', ['contact_id' => $contactId, 'error' => $r2['error']]);
+        }
+        return ($r1['success'] ?? false) && ($r2['success'] ?? false);
     }
 
     /**
