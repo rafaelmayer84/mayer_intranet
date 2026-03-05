@@ -5,12 +5,15 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Carbon\Carbon;
 
 class CrmCheckDeadlines extends Command
 {
     protected $signature = 'crm:check-deadlines';
     protected $description = 'Verifica oportunidades CRM com prazo vencido e notifica responsáveis';
+
+    private const CHEFIA_USER_ID = 1; // Rafael
 
     public function handle(): int
     {
@@ -29,6 +32,7 @@ class CrmCheckDeadlines extends Command
                 'crm_opportunities.title',
                 'crm_opportunities.next_action_at',
                 'crm_opportunities.owner_user_id',
+                'crm_opportunities.value_estimated',
                 'crm_accounts.name as account_name'
             )
             ->get();
@@ -37,8 +41,10 @@ class CrmCheckDeadlines extends Command
 
         foreach ($vencidas as $op) {
             $dias = Carbon::parse($op->next_action_at)->diffInDays($hoje);
+            $user = DB::table('users')->where('id', $op->owner_user_id)->first();
+            if (!$user) continue;
 
-            // Verificar se já notificou hoje para esta oportunidade
+            // Verificar se já notificou hoje
             $jaNotificou = DB::table('notifications_intranet')
                 ->where('user_id', $op->owner_user_id)
                 ->where('tipo', 'crm_deadline')
@@ -48,37 +54,110 @@ class CrmCheckDeadlines extends Command
 
             if ($jaNotificou) continue;
 
-            // Criar notificação intranet
-            DB::table('notifications_intranet')->insert([
-                'user_id'    => $op->owner_user_id,
-                'tipo'       => 'crm_deadline',
-                'titulo'     => 'Oportunidade com prazo vencido',
-                'mensagem'   => ($op->account_name ?? 'Sem conta') . ' — "' . $op->title . '" está ' . $dias . ' dia(s) atrasada. Próxima ação era ' . Carbon::parse($op->next_action_at)->format('d/m/Y') . '.',
-                'link'       => url('/crm/oportunidades/' . $op->id),
-                'icone'      => 'clock',
-                'lida'       => false,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            $link = url('/crm/oportunidades/' . $op->id);
+            $cliente = $op->account_name ?? 'Cliente não identificado';
+            $dataVenc = Carbon::parse($op->next_action_at)->format('d/m/Y');
 
-            $notificados++;
+            if ($dias <= 5) {
+                // ═══ VERSÃO 1: Amigável (1-5 dias) ═══
+                $tituloNotif = 'Lembrete: ação pendente no CRM';
+                $msgNotif = "Oi {$user->name}! A oportunidade \"{$op->title}\" ({$cliente}) está aguardando sua ação desde {$dataVenc} ({$dias} dia(s)). Quando puder, dê uma olhada para não perder o timing com o cliente.";
 
-            // Se atraso > 3 dias, enviar email também
-            if ($dias > 3) {
-                $user = DB::table('users')->where('id', $op->owner_user_id)->first();
-                if ($user && $user->email) {
+                // Notificação sininho — só para o advogado
+                DB::table('notifications_intranet')->insert([
+                    'user_id'    => $op->owner_user_id,
+                    'tipo'       => 'crm_deadline',
+                    'titulo'     => $tituloNotif,
+                    'mensagem'   => $msgNotif,
+                    'link'       => $link,
+                    'icone'      => 'clock',
+                    'lida'       => false,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                // Email amigável (a partir de 3 dias)
+                if ($dias >= 3 && $user->email) {
                     try {
-                        \Illuminate\Support\Facades\Mail::raw(
-                            "Olá {$user->name},\n\nA oportunidade \"{$op->title}\" ({$op->account_name}) está com {$dias} dias de atraso.\n\nA próxima ação era prevista para " . Carbon::parse($op->next_action_at)->format('d/m/Y') . ".\n\nAcesse: " . url('/crm/oportunidades/' . $op->id) . "\n\n— Sistema RESULTADOS!",
+                        Mail::raw(
+                            "Olá {$user->name},\n\n" .
+                            "Este é um lembrete amigável: a oportunidade \"{$op->title}\" do cliente {$cliente} está pendente de ação desde {$dataVenc} ({$dias} dias).\n\n" .
+                            "Sabemos que a rotina é corrida, mas manter o contato regular com o cliente faz diferença na conversão. Quando possível, registre a próxima ação no CRM.\n\n" .
+                            "Acesse: {$link}\n\n" .
+                            "Abraço,\nSistema RESULTADOS!",
                             function ($msg) use ($user) {
-                                $msg->to($user->email)->subject('⚠ CRM: Oportunidade com prazo vencido');
+                                $msg->to($user->email)
+                                    ->subject('📋 Lembrete: oportunidade aguardando sua ação');
                             }
                         );
                     } catch (\Exception $e) {
-                        Log::warning('CRM Deadlines: falha email', ['user' => $user->id, 'error' => $e->getMessage()]);
+                        Log::warning('CRM Deadlines: falha email amigável', ['user' => $user->id, 'error' => $e->getMessage()]);
+                    }
+                }
+
+            } else {
+                // ═══ VERSÃO 2: Dura + cópia chefia (6+ dias) ═══
+                $tituloNotif = '⚠ REITERAÇÃO: oportunidade com ' . $dias . ' dias de atraso';
+                $msgNotif = "ATENÇÃO: A oportunidade \"{$op->title}\" ({$cliente}) está com {$dias} dias de atraso. A chefia foi notificada. A omissão no acompanhamento de oportunidades impacta diretamente o indicador de conformidade (PEN-D04) e será considerada na apuração do GDP.";
+
+                // Notificação sininho — para o advogado
+                DB::table('notifications_intranet')->insert([
+                    'user_id'    => $op->owner_user_id,
+                    'tipo'       => 'crm_deadline',
+                    'titulo'     => $tituloNotif,
+                    'mensagem'   => $msgNotif,
+                    'link'       => $link,
+                    'icone'      => 'alert-triangle',
+                    'lida'       => false,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                // Notificação sininho — para a chefia
+                DB::table('notifications_intranet')->insert([
+                    'user_id'    => self::CHEFIA_USER_ID,
+                    'tipo'       => 'crm_deadline_chefia',
+                    'titulo'     => "Reiteração: {$user->name} — oportunidade {$dias}d atrasada",
+                    'mensagem'   => "A advogada {$user->name} possui a oportunidade \"{$op->title}\" ({$cliente}) com {$dias} dias de atraso na próxima ação (vencimento: {$dataVenc}). Valor estimado: R$ " . number_format($op->value_estimated ?? 0, 2, ',', '.') . ". Esta é uma reiteração — a primeira notificação foi enviada anteriormente sem resposta.",
+                    'link'       => $link,
+                    'icone'      => 'alert-triangle',
+                    'lida'       => false,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                // Email duro — para o advogado com CC chefia
+                if ($user->email) {
+                    try {
+                        $chefia = DB::table('users')->where('id', self::CHEFIA_USER_ID)->first();
+                        $ccEmail = $chefia && $chefia->email ? $chefia->email : null;
+
+                        Mail::raw(
+                            "Prezado(a) {$user->name},\n\n" .
+                            "REITERAÇÃO — OPORTUNIDADE COM {$dias} DIAS DE ATRASO\n\n" .
+                            "A oportunidade \"{$op->title}\" vinculada ao cliente {$cliente} encontra-se com {$dias} dias sem a devida ação de acompanhamento. O prazo para a próxima ação era {$dataVenc}.\n\n" .
+                            "Informamos que:\n" .
+                            "1. A omissão no acompanhamento de oportunidades comerciais configura ocorrência de conformidade (PEN-D04) no sistema de Gestão de Desempenho (GDP).\n" .
+                            "2. O não cumprimento reiterado dos prazos de follow-up impacta diretamente a avaliação de desempenho semestral.\n" .
+                            "3. A perda de oportunidades por inação será considerada na apuração do eixo Financeiro do GDP.\n\n" .
+                            "Solicitamos a regularização imediata com o registro da ação tomada no CRM.\n\n" .
+                            "Acesse: {$link}\n\n" .
+                            "Atenciosamente,\nGestão — Mayer Advogados\n(Mensagem automática do Sistema RESULTADOS!)",
+                            function ($msg) use ($user, $ccEmail, $dias) {
+                                $msg->to($user->email)
+                                    ->subject("⚠ REITERAÇÃO: Oportunidade CRM com {$dias} dias de atraso — ação imediata requerida");
+                                if ($ccEmail) {
+                                    $msg->cc($ccEmail);
+                                }
+                            }
+                        );
+                    } catch (\Exception $e) {
+                        Log::warning('CRM Deadlines: falha email reiteração', ['user' => $user->id, 'error' => $e->getMessage()]);
                     }
                 }
             }
+
+            $notificados++;
         }
 
         $this->info("Verificadas {$vencidas->count()} oportunidades vencidas, {$notificados} notificações enviadas.");
