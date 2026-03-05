@@ -263,3 +263,11 @@ Schedule::command('crm:generate-insights --type=weekly')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/crm-ai-insights.log'));
 
+
+// CRM: Verificar oportunidades com prazo vencido — Diário 08:00 BRT
+Schedule::command('crm:check-deadlines')
+    ->dailyAt('08:00')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/crm-deadlines.log'));
+

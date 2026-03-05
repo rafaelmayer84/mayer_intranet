@@ -83,20 +83,45 @@ class CrmOpportunityController extends Controller
     /**
      * Marcar cadence task como concluída (AJAX).
      */
-    public function completeCadenceTask(int $oppId, int $taskId)
+    public function completeCadenceTask(int $oppId, int $taskId, \Illuminate\Http\Request $request)
     {
         $task = CrmCadenceTask::where('opportunity_id', $oppId)->findOrFail($taskId);
-        $task->update(['completed_at' => now()]);
+        $opp = \App\Models\Crm\CrmOpportunity::findOrFail($oppId);
 
-        // Atualizar last_touch do account
-        if ($task->account_id) {
-            \App\Models\Crm\CrmAccount::where('id', $task->account_id)->update(['last_touch_at' => now()]);
+        $resultado = $request->input('resultado', 'concluido');
+        $notas = $request->input('notas', '');
+        $objecao = $request->input('objecao');
+
+        if (in_array($resultado, ['objecao', 'recusa']) && empty($notas)) {
+            return response()->json(['ok' => false, 'error' => 'Nota obrigatória para objeção/recusa'], 422);
         }
 
-        return response()->json(['ok' => true]);
-    }
+        $task->update([
+            'completed_at' => now(),
+            'resolution_status' => $resultado,
+            'resolution_notes' => $notas . ($objecao ? ' | Objeção: ' . $objecao : ''),
+        ]);
 
-    /**
+        \App\Models\Crm\CrmActivity::create([
+            'opportunity_id' => $oppId,
+            'account_id'     => $opp->account_id,
+            'type'           => 'followup_result',
+            'purpose'        => $resultado,
+            'title'          => 'Cadência: ' . $task->title . ' — ' . ucfirst(str_replace('_', ' ', $resultado)),
+            'body'           => $notas . ($objecao ? ' | Objeção: ' . $objecao : ''),
+            'done_at'        => now(),
+            'resolution_status' => $resultado,
+            'resolution_notes'  => $notas,
+            'created_by_user_id' => auth()->id(),
+        ]);
+
+        if ($opp->account_id) {
+            \App\Models\Crm\CrmAccount::where('id', $opp->account_id)->update(['last_touch_at' => now()]);
+        }
+
+        return response()->json(['ok' => true, 'resultado' => $resultado]);
+    }
+        /**
      * Marcar atividade como concluída (AJAX).
      */
     public function completeActivity(int $oppId, int $activityId)

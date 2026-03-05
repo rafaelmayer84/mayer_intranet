@@ -280,24 +280,106 @@ function completeActivity(actId) {
     }).then(r => r.json()).then(d => { if(d.ok) location.reload(); });
 }
 
-function completeCadenceTask(taskId) {
-    if (!confirm('Marcar esta etapa como concluída?')) return;
-    fetch('{{ url("/crm/oportunidades") }}/{{ $opp->id }}/cadence/' + taskId + '/complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
-    }).then(r => r.json()).then(d => {
-        if (d.ok) location.reload();
-    });
-}
+// ── Modal Cadência Follow-up (DOR 1 — Accountability) ──
+var _cadTaskId = null;
 
 function completeCadenceTask(taskId) {
-    if (!confirm('Marcar esta etapa como concluída?')) return;
-    fetch('{{ url("/crm/oportunidades") }}/{{ $opp->id }}/cadence/' + taskId + '/complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content }
-    }).then(r => r.json()).then(d => {
-        if (d.ok) location.reload();
-    });
+    _cadTaskId = taskId;
+    document.getElementById('modal-cadencia').classList.remove('hidden');
+    document.getElementById('modal-cadencia').classList.add('flex');
+    document.getElementById('cad-notas').value = '';
+    document.getElementById('cad-objecao-wrap').classList.add('hidden');
+    document.getElementById('cad-resultado').value = 'contato_realizado';
+    document.getElementById('cad-notas').focus();
 }
+
+function fecharModalCadencia() {
+    document.getElementById('modal-cadencia').classList.add('hidden');
+    document.getElementById('modal-cadencia').classList.remove('flex');
+    _cadTaskId = null;
+}
+
+function onResultadoChange() {
+    var val = document.getElementById('cad-resultado').value;
+    var wrap = document.getElementById('cad-objecao-wrap');
+    if (val === 'objecao' || val === 'recusa') {
+        wrap.classList.remove('hidden');
+    } else {
+        wrap.classList.add('hidden');
+    }
+}
+
+function confirmarCadencia() {
+    var resultado = document.getElementById('cad-resultado').value;
+    var notas = document.getElementById('cad-notas').value.trim();
+    var objecao = document.getElementById('cad-objecao') ? document.getElementById('cad-objecao').value : '';
+
+    if ((resultado === 'objecao' || resultado === 'recusa') && !notas) {
+        document.getElementById('cad-notas').classList.add('border-red-400');
+        document.getElementById('cad-notas').focus();
+        return;
+    }
+
+    var btn = document.querySelector('#modal-cadencia button[onclick="confirmarCadencia()"]');
+    btn.disabled = true;
+    btn.textContent = 'Salvando...';
+
+    fetch('{{ url("/crm/oportunidades") }}/{{ $opp->id }}/cadence/' + _cadTaskId + '/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+        body: JSON.stringify({ resultado: resultado, notas: notas, objecao: objecao })
+    }).then(r => r.json()).then(d => {
+        if (d.ok) { fecharModalCadencia(); location.reload(); }
+        else { alert(d.error || 'Erro'); btn.disabled = false; btn.textContent = 'Confirmar'; }
+    }).catch(e => { alert('Erro: ' + e.message); btn.disabled = false; btn.textContent = 'Confirmar'; });
+}
+
+document.getElementById('modal-cadencia').addEventListener('click', function(e) {
+    if (e.target === this) fecharModalCadencia();
+});
+
+
 </script>
+
+{{-- Modal Cadência Follow-up --}}
+<div id="modal-cadencia" class="hidden fixed inset-0 bg-black/50 z-50 items-center justify-center" style="backdrop-filter: blur(2px);">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+        <div class="px-6 py-4 border-b" style="background: linear-gradient(135deg, #1B334A, #385776);">
+            <h3 class="text-white font-semibold text-sm">📋 Concluir Etapa da Cadência</h3>
+        </div>
+        <div class="p-6 space-y-4">
+            <div>
+                <label class="text-xs font-medium text-gray-600 block mb-1">Resultado *</label>
+                <select id="cad-resultado" onchange="onResultadoChange()" class="w-full border rounded-lg px-3 py-2 text-sm">
+                    <option value="contato_realizado">Contato realizado</option>
+                    <option value="sem_resposta">Sem resposta</option>
+                    <option value="reagendado">Reagendado</option>
+                    <option value="objecao">Objeção do cliente</option>
+                    <option value="recusa">Recusa</option>
+                    <option value="avancar_proposta">Avançar para proposta</option>
+                </select>
+            </div>
+            <div id="cad-objecao-wrap" class="hidden">
+                <label class="text-xs font-medium text-gray-600 block mb-1">Motivo da objeção *</label>
+                <select id="cad-objecao" class="w-full border rounded-lg px-3 py-2 text-sm">
+                    <option value="preco">Preço</option>
+                    <option value="prazo">Prazo</option>
+                    <option value="concorrencia">Concorrência</option>
+                    <option value="desinteresse">Desinteresse</option>
+                    <option value="momento">Não é o momento</option>
+                    <option value="outro">Outro</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-xs font-medium text-gray-600 block mb-1">O que aconteceu? *</label>
+                <textarea id="cad-notas" rows="3" placeholder="Descreva o resultado do contato, objeções, próximos passos..." class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+            </div>
+        </div>
+        <div class="px-6 py-3 border-t bg-gray-50 flex justify-end gap-3">
+            <button onclick="fecharModalCadencia()" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancelar</button>
+            <button onclick="confirmarCadencia()" class="px-4 py-2 bg-[#385776] text-white text-sm font-medium rounded-lg hover:bg-[#1B334A]">Confirmar</button>
+        </div>
+    </div>
+</div>
+
 @endsection

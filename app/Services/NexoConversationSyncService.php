@@ -145,6 +145,15 @@ class NexoConversationSyncService
                 'msg_type'   => $parsed['message_type'],
             ]);
 
+            // ── DOR 3: Auto-sync WhatsApp → CRM ──
+            if (!$msgExists && $conversation->phone) {
+                try {
+                    $this->syncWhatsappToCrm($conversation, $parsed['text'] ?? '', $sentAt);
+                } catch (\Throwable $crmEx) {
+                    \Log::warning('CRM auto-sync falhou', ['conv' => $conversation->id, 'error' => $crmEx->getMessage()]);
+                }
+            }
+
             DB::commit();
             return true;
         } catch (\Throwable $e) {
@@ -484,4 +493,70 @@ class NexoConversationSyncService
 
         return $payload;
     }
+
+    /**
+     * DOR 3: Sincroniza mensagem incoming WhatsApp com CRM
+     * - Atualiza last_touch_at do account
+     * - Cria crm_activity automática
+     * - Se cadência tem passo pendente "aguardar retorno", marca concluído
+     */
+    protected function syncWhatsappToCrm($conversation, string $messageText, $sentAt): void
+    {
+        if (empty($conversation->phone)) return;
+
+        // Normalizar telefone para busca
+        $phoneDigits = preg_replace('/\D/', '', $conversation->phone);
+
+        // Buscar account pelo telefone
+        $account = \App\Models\Crm\CrmAccount::where('phone_e164', 'LIKE', '%' . substr($phoneDigits, -8) . '%')->first();
+
+        if (!$account) return;
+
+        // Atualizar last_touch_at
+        $account->update(['last_touch_at' => $sentAt ?? now()]);
+
+        // Criar atividade automática (max 1 por conversa por dia para não poluir)
+        $jaRegistrouHoje = \App\Models\Crm\CrmActivity::where('account_id', $account->id)
+            ->where('type', 'whatsapp_incoming')
+            ->whereDate('created_at', today())
+            ->exists();
+
+        if (!$jaRegistrouHoje) {
+            \App\Models\Crm\CrmActivity::create([
+                'account_id'        => $account->id,
+                'type'              => 'whatsapp_incoming',
+                'purpose'           => 'acompanhamento',
+                'title'             => 'Mensagem recebida via WhatsApp',
+                'body'              => mb_substr($messageText, 0, 200),
+                'done_at'           => $sentAt ?? now(),
+                'created_by_user_id' => null, // automático
+            ]);
+        }
+
+        // Verificar cadência: se tem oportunidade open com passo pendente
+        $oportunidades = \App\Models\Crm\CrmOpportunity::where('account_id', $account->id)
+            ->where('status', 'open')
+            ->pluck('id');
+
+        if ($oportunidades->isNotEmpty()) {
+            // Buscar passos de cadência pendentes do tipo "aguardar"
+            $passosPendentes = \App\Models\Crm\CrmCadenceTask::whereIn('opportunity_id', $oportunidades)
+                ->whereNull('completed_at')
+                ->where(function ($q) {
+                    $q->where('title', 'LIKE', '%aguardar%')
+                      ->orWhere('title', 'LIKE', '%retorno%')
+                      ->orWhere('description', 'LIKE', '%aguardar retorno%');
+                })
+                ->get();
+
+            foreach ($passosPendentes as $passo) {
+                $passo->update([
+                    'completed_at'      => now(),
+                    'resolution_status' => 'cliente_respondeu',
+                    'resolution_notes'  => 'Auto: cliente respondeu via WhatsApp em ' . now('America/Sao_Paulo')->format('d/m/Y H:i'),
+                ]);
+            }
+        }
+    }
+
 }
