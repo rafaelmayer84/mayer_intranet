@@ -258,6 +258,68 @@
 
             {{-- Painel Direito --}}
             <div class="space-y-6">
+                {{-- IA — Sugestão de Ação --}}
+                <div class="bg-white rounded-lg shadow-sm border p-5" id="ai-insight-box">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold uppercase tracking-wider text-[#385776]">✦ Sugestão IA</span>
+                        </div>
+                        <button onclick="gerarSugestaoIA()" id="btn-ai-account" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-white bg-[#385776] hover:bg-[#1B334A] transition-colors">
+                            🤖 Analisar
+                        </button>
+                    </div>
+                    <div id="ai-insight-content">
+                        @php $lastInsight = \App\Models\CrmAiInsight::where('account_id', $account->id)->where('status', 'active')->where('tipo', 'account_action')->orderByDesc('created_at')->first(); @endphp
+                        @if($lastInsight)
+                            <div class="text-sm font-semibold text-[#1B334A] mb-2">{{ $lastInsight->titulo }}</div>
+                            <div class="text-xs text-gray-600 leading-relaxed">{{ $lastInsight->insight_text }}</div>
+                            @if($lastInsight->action_suggested)
+                                <div class="mt-3 pt-3 border-t border-gray-100">
+                                    <div class="text-xs text-[#385776] font-medium">→ {{ $lastInsight->action_suggested }}</div>
+                                </div>
+                            @endif
+                            <div class="mt-2 text-[10px] text-gray-400">Gerado em {{ $lastInsight->created_at->timezone('America/Sao_Paulo')->format('d/m/Y H:i') }}</div>
+                        @else
+                            <div class="text-xs text-gray-400 text-center py-2">Clique em "Analisar" para recomendação IA</div>
+                        @endif
+                    </div>
+                </div>
+
+                <script>
+                function gerarSugestaoIA() {
+                    const btn = document.getElementById('btn-ai-account');
+                    const box = document.getElementById('ai-insight-content');
+                    btn.disabled = true;
+                    btn.textContent = '⏳ Analisando...';
+                    box.innerHTML = '<div class="text-xs text-[#385776] text-center py-4">Analisando perfil com gpt-5-mini...</div>';
+
+                    fetch('{{ url("/crm/painel/account-action/" . $account->id) }}', {
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Accept': 'application/json' }
+                    })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success && data.insight) {
+                            let h = '<div class="text-sm font-semibold text-[#1B334A] mb-2">' + data.insight.titulo + '</div>';
+                            h += '<div class="text-xs text-gray-600 leading-relaxed">' + data.insight.insight_text + '</div>';
+                            if (data.insight.action_suggested) {
+                                h += '<div class="mt-3 pt-3 border-t border-gray-100"><div class="text-xs text-[#385776] font-medium">→ ' + data.insight.action_suggested + '</div></div>';
+                            }
+                            h += '<div class="mt-2 text-[10px] text-gray-400">Gerado agora</div>';
+                            box.innerHTML = h;
+                        } else {
+                            box.innerHTML = '<div class="text-xs text-red-500">Erro: ' + (data.error || 'falha') + '</div>';
+                        }
+                        btn.disabled = false;
+                        btn.textContent = '🤖 Analisar';
+                    })
+                    .catch(err => {
+                        box.innerHTML = '<div class="text-xs text-red-500">Erro de conexão</div>';
+                        btn.disabled = false;
+                        btn.textContent = '🤖 Analisar';
+                    });
+                }
+                </script>
                 <div class="bg-white rounded-lg shadow-sm border p-6">
                     <h2 class="text-lg font-semibold text-[#1B334A] mb-4">Gestão CRM</h2>
                     <form id="form-crm-update" class="space-y-4">
@@ -280,6 +342,7 @@
 
                 @if(in_array(auth()->user()->role, ['admin', 'coordenador', 'socio']))
                 <div class="bg-white rounded-lg shadow-sm border p-4 space-y-3">
+                    
                     <h3 class="text-sm font-semibold text-gray-700">Ações Administrativas</h3>
                     {{-- Transferir --}}
                     <div>
