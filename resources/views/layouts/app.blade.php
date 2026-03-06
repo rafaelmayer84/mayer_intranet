@@ -286,6 +286,20 @@
                 </a>
                 @endif
 
+                <!-- VIGÍLIA -->
+                <a href="/vigilia" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg transition-colors {{ request()->is('vigilia*') ? 'nav-link-active' : '' }}" data-tooltip="VIGÍLIA">
+                    <svg class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                        <circle cx="12" cy="12" r="6" stroke="currentColor" stroke-width="1.5" fill="none"/>
+                        <circle cx="12" cy="12" r="2" fill="#E8B931"/>
+                        <line x1="12" y1="2" x2="12" y2="5" stroke="currentColor" stroke-width="1.5"/>
+                        <line x1="12" y1="19" x2="12" y2="22" stroke="currentColor" stroke-width="1.5"/>
+                        <line x1="2" y1="12" x2="5" y2="12" stroke="currentColor" stroke-width="1.5"/>
+                        <line x1="19" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="1.5"/>
+                    </svg>
+                    <span class="font-medium menu-text">VIGÍLIA</span>
+                </a>
+
                 <!-- 2) RESULTADOS! (colapsável) -->
                 <div class="menu-group">
                     <button onclick="toggleSubmenu('resultados')" class="nav-link w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors {{ request()->is('visao-gerencial*') || request()->is('clientes-mercado*') || request()->is('processos-internos*') || request()->is('resultados/bsc/processos-internos*') || request()->is('times-evolucao*') || request()->is('bsc-insights*') ? 'nav-link-active' : '' }}" data-tooltip="RESULTADOS!">
@@ -516,6 +530,16 @@
                         <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
                         <span class="menu-text">SIATE</span>
                     </a>
+
+                                <!-- RELATÓRIOS - Central de Relatórios -->
+                <a href="{{ route('relatorios.index') }}"
+                   class="nav-link flex items-center px-4 py-3 rounded-lg transition-colors {{ request()->is('relatorios*') ? 'nav-link-active' : '' }}"
+                   data-tooltip="Relatórios">
+                    <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    <span class="menu-text">Relatórios</span>
+                </a>
 
                 <!-- Divisor visual -->
                 <hr class="my-4 border-gray-700/70">

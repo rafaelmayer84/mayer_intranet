@@ -243,8 +243,8 @@ Schedule::command('evidentia:chunk --limit=5000')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/cron-evidentia-chunk.log'));
 
-Schedule::command('evidentia:embed --sync --limit=10000')
-    ->dailyAt('06:30')
+Schedule::command('evidentia:embed --sync --limit=20000')
+    ->twiceDaily(3, 15)
     ->timezone('America/Sao_Paulo')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/cron-evidentia-embed.log'));
@@ -265,6 +265,13 @@ Schedule::command('crm:generate-insights --type=weekly')
 
 
 // CRM: Verificar oportunidades com prazo vencido — Diário 08:00 BRT
+// VIGILIA: Cruzamento diario atividades x andamentos — 07:00 BRT
+Schedule::command('vigilia:cruzar')
+    ->dailyAt('07:00')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/vigilia-cruzar.log'));
+
 Schedule::command('crm:check-deadlines')
     ->dailyAt('08:00')
     ->timezone('America/Sao_Paulo')
