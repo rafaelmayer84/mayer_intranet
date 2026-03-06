@@ -633,6 +633,11 @@ PROMPT;
             $digits = '55' . $m[1];
         }
 
+        // Se 12 digitos (55+DDD+8dig celular), adicionar nono digito
+        if (strlen($digits) === 12 && preg_match('/^55\\d{2}[6-9]/', $digits)) {
+            $digits = substr($digits, 0, 4) . '9' . substr($digits, 4);
+        }
+
         // Se comeca com 55 e tem 12-13 digitos, ja esta ok
         if (preg_match('/^55\\d{10,11}$/', $digits)) {
             return $digits;
@@ -856,37 +861,34 @@ PROMPT;
                 return null;
             }
 
-            // ========== IDEMPOTÊNCIA ATÔMICA (com lock DB) ==========
-            $lockKey = 'lead_process_' . $telefoneNorm;
-            $lock = \Illuminate\Support\Facades\Cache::lock($lockKey, 30);
-
-            if (!$lock->get()) {
-                Log::info('processLead: lock ativo, ignorando duplicata', ['telefone' => $telefone]);
-                return Lead::where('telefone', $telefoneNorm)->orWhere('telefone', $telefone)->first();
+            // ========== IDEMPOTENCIA VIA UNIQUE INDEX (telefone) ==========
+            // Variantes de telefone para dedup (com/sem nono digito)
+            $phoneVariants = [$telefoneNorm, $telefoneClean];
+            $semPais = substr($telefoneNorm, 2); // sem 55
+            if (strlen($telefoneNorm) === 12 && preg_match('/^55\d{2}[6-9]/', $telefoneNorm)) {
+                $phoneVariants[] = substr($telefoneNorm, 0, 4) . '9' . substr($telefoneNorm, 4);
             }
+            if (strlen($telefoneNorm) === 13 && $telefoneNorm[4] === '9') {
+                $phoneVariants[] = substr($telefoneNorm, 0, 4) . substr($telefoneNorm, 5);
+            }
+            $phoneVariants = array_unique($phoneVariants);
 
-            try {
-                $existingLead = Lead::where('telefone', $telefoneNorm)->orWhere('telefone', $telefone)->orWhere('telefone', $telefoneClean)->first();
+            $existingLead = Lead::whereIn('telefone', $phoneVariants)->first();
 
-                if ($existingLead) {
-                    $updates = [];
-                    if ($existingLead->telefone !== $telefoneNorm) {
-                        $updates['telefone'] = $telefoneNorm;
-                    }
-                    if (empty($existingLead->contact_id) && !empty($contactId)) {
-                        $updates['contact_id'] = $contactId;
-                    }
-                    if (!empty($updates)) {
-                        $existingLead->timestamps = false;
-                        $existingLead->update($updates);
-                    }
-                    Log::info('Lead ja existe', ['lead_id' => $existingLead->id, 'telefone_norm' => isset($updates['telefone'])]);
-                    $lock->release();
-                    return $existingLead;
+            if ($existingLead) {
+                $updates = [];
+                if ($existingLead->telefone !== $telefoneNorm) {
+                    $updates['telefone'] = $telefoneNorm;
                 }
-            } catch (\Throwable $e) {
-                $lock->release();
-                throw $e;
+                if (empty($existingLead->contact_id) && !empty($contactId)) {
+                    $updates['contact_id'] = $contactId;
+                }
+                if (!empty($updates)) {
+                    $existingLead->timestamps = false;
+                    $existingLead->update($updates);
+                }
+                Log::info('Lead ja existe (dedup)', ['lead_id' => $existingLead->id, 'telefone' => $telefoneNorm]);
+                return $existingLead;
             }
 
             // Token SendPulse
@@ -927,7 +929,7 @@ PROMPT;
             // Se sem mensagens, criar lead básico
             if (!$chatMessages || $msgCount === 0) {
                 Log::warning('Sem mensagens, criando lead sem IA');
-                $lead = Lead::create([
+                $lead = $this->createLeadSafe([
                     'nome' => $nome,
                     'telefone' => $telefoneNorm,
                     'contact_id' => $contactId,
@@ -966,7 +968,7 @@ PROMPT;
             }
 
             // Criar lead com todos os campos de marketing jurídico
-            $lead = Lead::create([
+            $lead = $this->createLeadSafe([
                 'nome' => $nome,
                 'telefone' => $telefoneNorm,
                 'contact_id' => $contactId,
@@ -992,10 +994,7 @@ PROMPT;
 
             Log::info('Lead criado', ['lead_id' => $lead->id, 'cidade' => $cidade, 'area' => $lead->area_interesse]);
 
-            // Liberar lock de idempotência
-            if (isset($lock)) {
-                $lock->release();
-            }
+
             // === TRACKING DE ORIGEM (GCLID/UTM) ===
             try { \App\Services\LeadTrackingService::applyToLead($lead); } catch (\Throwable $e) { \Illuminate\Support\Facades\Log::warning("[Lead] Tracking: " . $e->getMessage()); }
 
@@ -1015,10 +1014,20 @@ PROMPT;
         } catch (Exception $e) {
             Log::error('Erro ao processar lead', ['error' => $e->getMessage()]);
 
+            // DEDUP: verificar se lead ja existe antes de criar duplicata
+            $phoneForFallback = !empty($telefone) ? self::normalizePhoneE164($telefone) : '';
+            if ($phoneForFallback !== '') {
+                $existing = Lead::where('telefone', $phoneForFallback)->first();
+                if ($existing) {
+                    Log::info('processLead catch: lead existente encontrado', ['lead_id' => $existing->id]);
+                    return $existing;
+                }
+            }
+
             try {
-                return Lead::create([
+                return $this->createLeadSafe([
                     'nome' => $nome ?: 'Desconhecido',
-                    'telefone' => $telefone ?: 'Desconhecido',
+                    'telefone' => $phoneForFallback ?: ($telefone ?: 'Desconhecido'),
                     'contact_id' => $contactId,
                     'status' => 'novo',
                     'erro_processamento' => $e->getMessage(),
@@ -1034,7 +1043,42 @@ PROMPT;
     /**
      * Reprocessar lead existente
      */
-    public function reprocessLead(Lead $lead): bool
+    /**
+     * Criar lead com protecao contra duplicata (UNIQUE index no telefone)
+     * Se o INSERT violar o UNIQUE, retorna o lead existente em vez de erro
+     */
+    private function createLeadSafe(array $data): Lead
+    {
+        try {
+            return Lead::create($data);
+        } catch (\Illuminate\Database\QueryException $e) {
+            if (str_contains($e->getMessage(), 'Duplicate entry') || $e->getCode() === '23000') {
+                $phone = $data['telefone'] ?? '';
+                $existing = Lead::where('telefone', $phone)->first();
+                if ($existing) {
+                    Log::info('createLeadSafe: duplicata prevenida pelo UNIQUE index', [
+                        'telefone' => $phone, 'lead_id' => $existing->id
+                    ]);
+                    // Atualizar campos que podem estar vazios
+                    $fillable = ['contact_id', 'area_interesse', 'resumo_demanda'];
+                    $updates = [];
+                    foreach ($fillable as $f) {
+                        if (empty($existing->$f) && !empty($data[$f])) {
+                            $updates[$f] = $data[$f];
+                        }
+                    }
+                    if (!empty($updates)) {
+                        $existing->timestamps = false;
+                        $existing->update($updates);
+                    }
+                    return $existing;
+                }
+            }
+            throw $e;
+        }
+    }
+
+        public function reprocessLead(Lead $lead): bool
     {
         try {
             $accessToken = $this->getSendPulseToken();
