@@ -21,6 +21,7 @@ class CrmLeadsController extends Controller
 
         $crmQuery = DB::table('crm_accounts')
             ->leftJoin('users', 'crm_accounts.owner_user_id', '=', 'users.id')
+            ->leftJoin('leads', 'leads.crm_account_id', '=', 'crm_accounts.id')
             ->where('crm_accounts.kind', 'prospect')
             ->where('crm_accounts.lifecycle', '!=', 'arquivado')
             ->select([
@@ -32,12 +33,13 @@ class CrmLeadsController extends Controller
                 DB::raw("crm_accounts.lifecycle as lifecycle"),
                 DB::raw("crm_accounts.owner_user_id as owner_user_id"),
                 DB::raw("users.name as owner_name"),
-                DB::raw("COALESCE(crm_accounts.notes, '') as area_interesse"),
-                DB::raw("'' as intencao_contratar"),
-                DB::raw("'' as potencial_honorarios"),
+                DB::raw("COALESCE(leads.area_interesse, crm_accounts.notes, '') as area_interesse"),
+                DB::raw("COALESCE(leads.intencao_contratar, '') as intencao_contratar"),
+                DB::raw("COALESCE(leads.potencial_honorarios, '') as potencial_honorarios"),
+                DB::raw("COALESCE(leads.origem_canal, '') as origem_canal"),
                 DB::raw("crm_accounts.last_touch_at as ultimo_contato"),
                 DB::raw("crm_accounts.created_at as data"),
-                DB::raw("0 as crm_account_id"),
+                DB::raw("COALESCE(leads.id, 0) as lead_id"),
             ]);
 
         $leadsQuery = DB::table('leads')
@@ -58,7 +60,9 @@ class CrmLeadsController extends Controller
                 DB::raw("COALESCE(leads.potencial_honorarios, '') as potencial_honorarios"),
                 DB::raw("leads.updated_at as ultimo_contato"),
                 DB::raw("leads.data_entrada as data"),
+                DB::raw("COALESCE(leads.origem_canal, '') as origem_canal"),
                 DB::raw("COALESCE(leads.crm_account_id, 0) as crm_account_id"),
+                DB::raw("leads.id as lead_id"),
             ]);
 
         if ($search) {

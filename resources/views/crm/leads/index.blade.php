@@ -111,11 +111,24 @@
                         @if($row->email)<span class="block text-xs text-gray-400">{{ $row->email }}</span>@endif
                     </td>
                     <td class="px-4 py-3">
-                        @if($row->origem === 'marketing')
+                        @php
+                            $origemMap = [
+                                'google_ads' => ['Google Ads', 'bg-blue-100 text-blue-700'],
+                                'indicacao' => ['Indicação', 'bg-green-100 text-green-700'],
+                                'redes_sociais' => ['Redes Sociais', 'bg-pink-100 text-pink-700'],
+                                'organico' => ['Orgânico', 'bg-teal-100 text-teal-700'],
+                                'relacionamento' => ['Relacionamento', 'bg-indigo-100 text-indigo-700'],
+                                'telefone' => ['Telefone', 'bg-gray-100 text-gray-700'],
+                                'presencial' => ['Presencial', 'bg-cyan-100 text-cyan-700'],
+                                'WhatsApp Bot' => ['WhatsApp', 'bg-emerald-100 text-emerald-700'],
+                            ];
+                            $canal = $row->origem_canal ?? '';
+                            $origemInfo = $origemMap[$canal] ?? null;
+                        @endphp
+                        @if($origemInfo)
+                            <span class="text-[10px] px-2 py-0.5 rounded-full {{ $origemInfo[1] }} font-medium">{{ $origemInfo[0] }}</span>
+                        @elseif($row->origem === 'marketing')
                             <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Marketing</span>
-                            @if($row->crm_account_id)
-                                <span class="text-[10px] text-green-600 ml-1" title="Promovido ao CRM">&#10003; CRM</span>
-                            @endif
                         @else
                             <span class="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-medium">CRM</span>
                         @endif
