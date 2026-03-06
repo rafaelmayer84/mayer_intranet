@@ -21,8 +21,13 @@ class LeadController extends Controller
     /**
      * Dashboard principal da Central de Leads — Marketing Jurídico
      */
-    public function index(Request $request): View
+    public function index(Request $request)
     {
+        // Frente D: redirecionar para CRM Leads unificado
+        if (!$request->has('dashboard')) {
+            return redirect()->route('crm.leads');
+        }
+
         // Filtros
         $filtroArea = $request->get('area', 'todos');
         $filtroCidade = $request->get('cidade', 'todos');

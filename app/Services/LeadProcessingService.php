@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Lead;
+use App\Services\Crm\CrmLeadSyncService;
 use App\Services\LeadTrackingService;
 use App\Models\LeadMessage;
 use Illuminate\Support\Facades\Http;
@@ -941,7 +942,13 @@ PROMPT;
                     'erro_processamento' => 'Mensagens não recuperadas da API SendPulse',
                     'data_entrada' => now()
                 ]);
-                // ESPO desativado - CRM Nativo
+                // ── Auto-sync lead -> CRM (sem mensagens) ──
+                try {
+                    $syncSvc = new CrmLeadSyncService();
+                    $syncSvc->syncLead($lead);
+                } catch (\Throwable $e) {
+                    Log::warning('processLead: auto-sync CRM falhou (sem msgs)', ['error' => $e->getMessage()]);
+                }
                 return $lead;
             }
 
@@ -1001,7 +1008,14 @@ PROMPT;
             // Salvar mensagens
             $this->saveMessages($lead, $chatMessages);
 
-            // ESPO desativado - CRM Nativo v1.0
+            // ── FRENTE A: Auto-sync lead -> CRM ──
+            try {
+                $syncSvc = new CrmLeadSyncService();
+                $syncSvc->syncLead($lead);
+                Log::info('processLead: auto-sync CRM OK', ['lead_id' => $lead->id, 'crm_account_id' => $lead->fresh()->crm_account_id]);
+            } catch (\Throwable $e) {
+                Log::warning('processLead: auto-sync CRM falhou', ['lead_id' => $lead->id, 'error' => $e->getMessage()]);
+            }
 
             Log::info('Lead processado com sucesso', [
                 'lead_id' => $lead->id,

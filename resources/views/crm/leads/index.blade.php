@@ -221,18 +221,18 @@
 const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
 function promoverLead(leadId) {
     const btn = event.currentTarget;
+    if (!confirm('Promover este lead para o pipeline CRM?')) return;
     btn.disabled = true;
     btn.textContent = '...';
     btn.classList.add('opacity-50', 'cursor-not-allowed');
-    if (!confirm('Promover este lead para o pipeline CRM?')) return;
-    fetch('/nexo/atendimento/leads/' + leadId + '/promover-crm', {
+    fetch('{{ url("/nexo/atendimento/leads") }}/' + leadId + '/promover-crm', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf },
         body: JSON.stringify({})
     })
     .then(r => r.json())
     .then(d => {
-        if (d.ok) { alert('Lead promovido! Account #' + d.account_id); location.reload(); }
+        if (d.success || d.ok) { alert('Lead promovido! Account #' + d.account_id); location.reload(); }
         else { alert(d.error || 'Erro ao promover.'); btn.disabled = false; btn.textContent = 'CRM'; btn.classList.remove('opacity-50','cursor-not-allowed'); }
     })
     .catch(e => alert('Erro: ' + e.message));
