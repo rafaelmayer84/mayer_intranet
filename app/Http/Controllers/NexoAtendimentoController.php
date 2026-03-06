@@ -124,7 +124,8 @@ class NexoAtendimentoController extends Controller
             ]);
 
             // Auto-assumir: desativar bot + atribuir operador ao enviar msg humana
-            if ($conversation->bot_ativo) {
+            // v2.9: tratar bot_ativo NULL como true (conversas antigas sem campo setado)
+            if ($conversation->bot_ativo || $conversation->bot_ativo === null) {
                 $conversation->update([
                     'bot_ativo' => false,
                     'assigned_user_id' => auth()->id(),
