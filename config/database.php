@@ -30,6 +30,20 @@ return [
     */
 
     'connections' => [
+        'embeds' => [
+            'driver' => 'mysql',
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '3306'),
+            'database' => env('DB_EMBEDS_DATABASE'),
+            'username' => env('DB_EMBEDS_USERNAME'),
+            'password' => env('DB_EMBEDS_PASSWORD'),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => true,
+        ],
+
+
         'evidentia' => [
             'driver' => 'mysql',
             'host' => env('DB_HOST', '127.0.0.1'),
