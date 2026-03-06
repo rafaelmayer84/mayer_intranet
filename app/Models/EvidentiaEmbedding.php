@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EvidentiaEmbedding extends Model
 {
+    protected $connection = 'evidentia';
     protected $table = 'evidentia_embeddings';
 
     protected $fillable = [

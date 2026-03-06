@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EvidentiaSearchResult extends Model
 {
+    protected $connection = 'evidentia';
     protected $table = 'evidentia_search_results';
 
     protected $fillable = [

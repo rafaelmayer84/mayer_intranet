@@ -253,7 +253,7 @@ class JustusOpenAiService
             }
 
             // Auto-gerar titulo na primeira mensagem
-            if ($conversation->messages()->where('role', 'assistant')->count() === 1 && str_starts_with($conversation->title, 'Nova Anal')) {
+            if ($conversation->messages()->where('role', 'assistant')->count() <= 2 && str_starts_with($conversation->title, 'Nova Anal')) {
                 $this->generateTitle($conversation, $userMessage, $content);
             }
 
@@ -393,20 +393,23 @@ Resposta: {$respSnippet}"],
     private function autoRenameConversation(JustusConversation $conversation, $profile, string $userMessage): void
     {
         try {
-            if ($profile && $profile->numero_cnj) {
+            if ($profile && ($profile->numero_cnj || $profile->classe || $profile->reu)) {
                 $parts = [];
+                $abrev = [
+                    'Execução de Título Extrajudicial' => 'Exec. Título',
+                    'Cumprimento de Sentença' => 'Cumpr. Sentença',
+                    'Ação de Cobrança' => 'Cobrança',
+                    'Reclamação Trabalhista' => 'Recl. Trabalhista',
+                    'Ação Indenizatória' => 'Indenizatória',
+                    'Procedimento Comum' => 'Proc. Comum',
+                ];
                 if ($profile->classe) {
-                    $abrev = [
-                        'Execução de Título Extrajudicial' => 'Exec. Título',
-                        'Cumprimento de Sentença' => 'Cumpr. Sentença',
-                        'Ação de Cobrança' => 'Cobrança',
-                        'Reclamação Trabalhista' => 'Recl. Trabalhista',
-                        'Ação Indenizatória' => 'Indenizatória',
-                    ];
                     $classeShort = $abrev[$profile->classe] ?? mb_substr($profile->classe, 0, 25);
                     $parts[] = $classeShort;
                 }
-                $parts[] = $profile->numero_cnj;
+                if ($profile->numero_cnj) {
+                    $parts[] = $profile->numero_cnj;
+                }
                 if ($profile->reu) {
                     $nomes = explode(' ', trim($profile->reu));
                     if (count($nomes) > 1) {

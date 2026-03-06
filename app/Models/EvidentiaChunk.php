@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class EvidentiaChunk extends Model
 {
+    protected $connection = 'evidentia';
     protected $table = 'evidentia_chunks';
 
     protected $fillable = [

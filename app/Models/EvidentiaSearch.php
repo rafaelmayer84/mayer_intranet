@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class EvidentiaSearch extends Model
 {
+    protected $connection = 'evidentia';
     protected $table = 'evidentia_searches';
 
     protected $fillable = [

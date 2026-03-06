@@ -293,7 +293,7 @@
                             @php $msgMeta = json_decode($msg->metadata ?? '{}', true); @endphp
                             @if(!empty($msgMeta['doc_path']))
                             <div class="mt-3 mb-2">
-                                <a href="{{ route('justus.message.document', [$activeConversation->id, $msg->id]) }}" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white hover:shadow-lg" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);">
+                                <a href="{{ route('justus.message.document', [$activeConversation->id, $msg->id]) }}" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white hover:shadow-lg" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                                     Baixar Peça (DOCX)
                                 </a>
@@ -771,6 +771,13 @@ function justusApp() {
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'Accept': 'application/json' },
                     body: JSON.stringify({ message: text }),
                 });
+                if (!resp.ok) {
+                    throw new Error('Servidor retornou erro ' + resp.status + '. Recarregue a página (F5) para ver a resposta.');
+                }
+                const contentType = resp.headers.get('content-type') || '';
+                if (!contentType.includes('application/json')) {
+                    throw new Error('Resposta inesperada do servidor. Recarregue a página (F5) para ver a resposta.');
+                }
                 const result = await resp.json();
                 const typing = document.getElementById('justus-typing');
                 if (typing) typing.remove();
@@ -780,7 +787,7 @@ function justusApp() {
                     const mdHtml = (typeof marked !== 'undefined' && marked.parse) ? marked.parse(msg.content || '') : this.esc(msg.content || '').replace(/\n/g, '<br>');
                     const docMeta = msg.metadata ? (typeof msg.metadata === 'string' ? JSON.parse(msg.metadata) : msg.metadata) : {};
                     const convId2 = msg.conversation_id || '{{ $activeConversation ? $activeConversation->id : "" }}';
-                    const docBtnHtml = (msg.role === 'assistant' && docMeta.doc_path) ? `<div class="mt-3 mb-2"><a href="/justus/${convId2}/messages/${msg.id}/document" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white hover:shadow-lg" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Baixar Peça (DOCX)</a></div>` : '';
+                    const docBtnHtml = (msg.role === 'assistant' && docMeta.doc_path) ? `<div class="mt-3 mb-2"><a href="/justus/${convId2}/messages/${msg.id}/document" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white hover:shadow-lg" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Baixar Peça (DOCX)</a></div>` : '';
                     const feedbackHtml = msg.role === 'assistant' ? `<div class="mt-2 flex items-center gap-2"><button onclick="sendFeedback(${convId2}, ${msg.id}, 'positive', this)" class="p-1 rounded text-gray-300 hover:text-green-500 hover:bg-green-50 transition-all" title="Boa resposta"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/></svg></button><button onclick="sendFeedback(${convId2}, ${msg.id}, 'negative', this)" class="p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition-all" title="Resposta ruim"><svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018c.163 0 .326.02.485.06L17 4m-7 10v2a2 2 0 002 2h.095c.5 0 .905-.405.905-.905 0-.714.211-1.412.608-2.006L17 13V4m-7 10h2m5-6h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5"/></svg></button></div>` : '';
                     const tokensInfo = msg.input_tokens ? `<div class="mt-3 pt-2 border-t border-gray-50 text-[10px] text-gray-300 flex items-center gap-3"><span>${(msg.input_tokens+msg.output_tokens).toLocaleString()} tokens</span><span>R$ ${parseFloat(msg.cost_brl).toFixed(4).replace('.',',')}</span></div>` : '';
 
@@ -869,6 +876,10 @@ function insightsPanel() {
                 const resp = await fetch(`/justus/${convId}/jurisprudencia-insights`, {
                     headers: { 'Accept': 'application/json' }
                 });
+                if (!resp.ok || !(resp.headers.get('content-type') || '').includes('application/json')) {
+                    console.warn('Jurisprudencia insights: resposta invalida', resp.status);
+                    return;
+                }
                 const data = await resp.json();
                 if (data.success) {
                     this.jurisResults = data.results || [];

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EvidentiaCitationBlock extends Model
 {
+    protected $connection = 'evidentia';
     protected $table = 'evidentia_citation_blocks';
 
     protected $fillable = [
