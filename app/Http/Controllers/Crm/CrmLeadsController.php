@@ -39,6 +39,7 @@ class CrmLeadsController extends Controller
                 DB::raw("COALESCE(leads.origem_canal, '') as origem_canal"),
                 DB::raw("crm_accounts.last_touch_at as ultimo_contato"),
                 DB::raw("crm_accounts.created_at as data"),
+                DB::raw("crm_accounts.id as crm_account_id"),
                 DB::raw("COALESCE(leads.id, 0) as lead_id"),
             ]);
 
@@ -58,9 +59,9 @@ class CrmLeadsController extends Controller
                 DB::raw("COALESCE(leads.area_interesse, '') as area_interesse"),
                 DB::raw("COALESCE(leads.intencao_contratar, '') as intencao_contratar"),
                 DB::raw("COALESCE(leads.potencial_honorarios, '') as potencial_honorarios"),
+                DB::raw("COALESCE(leads.origem_canal, '') as origem_canal"),
                 DB::raw("leads.updated_at as ultimo_contato"),
                 DB::raw("leads.data_entrada as data"),
-                DB::raw("COALESCE(leads.origem_canal, '') as origem_canal"),
                 DB::raw("COALESCE(leads.crm_account_id, 0) as crm_account_id"),
                 DB::raw("leads.id as lead_id"),
             ]);

@@ -100,7 +100,7 @@ class NexoTrackingController extends Controller
         // ─────────────────────────────────────────────────────────
         
         try {
-            $trackingId = DB::table('leads_tracking')->insertGetId([
+            $trackingId = DB::table('lead_tracking')->insertGetId([
                 'phone' => $phone,
                 'gclid' => $request->input('gclid'),
                 'fbclid' => $request->input('fbclid'),
@@ -109,8 +109,10 @@ class NexoTrackingController extends Controller
                 'utm_campaign' => $request->input('utm_campaign'),
                 'utm_content' => $request->input('utm_content'),
                 'utm_term' => $request->input('utm_term'),
-                'referrer_url' => $request->input('referrer_url'),
+                'referrer' => $request->input('referrer_url') ?? $request->input('referrer'),
                 'landing_page' => $request->input('landing_page'),
+                'ip_address' => $request->ip(),
+                'user_agent' => substr($request->userAgent() ?? '', 0, 500),
                 'created_at' => now()
             ]);
             
@@ -147,7 +149,7 @@ class NexoTrackingController extends Controller
         
         // Se começar com 55, já está OK
         if (str_starts_with($digits, '55')) {
-            return '+' . $digits;
+            return $digits;
         }
         
         // Se começar com 0, remove
@@ -156,7 +158,7 @@ class NexoTrackingController extends Controller
         }
         
         // Adiciona código do Brasil
-        return '+55' . $digits;
+        return '55' . $digits;
     }
     
     /**
@@ -171,7 +173,7 @@ class NexoTrackingController extends Controller
      */
     public function cleanupOldTracking()
     {
-        $deleted = DB::table('leads_tracking')
+        $deleted = DB::table('lead_tracking')
             ->where('created_at', '<', now()->subDays(7))
             ->whereNull('matched_at')
             ->delete();
