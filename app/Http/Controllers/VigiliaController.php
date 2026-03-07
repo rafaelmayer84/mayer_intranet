@@ -14,20 +14,22 @@ class VigiliaController extends Controller
 
     public function __construct(VigiliaService $service, VigiliaExportService $export)
     {
-        $this->middleware(function ($request, $next) {
-            if (!auth()->user()->isAdmin()) {
-                abort(403, 'Acesso restrito.');
-            }
-            return $next($request);
-        });
         $this->service = $service;
         $this->export = $export;
+    }
+
+    private function checkAdmin(): void
+    {
+        if (!auth()->user()->isAdmin()) {
+            abort(403, 'Acesso restrito.');
+        }
     }
 
     // ─── VIEW PRINCIPAL ──────────────────────────────────────────────
 
     public function index()
     {
+        $this->checkAdmin();
         $responsaveis = $this->service->getResponsaveis();
         $tiposAtividade = $this->service->getTiposAtividade();
 
@@ -38,6 +40,7 @@ class VigiliaController extends Controller
 
     public function apiResumo(Request $request)
     {
+        $this->checkAdmin();
         [$inicio, $fim] = $this->parsePeriodo($request);
         $resumo = $this->service->getResumoGeral($inicio, $fim);
         $ranking = $this->service->getPerformancePorResponsavel($inicio, $fim);
@@ -50,6 +53,7 @@ class VigiliaController extends Controller
 
     public function apiAlertas(Request $request)
     {
+        $this->checkAdmin();
         $responsavel = $request->input('responsavel');
         $alertas = $this->service->getAlertasAtivos($responsavel);
 
@@ -58,6 +62,7 @@ class VigiliaController extends Controller
 
     public function apiCompromissos(Request $request)
     {
+        $this->checkAdmin();
         $filtros = $request->only(['responsavel', 'status', 'tipo_atividade', 'somente_alertas', 'page', 'per_page']);
         [$inicio, $fim] = $this->parsePeriodo($request);
         if ($inicio && $fim) {
@@ -72,6 +77,7 @@ class VigiliaController extends Controller
 
     public function apiCruzar()
     {
+        $this->checkAdmin();
         $stats = $this->service->executarCruzamento();
 
         return response()->json([
@@ -85,6 +91,7 @@ class VigiliaController extends Controller
 
     public function relatorioIndividual(Request $request)
     {
+        $this->checkAdmin();
         $responsavel = $request->input('responsavel', '');
         [$inicio, $fim] = $this->parsePeriodo($request);
         $responsaveis = $this->service->getResponsaveis();
@@ -99,6 +106,7 @@ class VigiliaController extends Controller
 
     public function relatorioPrazos()
     {
+        $this->checkAdmin();
         $dados = $this->service->getRelatorioPrazos();
 
         return view('vigilia.relatorio-prazos', compact('dados'));
@@ -106,6 +114,7 @@ class VigiliaController extends Controller
 
     public function relatorioConsolidado(Request $request)
     {
+        $this->checkAdmin();
         [$inicio, $fim] = $this->parsePeriodo($request);
         if (!$inicio || !$fim) {
             $inicio = Carbon::now()->startOfMonth()->toDateTimeString();
@@ -119,6 +128,7 @@ class VigiliaController extends Controller
 
     public function relatorioCruzamento(Request $request)
     {
+        $this->checkAdmin();
         [$inicio, $fim] = $this->parsePeriodo($request);
         $dados = $this->service->getRelatorioCruzamento($inicio, $fim);
 
@@ -129,6 +139,7 @@ class VigiliaController extends Controller
 
     public function exportExcel(Request $request)
     {
+        $this->checkAdmin();
         $filtros = $request->only(['responsavel', 'status', 'tipo_atividade']);
         [$inicio, $fim] = $this->parsePeriodo($request);
         if ($inicio && $fim) {
@@ -143,6 +154,7 @@ class VigiliaController extends Controller
 
     public function exportPdf(Request $request)
     {
+        $this->checkAdmin();
         $tipo = $request->input('tipo', 'prazos');
 
         switch ($tipo) {
