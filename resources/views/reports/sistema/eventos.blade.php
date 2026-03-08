@@ -2,20 +2,25 @@
 
 @section('title', 'Eventos do Sistema')
 
-@push('styles')
-<style>
-    .report-table { font-family: "Courier New", Courier, monospace; }
-    .report-table th { background: #1a1a1a !important; color: #fff; font-size: 0.7rem; letter-spacing: 1px; text-transform: uppercase; padding: 8px 10px; }
-    .report-table tbody tr:nth-child(even) td { background-color: #dcfce7; }
-    .report-table tbody tr:nth-child(odd) td { background-color: #ffffff; }
-    .report-table tbody tr:hover td { background-color: #fef3c7 !important; }
-    .report-table td { font-size: 0.78rem; padding: 6px 10px; letter-spacing: 0.3px; border-bottom: 1px solid #e5e7eb; }
-    .holes-left, .holes-right { position: absolute; top: 0; bottom: 0; width: 20px; background-image: radial-gradient(circle 4px, #d1d5db 4px, transparent 4px); background-size: 20px 24px; background-repeat: repeat-y; background-position: center 6px; }
-    .holes-left { left: 0; } .holes-right { right: 0; }
-</style>
-@endpush
+
 
 @section('content')
+<style>
+    .report-table { font-family: "Courier New", Courier, monospace !important; border-collapse: collapse !important; width: 100%; }
+    .report-table thead tr th {
+        background-color: #1B334A !important; color: #ffffff !important;
+        font-size: 0.7rem !important; letter-spacing: 1px; text-transform: uppercase;
+        padding: 10px 12px !important; border: 1px solid #0f1f2e !important; white-space: nowrap;
+    }
+    .report-table thead tr th a,
+    .report-table thead tr th a:hover,
+    .report-table thead tr th a:visited { color: #ffffff !important; text-decoration: none !important; }
+    .report-table tbody tr:nth-child(even) td { background-color: #dcfce7 !important; }
+    .report-table tbody tr:nth-child(odd) td { background-color: #ffffff !important; }
+    .report-table tbody tr:hover td { background-color: #fef3c7 !important; }
+    .report-table td { font-size: 0.78rem !important; padding: 6px 10px !important; border: 1px solid #d1d5db !important; }
+    .report-table tfoot td { background-color: #cbd5e1 !important; font-weight: bold !important; border-top: 3px double #374151 !important; }
+</style>
 <div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
     <nav class="flex mb-4 text-sm text-gray-500">
@@ -80,10 +85,10 @@
         </div>
     </div>
 
-    <div class="relative bg-white rounded-xl shadow-sm border border-gray-300 overflow-hidden">
-        <div class="holes-left"></div>
-        <div class="holes-right"></div>
-        <div class="overflow-x-auto mx-5">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-300 overflow-hidden">
+        
+        
+        <div class="overflow-x-auto">
             <table class="min-w-full report-table">
                 <thead>
                     <tr>

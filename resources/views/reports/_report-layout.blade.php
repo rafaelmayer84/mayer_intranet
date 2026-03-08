@@ -2,54 +2,25 @@
 
 @section('title', $reportTitle ?? 'Relatório')
 
-@push('styles')
-<style>
-    .report-table { font-family: "Courier New", Courier, monospace; }
-    .report-table th {
-        background: #1a1a1a !important;
-        color: #fff;
-        font-size: 0.7rem;
-        letter-spacing: 1px;
-        text-transform: uppercase;
-        padding: 8px 10px;
-    }
-    .report-table tbody tr:nth-child(even) td { background-color: #dcfce7; }
-    .report-table tbody tr:nth-child(odd) td { background-color: #ffffff; }
-    .report-table tbody tr:hover td { background-color: #fef3c7 !important; }
-    .report-table td {
-        font-size: 0.78rem;
-        padding: 6px 10px;
-        letter-spacing: 0.3px;
-        border-bottom: 1px solid #e5e7eb;
-    }
-    .report-table tfoot td {
-        background: #e5e7eb !important;
-        font-weight: bold;
-        border-top: 2px solid #374151;
-    }
-    .report-paper {
-        border-left: 20px solid #f3f4f6;
-        border-right: 20px solid #f3f4f6;
-        background-image:
-            radial-gradient(circle 4px at 10px center, #d1d5db 4px, transparent 4px),
-            radial-gradient(circle 4px at calc(100% - 10px) center, #d1d5db 4px, transparent 4px);
-    }
-    /* Furos laterais */
-    .holes-left, .holes-right {
-        position: absolute;
-        top: 0; bottom: 0;
-        width: 20px;
-        background-image: radial-gradient(circle 4px, #d1d5db 4px, transparent 4px);
-        background-size: 20px 24px;
-        background-repeat: repeat-y;
-        background-position: center 6px;
-    }
-    .holes-left { left: 0; }
-    .holes-right { right: 0; }
-</style>
-@endpush
+
 
 @section('content')
+<style>
+    .report-table { font-family: "Courier New", Courier, monospace !important; border-collapse: collapse !important; width: 100%; }
+    .report-table thead tr th {
+        background-color: #1B334A !important; color: #ffffff !important;
+        font-size: 0.7rem !important; letter-spacing: 1px; text-transform: uppercase;
+        padding: 10px 12px !important; border: 1px solid #0f1f2e !important; white-space: nowrap;
+    }
+    .report-table thead tr th a,
+    .report-table thead tr th a:hover,
+    .report-table thead tr th a:visited { color: #ffffff !important; text-decoration: none !important; }
+    .report-table tbody tr:nth-child(even) td { background-color: #dcfce7 !important; }
+    .report-table tbody tr:nth-child(odd) td { background-color: #ffffff !important; }
+    .report-table tbody tr:hover td { background-color: #fef3c7 !important; }
+    .report-table td { font-size: 0.78rem !important; padding: 6px 10px !important; border: 1px solid #d1d5db !important; }
+    .report-table tfoot td { background-color: #cbd5e1 !important; font-weight: bold !important; border-top: 3px double #374151 !important; }
+</style>
 <div class="max-w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
     {{-- Breadcrumb --}}
@@ -74,7 +45,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 EXCEL
             </a>
-            <a href="{{ $exportRoute }}&type=pdf"
+            <a href="{{ $exportRoute }}&type=pdf" target="_blank"
                class="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold font-mono rounded-lg transition-colors tracking-wider">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                 PDF
@@ -124,10 +95,10 @@
     {{-- Info bar --}}
     <div class="flex items-center justify-between mb-3">
         <div class="text-xs text-gray-500 font-mono">
-            @if(isset($data) && method_exists($data, 'total'))
+            @if(isset($data) && is_object($data) && method_exists($data, 'total'))
                 Registros {{ $data->firstItem() ?? 0 }}-{{ $data->lastItem() ?? 0 }} de {{ $data->total() }}
-            @elseif(isset($data) && $data instanceof \Illuminate\Support\Collection)
-                {{ $data->count() }} registros
+            @elseif(isset($data))
+                {{ is_object($data) && method_exists($data, 'count') ? $data->count() : count($data) }} registros
             @endif
         </div>
         <div class="flex items-center gap-2 text-xs font-mono">
@@ -142,12 +113,12 @@
     </div>
 
     {{-- Tabela estilo formulário contínuo --}}
-    <div class="relative bg-white rounded-xl shadow-sm border border-gray-300 overflow-hidden">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-300 overflow-hidden">
         {{-- Furos laterais --}}
-        <div class="holes-left"></div>
-        <div class="holes-right"></div>
+        
+        
 
-        <div class="overflow-x-auto mx-5">
+        <div class="overflow-x-auto">
             <table class="min-w-full report-table">
                 <thead>
                     <tr>
@@ -226,7 +197,7 @@
     </div>
 
     {{-- Paginação --}}
-    @if(isset($data) && method_exists($data, 'links'))
+    @if(isset($data) && is_object($data) && method_exists($data, 'links') && method_exists($data, 'hasPages') && $data->hasPages())
     <div class="mt-4">
         {{ $data->appends(request()->query())->links() }}
     </div>

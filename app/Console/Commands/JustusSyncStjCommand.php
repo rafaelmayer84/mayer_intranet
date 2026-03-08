@@ -147,7 +147,7 @@ class JustusSyncStjCommand extends Command
             'errors' => $this->errors,
         ]);
 
-        return ($this->errors > 0 && $this->imported === 0) ? 1 : 0;
+        return ($this->errors > 0 && $this->imported === 0 && $this->updated === 0) ? 1 : 0;
     }
 
     private function processAcordaos(array $acordaos, string $datasetName, string $resourceName): void

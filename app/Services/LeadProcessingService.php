@@ -788,7 +788,7 @@ PROMPT;
             // Extrair dados — suporte a formato SendPulse e testes curl
             $contactId = $data['contact']['id'] ?? $data['contact_id'] ?? null;
             $botId = $data['bot']['id'] ?? $data['bot_id'] ?? null;
-            $nome = $data['contact']['name'] ?? $data['nome'] ?? '';
+            $nome = mb_substr(trim($data['contact']['name'] ?? $data['nome'] ?? ''), 0, 200);
             $telefone = $data['contact']['phone'] ?? $data['telefone'] ?? '';
             $variables = $data['contact']['variables'] ?? $data['variables'] ?? [];
             $tags = $data['contact']['tags'] ?? $data['tags'] ?? [];

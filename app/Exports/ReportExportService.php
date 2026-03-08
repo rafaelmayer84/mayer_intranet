@@ -31,7 +31,7 @@ class ReportExportService
         array $columns,
         Collection $data,
         array $totals = [],
-        string $orientation = 'portrait'
+        string $orientation = 'landscape'
     ) {
         if ($type === 'xlsx') {
             return self::exportXlsx($title, $columns, $data, $totals);
@@ -79,10 +79,17 @@ class ReportExportService
             foreach ($columns as $i => $col) {
                 $cell = self::colLetter($i) . $row;
                 $value = is_array($item) ? ($item[$col['key']] ?? '') : ($item->{$col['key']} ?? '');
-                $sheet->setCellValue($cell, $value);
+                // Force type for non-numeric values
+                if ($value === '' || $value === null) {
+                    $sheet->setCellValue($cell, '');
+                } elseif (is_numeric($value)) {
+                    $sheet->setCellValue($cell, (float) $value);
+                } else {
+                    $sheet->setCellValueExplicit($cell, (string) $value, \PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING);
+                }
 
                 $format = $col['format'] ?? 'text';
-                if ($format === 'currency') {
+                if ($format === 'currency' && is_numeric($value)) {
                     $sheet->getStyle($cell)->getNumberFormat()->setFormatCode('#,##0.00');
                 } elseif ($format === 'date') {
                     $sheet->getStyle($cell)->getNumberFormat()->setFormatCode('DD/MM/YYYY');
@@ -160,7 +167,7 @@ class ReportExportService
 
         return response($dompdf->output(), 200, [
             'Content-Type'        => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Content-Disposition' => 'inline; filename="' . $filename . '"',
         ]);
     }
 

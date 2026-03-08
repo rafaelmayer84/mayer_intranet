@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('evidentia_embeddings', function (Blueprint $table) {
+        Schema::connection('evidentia')->create('evidentia_embeddings', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('chunk_id');
             $table->string('model', 60);
@@ -27,6 +27,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('evidentia_embeddings');
+        Schema::connection('evidentia')->dropIfExists('evidentia_embeddings');
     }
 };

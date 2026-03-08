@@ -15,7 +15,7 @@
             </div>
             <div>
                 <h1 class="text-2xl font-bold text-white">Central de Relatórios</h1>
-                <p class="text-white/60 text-sm mt-1">34 relatórios em 10 domínios — filtre, consulte e exporte em Excel ou PDF</p>
+                <p class="text-white/60 text-sm mt-1">27 relatórios em 7 domínios — filtre, consulte e exporte em Excel ou PDF</p>
             </div>
         </div>
     </div>
