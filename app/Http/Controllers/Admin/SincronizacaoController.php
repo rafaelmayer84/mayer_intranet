@@ -87,15 +87,6 @@ class SincronizacaoController extends Controller
                     'message' => $auth ? 'DataJuri API online' : 'Falha na autenticação',
                     'sistema' => 'DataJuri'
                 ]);
-            } elseif ($sistema === 'espocrm') {
-                $service = new EspoCrmSyncService();
-                $result = $service->syncAccounts(); // Teste básico
-                
-                return response()->json([
-                    'success' => true,
-                    'message' => 'ESPO CRM API online',
-                    'sistema' => 'ESPO CRM'
-                ]);
             }
 
             return response()->json([
