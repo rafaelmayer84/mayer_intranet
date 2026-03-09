@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class GenerateEmbeddingsJob implements ShouldQueue
@@ -30,9 +31,9 @@ class GenerateEmbeddingsJob implements ShouldQueue
 
     public function handle(EvidentiaOpenAIService $openai): void
     {
-        $chunks = EvidentiaChunk::whereIn('id', $this->chunkIds)
-            ->whereDoesntHave('embedding')
-            ->get();
+        // Carrega chunks da connection evidentia (onde ainda estão durante migração)
+        // ou do banco shardado (após migração completa)
+        $chunks = $this->loadChunks();
 
         if ($chunks->isEmpty()) {
             return;
@@ -61,13 +62,16 @@ class GenerateEmbeddingsJob implements ShouldQueue
                 }
 
                 $emb = $result['embeddings'][$index];
+                $conn = EvidentiaEmbedding::connectionForTribunal($chunk->tribunal);
 
-                EvidentiaEmbedding::create([
-                    'chunk_id'    => $chunk->id,
-                    'model'       => $model,
-                    'dims'        => $dims,
-                    'vector_json' => $emb['vector'],
-                    'norm'        => $emb['norm'],
+                DB::connection($conn)->table('evidentia_embeddings')->insert([
+                    'chunk_id'   => $chunk->id,
+                    'model'      => $model,
+                    'dims'       => $dims,
+                    'vector_bin' => EvidentiaEmbedding::vectorToBin($emb['vector']),
+                    'norm'       => $emb['norm'],
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ]);
             }
 
@@ -77,6 +81,61 @@ class GenerateEmbeddingsJob implements ShouldQueue
                 'cost'       => $result['cost'],
             ]);
         }
+    }
+
+    /**
+     * Carrega chunks pendentes de embedding.
+     * Busca em todos os shards + evidentia original.
+     */
+    private function loadChunks(): \Illuminate\Support\Collection
+    {
+        $allChunks = collect();
+
+        // Busca nos bancos shardados
+        $embDatabases = config('evidentia.embedding_databases', []);
+        $checkedConns = [];
+
+        foreach ($embDatabases as $tribunal => $conn) {
+            if ($tribunal === 'default' || in_array($conn, $checkedConns)) {
+                continue;
+            }
+            $checkedConns[] = $conn;
+
+            try {
+                $chunks = EvidentiaChunk::on($conn)
+                    ->whereIn('id', $this->chunkIds)
+                    ->whereNotExists(function ($q) use ($conn) {
+                        $q->select(DB::raw(1))
+                          ->from(DB::connection($conn)->getDatabaseName() . '.evidentia_embeddings')
+                          ->whereColumn('evidentia_embeddings.chunk_id', 'evidentia_chunks.id');
+                    })
+                    ->get();
+                $allChunks = $allChunks->merge($chunks);
+            } catch (\Exception $e) {
+                // Shard may not have these chunks
+            }
+        }
+
+        // Busca no banco evidentia original (default/fallback + chunks ainda não migrados)
+        $defaultConn = $embDatabases['default'] ?? 'evidentia';
+        if (!in_array($defaultConn, $checkedConns)) {
+            $checkedConns[] = $defaultConn;
+        }
+
+        $remainingIds = array_diff($this->chunkIds, $allChunks->pluck('id')->toArray());
+        if (!empty($remainingIds)) {
+            try {
+                $chunks = EvidentiaChunk::on('evidentia')
+                    ->whereIn('id', $remainingIds)
+                    ->whereDoesntHave('embedding')
+                    ->get();
+                $allChunks = $allChunks->merge($chunks);
+            } catch (\Exception $e) {
+                Log::warning('Evidentia: falha ao carregar chunks do evidentia', ['error' => $e->getMessage()]);
+            }
+        }
+
+        return $allChunks;
     }
 
     public function failed(\Throwable $exception): void

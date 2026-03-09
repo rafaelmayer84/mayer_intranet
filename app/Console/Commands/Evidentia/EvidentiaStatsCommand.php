@@ -36,19 +36,67 @@ class EvidentiaStatsCommand extends Command
 
         $this->newLine();
         $this->info('CHUNKS:');
-        $totalChunks = EvidentiaChunk::count();
+        $totalChunks = 0;
+        $byTribunal = [];
+        $embDbs = config('evidentia.embedding_databases', []);
+        $countedConns = [];
+        foreach ($embDbs as $trib => $conn) {
+            if ($trib === 'default' || in_array($conn, $countedConns)) continue;
+            $countedConns[] = $conn;
+            try {
+                $rows = \DB::connection($conn)->table('evidentia_chunks')
+                    ->select('tribunal', \DB::raw('count(*) as total'))
+                    ->groupBy('tribunal')->get();
+                foreach ($rows as $r) {
+                    $byTribunal[$r->tribunal] = ($byTribunal[$r->tribunal] ?? 0) + $r->total;
+                    $totalChunks += $r->total;
+                }
+            } catch (\Exception $e) {}
+        }
+        $defConn = $embDbs['default'] ?? 'evidentia';
+        if (!in_array($defConn, $countedConns)) {
+            try {
+                $rows = \DB::connection($defConn)->table('evidentia_chunks')
+                    ->select('tribunal', \DB::raw('count(*) as total'))
+                    ->groupBy('tribunal')->get();
+                foreach ($rows as $r) {
+                    $byTribunal[$r->tribunal] = ($byTribunal[$r->tribunal] ?? 0) + $r->total;
+                    $totalChunks += $r->total;
+                }
+            } catch (\Exception $e) {}
+        }
         $this->line("  Total: {$totalChunks}");
-        $byTribunal = EvidentiaChunk::select('tribunal', DB::raw('count(*) as total'))
-            ->groupBy('tribunal')
-            ->pluck('total', 'tribunal');
         foreach ($byTribunal as $trib => $count) {
             $this->line("  {$trib}: {$count}");
         }
 
         $this->newLine();
         $this->info('EMBEDDINGS:');
-        $totalEmb = EvidentiaEmbedding::count();
-        $pendingEmb = EvidentiaChunk::whereDoesntHave('embedding')->count();
+        // Count embeddings across all shards
+        $totalEmb = 0;
+        $pendingEmb = 0;
+        $embDatabases = config('evidentia.embedding_databases', []);
+        $checkedConns = [];
+        foreach ($embDatabases as $trib => $conn) {
+            if ($trib === 'default' || in_array($conn, $checkedConns)) continue;
+            $checkedConns[] = $conn;
+            try {
+                $totalEmb += \DB::connection($conn)->table('evidentia_embeddings')->count();
+                $pendingEmb += \DB::connection($conn)->table('evidentia_chunks as c')
+                    ->leftJoin('evidentia_embeddings as e', 'e.chunk_id', '=', 'c.id')
+                    ->whereNull('e.id')->count();
+            } catch (\Exception $e) {}
+        }
+        // Also count default/evidentia for TRF4/TRT12
+        $defaultConn = $embDatabases['default'] ?? 'evidentia';
+        if (!in_array($defaultConn, $checkedConns)) {
+            try {
+                $totalEmb += \DB::connection($defaultConn)->table('evidentia_embeddings')->count();
+                $pendingEmb += \DB::connection($defaultConn)->table('evidentia_chunks as c')
+                    ->leftJoin('evidentia_embeddings as e', 'e.chunk_id', '=', 'c.id')
+                    ->whereNull('e.id')->count();
+            } catch (\Exception $e) {}
+        }
         $this->line("  Gerados: {$totalEmb}");
         $this->line("  Pendentes: {$pendingEmb}");
 

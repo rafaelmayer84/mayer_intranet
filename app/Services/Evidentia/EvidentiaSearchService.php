@@ -21,7 +21,7 @@ class EvidentiaSearchService
     /**
      * Executa busca híbrida completa.
      */
-    public function search(string $query, array $filters = [], int $topk = 10, ?int $userId = null): EvidentiaSearch
+    public function search(string $query, array $filters = [], int $topk = 10, ?int $userId = null, bool $exactMatch = false): EvidentiaSearch
     {
         $startTime = microtime(true);
 
@@ -52,7 +52,7 @@ class EvidentiaSearchService
             $mergedFilters = array_merge($aiFilters, $filters);
 
             // ETAPA 2: Fulltext search cross-database
-            $fulltextCandidates = $this->fulltextSearch($termos, $expansoes, $mergedFilters);
+            $fulltextCandidates = $this->fulltextSearch($termos, $expansoes, $mergedFilters, $exactMatch, $query);
 
             if (empty($fulltextCandidates)) {
                 $search->update([
@@ -146,11 +146,11 @@ class EvidentiaSearchService
      * ETAPA 2: Fulltext search cross-database.
      * Retorna array de candidatos com score_text e metadados.
      */
-    private function fulltextSearch(array $termos, array $expansoes, array $filters): array
+    private function fulltextSearch(array $termos, array $expansoes, array $filters, bool $exactMatch = false, string $originalQuery = ''): array
     {
         $allTerms = array_merge($termos, $expansoes);
         // Se IA nao gerou termos, usa palavras originais da query
-        if (empty($allTerms)) {
+        if (empty($allTerms) && !$exactMatch) {
             return [];
         }
 
@@ -158,12 +158,32 @@ class EvidentiaSearchService
         $fulltextColumn = config('evidentia.fulltext_column', 'ementa');
         $candidates = [];
 
-        // Tenta 3 estrategias em cascata ate achar resultados
-        $strategies = [
-            ['mode' => 'BOOLEAN',  'query' => $this->buildBooleanQuery($allTerms)],
-            ['mode' => 'NATURAL',  'query' => $this->buildNaturalQuery($allTerms)],
-            ['mode' => 'NATURAL',  'query' => $this->buildNaturalQuery($termos)], // so termos originais
-        ];
+        // Extrai termos exatos entre aspas da query original
+        $exactTerms = [];
+        if ($exactMatch || preg_match_all('/"([^"]+)"/', $originalQuery, $matches)) {
+            if ($exactMatch) {
+                // Modo exato: trata a query inteira como termo exato
+                $exactTerms[] = trim($originalQuery, '"');
+            } elseif (!empty($matches[1])) {
+                $exactTerms = $matches[1];
+            }
+        }
+
+        // Se há termos exatos, prioriza busca com eles
+        if (!empty($exactTerms)) {
+            $strategies = [
+                ['mode' => 'BOOLEAN',  'query' => $this->buildExactBooleanQuery($exactTerms, $allTerms)],
+                ['mode' => 'BOOLEAN',  'query' => $this->buildBooleanQuery($allTerms)],
+                ['mode' => 'NATURAL',  'query' => $this->buildNaturalQuery($allTerms)],
+            ];
+        } else {
+            // Tenta 3 estrategias em cascata ate achar resultados
+            $strategies = [
+                ['mode' => 'BOOLEAN',  'query' => $this->buildBooleanQuery($allTerms)],
+                ['mode' => 'NATURAL',  'query' => $this->buildNaturalQuery($allTerms)],
+                ['mode' => 'NATURAL',  'query' => $this->buildNaturalQuery($termos)], // so termos originais
+            ];
+        }
 
         foreach ($strategies as $stratIndex => $strategy) {
             if (!empty($candidates)) {
@@ -307,6 +327,29 @@ class EvidentiaSearchService
     }
 
     /**
+     * Constrói query boolean com termos exatos (aspas duplas no BOOLEAN MODE).
+     */
+    private function buildExactBooleanQuery(array $exactTerms, array $otherTerms = []): string
+    {
+        $parts = [];
+        // Termos exatos obrigatórios com aspas
+        foreach ($exactTerms as $term) {
+            $clean = preg_replace('/[+\-><()~*@]/', '', trim($term));
+            if (mb_strlen($clean) >= 2) {
+                $parts[] = '+"' . $clean . '"';
+            }
+        }
+        // Termos adicionais opcionais (sem +)
+        foreach (array_slice($otherTerms, 0, 6) as $term) {
+            $clean = preg_replace('/[+\-><()~*"@]/', '', trim($term));
+            if (mb_strlen($clean) >= 3 && !in_array(mb_strtolower($clean), array_map('mb_strtolower', $exactTerms))) {
+                $parts[] = $clean;
+            }
+        }
+        return implode(' ', $parts);
+    }
+
+    /**
      * Constrói query boolean para MATCH AGAINST.
      */
     private function buildBooleanQuery(array $terms): string
@@ -354,51 +397,116 @@ class EvidentiaSearchService
         $queryVector = $queryEmbedding['vector'];
         $queryNorm   = $queryEmbedding['norm'];
 
-        // IDs das jurisprudências candidatas (por tribunal/source_db)
+        // Agrupa candidatos por tribunal
         $candidateGroups = [];
         foreach (array_slice($fulltextCandidates, 0, $maxSemantic) as $c) {
-            $key = $c['source_db'] . '|' . $c['tribunal'];
-            $candidateGroups[$key][] = $c['id'];
+            $tribunal = $c['tribunal'];
+            $candidateGroups[$tribunal][] = $c;
         }
 
-        $scores = []; // [tribunal|juris_id => max_similarity]
-        $bestChunks = []; // [tribunal|juris_id => chunk_text]
+        $scores = [];
+        $bestChunks = [];
 
-        foreach ($candidateGroups as $groupKey => $jurisIds) {
-            [$sourceDb, $tribunal] = explode('|', $groupKey);
+        foreach ($candidateGroups as $tribunal => $candidates) {
+            $jurisIds = array_column($candidates, 'id');
+            $sourceDb = $candidates[0]['source_db'];
+            $embConn = EvidentiaEmbedding::connectionForTribunal($tribunal);
 
-            // Busca chunks que têm embeddings
-            $chunkIds = EvidentiaChunk::where('source_db', $sourceDb)
+            // Busca chunk_ids no banco shardado
+            $chunkIds = DB::connection($embConn)
+                ->table('evidentia_chunks')
+                ->where('source_db', $sourceDb)
                 ->where('tribunal', $tribunal)
                 ->whereIn('jurisprudence_id', $jurisIds)
                 ->pluck('id')
                 ->toArray();
 
+            // Fallback: busca no banco evidentia original (chunks ainda não migrados)
+            if (empty($chunkIds) && $embConn !== 'evidentia') {
+                $chunkIds = DB::connection('evidentia')
+                    ->table('evidentia_chunks')
+                    ->where('source_db', $sourceDb)
+                    ->where('tribunal', $tribunal)
+                    ->whereIn('jurisprudence_id', $jurisIds)
+                    ->pluck('id')
+                    ->toArray();
+
+                // Se achou no evidentia, busca embeddings lá (formato JSON legado)
+                if (!empty($chunkIds)) {
+                    $this->searchEmbeddingsLegacy($chunkIds, $queryVector, $queryNorm, $scores, $bestChunks);
+                    continue;
+                }
+            }
+
             if (empty($chunkIds)) {
                 continue;
             }
 
-            // Carrega embeddings em lotes para não estourar memória
+            // Carrega embeddings (float16 binário) em lotes
             $batchSize = 500;
             foreach (array_chunk($chunkIds, $batchSize) as $batch) {
-                $embeddings = EvidentiaEmbedding::with('chunk')
-                    ->whereIn('chunk_id', $batch)
+                $rows = DB::connection($embConn)
+                    ->table('evidentia_embeddings as e')
+                    ->join('evidentia_chunks as c', 'c.id', '=', 'e.chunk_id')
+                    ->whereIn('e.chunk_id', $batch)
+                    ->select('e.vector_bin', 'e.norm', 'c.tribunal', 'c.jurisprudence_id', 'c.chunk_text')
                     ->get();
 
-                foreach ($embeddings as $emb) {
+                foreach ($rows as $row) {
+                    $emb = new EvidentiaEmbedding();
+                    $emb->attributes['vector_bin'] = $row->vector_bin;
+                    $emb->norm = $row->norm;
+
                     $similarity = $emb->cosineSimilarity($queryVector, $queryNorm);
-                    $chunk = $emb->chunk;
-                    $compositeKey = $chunk->tribunal . '|' . $chunk->jurisprudence_id;
+                    $compositeKey = $row->tribunal . '|' . $row->jurisprudence_id;
 
                     if (!isset($scores[$compositeKey]) || $similarity > $scores[$compositeKey]) {
                         $scores[$compositeKey] = $similarity;
-                        $bestChunks[$compositeKey] = $chunk->chunk_text;
+                        $bestChunks[$compositeKey] = $row->chunk_text;
                     }
                 }
             }
         }
 
         return ['scores' => $scores, 'best_chunks' => $bestChunks];
+    }
+
+    /**
+     * Busca embeddings no formato legado (JSON) do banco evidentia original.
+     * Usado durante o período de transição antes da migração completa.
+     */
+    private function searchEmbeddingsLegacy(array $chunkIds, array $queryVector, float $queryNorm, array &$scores, array &$bestChunks): void
+    {
+        $batchSize = 500;
+        foreach (array_chunk($chunkIds, $batchSize) as $batch) {
+            $rows = DB::connection('evidentia')
+                ->table('evidentia_embeddings as e')
+                ->join('evidentia_chunks as c', 'c.id', '=', 'e.chunk_id')
+                ->whereIn('e.chunk_id', $batch)
+                ->select('e.vector_json', 'e.norm', 'c.tribunal', 'c.jurisprudence_id', 'c.chunk_text')
+                ->get();
+
+            foreach ($rows as $row) {
+                $vector = json_decode($row->vector_json, true);
+                if (!$vector || !is_array($vector)) {
+                    continue;
+                }
+
+                $dot = 0.0;
+                $count = min(count($vector), count($queryVector));
+                for ($i = 0; $i < $count; $i++) {
+                    $dot += $vector[$i] * $queryVector[$i];
+                }
+                $denominator = $row->norm * $queryNorm;
+                $similarity = $denominator > 0 ? $dot / $denominator : 0.0;
+
+                $compositeKey = $row->tribunal . '|' . $row->jurisprudence_id;
+                if (!isset($scores[$compositeKey]) || $similarity > $scores[$compositeKey]) {
+                    $scores[$compositeKey] = $similarity;
+                    $bestChunks[$compositeKey] = $row->chunk_text;
+                }
+            }
+        }
     }
 
     /**

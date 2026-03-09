@@ -42,6 +42,7 @@ class EvidentiaController extends Controller
             'periodo_inicio' => 'nullable|date',
             'periodo_fim'    => 'nullable|date',
             'topk'           => 'nullable|integer|min:5|max:30',
+            'exact_match'    => 'nullable|boolean',
         ]);
 
         // Budget guard no controller
@@ -62,11 +63,14 @@ class EvidentiaController extends Controller
 
         $topk = (int) ($request->input('topk', config('evidentia.default_topk')));
 
+        $exactMatch = (bool) $request->input('exact_match', false);
+
         $search = $searchService->search(
             $request->input('query'),
             $filters,
             $topk,
-            auth()->id()
+            auth()->id(),
+            $exactMatch
         );
 
         return redirect()->route('evidentia.resultados', $search->id);

@@ -7,6 +7,26 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class EvidentiaChunk extends Model
 {
+
+    /**
+     * Resolve a connection correta baseada no tribunal.
+     * Usado via EvidentiaChunk::onTribunal('STJ')->where(...)
+     */
+    public static function onTribunal(string $tribunal): \Illuminate\Database\Eloquent\Builder
+    {
+        $conn = self::connectionForTribunal($tribunal);
+        return (new static)->setConnection($conn)->newQuery();
+    }
+
+    /**
+     * Retorna o nome da connection para um tribunal.
+     */
+    public static function connectionForTribunal(string $tribunal): string
+    {
+        $map = config('evidentia.embedding_databases', []);
+        return $map[strtoupper($tribunal)] ?? ($map['default'] ?? 'evidentia');
+    }
+
     protected $connection = 'evidentia';
     protected $table = 'evidentia_chunks';
 

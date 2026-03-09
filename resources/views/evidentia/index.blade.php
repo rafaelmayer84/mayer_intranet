@@ -39,11 +39,22 @@
             <textarea name="query" id="query" rows="3"
                 class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:border-transparent text-base"
                 style="focus:ring-color: #385776;"
-                placeholder="Ex: indenização por dano moral em contrato bancário com cláusula abusiva"
+                placeholder="Ex: indenização por dano moral em contrato bancário — use aspas para termos exatos: &quot;cruz vermelha&quot;"
                 required minlength="5">{{ old('query') }}</textarea>
             @error('query')
                 <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
             @enderror
+        </div>
+
+        {{-- Opção Termo Exato --}}
+        <div class="mb-4 flex items-center gap-3">
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" name="exact_match" value="1" class="sr-only peer"
+                    {{ old('exact_match') ? 'checked' : '' }}>
+                <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#385776]"></div>
+            </label>
+            <span class="text-sm text-gray-600">Termo exato</span>
+            <span class="text-xs text-gray-400" title="Busca a expressão exata na jurisprudência. Você também pode usar aspas na pesquisa: &quot;cruz vermelha&quot;">ℹ</span>
         </div>
 
         {{-- Filtros expansíveis --}}

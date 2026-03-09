@@ -30,20 +30,6 @@ return [
     */
 
     'connections' => [
-        'embeds' => [
-            'driver' => 'mysql',
-            'host' => env('DB_HOST', '127.0.0.1'),
-            'port' => env('DB_PORT', '3306'),
-            'database' => env('DB_EMBEDS_DATABASE'),
-            'username' => env('DB_EMBEDS_USERNAME'),
-            'password' => env('DB_EMBEDS_PASSWORD'),
-            'charset' => 'utf8mb4',
-            'collation' => 'utf8mb4_unicode_ci',
-            'prefix' => '',
-            'strict' => true,
-        ],
-
-
         'evidentia' => [
             'driver' => 'mysql',
             'host' => env('DB_HOST', '127.0.0.1'),
@@ -56,6 +42,33 @@ return [
             'prefix' => '',
             'strict' => true,
         ],
+
+        'emb_tjsc' => [
+            'driver' => 'mysql',
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '3306'),
+            'database' => env('DB_EMB_TJSC_DATABASE'),
+            'username' => env('DB_EMB_TJSC_USERNAME'),
+            'password' => env('DB_EMB_TJSC_PASSWORD'),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => true,
+        ],
+
+        'emb_stj' => [
+            'driver' => 'mysql',
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '3306'),
+            'database' => env('DB_EMB_STJ_DATABASE'),
+            'username' => env('DB_EMB_STJ_USERNAME'),
+            'password' => env('DB_EMB_STJ_PASSWORD'),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => true,
+        ],
+
 
 
 

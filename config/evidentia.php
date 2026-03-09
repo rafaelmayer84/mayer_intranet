@@ -99,4 +99,18 @@ return [
         ],
     ],
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Embedding Databases (sharded by tribunal)
+    |--------------------------------------------------------------------------
+    | Maps tribunal to the DB connection storing its chunks + embeddings.
+    | 'default' is used for tribunals without a dedicated shard.
+    */
+    'embedding_databases' => [
+        'TJSC'    => 'emb_tjsc',
+        'STJ'     => 'emb_stj',
+        'default' => 'evidentia',  // TRF4, TRT12, and any future tribunals
+    ],
+
 ];
