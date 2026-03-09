@@ -44,6 +44,8 @@ Route::middleware(['auth'])->prefix('relatorios')->name('relatorios.')->group(fu
         Route::get('/pipeline', [ReportCrmController::class, 'pipeline'])->name('pipeline');
         Route::get('/health-segmentacao', [ReportCrmController::class, 'healthSegmentacao'])->name('health-segmentacao');
         Route::get('/atividades', [ReportCrmController::class, 'atividades'])->name('atividades');
+        Route::get('/siric', [ReportCrmController::class, 'siric'])->name('siric');
+        Route::get('/sipex', [ReportCrmController::class, 'sipex'])->name('sipex');
     });
 
     // Produtividade (3)

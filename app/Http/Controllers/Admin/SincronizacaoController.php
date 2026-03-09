@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Services\DataJuriSyncService;
-// EspoCrmSyncService removido em 13/02/2026
+// EspoCrmSyncService removido em 13/02/2026 - cleanup 09/03/2026
 use App\Models\IntegrationLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
@@ -29,12 +29,7 @@ class SincronizacaoController extends Controller
                 'erro' => IntegrationLog::where('sistema', 'DataJuri')->where('status', 'erro')->count(),
                 'ultima_sync' => IntegrationLog::where('sistema', 'DataJuri')->where('status', 'sucesso')->latest()->first()?->created_at,
             ],
-            'espocrm' => [
-                'total' => 0,
-                'sucesso' => 0,
-                'erro' => 0,
-                'ultima_sync' => null,
-            ], // ESPO CRM desativado 13/02/2026
+            // ESPO CRM removido - cleanup 09/03/2026
         ];
 
         return view('admin.sincronizacao.index', compact('logs', 'stats'));
@@ -51,11 +46,6 @@ class SincronizacaoController extends Controller
         try {
             if ($sistema === 'datajuri') {
                 Artisan::call('sync:datajuri', [
-                    '--entity' => $entidade
-                ]);
-                $output = Artisan::output();
-            } elseif ($sistema === 'espocrm') {
-                Artisan::call('sync:espocrm', [
                     '--entity' => $entidade
                 ]);
                 $output = Artisan::output();

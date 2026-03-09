@@ -243,4 +243,101 @@ class ReportCrmController extends Controller
         ];
         return ReportExportService::export($type, 'Atividades CRM', $columns, collect($data->items()), [], 'landscape');
     }
+
+    // ── REL-IA01: SIRIC — Análises de Crédito ────────────────
+    public function siric(Request $request)
+    {
+        $filters = $request->only(['rating','recomendacao','busca','sort','dir']);
+        $data = $this->service->siricConsultas($filters, (int)$request->get('per_page',25));
+
+        return view('reports._report-layout', [
+            'reportTitle'=>'SIRIC — Análises de Crédito (IA)','domainLabel'=>'CRM / Clientes & Leads',
+            'columns'=>[
+                ['key'=>'created_at','label'=>'Data','format'=>'date','sortable'=>true],
+                ['key'=>'nome','label'=>'Nome','format'=>'text','sortable'=>false],
+                ['key'=>'cpf_cnpj','label'=>'CPF/CNPJ','format'=>'text','sortable'=>false],
+                ['key'=>'valor_total','label'=>'Valor (R$)','format'=>'currency','sortable'=>false],
+                ['key'=>'parcelas_desejadas','label'=>'Parcelas','format'=>'text','sortable'=>false],
+                ['key'=>'renda_declarada','label'=>'Renda (R$)','format'=>'currency','sortable'=>false],
+                ['key'=>'rating','label'=>'Rating IA','format'=>'badge','sortable'=>false,
+                 'badge_colors'=>['A'=>'bg-emerald-200 text-emerald-800','B'=>'bg-blue-100 text-blue-700','C'=>'bg-amber-100 text-amber-700','D'=>'bg-orange-200 text-orange-800','E'=>'bg-red-200 text-red-800']],
+                ['key'=>'score','label'=>'Score IA','format'=>'text','sortable'=>false],
+                ['key'=>'recomendacao','label'=>'Recomendação IA','format'=>'badge','sortable'=>false,
+                 'badge_colors'=>['aprovado'=>'bg-emerald-100 text-emerald-700','aprovado_condicional'=>'bg-amber-100 text-amber-700','negado'=>'bg-red-100 text-red-700']],
+                ['key'=>'decisao_humana','label'=>'Decisão Humana','format'=>'badge','sortable'=>false,
+                 'badge_colors'=>['aprovado'=>'bg-emerald-100 text-emerald-700','negado'=>'bg-red-100 text-red-700']],
+                ['key'=>'analista','label'=>'Analista','format'=>'text','sortable'=>false],
+                ['key'=>'resumo_ia','label'=>'Resumo IA','format'=>'text','sortable'=>false,'limit'=>100],
+            ],
+            'data'=>$data,'totals'=>[],
+            'filters'=>[
+                ['name'=>'rating','label'=>'Rating','type'=>'select','options'=>['A'=>'A','B'=>'B','C'=>'C','D'=>'D','E'=>'E']],
+                ['name'=>'recomendacao','label'=>'Recomendação','type'=>'select','options'=>['aprovado'=>'Aprovado','aprovado_condicional'=>'Condicional','negado'=>'Negado']],
+                ['name'=>'busca','label'=>'Busca','type'=>'text','placeholder'=>'Nome ou CPF...'],
+            ],
+            'exportRoute'=>route('relatorios.export',['domain'=>'crm','report'=>'siric']).'?'.http_build_query(array_filter($request->all())),
+        ]);
+    }
+
+    public function exportSiric(Request $request, string $type)
+    {
+        $data = $this->service->siricConsultas($request->only(['rating','recomendacao','busca','sort','dir']), 999999);
+        return ReportExportService::export($type, 'SIRIC Análises Crédito IA', [
+            ['key'=>'created_at','label'=>'Data','format'=>'date'],['key'=>'nome','label'=>'Nome','format'=>'text'],
+            ['key'=>'cpf_cnpj','label'=>'CPF/CNPJ','format'=>'text'],['key'=>'valor_total','label'=>'Valor','format'=>'currency'],
+            ['key'=>'rating','label'=>'Rating','format'=>'text'],['key'=>'score','label'=>'Score','format'=>'text'],
+            ['key'=>'recomendacao','label'=>'Recom. IA','format'=>'text'],['key'=>'decisao_humana','label'=>'Decisão','format'=>'text'],
+            ['key'=>'resumo_ia','label'=>'Resumo IA','format'=>'text'],
+        ], collect($data->items()), []);
+    }
+
+    // ── REL-IA02: SIPEX — Propostas Precificação IA ──────────
+    public function sipex(Request $request)
+    {
+        $filters = $request->only(['area','status','recomendacao','busca','sort','dir']);
+        $data = $this->service->sipexPropostas($filters, (int)$request->get('per_page',25));
+
+        return view('reports._report-layout', [
+            'reportTitle'=>'SIPEX — Propostas de Honorários (IA)','domainLabel'=>'CRM / Clientes & Leads',
+            'columns'=>[
+                ['key'=>'created_at','label'=>'Data','format'=>'date','sortable'=>true],
+                ['key'=>'nome_proponente','label'=>'Proponente','format'=>'text','sortable'=>false],
+                ['key'=>'tipo_pessoa','label'=>'Tipo','format'=>'badge','sortable'=>false,
+                 'badge_colors'=>['PF'=>'bg-blue-100 text-blue-700','PJ'=>'bg-violet-100 text-violet-700']],
+                ['key'=>'area_direito','label'=>'Área','format'=>'text','sortable'=>false,'limit'=>25],
+                ['key'=>'tipo_acao','label'=>'Tipo Ação','format'=>'text','sortable'=>false,'limit'=>30],
+                ['key'=>'valor_rapida','label'=>'Rápida (R$)','format'=>'currency','sortable'=>false],
+                ['key'=>'valor_equilibrada','label'=>'Equilibrada (R$)','format'=>'currency','sortable'=>false],
+                ['key'=>'valor_premium','label'=>'Premium (R$)','format'=>'currency','sortable'=>false],
+                ['key'=>'recomendacao_ia','label'=>'Recom. IA','format'=>'badge','sortable'=>false,
+                 'badge_colors'=>['rapida'=>'bg-blue-100 text-blue-700','equilibrada'=>'bg-emerald-100 text-emerald-700','premium'=>'bg-amber-100 text-amber-700']],
+                ['key'=>'valor_final','label'=>'Valor Final (R$)','format'=>'currency','sortable'=>false],
+                ['key'=>'status','label'=>'Status','format'=>'badge','sortable'=>false,
+                 'badge_colors'=>['gerada'=>'bg-blue-100 text-blue-700','aceita'=>'bg-emerald-100 text-emerald-700','rejeitada'=>'bg-red-100 text-red-700','enviada'=>'bg-amber-100 text-amber-700']],
+                ['key'=>'advogado','label'=>'Advogado','format'=>'text','sortable'=>false],
+                ['key'=>'justificativa_ia','label'=>'Justificativa IA','format'=>'text','sortable'=>false,'limit'=>80],
+            ],
+            'data'=>$data,'totals'=>[],
+            'filters'=>[
+                ['name'=>'area','label'=>'Área','type'=>'text','placeholder'=>'Cível, Trabalhista...'],
+                ['name'=>'status','label'=>'Status','type'=>'select','options'=>['gerada'=>'Gerada','aceita'=>'Aceita','enviada'=>'Enviada','rejeitada'=>'Rejeitada']],
+                ['name'=>'recomendacao','label'=>'Recom. IA','type'=>'select','options'=>['rapida'=>'Rápida','equilibrada'=>'Equilibrada','premium'=>'Premium']],
+                ['name'=>'busca','label'=>'Busca','type'=>'text','placeholder'=>'Nome ou tipo ação...'],
+            ],
+            'exportRoute'=>route('relatorios.export',['domain'=>'crm','report'=>'sipex']).'?'.http_build_query(array_filter($request->all())),
+        ]);
+    }
+
+    public function exportSipex(Request $request, string $type)
+    {
+        $data = $this->service->sipexPropostas($request->only(['area','status','recomendacao','busca','sort','dir']), 999999);
+        return ReportExportService::export($type, 'SIPEX Propostas IA', [
+            ['key'=>'created_at','label'=>'Data','format'=>'date'],['key'=>'nome_proponente','label'=>'Proponente','format'=>'text'],
+            ['key'=>'area_direito','label'=>'Área','format'=>'text'],['key'=>'tipo_acao','label'=>'Tipo Ação','format'=>'text'],
+            ['key'=>'valor_rapida','label'=>'Rápida','format'=>'currency'],['key'=>'valor_equilibrada','label'=>'Equilibrada','format'=>'currency'],
+            ['key'=>'valor_premium','label'=>'Premium','format'=>'currency'],['key'=>'recomendacao_ia','label'=>'Recom.','format'=>'text'],
+            ['key'=>'valor_final','label'=>'Final','format'=>'currency'],['key'=>'justificativa_ia','label'=>'Justificativa IA','format'=>'text'],
+        ], collect($data->items()), []);
+    }
+
 }

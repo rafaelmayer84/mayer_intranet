@@ -48,7 +48,7 @@ class IntegracoesController extends Controller
     {
         $status = [
             'datajuri' => $this->checkDataJuriStatus(),
-            'espocrm' => ['status' => 'disabled', 'message' => 'ESPO CRM desativado - CRM Nativo', 'last_check' => now()->toDateTimeString()], // desativado 13/02/2026
+            // ESPO CRM removido - cleanup 09/03/2026
         ];
 
         return response()->json($status);
@@ -73,34 +73,7 @@ class IntegracoesController extends Controller
         }
     }
 
-    private function checkEspoCrmStatus()
-    {
-        try {
-            // Tenta verificar se o service existe
-            if (class_exists(\App\Services\EspoCrmService::class)) {
-                $service = app(\App\Services\EspoCrmService::class);
-                if (method_exists($service, 'testarConexao')) {
-                    $connected = $service->testarConexao();
-                    return [
-                        'status' => $connected ? 'online' : 'offline',
-                        'message' => $connected ? 'Conexão OK' : 'Falha na conexão',
-                        'last_check' => now()->format('d/m/Y H:i:s'),
-                    ];
-                }
-            }
-            return [
-                'status' => 'unknown',
-                'message' => 'Service não configurado',
-                'last_check' => now()->format('d/m/Y H:i:s'),
-            ];
-        } catch (\Exception $e) {
-            return [
-                'status' => 'error',
-                'message' => 'Erro: ' . $e->getMessage(),
-                'last_check' => now()->format('d/m/Y H:i:s'),
-            ];
-        }
-    }
+    // checkEspoCrmStatus() removido - cleanup 09/03/2026
 
     /**
      * Sincronização DataJuri com progresso

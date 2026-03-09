@@ -4,7 +4,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SyncController;
 use App\Http\Controllers\ConfiguracaoController;
-use App\Http\Controllers\ClassificacaoController;
+// ClassificacaoController removido 09/03/2026 - consolidado em Admin\ClassificacaoRegrasController
 // Rota raiz - redireciona para dashboard se logado, senão para login
 Route::get("/", function () {
     return auth()->check() ? redirect()->route("avisos.index") : redirect()->route("login");
@@ -79,11 +79,7 @@ Route::middleware(["auth"])->group(function () {
     Route::post("/configuracoes/vincular", [ConfiguracaoController::class, "vincularAdvogado"])->name("configuracoes.vincular");
     Route::get("/configuracoes/resetar-classificacoes", [ConfiguracaoController::class, "resetarClassificacoes"])->name("configuracoes.resetar-classificacoes");
     
-    // Classificação Manual
-    Route::get("/classificacao", [ClassificacaoController::class, "index"])->name("classificacao")->middleware("admin");
-    Route::post("/classificacao/aplicar", [ClassificacaoController::class, "aplicar"])->name("classificacao.aplicar")->middleware("admin");
-    Route::post("/classificacao/classificar", [ClassificacaoController::class, "classificar"]);
-    Route::post("/classificacao/lote", [ClassificacaoController::class, "classificarLote"]);
+    // Classificacao Manual REMOVIDA 09/03/2026 - consolidada em admin/classificacao-regras
     Route::post("/api/configuracoes/ano", [ConfiguracaoController::class, "setAnoFiltro"]);
     Route::post("/api/configuracoes/datajuri", [ConfiguracaoController::class, "saveDataJuriCredentials"]);
     Route::get("/api/configuracoes/datajuri/test", [ConfiguracaoController::class, "testDataJuriConnection"]);

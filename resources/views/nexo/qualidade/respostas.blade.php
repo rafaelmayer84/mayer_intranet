@@ -23,7 +23,7 @@
                         <th class="px-4 py-3 text-left">Data</th>
                         <th class="px-4 py-3 text-left">Advogado</th>
                         <th class="px-4 py-3 text-center">Nota (1-5)</th>
-                        <th class="px-4 py-3 text-center">NPS (0-10)</th>
+                        <th class="px-4 py-3 text-center">NPS (0-5)</th>
                         <th class="px-4 py-3 text-left">Comentário</th>
                         @if($canViewIdentity)
                         <th class="px-4 py-3 text-left">Telefone</th>
@@ -45,7 +45,7 @@
                         </td>
                         <td class="px-4 py-3 text-center">
                             @if($r->nps !== null)
-                            <span class="text-xs font-medium {{ $r->nps >= 9 ? 'text-green-600' : ($r->nps >= 7 ? 'text-gray-500' : 'text-red-600') }}">{{ $r->nps }}</span>
+                            <span class="text-xs font-medium {{ $r->nps >= 4 ? 'text-green-600' : ($r->nps == 3 ? 'text-gray-500' : 'text-red-600') }}">{{ $r->nps }}</span>
                             @else — @endif
                         </td>
                         <td class="px-4 py-3 text-xs text-gray-600 max-w-xs truncate" title="{{ $r->free_text }}">

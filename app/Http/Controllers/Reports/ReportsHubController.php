@@ -35,6 +35,8 @@ class ReportsHubController extends Controller
                     ['route' => 'relatorios.crm.atividades', 'label' => 'Atividades CRM'],
                     ['route' => 'relatorios.leads.funil', 'label' => 'Funil de Leads'],
                     ['route' => 'relatorios.leads.marketing', 'label' => 'Performance Marketing'],
+                    ['route' => 'relatorios.crm.siric', 'label' => 'SIRIC — Análises de Crédito (IA)'],
+                    ['route' => 'relatorios.crm.sipex', 'label' => 'SIPEX — Propostas Honorários (IA)'],
                 ],
             ],
             [

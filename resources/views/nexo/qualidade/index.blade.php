@@ -144,7 +144,7 @@
                             </span>
                             @endif
                             @if($r->nps !== null)
-                            <span class="text-xs font-medium {{ $r->nps >= 9 ? 'text-green-600' : ($r->nps >= 7 ? 'text-gray-500' : 'text-red-600') }}">NPS {{ $r->nps }}</span>
+                            <span class="text-xs font-medium {{ $r->nps >= 4 ? 'text-green-600' : ($r->nps == 3 ? 'text-gray-500' : 'text-red-600') }}">NPS {{ $r->nps }}</span>
                             @endif
                         </div>
                     </div>
@@ -270,7 +270,7 @@ document.addEventListener('DOMContentLoaded', function() {
             interaction: { mode: 'index', intersect: false },
             scales: {
                 y: { position: 'left', min: 1, max: 5, title: { display: true, text: 'Nota (1-5)' } },
-                y1: { position: 'right', min: -100, max: 100, title: { display: true, text: 'NPS' }, grid: { drawOnChartArea: false } }
+                y1: { position: 'right', min: -100, max: 100, title: { display: true, text: 'NPS (0-5)' }, grid: { drawOnChartArea: false } }
             },
             plugins: { legend: { position: 'bottom' } }
         }

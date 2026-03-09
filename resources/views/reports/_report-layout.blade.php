@@ -149,7 +149,8 @@
                                 $fmt = $col['format'] ?? 'text';
                             @endphp
                             @if($fmt === 'currency')
-                                <span class="{{ $val < 0 ? 'text-red-600 font-bold' : '' }}">R$ {{ number_format($val, 2, ',', '.') }}</span>
+                                @php $numVal = is_numeric($val) ? (float)$val : 0; @endphp
+                                <span class="{{ $numVal < 0 ? 'text-red-600 font-bold' : '' }}">R$ {{ number_format($numVal, 2, ',', '.') }}</span>
                             @elseif($fmt === 'percent')
                                 {{ number_format($val * 100, 1, ',', '.') }}%
                             @elseif($fmt === 'date' && $val)
@@ -180,7 +181,7 @@
                             @if(isset($totals[$col['key']]))
                                 @php $fmt = $col['format'] ?? 'text'; @endphp
                                 @if($fmt === 'currency')
-                                    R$ {{ number_format($totals[$col['key']], 2, ',', '.') }}
+                                    R$ {{ number_format((float)($totals[$col['key']] ?? 0), 2, ',', '.') }}
                                 @else
                                     {{ $totals[$col['key']] }}
                                 @endif

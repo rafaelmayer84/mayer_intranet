@@ -216,4 +216,57 @@ class ReportCrmService
             'ultimos_30d' => DB::table('crm_activities')->where('created_at', '>=', now()->subDays(30))->count(),
         ];
     }
+
+    // ── REL-IA01: SIRIC — Análises de Crédito IA ────────────
+    public function siricConsultas(array $filters, int $perPage = 25)
+    {
+        $query = DB::table('siric_consultas as sc')
+            ->leftJoin('users as u', 'u.id', '=', 'sc.user_id')
+            ->select(
+                'sc.id', 'sc.nome', 'sc.cpf_cnpj', 'sc.valor_total', 'sc.parcelas_desejadas',
+                'sc.renda_declarada', 'sc.rating', 'sc.score', 'sc.recomendacao',
+                'sc.parcelas_max_sugeridas', 'sc.decisao_humana', 'sc.nota_decisao',
+                'sc.status', 'sc.created_at', 'u.name as analista',
+                DB::raw("JSON_UNQUOTE(JSON_EXTRACT(sc.actions_ia, '$.relatorio.resumo_executivo')) as resumo_ia")
+            );
+        if (!empty($filters['rating'])) $query->where('sc.rating', $filters['rating']);
+        if (!empty($filters['recomendacao'])) $query->where('sc.recomendacao', $filters['recomendacao']);
+        if (!empty($filters['busca'])) {
+            $query->where(function($q) use ($filters) {
+                $q->where('sc.nome', 'LIKE', '%'.$filters['busca'].'%')
+                  ->orWhere('sc.cpf_cnpj', 'LIKE', '%'.$filters['busca'].'%');
+            });
+        }
+        $query->orderByDesc('sc.created_at');
+        return $query->paginate($perPage);
+    }
+
+    // ── REL-IA02: SIPEX — Propostas de Precificação IA ──────
+    public function sipexPropostas(array $filters, int $perPage = 25)
+    {
+        $query = DB::table('pricing_proposals as pp')
+            ->leftJoin('users as u', 'u.id', '=', 'pp.user_id')
+            ->select(
+                'pp.id', 'pp.nome_proponente', 'pp.tipo_pessoa', 'pp.area_direito',
+                'pp.tipo_acao', 'pp.valor_causa', 'pp.valor_economico',
+                'pp.recomendacao_ia', 'pp.justificativa_ia',
+                'pp.proposta_escolhida', 'pp.valor_final', 'pp.status',
+                'pp.created_at', 'u.name as advogado',
+                DB::raw("JSON_UNQUOTE(JSON_EXTRACT(pp.proposta_rapida, '$.valor_honorarios')) as valor_rapida"),
+                DB::raw("JSON_UNQUOTE(JSON_EXTRACT(pp.proposta_equilibrada, '$.valor_honorarios')) as valor_equilibrada"),
+                DB::raw("JSON_UNQUOTE(JSON_EXTRACT(pp.proposta_premium, '$.valor_honorarios')) as valor_premium")
+            );
+        if (!empty($filters['area'])) $query->where('pp.area_direito', 'LIKE', '%'.$filters['area'].'%');
+        if (!empty($filters['status'])) $query->where('pp.status', $filters['status']);
+        if (!empty($filters['recomendacao'])) $query->where('pp.recomendacao_ia', $filters['recomendacao']);
+        if (!empty($filters['busca'])) {
+            $query->where(function($q) use ($filters) {
+                $q->where('pp.nome_proponente', 'LIKE', '%'.$filters['busca'].'%')
+                  ->orWhere('pp.tipo_acao', 'LIKE', '%'.$filters['busca'].'%');
+            });
+        }
+        $query->orderByDesc('pp.created_at');
+        return $query->paginate($perPage);
+    }
+
 }

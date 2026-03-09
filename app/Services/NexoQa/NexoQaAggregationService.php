@@ -55,10 +55,10 @@ class NexoQaAggregationService
 
             $avgScore = $scores->isNotEmpty() ? round($scores->avg(), 2) : null;
 
-            // NPS: promoters (9-10), passives (7-8), detractors (0-6)
-            $promoters = $npsValues->filter(fn($v) => $v >= 9)->count();
-            $passives = $npsValues->filter(fn($v) => $v >= 7 && $v <= 8)->count();
-            $detractors = $npsValues->filter(fn($v) => $v <= 6)->count();
+            // NPS escala 0-5: promoters (4-5), passives (3), detractors (0-2)
+            $promoters = $npsValues->filter(fn($v) => $v >= 4)->count();
+            $passives = $npsValues->filter(fn($v) => $v == 3)->count();
+            $detractors = $npsValues->filter(fn($v) => $v <= 2)->count();
 
             $totalNps = $promoters + $passives + $detractors;
             $npsScore = $totalNps > 0

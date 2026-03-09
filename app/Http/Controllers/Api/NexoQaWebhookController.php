@@ -211,7 +211,7 @@ class NexoQaWebhookController extends Controller
                 $rawNps = $payload['qa_nps'] ?? '';
                 preg_match('/(\d+)/', $rawNps, $m);
                 $nps = intval($m[1] ?? -1);
-                if ($nps >= 0 && $nps <= 10) {
+                if ($nps >= 0 && $nps <= 5) {
                     $content->update(['nps' => $nps]);
                     Log::info('[NexoQA Flow] NPS salvo', ['target_id' => $target->id, 'nps' => $nps]);
                 }
