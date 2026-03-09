@@ -100,10 +100,7 @@ require __DIR__ . "/_precificacao_routes.php";
 
 // Metas KPI Mensais
 Route::middleware(["auth"])->group(function () {
-    Route::get("/administracao/metas-kpi-mensais", [App\Http\Controllers\Admin\KpiMetasController::class, "index"])->name("admin.metas-kpi-mensais");
-    Route::post("/administracao/metas-kpi-mensais", [App\Http\Controllers\Admin\KpiMetasController::class, "store"])->name("admin.metas-kpi-mensais.store");
-
-    // Rotas adicionais Metas KPI
+    // Rotas duplicadas removidas 09/03/2026
     Route::get("/administracao/metas-kpi-mensais", [App\Http\Controllers\Admin\KpiMetasController::class, "index"])->name("admin.metas-kpi.index");
     Route::get("/administracao/metas-kpi/template", [App\Http\Controllers\Admin\KpiMetasController::class, "downloadTemplate"])->name("admin.metas-kpi.template");
     Route::post("/administracao/metas-kpi/upload", [App\Http\Controllers\Admin\KpiMetasController::class, "upload"])->name("admin.metas-kpi.upload");
