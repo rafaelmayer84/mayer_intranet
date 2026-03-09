@@ -1,0 +1,25 @@
+/*
+  CSS auxiliar da Visão Gerencial
+  - Evita 404 no console (o layout referencia este arquivo)
+  - Ajuda a padronizar o tamanho dos gráficos
+*/
+
+canvas {
+  display: block;
+}
+
+.chart-box {
+  position: relative;
+  height: 16rem; /* equivalente ao Tailwind h-64 */
+}
+
+.chart-box > canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+@media (max-width: 768px) {
+  .chart-box {
+    height: 14rem;
+  }
+}

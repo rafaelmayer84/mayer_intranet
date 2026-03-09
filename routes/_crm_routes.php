@@ -35,6 +35,7 @@ Route::middleware(['auth','modulo:operacional.crm,visualizar'])->prefix('crm')->
 
     // Carteira
     Route::get('/carteira', [CrmCarteiraController::class, 'index'])->name('carteira');
+    Route::post('/carteira/bulk-assign', [CrmCarteiraController::class, 'bulkAssign'])->name('carteira.bulk-assign');
 
     // Distribuição de Carteira (Admin)
     Route::get('/distribuicao', [CrmDistributionController::class, 'index'])->name('distribution');

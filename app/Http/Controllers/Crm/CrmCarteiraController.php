@@ -9,6 +9,29 @@ use Illuminate\Http\Request;
 
 class CrmCarteiraController extends Controller
 {
+    public function bulkAssign(Request $request)
+    {
+        $user = auth()->user();
+        if (!$user->isAdmin()) {
+            abort(403);
+        }
+
+        $request->validate([
+            'account_ids'   => 'required|array|min:1',
+            'account_ids.*' => 'integer|exists:crm_accounts,id',
+            'owner_user_id' => 'nullable|integer|exists:users,id',
+        ]);
+
+        $updated = CrmAccount::whereIn('id', $request->account_ids)
+            ->update(['owner_user_id' => $request->owner_user_id ?: null]);
+
+        return response()->json([
+            'success' => true,
+            'updated' => $updated,
+            'message' => $updated . ' conta(s) atualizada(s) com sucesso.',
+        ]);
+    }
+
     public function index(Request $request)
     {
         $query = CrmAccount::with('owner')
@@ -33,7 +56,11 @@ class CrmCarteiraController extends Controller
             $query->where('lifecycle', 'ativo');
         }
         if ($request->filled('owner_user_id')) {
-            $query->where('owner_user_id', $request->owner_user_id);
+            if ($request->owner_user_id === 'sem_responsavel') {
+                $query->whereNull('owner_user_id');
+            } else {
+                $query->where('owner_user_id', $request->owner_user_id);
+            }
         }
         if ($request->filled('sem_contato_dias')) {
             $query->withoutContactSince((int) $request->sem_contato_dias);
