@@ -111,7 +111,11 @@ Route::middleware(["auth"])->group(function () {
     Route::delete("/administracao/metas-kpi/limpar", [App\Http\Controllers\Admin\KpiMetasController::class, "limpar"])->name("admin.metas-kpi.limpar");
 });
 
-// Bloco config/metas-kpi duplicado removido 09/03/2026
+// Metas KPI Mensais - Configurações
+Route::middleware(["auth"])->prefix("configuracoes")->name("config.")->group(function () {
+    Route::get("metas-kpi-mensais", [App\Http\Controllers\Admin\KpiMetasController::class, "index"])->name("metas-kpi-mensais");
+    Route::post("metas-kpi-mensais", [App\Http\Controllers\Admin\KpiMetasController::class, "store"])->name("metas-kpi-mensais.store");
+});
 
 // Integrações (Admin only)
 Route::middleware(["auth"])->group(function () {
