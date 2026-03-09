@@ -69,14 +69,25 @@ class NexoInactivityController extends Controller
 
         $expirado = $horasDecorridas >= 6 ? 'sim' : 'nao';
 
+        // === ATENDIMENTO HUMANO (SIATE-914477) ===
+        // bot_ativo = NULL ou 0 -> humano atendendo; 1 -> bot ativo
+        $botAtivo = DB::table('wa_conversations')
+            ->where('phone', $telefone)
+            ->value('bot_ativo');
+
+        $atendimentoHumano = empty($botAtivo) ? 'sim' : 'nao';
+
         Log::info('NexoInactivity: resultado', [
             'telefone' => $telefone,
             'horas_decorridas' => $horasDecorridas,
             'expirado' => $expirado,
+            'atendimento_humano' => $atendimentoHumano,
+            'bot_ativo_raw' => $botAtivo,
         ]);
 
         return response()->json([
             'expirado' => $expirado,
+            'atendimento_humano' => $atendimentoHumano,
         ]);
     }
 
