@@ -1195,44 +1195,54 @@ class NexoAutoatendimentoService
     // RESUMIR CONTEXTO PARA TICKET (IA)
     // =====================================================
 
-    public function resumirContexto(string $telefone): array
+    public function resumirContexto(string $telefone, ?string $contexto = null): array
     {
         $telefoneNormalizado = $this->normalizarTelefone($telefone);
 
-        $conversa = \App\Models\WaConversation::where('phone', $telefoneNormalizado)->first();
-        if (!$conversa) {
-            $conversa = \App\Models\WaConversation::where('phone', '+' . $telefoneNormalizado)->first();
+        // Se contexto fornecido diretamente pelo SendPulse, usar sem buscar no banco
+        if (!empty($contexto) && mb_strlen(trim($contexto)) >= 5) {
+            $contextoTexto = trim($contexto);
+            \Illuminate\Support\Facades\Log::info('NEXO-TICKET: usando contexto direto do SendPulse', [
+                'telefone' => $telefoneNormalizado,
+                'contexto_len' => mb_strlen($contextoTexto),
+            ]);
+        } else {
+            // Fallback: buscar mensagens recentes da conversa no banco
+            $conversa = \App\Models\WaConversation::where('phone', $telefoneNormalizado)->first();
+            if (!$conversa) {
+                $conversa = \App\Models\WaConversation::where('phone', '+' . $telefoneNormalizado)->first();
+            }
+
+            if (!$conversa) {
+                return [
+                    'sucesso' => true,
+                    'ticket_resumo' => 'Cliente entrou em contato via WhatsApp.',
+                    'fonte' => 'padrao',
+                ];
+            }
+
+            $mensagens = \App\Models\WaMessage::where('conversation_id', $conversa->id)
+                ->where('direction', 1)
+                ->whereNotNull('body')
+                ->where('body', '!=', '')
+                ->where('body', 'NOT LIKE', '/start%')
+                ->where('body', 'NOT LIKE', '/stop%')
+                ->orderByDesc('sent_at')
+                ->limit(10)
+                ->get(['body', 'sent_at']);
+
+            if ($mensagens->isEmpty()) {
+                return [
+                    'sucesso' => true,
+                    'ticket_resumo' => 'Cliente entrou em contato via WhatsApp.',
+                    'fonte' => 'padrao',
+                ];
+            }
+
+            $contextoTexto = $mensagens->reverse()->map(function ($m) {
+                return '[' . $m->sent_at->format('H:i') . '] ' . mb_substr($m->body, 0, 300);
+            })->implode("\n");
         }
-
-        if (!$conversa) {
-            return [
-                'sucesso' => true,
-                'ticket_resumo' => 'Cliente entrou em contato via WhatsApp.',
-                'fonte' => 'padrao',
-            ];
-        }
-
-        $mensagens = \App\Models\WaMessage::where('conversation_id', $conversa->id)
-            ->where('direction', 1)
-            ->whereNotNull('body')
-            ->where('body', '!=', '')
-            ->where('body', 'NOT LIKE', '/start%')
-            ->where('body', 'NOT LIKE', '/stop%')
-            ->orderByDesc('sent_at')
-            ->limit(10)
-            ->get(['body', 'sent_at']);
-
-        if ($mensagens->isEmpty()) {
-            return [
-                'sucesso' => true,
-                'ticket_resumo' => 'Cliente entrou em contato via WhatsApp.',
-                'fonte' => 'padrao',
-            ];
-        }
-
-        $contexto = $mensagens->reverse()->map(function ($m) {
-            return '[' . $m->sent_at->format('H:i') . '] ' . mb_substr($m->body, 0, 300);
-        })->implode("\n");
 
         try {
             $apiKey = config('services.openai.api_key');
@@ -1258,7 +1268,7 @@ class NexoAutoatendimentoService
                         ],
                         [
                             'role' => 'user',
-                            'content' => "Mensagens recentes do cliente:\n" . $contexto
+                            'content' => "Mensagens recentes do cliente:\n" . $contextoTexto
                         ],
                     ],
                 ]),
@@ -1276,7 +1286,7 @@ class NexoAutoatendimentoService
 
                 \Illuminate\Support\Facades\Log::info('NEXO-TICKET: contexto resumido', [
                     'telefone' => $telefoneNormalizado,
-                    'msgs' => $mensagens->count(),
+                    'msgs' => isset($mensagens) ? $mensagens->count() : 0,
                     'resumo' => $resumo,
                 ]);
 
@@ -1297,8 +1307,14 @@ class NexoAutoatendimentoService
             ]);
         }
 
-        $ultimaMsg = $mensagens->first();
-        $fallback = mb_substr($ultimaMsg->body, 0, 200);
+        // Fallback: usar contexto direto ou ultima mensagem do banco
+        if (!empty($contextoTexto)) {
+            $fallback = mb_substr($contextoTexto, 0, 200);
+        } elseif (isset($mensagens) && $mensagens->isNotEmpty()) {
+            $fallback = mb_substr($mensagens->first()->body, 0, 200);
+        } else {
+            $fallback = 'Cliente entrou em contato via WhatsApp.';
+        }
 
         return [
             'sucesso' => true,

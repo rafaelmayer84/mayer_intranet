@@ -252,7 +252,7 @@ class NexoAutoatendimentoController extends Controller
         $request->validate(['telefone' => 'required|string']);
 
         try {
-            $resultado = $this->service->resumirContexto($request->input('telefone'));
+            $resultado = $this->service->resumirContexto($request->input('telefone'), $request->input('contexto'));
             return response()->json($resultado);
         } catch (\Throwable $e) {
             Log::error('NexoAutoatendimento@resumirContexto erro', ['msg' => $e->getMessage()]);
