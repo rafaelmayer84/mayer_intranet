@@ -89,13 +89,14 @@ class NexoConsultaController extends Controller
         }
 
         $telefone = $request->input('telefone', '');
+        $cpf = $request->input('cpf', '') ?: $request->input('documento', '');
 
-        if (empty($telefone)) {
-            return response()->json(['error' => 'Telefone obrigatório'], 400);
+        if (empty($telefone) && empty($cpf)) {
+            return response()->json(['error' => 'Telefone ou CPF obrigatório'], 400);
         }
 
         try {
-            $resultado = $this->service->gerarPerguntasAuth($telefone);
+            $resultado = $this->service->gerarPerguntasAuth($telefone, $cpf ?: null);
 
             if (isset($resultado['erro'])) {
                 return response()->json(['error' => $resultado['erro']], 404);
@@ -123,6 +124,8 @@ class NexoConsultaController extends Controller
             return response()->json(['error' => 'Telefone obrigatório'], 400);
         }
 
+        $cpf = $request->input('cpf', '') ?: $request->input('documento', '');
+
         $respostas = [
             'pergunta1_campo' => $request->input('pergunta1_campo', ''),
             'pergunta1_valor' => $request->input('pergunta1_valor', ''),
@@ -135,7 +138,7 @@ class NexoConsultaController extends Controller
         ];
 
         try {
-            $resultado = $this->service->validarAuth($telefone, $respostas);
+            $resultado = $this->service->validarAuth($telefone, $respostas, $cpf ?: null);
             return response()->json($resultado);
         } catch (\Exception $e) {
             Log::error('[NEXO-CONSULTA] Erro validar-auth: ' . $e->getMessage());

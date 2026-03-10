@@ -123,7 +123,7 @@ class NexoConsultaService
      * Gera 2 perguntas aleatórias com 3 opções (1 correta + 2 falsas).
      * Campos possíveis: email, cpf_cnpj, data_nascimento, nome
      */
-    public function gerarPerguntasAuth(string $telefone): array
+    public function gerarPerguntasAuth(string $telefone, ?string $cpf = null): array
     {
         $telefoneNorm = $this->normalizarTelefone($telefone);
         $cliente = $this->buscarClientePorTelefone($telefoneNorm);
@@ -178,10 +178,16 @@ class NexoConsultaService
     /**
      * Valida as respostas da autenticação multifator.
      */
-    public function validarAuth(string $telefone, array $respostas): array
+    public function validarAuth(string $telefone, array $respostas, ?string $cpf = null): array
     {
         $telefoneNorm = $this->normalizarTelefone($telefone);
         $cliente = $this->buscarClientePorTelefone($telefoneNorm);
+
+        // Fallback: buscar por CPF/CNPJ
+        if (!$cliente && !empty($cpf)) {
+            Log::info('[NEXO-CONSULTA] validarAuth: tentando CPF', ['cpf' => $cpf]);
+            $cliente = $this->buscarClientePorCpf($cpf);
+        }
 
         if (!$cliente) {
             return ['valido' => 'nao', 'tentativas_restantes' => '0', 'bloqueado' => 'sim'];
