@@ -83,8 +83,8 @@ class TimesEvolucaoService
     {
         $rows = DB::table('kpi_monthly_targets')
             ->where('modulo', 'times_evolucao')
-            ->where('year', $year)
-            ->where('month', $month)
+            ->where('ano', $year)
+            ->where('mes', $month)
             ->get();
 
         $metas = [];
@@ -93,7 +93,7 @@ class TimesEvolucaoService
                 'meta_valor'   => (float) $row->meta_valor,
                 'unidade'      => $row->unidade,
                 'tipo_meta'    => $row->tipo_meta, // min, max
-                'target_value' => $row->target_value,
+                'target_value' => $row->meta_valor ?? null,
             ];
         }
 

@@ -14,13 +14,13 @@ class KpiMonthlyTargetController extends Controller
         
         // Buscar todas as metas para o ano selecionado
         $metasDb = DB::table('kpi_monthly_targets')
-            ->where('year', $ano)
+            ->where('ano', $ano)
             ->get();
 
         // Transformar em array associativo para a view
         $metas = collect();
         foreach ($metasDb as $meta) {
-            $key = $meta->kpi_key . '_' . $meta->month;
+            $key = $meta->kpi_key . '_' . $meta->mes;
             $metas->put($key, $meta->target_value ?? '');
         }
 
@@ -37,7 +37,7 @@ class KpiMonthlyTargetController extends Controller
 
         // Limpar metas antigas do ano
         DB::table('kpi_monthly_targets')
-            ->where('year', $ano)
+            ->where('ano', $ano)
             ->delete();
 
         // Inserir novas metas
@@ -48,8 +48,8 @@ class KpiMonthlyTargetController extends Controller
             foreach ($metas['receita_pf'] as $mes => $valor) {
                 if ($valor !== '' && $valor !== null) {
                     $inserts[] = [
-                        'year' => $ano,
-                        'month' => (int)$mes,
+                        'ano' => $ano,
+                        'mes' => (int)$mes,
                         'kpi_key' => 'receita_pf',
                         'target_value' => (float)$valor,
                         'created_at' => now(),
@@ -64,8 +64,8 @@ class KpiMonthlyTargetController extends Controller
             foreach ($metas['receita_pj'] as $mes => $valor) {
                 if ($valor !== '' && $valor !== null) {
                     $inserts[] = [
-                        'year' => $ano,
-                        'month' => (int)$mes,
+                        'ano' => $ano,
+                        'mes' => (int)$mes,
                         'kpi_key' => 'receita_pj',
                         'target_value' => (float)$valor,
                         'created_at' => now(),
@@ -80,8 +80,8 @@ class KpiMonthlyTargetController extends Controller
             foreach ($metas['despesas'] as $mes => $valor) {
                 if ($valor !== '' && $valor !== null) {
                     $inserts[] = [
-                        'year' => $ano,
-                        'month' => (int)$mes,
+                        'ano' => $ano,
+                        'mes' => (int)$mes,
                         'kpi_key' => 'despesas',
                         'target_value' => (float)$valor,
                         'created_at' => now(),
@@ -101,8 +101,8 @@ class KpiMonthlyTargetController extends Controller
         foreach ($saude_financeira as $key => $db_key) {
             if (isset($metas[$key]) && $metas[$key] !== '' && $metas[$key] !== null) {
                 $inserts[] = [
-                    'year' => $ano,
-                    'month' => 0, // 0 = anual
+                    'ano' => $ano,
+                    'mes' => 0, // 0 = anual
                     'kpi_key' => $db_key,
                     'target_value' => (float)$metas[$key],
                     'created_at' => now(),
@@ -120,8 +120,8 @@ class KpiMonthlyTargetController extends Controller
         foreach ($eficiencia as $key => $db_key) {
             if (isset($metas[$key]) && $metas[$key] !== '' && $metas[$key] !== null) {
                 $inserts[] = [
-                    'year' => $ano,
-                    'month' => 0, // 0 = anual
+                    'ano' => $ano,
+                    'mes' => 0, // 0 = anual
                     'kpi_key' => $db_key,
                     'target_value' => (float)$metas[$key],
                     'created_at' => now(),

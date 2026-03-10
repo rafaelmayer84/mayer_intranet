@@ -20,8 +20,8 @@ class KpiMetaHelper
         return Cache::remember($cacheKey, 3600, function () use ($kpiKey, $ano, $mes, $default) {
             $row = DB::table('kpi_monthly_targets')
                 ->where('kpi_key', $kpiKey)
-                ->where('year', $ano)
-                ->where('month', $mes)
+                ->where('ano', $ano)
+                ->where('mes', $mes)
                 ->first();
             return $row ? (float) $row->meta_valor : $default;
         });
@@ -46,11 +46,11 @@ class KpiMetaHelper
     {
         if ($ano) {
             $rows = DB::table('kpi_monthly_targets')
-                ->where('year', $ano)
-                ->select('kpi_key', 'month')
+                ->where('ano', $ano)
+                ->select('kpi_key', 'mes')
                 ->get();
             foreach ($rows as $r) {
-                Cache::forget("kpi_meta_{$r->kpi_key}_{$ano}_{$r->month}");
+                Cache::forget("kpi_meta_{$r->kpi_key}_{$ano}_{$r->mes}");
             }
         }
     }

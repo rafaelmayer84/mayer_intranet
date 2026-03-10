@@ -46,8 +46,8 @@ class KpiTargetService
         $row = DB::table('kpi_monthly_targets')
             ->where('modulo', $modulo)
             ->where('kpi_key', $kpiKey)
-            ->where('year', $ano)
-            ->where('month', $mes)
+            ->where('ano', $ano)
+            ->where('mes', $mes)
             ->whereNotNull('meta_valor')
             ->first();
 
@@ -70,8 +70,8 @@ class KpiTargetService
     {
         $rows = DB::table('kpi_monthly_targets')
             ->where('modulo', $modulo)
-            ->where('year', $ano)
-            ->where('month', $mes)
+            ->where('ano', $ano)
+            ->where('mes', $mes)
             ->whereNotNull('meta_valor')
             ->get();
 
@@ -140,7 +140,7 @@ class KpiTargetService
     public function listarMetas(int $ano): array
     {
         return DB::table('kpi_monthly_targets')
-            ->where('year', $ano)
+            ->where('ano', $ano)
             ->orderBy('modulo')
             ->orderBy('kpi_key')
             ->orderBy('mes')
@@ -199,8 +199,8 @@ class KpiTargetService
             $existing = DB::table('kpi_monthly_targets')
                 ->where('modulo', $modulo)
                 ->where('kpi_key', $kpiKey)
-                ->where('year', $ano)
-                ->where('month', $mes)
+                ->where('ano', $ano)
+                ->where('mes', $mes)
                 ->first();
 
             if ($existing) {
@@ -224,10 +224,7 @@ class KpiTargetService
                     'meta_valor' => $metaFloat,
                     'unidade'    => $unidade,
                     'tipo_meta'  => $tipoMeta,
-                    'year'       => $ano,
-                    'month'      => $mes,
-                    'year'       => $ano,
-                    'month'      => $mes,
+
                     'created_by' => $userId,
                     'created_at' => now(),
                     'updated_at' => now(),
