@@ -1079,6 +1079,16 @@ class NexoConsultaService
             ->whereIn('telefone', $formatos)
             ->first();
 
+        // Fallback: buscar removendo máscara do banco (parênteses, hífens, espaços)
+        if (!$cliente) {
+            $cliente = DB::table('clientes')
+                ->whereRaw(
+                    "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(telefone, '(', ''), ')', ''), '-', ''), ' ', ''), '+', '') IN (" . implode(',', array_fill(0, count($formatos), '?')) . ")",
+                    $formatos
+                )
+                ->first();
+        }
+
         // Se não encontrou na tabela clientes, tentar via wa_conversations linkada
         if (!$cliente) {
             $conv = DB::table('wa_conversations')
