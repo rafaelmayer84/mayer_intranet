@@ -445,6 +445,14 @@ class DataJuriSyncOrchestrator
                         }
                     }
 
+                    // PATCH 10/03/2026: Módulo Pessoa — só importar clientes reais
+                    if ($modulo === 'Pessoa') {
+                        $clienteFlag = $row['cliente'] ?? '';
+                        if (mb_strtolower(trim($clienteFlag)) !== 'sim') {
+                            continue;
+                        }
+                    }
+
                     $upsertResult = $this->upsertRecord($modulo, $row, $config);
 
                     if ($upsertResult === 'created') {
