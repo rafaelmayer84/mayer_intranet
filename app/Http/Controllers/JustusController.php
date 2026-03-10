@@ -151,7 +151,8 @@ class JustusController extends Controller
         }
 
         $openAiService = app(JustusOpenAiService::class);
-        $result = $openAiService->sendMessage($conversation, $request->input('message'));
+        $fullContext = (bool) $request->input('full_context', false);
+        $result = $openAiService->sendMessage($conversation, $request->input('message'), $fullContext);
 
         if ($request->ajax() || $request->wantsJson()) {
             return response()->json($result);

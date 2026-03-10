@@ -322,6 +322,7 @@
             {{-- Info bar --}}
             <div class="px-4 py-1.5 text-[10px] text-gray-400 flex items-center gap-4 border-t flex-shrink-0" style="background:rgba(255,255,255,0.7);">
                 <span>{{ $activeConversation->type_label }}</span>
+                <span x-show="fullContext" x-cloak class="px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-700">DOC INTEGRAL</span>
                 <span><span id="justus-token-count">{{ number_format($activeConversation->total_input_tokens + $activeConversation->total_output_tokens) }}</span> tokens</span>
                 <span>R$ {{ number_format($activeConversation->total_cost_brl, 2, ',', '.') }}</span>
             </div>
@@ -333,6 +334,14 @@
                     <button type="button" @click="$refs.pdfInput.click()"
                         class="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all flex-shrink-0 mb-0.5" title="Enviar PDF">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                    </button>
+                    {{-- Toggle Análise Completa --}}
+                    <button type="button" @click="toggleFullContext()"
+                        class="p-2 rounded-xl transition-all flex-shrink-0 mb-0.5 relative"
+                        :class="fullContext ? 'bg-amber-100 text-amber-700 ring-2 ring-amber-300' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'"
+                        :title="fullContext ? 'Análise Completa ATIVA (documento integral)' : 'Ativar Análise Completa (envia documento integral)'">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        <span x-show="fullContext" x-cloak class="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-amber-500 border-2 border-white"></span>
                     </button>
                     <textarea x-model="messageText" @keydown.enter.exact.prevent="sendMessage()" placeholder="Pergunte sobre o processo, solicite uma análise ou peça..."
                         class="flex-1 px-2 py-2 text-sm border-0 outline-none bg-transparent resize-none"
@@ -607,6 +616,8 @@ function justusApp() {
         searchQuery: '',
         messageText: '',
         sending: false,
+        fullContext: false,
+        fullContextAccepted: false,
         showNewModal: false,
         newMode: 'consultor',
         newType: 'analise_estrategica',
@@ -729,6 +740,27 @@ function justusApp() {
         },
 
         /* === ENVIAR MENSAGEM === */
+        toggleFullContext() {
+            if (!this.fullContext) {
+                if (!this.fullContextAccepted) {
+                    const accepted = confirm(
+                        'ANÁLISE COMPLETA — ADVERTÊNCIA\n\n'
+                        + 'Este modo envia o DOCUMENTO INTEGRAL para a IA, sem filtragem de trechos. '
+                        + 'O custo por mensagem será significativamente maior (proporcional ao tamanho do documento).\n\n'
+                        + 'O uso deste recurso deve ser responsável e justificado. '
+                        + 'O uso indiscriminado estará sujeito a apuração de responsabilidade e imputação de custos ao operador, '
+                        + 'conforme Normativo AD003.\n\n'
+                        + 'Deseja ativar a Análise Completa?'
+                    );
+                    if (!accepted) return;
+                    this.fullContextAccepted = true;
+                }
+                this.fullContext = true;
+            } else {
+                this.fullContext = false;
+            }
+        },
+
         async sendMessage() {
             if (!this.messageText.trim() || this.sending) return;
             this.sending = true;
@@ -769,7 +801,7 @@ function justusApp() {
                 const resp = await fetch(`/justus/${convId}/message`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content, 'Accept': 'application/json' },
-                    body: JSON.stringify({ message: text }),
+                    body: JSON.stringify({ message: text, full_context: this.fullContext }),
                 });
                 if (!resp.ok) {
                     throw new Error('Servidor retornou erro ' + resp.status + '. Recarregue a página (F5) para ver a resposta.');

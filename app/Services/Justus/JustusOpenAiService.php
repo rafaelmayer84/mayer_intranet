@@ -25,7 +25,7 @@ class JustusOpenAiService
         $this->claude = $claude;
     }
 
-    public function sendMessage(JustusConversation $conversation, string $userMessage): array
+    public function sendMessage(JustusConversation $conversation, string $userMessage, bool $fullContext = false): array
     {
         $userId = $conversation->user_id;
         $budgetCheck = $this->budget->canProceed($userId);
@@ -44,7 +44,16 @@ class JustusOpenAiService
             'content' => $userMessage,
         ]);
 
-        $chunks = $this->rag->retrieveRelevantChunks($conversation, $userMessage);
+        if ($fullContext) {
+            $chunks = $this->rag->retrieveAllChunks($conversation);
+            \Illuminate\Support\Facades\Log::info('JUSTUS: Modo ANÁLISE COMPLETA ativado', [
+                'conversation_id' => $conversation->id,
+                'user_id' => $userId,
+                'total_chunks' => $chunks->count(),
+            ]);
+        } else {
+            $chunks = $this->rag->retrieveRelevantChunks($conversation, $userMessage);
+        }
         $usedChunkIds = $chunks->pluck('id')->toArray();
         $attachmentId = $conversation->attachments()->where('processing_status', 'completed')->value('id');
         $ragContext = $this->rag->buildContextFromChunks($chunks, $attachmentId);

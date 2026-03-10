@@ -453,11 +453,17 @@ class EvidentiaSearchService
                     ->get();
 
                 foreach ($rows as $row) {
-                    $emb = new EvidentiaEmbedding();
-                    $emb->attributes['vector_bin'] = $row->vector_bin;
-                    $emb->norm = $row->norm;
-
-                    $similarity = $emb->cosineSimilarity($queryVector, $queryNorm);
+                    $norm = (float) $row->norm;
+                    if ($row->vector_bin === null || $norm == 0 || $queryNorm == 0) {
+                        continue;
+                    }
+                    $vec = EvidentiaEmbedding::binToVector($row->vector_bin);
+                    $dot = 0.0;
+                    $count = min(count($vec), count($queryVector));
+                    for ($i = 0; $i < $count; $i++) {
+                        $dot += $vec[$i] * $queryVector[$i];
+                    }
+                    $similarity = $dot / ($norm * $queryNorm);
                     $compositeKey = $row->tribunal . '|' . $row->jurisprudence_id;
 
                     if (!isset($scores[$compositeKey]) || $similarity > $scores[$compositeKey]) {

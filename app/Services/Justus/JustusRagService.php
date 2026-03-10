@@ -12,6 +12,25 @@ use App\Models\JustusRagFeedback;
 
 class JustusRagService
 {
+    /**
+     * Retorna TODOS os chunks do documento, sem limite.
+     * Modo "Análise Completa" — envia documento integral para a IA.
+     */
+    public function retrieveAllChunks(JustusConversation $conversation): Collection
+    {
+        $attachmentIds = $conversation->attachments()
+            ->where('processing_status', 'completed')
+            ->pluck('id');
+
+        if ($attachmentIds->isEmpty()) {
+            return collect();
+        }
+
+        return JustusDocumentChunk::whereIn('attachment_id', $attachmentIds)
+            ->orderBy('page_start')
+            ->get();
+    }
+
     public function retrieveRelevantChunks(JustusConversation $conversation, string $query, ?int $maxChunks = null): Collection
     {
         $maxChunks = $maxChunks ?? config('justus.rag_max_chunks', 15);
