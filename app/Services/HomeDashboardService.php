@@ -352,4 +352,77 @@ class HomeDashboardService
         }
     }
 
+
+    /**
+     * Retorna atalhos salvos do usuario com dados do modulo
+     */
+    public function getUserShortcuts(int $userId): array
+    {
+        try {
+            $shortcuts = DB::table('user_home_shortcuts as s')
+                ->join('modulos as m', 's.modulo_slug', '=', 'm.slug')
+                ->where('s.user_id', $userId)
+                ->where('m.ativo', 1)
+                ->select('s.posicao', 's.modulo_slug', 'm.nome', 'm.icone', 'm.rota', 'm.grupo')
+                ->orderBy('s.posicao')
+                ->get();
+
+            return $shortcuts->map(function($s) {
+                return [
+                    'posicao' => $s->posicao,
+                    'slug'    => $s->modulo_slug,
+                    'nome'    => $s->nome,
+                    'icone'   => $s->icone,
+                    'rota'    => $s->rota,
+                    'grupo'   => $s->grupo,
+                ];
+            })->toArray();
+        } catch (\Throwable $e) {
+            Log::warning('Home shortcuts: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Lista modulos disponiveis para atalho
+     */
+    public function getAvailableModules(): array
+    {
+        try {
+            $user = Auth::user();
+            $userId = $user->id ?? 0;
+            $isAdmin = ($user->role ?? '') === 'admin';
+
+            $query = DB::table('modulos')
+                ->where('ativo', 1)
+                ->whereNotNull('rota')
+                ->where('rota', '!=', '');
+
+            if (!$isAdmin) {
+                $query->where(function ($q) use ($userId) {
+                    $q->whereIn('modulos.id', function ($sub) use ($userId) {
+                        $sub->select('modulo_id')
+                            ->from('user_permissions')
+                            ->where('user_id', $userId);
+                    })->orWhere('modulos.slug', 'NOT LIKE', 'admin.%');
+                });
+            }
+
+            $modulos = $query->select('id', 'slug', 'nome', 'icone', 'rota', 'grupo', 'ordem')
+                ->orderBy('grupo')->orderBy('ordem')->get();
+
+            return $modulos->map(fn($m) => [
+                'id'    => $m->id,
+                'slug'  => $m->slug,
+                'nome'  => $m->nome,
+                'icone' => $m->icone,
+                'rota'  => $m->rota,
+                'grupo' => $m->grupo,
+            ])->toArray();
+        } catch (\Throwable $e) {
+            Log::warning('Home available modules: ' . $e->getMessage());
+            return [];
+        }
+    }
+
 }

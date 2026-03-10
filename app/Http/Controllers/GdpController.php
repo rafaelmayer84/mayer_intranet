@@ -664,17 +664,32 @@ class GdpController extends Controller
         if (!in_array($user->role, ['admin','coordenador'])) {
             return response()->json(['erro' => 'Sem permissao'], 403);
         }
+
         $mes = (int) $request->input('mes', now()->month);
         $ano = (int) $request->input('ano', now()->year);
-        $ciclo = GdpCiclo::where('status', 'aberto')->first();
 
-        $scanner = new GdpPenalizacaoScanner($ciclo, $mes, $ano);
-        $novas = 0;
-        foreach ([1,3,7,8] as $uid) {
-            $result = $scanner->scanUsuario($uid);
-            $novas += $result['novas'] ?? 0;
+        $ciclo = GdpCiclo::ativo();
+        if (!$ciclo) {
+            return response()->json(['erro' => 'Nenhum ciclo aberto'], 422);
         }
-        return response()->json(['ok' => true, 'novas' => $novas]);
+
+        $scanner = new GdpPenalizacaoScanner($ciclo->id, $mes, $ano);
+
+        $usuarios = User::where('ativo', true)
+            ->whereNotNull('datajuri_proprietario_id')
+            ->pluck('id');
+
+        $novas = 0;
+        foreach ($usuarios as $uid) {
+            $result = $scanner->scanUsuario($uid);
+            $novas += $result['total_penalizacoes'] ?? 0;
+        }
+
+        return response()->json([
+            'ok'    => true,
+            'novas' => $novas,
+            'users' => $usuarios->count(),
+        ]);
     }
 
 }

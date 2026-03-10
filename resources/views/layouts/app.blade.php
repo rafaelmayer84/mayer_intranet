@@ -411,6 +411,9 @@
                         <a href="/sisrh/advogados" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('sisrh.advogados') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
                             <span class="ml-2 menu-text">Advogados</span>
                         </a>
+                        <a href="/sisrh/frequencia" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('sisrh.frequencia') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
+                            <span class="ml-2 menu-text">Frequência</span>
+                        </a>
                         <a href="/sisrh/folha" class="nav-sublink flex items-center px-4 py-2 text-sm rounded-lg transition-colors {{ request()->routeIs('sisrh.folha') ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50' }}">
                             <span class="ml-2 menu-text">Folha Pagamento</span>
                         </a>
@@ -497,6 +500,7 @@
                             <a href="{{ route('crm.reports') }}" class="block px-3 py-1 text-xs rounded-lg hover:bg-gray-100 {{ request()->routeIs('crm.reports') ? 'text-[#385776] font-medium' : 'text-gray-400' }}">Relatórios</a>
                             @if(auth()->user()->role === 'admin')
                             <a href="{{ route('crm.distribution') }}" class="block px-3 py-1 text-xs rounded-lg hover:bg-gray-100 {{ request()->routeIs('crm.distribution*') ? 'text-[#385776] font-medium' : 'text-gray-400' }}">Distribuição</a>
+                            <a href="{{ route('crm.pulso') }}" class="block px-3 py-1 text-xs rounded-lg hover:bg-gray-100 {{ request()->routeIs('crm.pulso*') ? 'text-[#385776] font-medium' : 'text-gray-400' }}">Pulso do Cliente</a>
                             @endif
                         </div>
                     </div>

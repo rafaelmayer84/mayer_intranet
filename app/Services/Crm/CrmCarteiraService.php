@@ -113,10 +113,8 @@ class CrmCarteiraService
         // Contrato recente (assinado nos últimos 24 meses)?
         $contratosRecentes = DB::table('contratos')
             ->where('contratante_id_datajuri', $djPessoaId)
-            ->where(function ($q) {
-                $q->whereNull('data_assinatura')
-                  ->orWhere('data_assinatura', '>=', now()->subMonths(24)->toDateString());
-            })
+            ->whereNotNull('data_assinatura')
+            ->where('data_assinatura', '>=', now()->subMonths(24)->toDateString())
             ->count();
 
         if ($processosAtivos > 0 || $contratosRecentes > 0) {

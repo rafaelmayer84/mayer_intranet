@@ -24,6 +24,15 @@ class CrmSyncCarteira extends Command
                 $q->where('is_cliente', 1)
                   ->orWhereNull('is_cliente');
             })
+            ->where(function ($q) {
+                $q->whereNull('status_pessoa')
+                  ->orWhere('status_pessoa', '')
+                  ->orWhere(function ($q2) {
+                      $q2->where('status_pessoa', 'NOT LIKE', '%Adversa%')
+                          ->where('status_pessoa', 'NOT LIKE', '%Contraparte%')
+                          ->where('status_pessoa', 'NOT LIKE', '%Fornecedor%');
+                  });
+            })
             ->get();
 
         $this->info("Clientes DataJuri encontrados: {$clientes->count()}");

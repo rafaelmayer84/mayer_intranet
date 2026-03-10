@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\HomeDashboardService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class HomeController extends Controller
 {
@@ -35,10 +36,14 @@ class HomeController extends Controller
 
         $primeiroNome = explode(' ', $user->name ?? $user->nome ?? 'Usuario')[0];
 
+        $shortcuts = $this->service->getUserShortcuts($userId);
+        $availableModules = $this->service->getAvailableModules();
+
         return view('home.index', compact(
             'user', 'saudacao', 'primeiroNome',
             'gdpScore', 'alertasCrm', 'ticketsAbertos',
-            'resumoFinanceiro', 'avisos', 'volumetria', 'solicitacoes'
+            'resumoFinanceiro', 'avisos', 'volumetria', 'solicitacoes',
+            'shortcuts', 'availableModules'
         ));
     }
 
@@ -48,4 +53,41 @@ class HomeController extends Controller
         if (mb_strlen($query) < 2) return response()->json([]);
         return response()->json($this->service->buscarGlobal($query));
     }
+
+    public function getShortcuts()
+    {
+        $userId = Auth::id();
+        return response()->json($this->service->getUserShortcuts($userId));
+    }
+
+    public function saveShortcuts(Request $request)
+    {
+        $userId = Auth::id();
+        $slugs = $request->input('slugs', []);
+
+        if (!is_array($slugs) || count($slugs) > 5) {
+            return response()->json(['error' => 'Maximo 5 atalhos'], 422);
+        }
+
+        DB::table('user_home_shortcuts')->where('user_id', $userId)->delete();
+
+        foreach ($slugs as $i => $slug) {
+            if (empty($slug)) continue;
+            DB::table('user_home_shortcuts')->insert([
+                'user_id'      => $userId,
+                'posicao'      => $i + 1,
+                'modulo_slug'  => $slug,
+                'created_at'   => now(),
+                'updated_at'   => now(),
+            ]);
+        }
+
+        return response()->json(['success' => true, 'total' => count($slugs)]);
+    }
+
+    public function getAvailableModules()
+    {
+        return response()->json($this->service->getAvailableModules());
+    }
+
 }

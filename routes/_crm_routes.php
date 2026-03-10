@@ -36,6 +36,7 @@ Route::middleware(['auth','modulo:operacional.crm,visualizar'])->prefix('crm')->
     // Carteira
     Route::get('/carteira', [CrmCarteiraController::class, 'index'])->name('carteira');
     Route::post('/carteira/bulk-assign', [CrmCarteiraController::class, 'bulkAssign'])->name('carteira.bulk-assign');
+    Route::post('/carteira/bulk-action', [CrmCarteiraController::class, 'bulkAction'])->name('carteira.bulk-action');
 
     // Distribuição de Carteira (Admin)
     Route::get('/distribuicao', [CrmDistributionController::class, 'index'])->name('distribution');
@@ -53,6 +54,7 @@ Route::middleware(['auth','modulo:operacional.crm,visualizar'])->prefix('crm')->
 
     // Account 360
     Route::get('/accounts/{id}', [CrmAccountController::class, 'show'])->name('accounts.show');
+    Route::delete('/accounts/{id}', [CrmAccountController::class, 'destroy'])->name('accounts.destroy');
     Route::put('/accounts/{id}', [CrmAccountController::class, 'update'])->name('accounts.update');
     Route::post('/accounts/{id}/opportunities', [CrmAccountController::class, 'createOpportunity'])->name('accounts.create-opp');
     Route::post('/accounts/{id}/activities', [CrmAccountController::class, 'storeActivity'])->name('accounts.store-activity');
@@ -85,4 +87,7 @@ Route::middleware(['auth','modulo:operacional.crm,visualizar'])->prefix('crm')->
 
     // Relatórios
     Route::get('/relatorios', [CrmReportsController::class, 'index'])->name('reports');
+
+    // ── Pulso do Cliente ──
+    require __DIR__ . '/_crm_pulso_routes.php';
 });

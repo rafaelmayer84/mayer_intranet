@@ -382,6 +382,76 @@ class NexoAutoatendimentoService
             ];
         }
 
+        // Buscar responsavel via CRM account
+        $responsavelId = null;
+        $statusInicial = 'aberto';
+
+        $crmAccount = null;
+        if ($datajuriId) {
+            $crmAccount = DB::table('crm_accounts')
+                ->where('datajuri_pessoa_id', $datajuriId)
+                ->whereNotNull('owner_user_id')
+                ->first(['owner_user_id', 'name']);
+        }
+        if (!$crmAccount) {
+            $crmAccount = DB::table('crm_accounts')
+                ->where('phone_e164', $telefoneNormalizado)
+                ->whereNotNull('owner_user_id')
+                ->first(['owner_user_id', 'name']);
+        }
+        if (!$crmAccount && $telefoneNormalizado) {
+            // Tentar com ultimos 8 digitos (resolve problema do 9 faltante/sobrante)
+            $parcial = substr($telefoneNormalizado, -8);
+            $crmAccount = DB::table('crm_accounts')
+                ->where('phone_e164', 'LIKE', '%' . $parcial)
+                ->whereNotNull('owner_user_id')
+                ->where('lifecycle', '!=', 'arquivado')
+                ->first(['owner_user_id', 'name']);
+        }
+
+        // Fallback: buscar por nome aproximado (quando cliente autenticado)
+        if (!$crmAccount && $nomeCliente && mb_strlen($nomeCliente) >= 5) {
+            $crmAccount = DB::table('crm_accounts')
+                ->where('name', 'LIKE', '%' . trim($nomeCliente) . '%')
+                ->whereNotNull('owner_user_id')
+                ->where('lifecycle', '!=', 'arquivado')
+                ->first(['owner_user_id', 'name']);
+        }
+
+        // Fallback: buscar por datajuri_pessoa_id via tabela clientes
+        if (!$crmAccount && !$datajuriId && $telefoneNormalizado) {
+            $parcial8 = substr($telefoneNormalizado, -8);
+            $clienteLocal = DB::table('clientes')
+                ->where(function ($q) use ($telefoneNormalizado, $parcial8) {
+                    $q->where('telefone_normalizado', 'LIKE', '%' . $parcial8)
+                      ->orWhere('celular', 'LIKE', '%' . $parcial8);
+                })
+                ->whereNotNull('datajuri_id')
+                ->first(['datajuri_id']);
+            if ($clienteLocal) {
+                $crmAccount = DB::table('crm_accounts')
+                    ->where('datajuri_pessoa_id', $clienteLocal->datajuri_id)
+                    ->whereNotNull('owner_user_id')
+                    ->where('lifecycle', '!=', 'arquivado')
+                    ->first(['owner_user_id', 'name']);
+            }
+        }
+
+        if ($crmAccount && $crmAccount->owner_user_id) {
+            $responsavelId = $crmAccount->owner_user_id;
+            $statusInicial = 'em_andamento';
+            Log::info('NEXO-TICKET: responsavel atribuido via CRM', [
+                'owner_user_id' => $responsavelId,
+                'crm_account' => $crmAccount->name ?? 'N/I',
+                'telefone' => $telefoneNormalizado,
+            ]);
+        }
+
+        // Gerar protocolo sequencial do dia
+        $protocolo = 'TK-' . date('Ymd') . '-' . str_pad(
+            NexoTicket::whereDate('created_at', today())->count() + 1, 3, '0', STR_PAD_LEFT
+        );
+
         $ticket = NexoTicket::create([
             'cliente_id' => $clienteId,
             'datajuri_id' => $datajuriId,
@@ -389,13 +459,17 @@ class NexoAutoatendimentoService
             'nome_cliente' => $nomeCliente,
             'assunto' => mb_substr($assunto, 0, 255),
             'mensagem' => $mensagem ? mb_substr($mensagem, 0, 2000) : null,
-            'status' => 'aberto',
+            'status' => $statusInicial,
+            'responsavel_id' => $responsavelId,
+            'protocolo' => $protocolo,
+            'origem' => 'whatsapp',
         ]);
 
         $this->logarAcao($telefoneNormalizado, 'ticket_aberto', [
             'ticket_id' => $ticket->id,
             'assunto' => $assunto,
             'cliente_id' => $clienteId,
+            'responsavel_id' => $responsavelId,
         ]);
 
         $saudacao = $nomeCliente ? "Olá {$nomeCliente}!" : "Olá!";

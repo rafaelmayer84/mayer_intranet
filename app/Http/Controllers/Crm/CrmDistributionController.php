@@ -35,14 +35,12 @@ class CrmDistributionController extends Controller
         return back()->with('success', 'Perfil atualizado.');
     }
 
-    public function generate(CrmDistributionService $service)
+    public function generate()
     {
-        try {
-            $proposal = $service->gerarProposta(auth()->id());
-            return redirect()->route('crm.distribution.review', $proposal->id)->with('success', 'Proposta gerada com sucesso.');
-        } catch (\Throwable $e) {
-            return back()->with('error', 'Erro ao gerar proposta: ' . $e->getMessage());
-        }
+        \App\Jobs\GenerateDistributionJob::dispatch(auth()->id());
+
+        return redirect()->route('crm.distribution')
+            ->with('success', 'Distribuicao iniciada em background. A pagina atualizara automaticamente quando concluir (~2-3 min).');
     }
 
     public function review(int $id)

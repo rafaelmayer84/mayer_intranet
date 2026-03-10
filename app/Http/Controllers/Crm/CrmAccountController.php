@@ -730,4 +730,27 @@ class CrmAccountController extends Controller
         return back()->with('success', 'Documento removido.')->withFragment('documentos');
     }
 
+
+    public function destroy(int $id)
+    {
+        if (!auth()->user()->isAdmin()) {
+            abort(403);
+        }
+
+        $account = \App\Models\Crm\CrmAccount::findOrFail($id);
+        $name = $account->name;
+
+        // Remover identidades, atividades e oportunidades vinculadas
+        \App\Models\Crm\CrmIdentity::where('account_id', $id)->delete();
+        \App\Models\Crm\CrmActivity::where('account_id', $id)->delete();
+        \App\Models\Crm\CrmOpportunity::where('account_id', $id)->delete();
+        \Illuminate\Support\Facades\DB::table('crm_distribution_queue')->where('account_id', $id)->delete();
+
+        $account->delete();
+
+        \Illuminate\Support\Facades\Log::info('[CRM] Account excluido', ['id' => $id, 'name' => $name, 'by' => auth()->id()]);
+
+        return redirect()->route('crm.carteira')->with('success', "Conta \"{$name}\" excluida com sucesso.");
+    }
+
 }

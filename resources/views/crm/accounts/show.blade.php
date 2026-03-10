@@ -971,7 +971,155 @@
     </div>
 </div>
 
+
+@if(auth()->user()->isAdmin())
+{{-- Botao excluir no header --}}
+<style>#delete-account-btn { position: fixed; bottom: 2rem; right: 2rem; z-index: 40; }</style>
+<button id="delete-account-btn" onclick="document.getElementById('delete-modal').classList.remove('hidden')"
+    class="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium shadow-lg transition flex items-center gap-2">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+    Excluir Conta
+</button>
+<div id="delete-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/50">
+    <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4">
+        <h2 class="text-lg font-bold text-red-600 mb-2">Excluir conta permanentemente</h2>
+        <p class="text-sm text-gray-600 mb-1">Tem certeza que deseja excluir <strong>{{ $account->name }}</strong>?</p>
+        <p class="text-xs text-gray-400 mb-4">Isso removerá a conta, identidades, atividades e oportunidades vinculadas. Esta ação não pode ser desfeita.</p>
+        <div class="flex gap-3 justify-end">
+            <button onclick="document.getElementById('delete-modal').classList.add('hidden')" class="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancelar</button>
+            <form action="{{ route('crm.accounts.destroy', $account->id) }}" method="POST">
+                @csrf @method('DELETE')
+                <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 font-medium">Sim, excluir</button>
+            </form>
+        </div>
+    </div>
+</div>
+@endif
+
 @endsection
+
+
+
+{{-- ================================================================== --}}
+{{-- ABA PULSO DO CLIENTE                                               --}}
+{{-- ================================================================== --}}
+<div id="tab-pulso" class="tab-content hidden">
+    <div class="bg-white rounded-lg shadow-sm border p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-[#1B334A]">Pulso do Cliente</h2>
+            <div id="pulso-badge"></div>
+        </div>
+        <div id="pulso-loading" class="text-center py-8 text-gray-400">Carregando dados do Pulso...</div>
+        <div id="pulso-content" class="hidden">
+            <div class="grid grid-cols-3 gap-4 mb-6">
+                <div class="bg-gray-50 rounded-lg p-4 text-center">
+                    <p class="text-xs text-gray-400 mb-1">Média 7 dias</p>
+                    <p id="pulso-media" class="text-2xl font-bold text-[#1B334A]">—</p>
+                    <p class="text-xs text-gray-400">contatos/dia</p>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4 text-center">
+                    <p class="text-xs text-gray-400 mb-1">Classificação</p>
+                    <p id="pulso-class" class="text-lg font-bold">—</p>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4 text-center">
+                    <p class="text-xs text-gray-400 mb-1">Alertas Ativos</p>
+                    <p id="pulso-alertas-count" class="text-2xl font-bold text-[#1B334A]">—</p>
+                </div>
+            </div>
+            {{-- Gráfico (barras simples via divs) --}}
+            <div class="mb-6">
+                <h3 class="text-sm font-medium text-gray-600 mb-2">Contatos por dia (últimos 30 dias)</h3>
+                <div id="pulso-chart" class="flex items-end gap-1 h-32 border-b border-gray-200"></div>
+            </div>
+            {{-- Alertas --}}
+            <div id="pulso-alertas-list"></div>
+        </div>
+    </div>
+</div>
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tabPulso = document.querySelector('[data-tab="pulso"]');
+    if (!tabPulso) return;
+
+    let pulsoLoaded = false;
+    tabPulso.addEventListener('click', function() {
+        if (pulsoLoaded) return;
+        pulsoLoaded = true;
+
+        fetch("{{ route('crm.accounts.pulso', $account->id) }}")
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('pulso-loading').classList.add('hidden');
+                document.getElementById('pulso-content').classList.remove('hidden');
+
+                // Média
+                document.getElementById('pulso-media').textContent = data.media_7d;
+
+                // Classificação
+                const classEl = document.getElementById('pulso-class');
+                const cls = data.classificacao;
+                const clsColors = {normal: 'text-green-600', atencao: 'text-yellow-600', excessivo: 'text-red-600'};
+                classEl.textContent = cls.charAt(0).toUpperCase() + cls.slice(1);
+                classEl.className = 'text-lg font-bold ' + (clsColors[cls] || '');
+
+                // Badge no header
+                const badge = document.getElementById('pulso-badge');
+                const badgeColors = {normal: 'bg-green-100 text-green-700', atencao: 'bg-yellow-100 text-yellow-700', excessivo: 'bg-red-100 text-red-700'};
+                badge.innerHTML = '<span class="px-2.5 py-1 rounded-full text-xs font-medium ' + (badgeColors[cls] || '') + '">' + cls.charAt(0).toUpperCase() + cls.slice(1) + '</span>';
+
+                // Alertas count
+                document.getElementById('pulso-alertas-count').textContent = data.alertas.length;
+
+                // Chart
+                const chart = document.getElementById('pulso-chart');
+                const threshold = parseInt(data.thresholds.max_contatos_dia || 5);
+                const maxVal = Math.max(...data.diarios.map(d => d.total_contatos), threshold, 1);
+
+                chart.innerHTML = '';
+                data.diarios.forEach(d => {
+                    const pct = (d.total_contatos / maxVal * 100);
+                    const color = d.total_contatos > threshold ? 'bg-red-400' : (d.has_movimentacao ? 'bg-green-400' : 'bg-[#385776]');
+                    const bar = document.createElement('div');
+                    bar.className = color + ' rounded-t flex-1 min-w-[6px] relative group cursor-default';
+                    bar.style.height = Math.max(pct, 2) + '%';
+                    bar.title = d.data + ': ' + d.total_contatos + ' contatos' + (d.has_movimentacao ? ' (com mov.)' : '');
+                    chart.appendChild(bar);
+                });
+
+                // Threshold line
+                const linePct = (threshold / maxVal * 100);
+                chart.style.position = 'relative';
+                const line = document.createElement('div');
+                line.className = 'absolute w-full border-t-2 border-dashed border-red-300 pointer-events-none';
+                line.style.bottom = linePct + '%';
+                line.title = 'Limite: ' + threshold + ' contatos/dia';
+                chart.appendChild(line);
+
+                // Alertas list
+                const alertasDiv = document.getElementById('pulso-alertas-list');
+                if (data.alertas.length > 0) {
+                    let html = '<h3 class="text-sm font-medium text-gray-600 mb-2">Alertas ativos</h3><div class="space-y-2">';
+                    data.alertas.forEach(a => {
+                        const tColors = {diario_excedido: 'bg-red-50 border-red-200', semanal_excedido: 'bg-orange-50 border-orange-200', reiteracao: 'bg-yellow-50 border-yellow-200', fora_horario: 'bg-purple-50 border-purple-200'};
+                        html += '<div class="p-3 rounded-lg border text-xs ' + (tColors[a.tipo] || 'bg-gray-50') + '">';
+                        html += '<span class="font-medium">' + a.tipo.replace(/_/g, ' ') + '</span> — ' + a.descricao;
+                        html += '<span class="text-gray-400 ml-2">' + new Date(a.created_at).toLocaleDateString('pt-BR') + '</span>';
+                        html += '</div>';
+                    });
+                    html += '</div>';
+                    alertasDiv.innerHTML = html;
+                }
+            })
+            .catch(err => {
+                document.getElementById('pulso-loading').textContent = 'Erro ao carregar dados do Pulso.';
+                console.error('Pulso error:', err);
+            });
+    });
+});
+</script>
+@endpush
 
 @push('scripts')
 <script>

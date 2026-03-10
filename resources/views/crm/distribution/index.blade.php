@@ -103,4 +103,65 @@
     <div class="bg-white rounded-lg shadow-sm border p-6 text-gray-400 text-sm">Nenhuma distribuição gerada ainda. Clique em "Gerar Distribuição via IA".</div>
     @endif
 </div>
+
+@push('scripts')
+<script>
+(function() {
+    const msg = document.querySelector('.bg-green-50');
+    if (!msg || !msg.textContent.includes('background')) return;
+
+    let dots = 0;
+    const btn = document.querySelector('button[type="submit"]');
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Gerando...';
+        btn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+
+    const banner = document.createElement('div');
+    banner.className = 'mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm flex items-center gap-3';
+    banner.innerHTML = '<svg class="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg><span id="dist-status">A IA esta distribuindo os clientes. Isso leva 2-3 minutos. Nao feche esta pagina...</span>';
+
+    const container = msg.parentNode;
+    container.insertBefore(banner, msg.nextSibling);
+    msg.style.display = 'none';
+
+    const statusEl = document.getElementById('dist-status');
+    const poll = setInterval(function() {
+        dots = (dots + 1) % 4;
+        const d = '.'.repeat(dots);
+
+        fetch(window.location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(r => r.text())
+            .then(html => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const rows = doc.querySelectorAll('tbody tr');
+                if (rows.length > 0) {
+                    const firstStatus = rows[0].querySelector('td:nth-child(2)');
+                    if (firstStatus && firstStatus.textContent.trim().toLowerCase() === 'pending') {
+                        clearInterval(poll);
+                        banner.className = 'mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm';
+                        banner.innerHTML = '&#9989; Proposta gerada com sucesso! Recarregando...';
+                        setTimeout(function() { window.location.reload(); }, 1500);
+                        return;
+                    }
+                }
+                if (statusEl) statusEl.textContent = 'A IA esta distribuindo os clientes' + d + ' (~2-3 min)';
+            })
+            .catch(function() {
+                if (statusEl) statusEl.textContent = 'Processando' + d;
+            });
+    }, 10000);
+
+    // Timeout de seguranca: 5 minutos
+    setTimeout(function() {
+        clearInterval(poll);
+        banner.className = 'mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-700 text-sm';
+        banner.innerHTML = 'O processo esta demorando mais que o esperado. <a href="" class="underline font-medium">Recarregar pagina</a>';
+    }, 300000);
+})();
+</script>
+@endpush
+
 @endsection

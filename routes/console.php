@@ -120,6 +120,13 @@ Schedule::command('gdp:apurar')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/cron-gdp-apuracao.log'));
 
+// GDP Scanner Conformidade — diario 08:00 BRT (verifica ocorrencias automaticas)
+Schedule::command('gdp:penalizacoes')
+    ->dailyAt('08:00')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/cron-gdp-conformidade.log'));
+
 
 
 // GDP Lembrete Acordo pendente → diário 09:00 BRT
@@ -277,4 +284,31 @@ Schedule::command('crm:check-deadlines')
     ->timezone('America/Sao_Paulo')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/crm-deadlines.log'));
+
+// ===== PULSO DO CLIENTE =====
+// Consolidação diária — 23:00 BRT (após expediente)
+Schedule::command('pulso:consolidar')
+    ->dailyAt('23:00')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/cron-pulso-consolidar.log'));
+
+// Lembrete upload ligações — sexta 9:00 BRT
+Schedule::command('pulso:lembrete-telefone')
+    ->weeklyOn(5, '09:00')
+    ->timezone('America/Sao_Paulo')
+    ->appendOutputTo(storage_path('logs/cron-pulso-lembrete.log'));
+
+// SISRH: Lembrete semanal para importar frequencia (segunda 09:00 BRT)
+Schedule::call(function () {
+    \Illuminate\Support\Facades\DB::table('notifications')->insert([
+        'user_id' => 1,
+        'tipo' => 'lembrete',
+        'titulo' => 'Importar Frequencia Semanal',
+        'mensagem' => 'Lembre-se de importar os dados de login do DataJuri desta semana na Folha de Frequencia (SISRH > Frequencia).',
+        'lida' => false,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+})->weeklyOn(1, '09:00')->timezone('America/Sao_Paulo');
 

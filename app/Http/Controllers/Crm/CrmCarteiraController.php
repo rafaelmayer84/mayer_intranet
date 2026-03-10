@@ -32,6 +32,73 @@ class CrmCarteiraController extends Controller
         ]);
     }
 
+
+    public function bulkAction(Request $request)
+    {
+        $user = auth()->user();
+        if (!$user->isAdmin()) {
+            abort(403);
+        }
+
+        $request->validate([
+            'account_ids'   => 'required|array|min:1',
+            'account_ids.*' => 'integer|exists:crm_accounts,id',
+            'action'        => 'required|in:assign,archive,activate,dormant,onboarding,delete_prospect',
+            'owner_user_id' => 'nullable|integer|exists:users,id',
+        ]);
+
+        $ids = $request->account_ids;
+        $action = $request->action;
+        $count = 0;
+
+        switch ($action) {
+            case 'assign':
+                $count = CrmAccount::whereIn('id', $ids)
+                    ->update(['owner_user_id' => $request->owner_user_id ?: null, 'updated_at' => now()]);
+                $msg = $count . ' conta(s) atribuida(s).';
+                break;
+
+            case 'archive':
+                $count = CrmAccount::whereIn('id', $ids)
+                    ->where('lifecycle', '!=', 'arquivado')
+                    ->update(['lifecycle' => 'arquivado', 'updated_at' => now()]);
+                $msg = $count . ' conta(s) arquivada(s).';
+                break;
+
+            case 'activate':
+                $count = CrmAccount::whereIn('id', $ids)
+                    ->where('lifecycle', '!=', 'ativo')
+                    ->update(['lifecycle' => 'ativo', 'updated_at' => now()]);
+                $msg = $count . ' conta(s) reativada(s).';
+                break;
+
+            case 'dormant':
+                $count = CrmAccount::whereIn('id', $ids)
+                    ->update(['lifecycle' => 'adormecido', 'updated_at' => now()]);
+                $msg = $count . ' conta(s) marcada(s) como adormecida(s).';
+                break;
+
+            case 'onboarding':
+                $count = CrmAccount::whereIn('id', $ids)
+                    ->update(['lifecycle' => 'onboarding', 'updated_at' => now()]);
+                $msg = $count . ' conta(s) movida(s) para onboarding.';
+                break;
+
+            case 'delete_prospect':
+                $count = CrmAccount::whereIn('id', $ids)
+                    ->where('kind', 'prospect')
+                    ->whereNull('datajuri_pessoa_id')
+                    ->delete();
+                $msg = $count . ' prospect(s) sem vinculo removido(s).';
+                break;
+
+            default:
+                return response()->json(['success' => false, 'message' => 'Acao invalida.'], 400);
+        }
+
+        return response()->json(['success' => true, 'updated' => $count, 'message' => $msg]);
+    }
+
     public function index(Request $request)
     {
         $query = CrmAccount::with('owner')
