@@ -663,14 +663,22 @@ class CrmAccountController extends Controller
      */
     public function uploadDocument(Request $request, int $id)
     {
-        $request->validate([
-            'file'     => 'required|file|mimes:pdf,jpg,jpeg,png,doc,docx|max:20480',
-            'category' => 'required|string|max:50',
-            'notes'    => 'nullable|string|max:500',
-        ]);
+        \Log::info('[CRM-DOC-UPLOAD] Inicio', ['account_id' => $id, 'user' => auth()->id(), 'hasFile' => $request->hasFile('file'), 'category' => $request->category]);
+
+        try {
+            $request->validate([
+                'file'     => ['required', 'file', 'max:20480', function ($attribute, $value, $fail) { $ext = strtolower($value->getClientOriginalExtension()); if (!in_array($ext, ['pdf','jpg','jpeg','png','doc','docx'])) { $fail('O arquivo deve ser PDF, JPG, PNG, DOC ou DOCX.'); } }],
+                'category' => 'required|string|max:50',
+                'notes'    => 'nullable|string|max:500',
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $ve) {
+            \Log::warning('[CRM-DOC-UPLOAD] Validacao falhou', ['errors' => $ve->errors()]);
+            throw $ve;
+        }
 
         $account = \App\Models\Crm\CrmAccount::findOrFail($id);
         $file = $request->file('file');
+        \Log::info('[CRM-DOC-UPLOAD] Arquivo recebido', ['name' => $file->getClientOriginalName(), 'mime' => $file->getMimeType(), 'size' => $file->getSize()]);
 
         $normalizedName = CrmDocument::normalizarNome(
             $file->getClientOriginalName(),

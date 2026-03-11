@@ -873,8 +873,19 @@
                 <button onclick="document.getElementById('form-upload-doc').classList.toggle('hidden')" class="px-3 py-1.5 bg-[#385776] text-white rounded-lg text-xs hover:bg-[#1B334A] transition">+ Enviar Documento</button>
             </div>
 
+            {{-- Erros de validação do upload --}}
+            @if($errors->any())
+                <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p class="text-sm font-medium text-red-700">Erro no upload:</p>
+                    @foreach($errors->all() as $error)
+                        <p class="text-xs text-red-600 mt-1">{{ $error }}</p>
+                    @endforeach
+                </div>
+                <script>document.addEventListener('DOMContentLoaded',function(){var t=document.querySelector('[data-tab="documentos"]');if(t)t.click();var f=document.getElementById('form-upload-doc');if(f)f.classList.remove('hidden');});</script>
+            @endif
+
             {{-- Formulário de upload --}}
-            <form id="form-upload-doc" method="POST" action="{{ route('crm.accounts.upload-document', $account->id) }}" enctype="multipart/form-data" class="hidden mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
+            <form id="form-upload-doc" method="POST" action="{{ route('crm.accounts.upload-document', $account->id) }}" enctype="multipart/form-data" class="{{ $errors->any() ? '' : 'hidden' }} mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-3">
                 @csrf
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
@@ -1317,8 +1328,8 @@ function saveVisit(generatePdf) {
         }
     });
 }
-document.addEventListener('keydown', function(e) { if (e.key === 'Escape' && !document.getElementById('modal-visit').classList.contains('hidden')) closeVisitModal(); });
-document.getElementById('modal-visit').addEventListener('click', function(e) { if (e.target === this) closeVisitModal(); });
+document.addEventListener('keydown', function(e) { var mv = document.getElementById('modal-visit'); if (mv && e.key === 'Escape' && !mv.classList.contains('hidden')) closeVisitModal(); });
+document.addEventListener('DOMContentLoaded', function() { var mv = document.getElementById('modal-visit'); if (mv) mv.addEventListener('click', function(e) { if (e.target === this) closeVisitModal(); }); });
 </script>
 
 <!-- ======= MODAL VISITA PRESENCIAL ======= -->
