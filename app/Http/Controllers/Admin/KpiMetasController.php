@@ -217,7 +217,7 @@ class KpiMetasController extends Controller
     {
         $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($filePath);
         $sheet = $spreadsheet->getActiveSheet();
-        $rows = $sheet->toArray(null, true, true, true);
+        $rows = $sheet->toArray(null, true, false, true);
 
         if (count($rows) < 2) {
             return [];

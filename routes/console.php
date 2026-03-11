@@ -202,6 +202,13 @@ Schedule::call(function () {
     }
 })->dailyAt('03:15')->timezone('America/Sao_Paulo');
 
+// CRM Inadimplência — verificar contas vencidas e notificar responsáveis — 10:12 BRT
+Schedule::command('crm:check-inadimplencia')
+    ->dailyAt('10:12')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/cron-crm-inadimplencia.log'));
+
 // CRM Cadência — verificar tasks vencendo hoje (sininho + email) — 8h BRT
 Schedule::command('crm:cadence-check')
     ->dailyAt('08:00')

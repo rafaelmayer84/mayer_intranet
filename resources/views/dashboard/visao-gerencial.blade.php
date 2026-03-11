@@ -318,7 +318,7 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
-                            @foreach(array_slice($contasLista, 0, 6) as $ct)
+                            @foreach($contasLista as $ct)
                                 @php
                                     $diasBadge = match(true) {
                                         $ct['diasAtraso'] > 30 => 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',

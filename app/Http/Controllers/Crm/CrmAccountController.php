@@ -464,11 +464,11 @@ class CrmAccountController extends Controller
                 ->orderByDesc('data')
                 ->first(['data', 'valor', 'descricao', 'classificacao']);
 
-            // 5. Contas a receber detalhadas
+            // 5. Contas a receber detalhadas (sem limit — cliente pode ter muitas parcelas)
             $ctx['contas_receber'] = DB::table('contas_receber')
                 ->where('pessoa_datajuri_id', $djId)
+                ->where('is_stale', false)
                 ->orderByDesc('data_vencimento')
-                ->limit(20)
                 ->get([
                     'id', 'descricao', 'valor', 'data_vencimento',
                     'data_pagamento', 'status', 'tipo',
