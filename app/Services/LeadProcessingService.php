@@ -1063,6 +1063,11 @@ PROMPT;
      */
     private function createLeadSafe(array $data): Lead
     {
+        // Truncar nome para caber em VARCHAR(255)
+        if (isset($data['nome'])) {
+            $data['nome'] = mb_substr($data['nome'], 0, 250);
+        }
+
         try {
             return Lead::create($data);
         } catch (\Illuminate\Database\QueryException $e) {
