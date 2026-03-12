@@ -146,7 +146,7 @@ Formato obrigatorio:
         $userPrompt = "DADOS DO CASO:\n" . json_encode($dadosCaso, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
         $userPrompt .= "\n\nCONFIGURACOES CONFIRMADAS PELO ADVOGADO:\n" . json_encode($config, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 
-        $result = $this->callClaude($systemPrompt, $userPrompt, 8000);
+        $result = $this->callClaude($systemPrompt, $userPrompt, 4096);
 
         if (isset($result['erro'])) {
             return ['error' => $result['erro']];
@@ -239,7 +239,7 @@ REGRAS CRITICAS:
         }
 
         try {
-            $response = Http::timeout(120)
+            $response = Http::connectTimeout(10)->timeout(180)
                 ->withHeaders([
                     'x-api-key' => $this->apiKey,
                     'anthropic-version' => '2023-06-01',
@@ -279,9 +279,14 @@ REGRAS CRITICAS:
     private function parseJson(string $raw): array
     {
         $clean = trim($raw);
-        $clean = preg_replace('/^```json\s*/', '', $clean);
-        $clean = preg_replace('/^```\s*/', '', $clean);
-        $clean = preg_replace('/\s*```$/', '', $clean);
+        // Remover blocos markdown ```json ... ``` em qualquer posicao
+        if (preg_match('/```(?:json)?\s*\n?(\{.*\})\s*\n?```/s', $clean, $m)) {
+            $clean = $m[1];
+        } else {
+            $clean = preg_replace('/^```json\s*/', '', $clean);
+            $clean = preg_replace('/^```\s*/', '', $clean);
+            $clean = preg_replace('/\s*```$/', '', $clean);
+        }
         $clean = trim($clean);
 
         $parsed = json_decode($clean, true);

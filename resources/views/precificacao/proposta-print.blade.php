@@ -3,17 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <title>Proposta de Honorários — {{ $proposta->nome_proponente }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         @page {
             size: A4;
-            margin: 25mm 20mm 20mm 20mm;
+            margin: 20mm 18mm 18mm 18mm;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Georgia', 'Times New Roman', serif;
-            font-size: 11pt;
-            line-height: 1.6;
+            font-family: 'Montserrat', 'Arial', sans-serif;
+            font-size: 10pt;
+            line-height: 1.7;
             color: #1a1a1a;
+            background: #fff;
+            position: relative;
+        }
+
+        /* ====== MARCA D'AGUA (icone M estilizado) ====== */
+        body::before {
+            content: 'M';
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Montserrat', sans-serif;
+            font-size: 400pt;
+            font-weight: 700;
+            color: rgba(56, 87, 118, 0.03);
+            pointer-events: none;
+            z-index: 0;
         }
 
         /* ====== HEADER ====== */
@@ -21,116 +40,197 @@
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            border-bottom: 2px solid #C4A35A;
-            padding-bottom: 12px;
+            padding-bottom: 16px;
             margin-bottom: 28px;
+            border-bottom: 3px solid #385776;
+            position: relative;
+            z-index: 1;
         }
-        .header-left { font-family: 'Arial', sans-serif; }
-        .header-left .firm-name {
-            font-size: 16pt;
-            font-weight: bold;
-            letter-spacing: 2px;
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .header-logo {
+            display: flex;
+            flex-direction: column;
+        }
+        .header-logo .firm-name {
+            font-size: 22pt;
+            font-weight: 700;
             color: #1B334A;
+            letter-spacing: 1px;
+            line-height: 1.1;
         }
-        .header-left .firm-sub {
-            font-size: 8pt;
-            letter-spacing: 3px;
-            color: #666;
+        .header-logo .firm-sub {
+            font-size: 7pt;
+            font-weight: 500;
+            letter-spacing: 4px;
+            color: #385776;
             text-transform: uppercase;
-        }
-        .header-left .firm-oab {
-            font-size: 8pt;
-            color: #999;
             margin-top: 2px;
+        }
+        .header-logo .firm-oab {
+            font-size: 7.5pt;
+            color: #999;
+            margin-top: 3px;
+            font-weight: 400;
         }
         .header-right {
             text-align: right;
-            font-size: 8pt;
+            font-size: 7.5pt;
             color: #666;
-            line-height: 1.6;
+            line-height: 1.8;
+            font-weight: 400;
+        }
+        .header-right strong {
+            color: #1B334A;
+            font-weight: 600;
         }
 
-        /* ====== CORPO ====== */
+        /* ====== LINHA DOURADA ACCENT ====== */
+        .accent-line {
+            height: 2px;
+            background: linear-gradient(90deg, #C4A35A 0%, #385776 100%);
+            margin-bottom: 24px;
+            border-radius: 2px;
+        }
+
+        /* ====== DATA/LOCAL ====== */
         .data-local {
             text-align: right;
-            font-size: 10pt;
-            color: #444;
+            font-size: 9.5pt;
+            color: #555;
             margin-bottom: 20px;
-        }
-        .destinatario {
-            margin-bottom: 8px;
-            font-size: 10.5pt;
-        }
-        .destinatario strong {
-            color: #1B334A;
-        }
-        .ref-line {
-            font-size: 10.5pt;
-            font-weight: bold;
-            color: #1B334A;
-            margin: 16px 0 20px 0;
-            padding-bottom: 6px;
-            border-bottom: 1px solid #ddd;
+            font-weight: 400;
         }
 
-        /* Seções */
-        .secao-titulo {
-            font-size: 11pt;
-            font-weight: bold;
-            color: #1B334A;
-            margin: 22px 0 8px 0;
+        /* ====== DESTINATARIO ====== */
+        .destinatario {
+            margin-bottom: 6px;
+            font-size: 10pt;
+        }
+        .destinatario .label {
+            font-size: 8pt;
+            color: #999;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+        .destinatario .nome {
+            font-size: 12pt;
+            font-weight: 700;
+            color: #1B334A;
+            margin-top: 2px;
+        }
+        .destinatario .doc {
+            font-size: 8.5pt;
+            color: #777;
+        }
+
+        /* ====== REF ====== */
+        .ref-line {
+            font-size: 10pt;
+            font-weight: 600;
+            color: #1B334A;
+            margin: 18px 0 24px 0;
+            padding: 10px 16px;
+            background: linear-gradient(135deg, #f0f4f8 0%, #e8edf3 100%);
+            border-left: 4px solid #385776;
+            border-radius: 0 6px 6px 0;
+        }
+
+        /* ====== SECOES ====== */
+        .secao-titulo {
+            font-size: 10pt;
+            font-weight: 700;
+            color: #385776;
+            margin: 26px 0 10px 0;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            padding-bottom: 6px;
+            border-bottom: 1.5px solid #e0e6ed;
+            position: relative;
+        }
+        .secao-titulo::after {
+            content: '';
+            position: absolute;
+            bottom: -1.5px;
+            left: 0;
+            width: 60px;
+            height: 1.5px;
+            background: #C4A35A;
         }
         .secao-texto {
             text-align: justify;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
+            font-weight: 400;
+            color: #2a2a2a;
         }
 
-        /* Tabela de honorários */
+        /* ====== HONORARIOS BOX ====== */
         .honorarios-box {
-            background: #f8f9fb;
-            border: 1px solid #dde2e8;
-            border-radius: 4px;
-            padding: 16px 20px;
-            margin: 12px 0 16px 0;
+            background: linear-gradient(135deg, #1B334A 0%, #385776 100%);
+            color: #fff;
+            border-radius: 8px;
+            padding: 20px 24px;
+            margin: 14px 0 18px 0;
+            position: relative;
+            overflow: hidden;
+        }
+        .honorarios-box::before {
+            content: '';
+            position: absolute;
+            top: -20px;
+            right: -20px;
+            width: 100px;
+            height: 100px;
+            background: rgba(196, 163, 90, 0.15);
+            border-radius: 50%;
         }
         .honorarios-box .valor-destaque {
-            font-size: 14pt;
-            font-weight: bold;
-            color: #1B334A;
+            font-size: 15pt;
+            font-weight: 700;
+            letter-spacing: 0.5px;
         }
         .honorarios-box .valor-detalhe {
-            font-size: 9.5pt;
-            color: #555;
-            margin-top: 4px;
+            font-size: 9pt;
+            opacity: 0.85;
+            margin-top: 6px;
+            font-weight: 400;
+            line-height: 1.6;
         }
 
-        /* Tabela genérica */
+        /* ====== TABELA ====== */
         table.tabela-fases {
             width: 100%;
             border-collapse: collapse;
-            margin: 10px 0 16px 0;
-            font-size: 10pt;
+            margin: 12px 0 18px 0;
+            font-size: 9pt;
         }
         table.tabela-fases th {
             background: #1B334A;
             color: #fff;
-            padding: 6px 10px;
+            padding: 8px 12px;
             text-align: left;
-            font-size: 9pt;
+            font-size: 7.5pt;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 1px;
+            font-weight: 600;
         }
         table.tabela-fases td {
-            padding: 6px 10px;
-            border-bottom: 1px solid #e5e7eb;
+            padding: 8px 12px;
+            border-bottom: 1px solid #e8ecf1;
+            color: #333;
         }
         table.tabela-fases tr:nth-child(even) {
-            background: #f9fafb;
+            background: #f7f9fb;
+        }
+        table.tabela-fases tr:hover {
+            background: #eef2f7;
         }
 
-        /* Assinaturas */
+        /* ====== ASSINATURAS ====== */
         .assinaturas {
             display: flex;
             justify-content: space-between;
@@ -142,52 +242,68 @@
             width: 42%;
         }
         .assinatura-linha {
-            border-top: 1px solid #333;
-            padding-top: 6px;
+            border-top: 2px solid #1B334A;
+            padding-top: 8px;
             font-size: 10pt;
-            font-weight: bold;
+            font-weight: 700;
             color: #1B334A;
         }
         .assinatura-cargo {
-            font-size: 8.5pt;
-            color: #666;
+            font-size: 8pt;
+            color: #777;
+            font-weight: 400;
+            margin-top: 2px;
         }
 
-        /* Footer */
-        .footer-cidades {
-            text-align: center;
+        /* ====== FOOTER ====== */
+        .footer {
             margin-top: 40px;
-            padding-top: 10px;
-            border-top: 1px solid #C4A35A;
-            font-family: 'Arial', sans-serif;
-            font-size: 8pt;
-            letter-spacing: 4px;
+            padding-top: 14px;
+            border-top: 3px solid #385776;
+            text-align: center;
+        }
+        .footer-cidades {
+            font-size: 7.5pt;
+            letter-spacing: 5px;
             color: #999;
             text-transform: uppercase;
+            font-weight: 600;
         }
-        .footer-cidades span { margin: 0 15px; }
+        .footer-cidades span { margin: 0 12px; }
+        .footer-contato {
+            font-size: 7pt;
+            color: #bbb;
+            margin-top: 6px;
+            font-weight: 400;
+        }
 
-        /* Botão imprimir */
+        /* ====== BOTAO IMPRIMIR ====== */
         .btn-print {
             position: fixed;
             top: 15px;
             right: 20px;
-            background: #385776;
+            background: linear-gradient(135deg, #1B334A, #385776);
             color: #fff;
             border: none;
-            padding: 10px 24px;
-            border-radius: 6px;
+            padding: 12px 28px;
+            border-radius: 8px;
             cursor: pointer;
             font-size: 10pt;
-            font-family: Arial, sans-serif;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 600;
             z-index: 9999;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            box-shadow: 0 4px 12px rgba(27, 51, 74, 0.3);
+            letter-spacing: 0.5px;
         }
-        .btn-print:hover { background: #1B334A; }
+        .btn-print:hover { background: #1B334A; transform: translateY(-1px); box-shadow: 0 6px 16px rgba(27, 51, 74, 0.4); }
 
         @media print {
             .btn-print { display: none !important; }
-            body { font-size: 10.5pt; }
+            body { font-size: 9.5pt; }
+            body::before { position: absolute; }
+            .honorarios-box { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            table.tabela-fases th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .ref-line { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
     </style>
 </head>
@@ -197,29 +313,31 @@
     <!-- HEADER -->
     <div class="header">
         <div class="header-left">
-            <div class="firm-name">MAYER</div>
-            <div class="firm-sub">Sociedade de Advogados</div>
-            <div class="firm-oab">OAB/SC 2097</div>
+            <div class="header-logo">
+                <div class="firm-name">MAYER</div>
+                <div class="firm-sub">Sociedade de Advogados</div>
+                <div class="firm-oab">OAB/SC 2097</div>
+            </div>
         </div>
         <div class="header-right">
             Rua Samuel Heusi, 284 — Centro<br>
             Itajaí/SC — CEP 88301-040<br>
-            (47) 3842-1050<br>
+            <strong>(47) 3842-1050</strong><br>
             contato@mayeradvogados.adv.br
         </div>
     </div>
 
-    <!-- DATA -->
-    <div class="data-local">
-        {{ $dataFormatada }}
-    </div>
+    <div class="accent-line"></div>
 
-    <!-- DESTINATÁRIO -->
+    <!-- DATA -->
+    <div class="data-local">{{ $dataFormatada }}</div>
+
+    <!-- DESTINATARIO -->
     <div class="destinatario">
-        A<br>
-        <strong>{{ $proposta->nome_proponente }}</strong>
+        <div class="label">Destinatário</div>
+        <div class="nome">{{ $proposta->nome_proponente }}</div>
         @if($proposta->documento_proponente)
-            <br><span style="font-size:9.5pt;color:#666;">{{ $proposta->tipo_pessoa === 'PJ' ? 'CNPJ' : 'CPF' }}: {{ $proposta->documento_proponente }}</span>
+            <div class="doc">{{ $proposta->tipo_pessoa === 'PJ' ? 'CNPJ' : 'CPF' }}: {{ $proposta->documento_proponente }}</div>
         @endif
     </div>
 
@@ -228,7 +346,7 @@
         Ref.: Proposta de Honorários — {{ $proposta->area_direito }}{{ $proposta->tipo_acao ? ' / ' . $proposta->tipo_acao : '' }}
     </div>
 
-    <!-- CONTEÚDO GERADO PELA IA -->
+    <!-- CONTEUDO GERADO PELA IA -->
     @php
         $texto = $proposta->texto_proposta_cliente;
         $secoes = is_array($texto) ? $texto : (json_decode($texto, true) ?? []);
@@ -258,14 +376,14 @@
         <table class="tabela-fases">
             <thead>
                 <tr>
-                    <th style="width:25%;">Fase</th>
+                    <th style="width:28%;">Fase</th>
                     <th>Descrição</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach($secoes['fases'] as $fase)
                     <tr>
-                        <td style="font-weight:bold;color:#1B334A;">{{ $fase['nome'] ?? '' }}</td>
+                        <td style="font-weight:600;color:#1B334A;">{{ $fase['nome'] ?? '' }}</td>
                         <td>{{ $fase['descricao'] ?? '' }}</td>
                     </tr>
                 @endforeach
@@ -275,16 +393,16 @@
 
     @if(!empty($secoes['fases_horas']) && is_array($secoes['fases_horas']))
         <div class="secao-titulo">Atividades e Horas Estimadas</div>
-        <p class="secao-texto" style="font-size:9.5pt;color:#555;margin-bottom:10px;">As horas abaixo representam a estimativa de dedicação da equipe jurídica, absorvidas pelo pró-labore contratado. Eventuais extrapolações atípicas serão previamente comunicadas.</p>
+        <p class="secao-texto" style="font-size:8.5pt;color:#777;margin-bottom:10px;">As horas representam a estimativa de dedicação da equipe jurídica, absorvidas pelo pró-labore contratado.</p>
         @foreach($secoes['fases_horas'] as $faseH)
-            <p style="font-weight:bold;color:#1B334A;font-size:10.5pt;margin:14px 0 6px 0;">{{ $faseH['nome'] ?? '' }}</p>
+            <p style="font-weight:700;color:#1B334A;font-size:9.5pt;margin:14px 0 6px 0;">{{ $faseH['nome'] ?? '' }}</p>
             <table class="tabela-fases">
                 <thead>
                     <tr>
                         <th style="width:28%;">Atividade</th>
                         <th>Descrição</th>
-                        <th style="width:10%;text-align:center;">Hrs Mín</th>
-                        <th style="width:10%;text-align:center;">Hrs Máx</th>
+                        <th style="width:9%;text-align:center;">Hrs Mín</th>
+                        <th style="width:9%;text-align:center;">Hrs Máx</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -297,9 +415,9 @@
                     </tr>
                     @endforeach
                     <tr style="background:#eef2f7;">
-                        <td colspan="2" style="font-weight:bold;text-align:right;color:#1B334A;">Subtotal {{ $faseH['nome'] ?? '' }}</td>
-                        <td style="text-align:center;font-weight:bold;">{{ $faseH['subtotal_min'] ?? '-' }}</td>
-                        <td style="text-align:center;font-weight:bold;">{{ $faseH['subtotal_max'] ?? '-' }}</td>
+                        <td colspan="2" style="font-weight:700;text-align:right;color:#1B334A;">Subtotal</td>
+                        <td style="text-align:center;font-weight:700;">{{ $faseH['subtotal_min'] ?? '-' }}</td>
+                        <td style="text-align:center;font-weight:700;">{{ $faseH['subtotal_max'] ?? '-' }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -308,8 +426,8 @@
             $totalMin = collect($secoes['fases_horas'])->sum('subtotal_min');
             $totalMax = collect($secoes['fases_horas'])->sum('subtotal_max');
         @endphp
-        <div class="honorarios-box" style="margin-top:8px;">
-            <div style="font-size:10pt;color:#1B334A;font-weight:bold;">Total estimado: {{ $totalMin }} a {{ $totalMax }} horas</div>
+        <div class="honorarios-box" style="background:linear-gradient(135deg,#385776,#1B334A);margin-top:8px;">
+            <div style="font-size:10pt;font-weight:700;">Total estimado: {{ $totalMin }} a {{ $totalMax }} horas de trabalho</div>
         </div>
     @endif
 
@@ -326,7 +444,7 @@
                 <div class="valor-detalhe">{{ $secoes['honorarios']['forma_pagamento'] }}</div>
             @endif
             @if(!empty($secoes['honorarios']['observacao']))
-                <div class="valor-detalhe" style="margin-top:8px;">{{ $secoes['honorarios']['observacao'] }}</div>
+                <div class="valor-detalhe" style="margin-top:8px;opacity:0.75;">{{ $secoes['honorarios']['observacao'] }}</div>
             @endif
         </div>
     @endif
@@ -352,14 +470,14 @@
     @endif
 
     @if(!empty($secoes['encerramento']))
-        <div class="secao-texto" style="margin-top:16px;">{!! nl2br(e($secoes['encerramento'])) !!}</div>
+        <div class="secao-texto" style="margin-top:20px;">{!! nl2br(e($secoes['encerramento'])) !!}</div>
     @endif
 
     <!-- ASSINATURAS -->
     <div class="assinaturas">
         <div class="assinatura-box">
-            <div class="assinatura-linha">{{ Auth::user()->name ?? 'Advogado Responsável' }}</div>
-            <div class="assinatura-cargo">{{ Auth::user()->cargo ?? 'Advogado(a)' }}<br>Mayer Sociedade de Advogados</div>
+            <div class="assinatura-linha">Rafael Mayer</div>
+            <div class="assinatura-cargo">Sócio Proprietário<br>Mayer Sociedade de Advogados<br>OAB/SC 2097</div>
         </div>
         <div class="assinatura-box">
             <div class="assinatura-linha">{{ $proposta->nome_proponente }}</div>
@@ -368,10 +486,15 @@
     </div>
 
     <!-- FOOTER -->
-    <div class="footer-cidades">
-        <span>ITAJAÍ</span>
-        <span>FLORIANÓPOLIS</span>
-        <span>SÃO PAULO</span>
+    <div class="footer">
+        <div class="footer-cidades">
+            <span>Itajaí</span>
+            <span>Florianópolis</span>
+            <span>São Paulo</span>
+        </div>
+        <div class="footer-contato">
+            (47) 3842-1050 &nbsp;|&nbsp; contato@mayeradvogados.adv.br &nbsp;|&nbsp; www.mayeradvogados.adv.br
+        </div>
     </div>
 </body>
 </html>

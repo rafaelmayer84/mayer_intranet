@@ -299,12 +299,23 @@ class PrecificacaoController extends Controller
     }
 
     // ===================== CALIBRAÇÃO (ADMIN ONLY) =====================
+    /**
+     * API: Sugerir configuracoes para o modal (pre-preenchido pela IA)
+     */
+    public function sugerirConfigProposta(int $id)
+    {
+        $proposal = PricingProposal::where('user_id', Auth::id())->findOrFail($id);
+
+        if (!$proposal->proposta_escolhida || $proposal->proposta_escolhida === 'nenhuma') {
+            return response()->json(['error' => 'Escolha uma proposta antes.'], 422);
+        }
+
+        $sugestao = $this->proposalClaude->sugerirConfiguracao($proposal);
+        return response()->json(['success' => true, 'config' => $sugestao]);
+    }
 
     /**
-     * Tela de calibração estratégica (admin/sócios)
-     */
-    /**
-     * Gera texto persuasivo da proposta via IA e salva no registro.
+     * Gerar proposta persuasiva via Claude com configs confirmadas
      */
     public function gerarPropostaCliente(Request $request, int $id)
     {
@@ -314,14 +325,35 @@ class PrecificacaoController extends Controller
             return response()->json(['error' => 'Escolha uma proposta antes de gerar o documento.'], 422);
         }
 
+        $config = [
+            'valor_honorarios' => (float) $request->input('valor_honorarios', 0),
+            'tipo_cobranca' => $request->input('tipo_cobranca', 'fixo'),
+            'parcelas' => (int) $request->input('parcelas', 1),
+            'incluir_exito' => (bool) $request->input('incluir_exito', false),
+            'exito_tipo' => $request->input('exito_tipo', 'percentual'),
+            'exito_valor' => $request->input('exito_valor', ''),
+            'exito_condicao' => $request->input('exito_condicao', ''),
+            'horas_estimadas_min' => (int) $request->input('horas_estimadas_min', 0),
+            'horas_estimadas_max' => (int) $request->input('horas_estimadas_max', 0),
+            'escopo' => $request->input('escopo', ''),
+            'estrategia_resumo' => $request->input('estrategia_resumo', ''),
+            'despesas_selecionadas' => $request->input('despesas_selecionadas', []),
+            'vigencia_dias' => (int) $request->input('vigencia_dias', 15),
+            'incluir_tabela_horas' => (bool) $request->input('incluir_tabela_horas', false),
+            'observacoes_advogado' => $request->input('observacoes_advogado', ''),
+        ];
+
         try {
-            $textoGerado = $this->ai->gerarTextoPropostaCliente($proposal, $proposal->proposta_escolhida);
+            $textoGerado = $this->proposalClaude->gerarProposta($proposal, $config);
 
             if (isset($textoGerado['error'])) {
                 return response()->json(['error' => $textoGerado['error']], 500);
             }
 
-            $proposal->update(['texto_proposta_cliente' => json_encode($textoGerado, JSON_UNESCAPED_UNICODE)]);
+            $proposal->update([
+                'texto_proposta_cliente' => json_encode($textoGerado, JSON_UNESCAPED_UNICODE),
+                'valor_final' => $config['valor_honorarios'] ?: $proposal->valor_final,
+            ]);
 
             return response()->json([
                 'success' => true,
