@@ -31,6 +31,8 @@ class JustusSyncTrf4Command extends Command
     private int $skipped = 0;
     private int $errors = 0;
     private int $requestCount = 0;
+    private int $consecutiveSkips = 0;
+    private int $maxConsecutiveSkips = 100;
 
     public function handle(): int
     {
@@ -104,6 +106,12 @@ class JustusSyncTrf4Command extends Command
             $resultados = $this->parsearResultados($html);
             $this->info("Página {$pg}/{$totalPaginas}: " . count($resultados) . " resultados");
             $this->salvarResultados($resultados, $dryRun, $force);
+
+            // Early-stop: se N registros consecutivos ja existem, parar
+            if ($this->consecutiveSkips >= $this->maxConsecutiveSkips) {
+                $this->warn("Early-stop: {$this->maxConsecutiveSkips} registros consecutivos ja existentes. Parando.");
+                break;
+            }
 
             // Log progresso a cada 50 páginas
             if ($pg % 50 === 0) {
@@ -474,17 +482,20 @@ class JustusSyncTrf4Command extends Command
 
                 if ($existing && !$force) {
                     $this->skipped++;
+                    $this->consecutiveSkips++;
                     continue;
                 }
 
                 if ($existing) {
                     $existing->update($record);
                     $this->updated++;
+                    $this->consecutiveSkips = 0;
                 } else {
                     $j = new JustusJurisprudencia($record);
-                    $j->setConnection('justus_falcao');
+                    $j->setConnection(static::$resolvedConnection ?? 'justus_falcao');
                     $j->save();
                     $this->imported++;
+                    $this->consecutiveSkips = 0;
                 }
             } catch (\Throwable $e) {
                 $this->errors++;

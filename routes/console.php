@@ -237,7 +237,7 @@ Schedule::command('crm:notify-inactive')
     ->appendOutputTo(storage_path('logs/cron-crm-notify.log'));
 
 // JUSTUS TRF4 Sync - diário 05:00 BRT (02/03/2026)
-Schedule::command('justus:sync-trf4 --meses-atras=1 --ps=10 --tipo=1')
+Schedule::command('justus:sync-trf4 --meses-atras=1 --ps=50 --tipo=1')
     ->dailyAt('05:00')
     ->timezone('America/Sao_Paulo')
     ->withoutOverlapping()
