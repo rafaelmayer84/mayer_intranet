@@ -350,9 +350,14 @@ class PrecificacaoController extends Controller
                 return response()->json(['error' => $textoGerado['error']], 500);
             }
 
+            $jsonTexto = json_encode($textoGerado, JSON_UNESCAPED_UNICODE);
+            $hashRaw = hash('sha256', $jsonTexto . '|' . $proposal->id . '|' . now()->toIso8601String());
+            $hashFormatted = strtoupper(substr($hashRaw, 0, 4) . '-' . substr($hashRaw, 4, 4) . '-' . substr($hashRaw, 8, 4) . '-' . substr($hashRaw, 12, 4));
+
             $proposal->update([
-                'texto_proposta_cliente' => json_encode($textoGerado, JSON_UNESCAPED_UNICODE),
+                'texto_proposta_cliente' => $jsonTexto,
                 'valor_final' => $config['valor_honorarios'] ?: $proposal->valor_final,
+                'observacao_advogado' => trim(($proposal->observacao_advogado ?? '') . '\nHASH:MAYER-' . $hashFormatted),
             ]);
 
             return response()->json([

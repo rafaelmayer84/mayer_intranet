@@ -147,6 +147,16 @@
 
 <div class="footer">
     <div class="footer-addr">Av. Marcos Konder, 1207, sala 062 — Centro, Itajaí/SC — CEP 88301-303</div>
+    @php
+        $hashSource = ($proposta->texto_proposta_cliente ?? '') . '|' . $proposta->id . '|' . $proposta->updated_at->toIso8601String();
+        $hashRaw = hash('sha256', $hashSource);
+        $hashDisplay = 'MAYER-' . strtoupper(substr($hashRaw,0,4) . '-' . substr($hashRaw,4,4) . '-' . substr($hashRaw,8,4) . '-' . substr($hashRaw,12,4));
+    @endphp
+    <div style="margin-top:12px;padding:10px 16px;background:#f8f9fb;border:1px solid #e8ecf1;border-radius:6px;display:inline-block;">
+        <div style="font-size:6pt;color:#aaa;text-transform:uppercase;letter-spacing:2px;font-weight:600;margin-bottom:3px;">Certificação Digital de Autenticidade</div>
+        <div style="font-family:'Courier New',monospace;font-size:9pt;color:#1B334A;font-weight:700;letter-spacing:1.5px;">{{ $hashDisplay }}</div>
+        <div style="font-size:5.5pt;color:#bbb;margin-top:3px;">Documento gerado eletronicamente em {{ $proposta->updated_at->format('d/m/Y H:i') }} · Proposta #{{ $proposta->id }} · Mayer Sociedade de Advogados · OAB/SC 2097</div>
+    </div>
 </div>
 </body>
 </html>
