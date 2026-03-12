@@ -743,6 +743,74 @@ PROMPT;
     }
 
     /**
+     * Verificar se nome parece ser de terceiro (negociador, cobrador, assessoria)
+     * Heurística: nomes muito longos (>60 chars) ou com padrões de apresentação de terceiro
+     */
+    private function isNomeTerceiro(string $nome): bool
+    {
+        $nome = trim($nome);
+        if (mb_strlen($nome) > 60) return true;
+
+        $lower = mb_strtolower($nome);
+        $patterns = [
+            'me chamo', 'meu nome é', 'meu nome e',
+            'represento', 'representante',
+            'negociador', 'negociadora',
+            'assessoria', 'cobranç', 'cobranc',
+            'recuperação de crédito', 'recuperacao de credito',
+            'boa tarde', 'bom dia', 'boa noite',
+            'olá dr', 'ola dr', 'olá dra', 'ola dra',
+            'tudo bem', 'tudo certo',
+            'banco ', 'financeira ', 'finan.',
+            'jurídico do', 'juridico do', 'setor de',
+            'escritório ', 'escritorio ',
+            'recebemos seu', 'entramos em contato',
+            'referente a', 'referente ao', 'referente à',
+        ];
+        foreach ($patterns as $p) {
+            if (str_contains($lower, $p)) return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Verificar se telefone é comercial/institucional (fixo 3xxx, 0800, call center)
+     */
+    private function isTelefoneComercial(string $phoneNorm): bool
+    {
+        // Remover prefixo 55
+        $sem55 = $phoneNorm;
+        if (str_starts_with($phoneNorm, '55') && strlen($phoneNorm) >= 12) {
+            $sem55 = substr($phoneNorm, 2);
+        }
+
+        // 0800 (com ou sem 55)
+        if (str_starts_with($sem55, '0800') || str_starts_with($phoneNorm, '0800')) {
+            return true;
+        }
+
+        // Fixo comercial: DDD + 3xxx (10 dígitos, sem nono dígito)
+        // Ex: 4733986287 -> DDD 47, número começa com 3
+        if (strlen($sem55) === 10) {
+            $numSemDdd = substr($sem55, 2);
+            if (str_starts_with($numSemDdd, '3') || str_starts_with($numSemDdd, '2')) {
+                return true;
+            }
+        }
+
+        // 55 + DDD + fixo (12 dígitos, fixo não tem nono dígito)
+        if (strlen($phoneNorm) === 12 && str_starts_with($phoneNorm, '55')) {
+            $numSemDdd = substr($phoneNorm, 4);
+            if (str_starts_with($numSemDdd, '3') || str_starts_with($numSemDdd, '2')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Verificar se contato completou o fluxo do bot (tem tag de área jurídica)
      */
     private function contatoComFluxoCompleto(?string $contactId): array
@@ -831,6 +899,38 @@ PROMPT;
             ];
             if (in_array($telefoneNorm, $blacklistPhones) || in_array($telefoneClean, $blacklistPhones)) {
                 Log::info('processLead: telefone institucional bloqueado (blacklist)', [
+                    'telefone' => $telefoneNorm, 'nome' => $nome
+                ]);
+                return null;
+            }
+
+            // ========== FILTRO 2c: Nome parece terceiro (negociador, cobrador, banco) ==========
+            if ($this->isNomeTerceiro($nome)) {
+                Log::info('processLead: BLOQUEADO - nome parece terceiro/negociador', [
+                    'nome' => $nome, 'telefone' => $telefoneNorm
+                ]);
+                return null;
+            }
+
+            // ========== FILTRO 2d: Telefone comercial/fixo (3xxx, 0800) ==========
+            if ($this->isTelefoneComercial($telefoneNorm)) {
+                Log::info('processLead: BLOQUEADO - telefone comercial/institucional', [
+                    'telefone' => $telefoneNorm, 'nome' => $nome
+                ]);
+                return null;
+            }
+
+            // ========== FILTRO 2c: Nome parece terceiro (negociador, cobrador, banco) ==========
+            if ($this->isNomeTerceiro($nome)) {
+                Log::info('processLead: BLOQUEADO - nome parece terceiro/negociador', [
+                    'nome' => $nome, 'telefone' => $telefoneNorm
+                ]);
+                return null;
+            }
+
+            // ========== FILTRO 2d: Telefone comercial/fixo (3xxx, 0800) ==========
+            if ($this->isTelefoneComercial($telefoneNorm)) {
+                Log::info('processLead: BLOQUEADO - telefone comercial/institucional', [
                     'telefone' => $telefoneNorm, 'nome' => $nome
                 ]);
                 return null;
