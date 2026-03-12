@@ -147,7 +147,6 @@
 
 <div class="footer">
     <div class="footer-addr">Av. Marcos Konder, 1207, sala 062 — Centro, Itajaí/SC — CEP 88301-303</div>
-    <div class="footer-cities"><span>Itajaí</span><span>Florianópolis</span><span>São Paulo</span></div>
 </div>
 </body>
 </html>
