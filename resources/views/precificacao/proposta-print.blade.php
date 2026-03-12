@@ -273,6 +273,46 @@
         </table>
     @endif
 
+    @if(!empty($secoes['fases_horas']) && is_array($secoes['fases_horas']))
+        <div class="secao-titulo">Atividades e Horas Estimadas</div>
+        <p class="secao-texto" style="font-size:9.5pt;color:#555;margin-bottom:10px;">As horas abaixo representam a estimativa de dedicação da equipe jurídica, absorvidas pelo pró-labore contratado. Eventuais extrapolações atípicas serão previamente comunicadas.</p>
+        @foreach($secoes['fases_horas'] as $faseH)
+            <p style="font-weight:bold;color:#1B334A;font-size:10.5pt;margin:14px 0 6px 0;">{{ $faseH['nome'] ?? '' }}</p>
+            <table class="tabela-fases">
+                <thead>
+                    <tr>
+                        <th style="width:28%;">Atividade</th>
+                        <th>Descrição</th>
+                        <th style="width:10%;text-align:center;">Hrs Mín</th>
+                        <th style="width:10%;text-align:center;">Hrs Máx</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach(($faseH['atividades'] ?? []) as $ativ)
+                    <tr>
+                        <td style="font-weight:600;color:#1B334A;">{{ $ativ['atividade'] ?? '' }}</td>
+                        <td>{{ $ativ['descricao'] ?? '' }}</td>
+                        <td style="text-align:center;">{{ $ativ['horas_min'] ?? '-' }}</td>
+                        <td style="text-align:center;">{{ $ativ['horas_max'] ?? '-' }}</td>
+                    </tr>
+                    @endforeach
+                    <tr style="background:#eef2f7;">
+                        <td colspan="2" style="font-weight:bold;text-align:right;color:#1B334A;">Subtotal {{ $faseH['nome'] ?? '' }}</td>
+                        <td style="text-align:center;font-weight:bold;">{{ $faseH['subtotal_min'] ?? '-' }}</td>
+                        <td style="text-align:center;font-weight:bold;">{{ $faseH['subtotal_max'] ?? '-' }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        @endforeach
+        @php
+            $totalMin = collect($secoes['fases_horas'])->sum('subtotal_min');
+            $totalMax = collect($secoes['fases_horas'])->sum('subtotal_max');
+        @endphp
+        <div class="honorarios-box" style="margin-top:8px;">
+            <div style="font-size:10pt;color:#1B334A;font-weight:bold;">Total estimado: {{ $totalMin }} a {{ $totalMax }} horas</div>
+        </div>
+    @endif
+
     @if(!empty($secoes['estrategia']))
         <div class="secao-titulo">Estratégia Jurídica</div>
         <div class="secao-texto">{!! nl2br(e($secoes['estrategia'])) !!}</div>

@@ -122,13 +122,12 @@
         @endif
     </div>
 
-    {{-- Botão: Gerar Proposta para Cliente --}}
-    <div class="mt-4 flex items-center gap-3">
-        <button id="btn-gerar-proposta"
-            onclick="gerarPropostaCliente({{ $proposta->id }})"
+    {{-- SIPEX v2.0: Botao abre modal de configuracao --}}
+    <div class="mt-4 flex items-center gap-3" x-data="sipexModal()">
+        <button @click="abrirModal()"
             class="px-5 py-2.5 rounded-xl text-sm font-medium hover:opacity-90 transition flex items-center gap-2" style="background-color:#1B334A;color:#ffffff;">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-            <span id="btn-gerar-texto">Gerar Proposta para Cliente</span>
+            <span x-text="loading ? 'Carregando...' : 'Gerar Proposta para Cliente'"></span>
         </button>
 
         @if($proposta->texto_proposta_cliente)
@@ -138,54 +137,270 @@
                 Ver Proposta Gerada
             </a>
         @endif
-    </div>
 
-    <div id="proposta-status" class="mt-2 text-sm hidden"></div>
+        <div x-show="status" x-text="statusMsg" class="text-sm" :class="statusOk ? 'text-green-600' : 'text-red-600'"></div>
+
+        {{-- MODAL DE CONFIGURACAO --}}
+        <div x-show="modalOpen" x-cloak
+            style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);backdrop-filter:blur(2px);"
+            @keydown.escape.window="modalOpen=false">
+            <div @click.outside="modalOpen=false"
+                style="background:#fff;border-radius:16px;width:95%;max-width:720px;max-height:90vh;overflow-y:auto;box-shadow:0 25px 50px rgba(0,0,0,0.25);padding:0;">
+
+                {{-- Header --}}
+                <div style="background:#1B334A;color:#fff;padding:20px 28px;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <h2 style="font-size:16px;font-weight:700;margin:0;">Configurar Proposta de Honorarios</h2>
+                        <p style="font-size:12px;opacity:0.8;margin-top:4px;">Valores pre-sugeridos pela IA. Confirme ou ajuste antes de gerar.</p>
+                    </div>
+                    <button @click="modalOpen=false" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;">&times;</button>
+                </div>
+
+                <div style="padding:24px 28px;">
+
+                    {{-- SECAO: HONORARIOS --}}
+                    <div style="margin-bottom:24px;">
+                        <h3 style="font-size:13px;font-weight:700;color:#1B334A;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #C4A35A;">Honorarios</h3>
+                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+                            <div>
+                                <label style="font-size:11px;color:#666;display:block;margin-bottom:4px;">Valor (R$)</label>
+                                <input type="number" x-model="cfg.valor_honorarios" step="0.01" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+                                <p style="font-size:10px;color:#999;margin-top:2px;">Faixa: R$ <span x-text="fmt(cfg.faixa_min)"></span> a R$ <span x-text="fmt(cfg.faixa_max)"></span></p>
+                            </div>
+                            <div>
+                                <label style="font-size:11px;color:#666;display:block;margin-bottom:4px;">Tipo Cobranca</label>
+                                <select x-model="cfg.tipo_cobranca" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+                                    <option value="fixo">Fixo</option>
+                                    <option value="mensal">Mensal</option>
+                                    <option value="misto">Misto</option>
+                                    <option value="percentual">Percentual</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:11px;color:#666;display:block;margin-bottom:4px;">Parcelas</label>
+                                <input type="number" x-model="cfg.parcelas" min="1" max="24" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- SECAO: EXITO --}}
+                    <div style="margin-bottom:24px;">
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+                            <h3 style="font-size:13px;font-weight:700;color:#1B334A;text-transform:uppercase;letter-spacing:0.5px;margin:0;">Honorarios de Exito</h3>
+                            <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#666;cursor:pointer;">
+                                <input type="checkbox" x-model="cfg.incluir_exito" style="accent-color:#1B334A;"> Incluir
+                            </label>
+                        </div>
+                        <div x-show="cfg.incluir_exito" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                            <div>
+                                <label style="font-size:11px;color:#666;display:block;margin-bottom:4px;">Tipo</label>
+                                <select x-model="cfg.exito_tipo" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+                                    <option value="percentual">Percentual do proveito</option>
+                                    <option value="fixo">Valor fixo</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:11px;color:#666;display:block;margin-bottom:4px;">Valor / Percentual</label>
+                                <input type="text" x-model="cfg.exito_valor" placeholder="Ex: 20% ou R$ 30.000" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+                            </div>
+                            <div style="grid-column:span 2;">
+                                <label style="font-size:11px;color:#666;display:block;margin-bottom:4px;">Condicao do exito</label>
+                                <input type="text" x-model="cfg.exito_condicao" placeholder="Ex: Apos transito em julgado favoravel" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- SECAO: ESCOPO --}}
+                    <div style="margin-bottom:24px;">
+                        <h3 style="font-size:13px;font-weight:700;color:#1B334A;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #C4A35A;">Escopo e Estrategia</h3>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                            <div>
+                                <label style="font-size:11px;color:#666;display:block;margin-bottom:4px;">Escopo</label>
+                                <select x-model="cfg.escopo" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+                                    <template x-for="op in cfg.escopo_opcoes" :key="op">
+                                        <option :value="op" x-text="op"></option>
+                                    </template>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="font-size:11px;color:#666;display:block;margin-bottom:4px;">Vigencia (dias)</label>
+                                <input type="number" x-model="cfg.vigencia_dias" min="5" max="90" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+                            </div>
+                        </div>
+                        <div style="margin-top:12px;">
+                            <label style="font-size:11px;color:#666;display:block;margin-bottom:4px;">Estrategia (resumo para a IA expandir)</label>
+                            <textarea x-model="cfg.estrategia_resumo" rows="2" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;resize:vertical;"></textarea>
+                        </div>
+                    </div>
+
+                    {{-- SECAO: HORAS --}}
+                    <div style="margin-bottom:24px;">
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+                            <h3 style="font-size:13px;font-weight:700;color:#1B334A;text-transform:uppercase;letter-spacing:0.5px;margin:0;">Horas de Trabalho</h3>
+                            <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#666;cursor:pointer;">
+                                <input type="checkbox" x-model="cfg.incluir_tabela_horas" style="accent-color:#1B334A;"> Incluir tabela detalhada
+                            </label>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                            <div>
+                                <label style="font-size:11px;color:#666;display:block;margin-bottom:4px;">Horas estimadas (min)</label>
+                                <input type="number" x-model="cfg.horas_estimadas_min" min="0" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+                            </div>
+                            <div>
+                                <label style="font-size:11px;color:#666;display:block;margin-bottom:4px;">Horas estimadas (max)</label>
+                                <input type="number" x-model="cfg.horas_estimadas_max" min="0" style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;">
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- SECAO: DESPESAS --}}
+                    <div style="margin-bottom:24px;">
+                        <h3 style="font-size:13px;font-weight:700;color:#1B334A;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #C4A35A;">Despesas Reembolsaveis</h3>
+                        <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                            <template x-for="(d, i) in despesasOpcoes" :key="i">
+                                <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#444;cursor:pointer;background:#f8f9fb;padding:6px 12px;border-radius:8px;border:1px solid #e5e7eb;">
+                                    <input type="checkbox" :value="d" x-model="cfg.despesas_selecionadas" style="accent-color:#1B334A;">
+                                    <span x-text="d"></span>
+                                </label>
+                            </template>
+                        </div>
+                    </div>
+
+                    {{-- OBSERVACOES --}}
+                    <div style="margin-bottom:24px;">
+                        <label style="font-size:11px;color:#666;display:block;margin-bottom:4px;">Observacoes adicionais (opcional)</label>
+                        <textarea x-model="cfg.observacoes_advogado" rows="2" placeholder="Instrucoes extras para a IA considerar na redacao..." style="width:100%;padding:8px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;resize:vertical;"></textarea>
+                    </div>
+
+                    {{-- BOTOES --}}
+                    <div style="display:flex;justify-content:flex-end;gap:12px;padding-top:16px;border-top:1px solid #eee;">
+                        <button @click="modalOpen=false" style="padding:10px 20px;border:1px solid #ddd;border-radius:8px;font-size:13px;cursor:pointer;background:#fff;">Cancelar</button>
+                        <button @click="gerarProposta()" :disabled="gerando"
+                            style="padding:10px 24px;border:none;border-radius:8px;font-size:13px;cursor:pointer;background:#1B334A;color:#fff;font-weight:600;"
+                            :style="gerando ? 'opacity:0.6;cursor:wait;' : ''">
+                            <span x-text="gerando ? 'Gerando proposta... (30-60s)' : 'Gerar Proposta Persuasiva'"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     @endif
 </div>
-@push('scripts')
 <script>
-function gerarPropostaCliente(id) {
-    const btn = document.getElementById('btn-gerar-proposta');
-    const btnTexto = document.getElementById('btn-gerar-texto');
-    const status = document.getElementById('proposta-status');
-
-    btn.disabled = true;
-    btnTexto.textContent = 'Gerando proposta...';
-    btn.classList.add('opacity-60');
-    status.classList.remove('hidden', 'text-red-600', 'text-green-600');
-    status.textContent = 'A IA está redigindo a proposta persuasiva. Aguarde ~15-30 segundos...';
-    status.classList.add('text-gray-500');
-
-    fetch(`/precificacao/${id}/gerar-proposta-cliente`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-            'Accept': 'application/json',
+function sipexModal() {
+    return {
+        modalOpen: false,
+        loading: false,
+        gerando: false,
+        status: false,
+        statusMsg: '',
+        statusOk: false,
+        proposalId: {{ $proposta->id }},
+        cfg: {
+            valor_honorarios: 0,
+            tipo_cobranca: 'fixo',
+            parcelas: 1,
+            incluir_exito: false,
+            exito_tipo: 'percentual',
+            exito_valor: '',
+            exito_condicao: '',
+            horas_estimadas_min: 0,
+            horas_estimadas_max: 0,
+            escopo: '',
+            escopo_opcoes: ['1a instancia ate sentenca'],
+            estrategia_resumo: '',
+            vigencia_dias: 15,
+            incluir_tabela_horas: false,
+            observacoes_advogado: '',
+            faixa_min: 0,
+            faixa_max: 0,
+            despesas_selecionadas: [],
         },
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            status.textContent = 'Proposta gerada com sucesso! Abrindo...';
-            status.classList.remove('text-gray-500');
-            status.classList.add('text-green-600');
-            window.open(data.redirect, '_blank');
-            setTimeout(() => location.reload(), 1500);
-        } else {
-            throw new Error(data.error || 'Erro desconhecido');
+        despesasOpcoes: [
+            'Custas judiciais',
+            'Honorarios periciais',
+            'Assistente tecnico',
+            'Deslocamentos fora da comarca',
+            'Correios e reprografia',
+            'Emolumentos cartorios',
+            'Certidoes e diligencias',
+        ],
+
+        fmt(v) {
+            return Number(v || 0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+        },
+
+        async abrirModal() {
+            this.loading = true;
+            try {
+                const url = '{{ url("/precificacao") }}/' + this.proposalId + '/sugerir-config';
+                const resp = await fetch(url, {
+                    headers: {'Accept':'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content}
+                });
+                const data = await resp.json();
+                if (data.success && data.config) {
+                    const c = data.config;
+                    this.cfg.valor_honorarios = c.valor_honorarios || this.cfg.valor_honorarios;
+                    this.cfg.tipo_cobranca = c.tipo_cobranca || 'fixo';
+                    this.cfg.parcelas = c.parcelas || 1;
+                    this.cfg.incluir_exito = !!c.incluir_exito;
+                    this.cfg.exito_tipo = c.exito_tipo || 'percentual';
+                    this.cfg.exito_valor = c.exito_valor || '';
+                    this.cfg.exito_condicao = c.exito_condicao || '';
+                    this.cfg.horas_estimadas_min = c.horas_estimadas_min || 0;
+                    this.cfg.horas_estimadas_max = c.horas_estimadas_max || 0;
+                    this.cfg.escopo = c.escopo || '';
+                    this.cfg.escopo_opcoes = c.escopo_opcoes || ['1a instancia ate sentenca'];
+                    this.cfg.estrategia_resumo = c.estrategia_resumo || '';
+                    this.cfg.vigencia_dias = c.vigencia_dias || 15;
+                    this.cfg.incluir_tabela_horas = !!c.incluir_tabela_horas;
+                    this.cfg.faixa_min = c.faixa_min || 0;
+                    this.cfg.faixa_max = c.faixa_max || 0;
+                    if (c.despesas_sugeridas && Array.isArray(c.despesas_sugeridas)) {
+                        this.cfg.despesas_selecionadas = c.despesas_sugeridas;
+                    }
+                }
+            } catch(e) {
+                console.error('Erro ao carregar sugestoes:', e);
+            }
+            this.loading = false;
+            this.modalOpen = true;
+        },
+
+        async gerarProposta() {
+            this.gerando = true;
+            this.status = false;
+            try {
+                const url = '{{ url("/precificacao") }}/' + this.proposalId + '/gerar-proposta-cliente';
+                const resp = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                    },
+                    body: JSON.stringify(this.cfg),
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    this.modalOpen = false;
+                    this.status = true;
+                    this.statusOk = true;
+                    this.statusMsg = 'Proposta gerada com sucesso! Abrindo...';
+                    window.open(data.redirect, '_blank');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    throw new Error(data.error || 'Erro desconhecido');
+                }
+            } catch(e) {
+                this.status = true;
+                this.statusOk = false;
+                this.statusMsg = 'Erro: ' + e.message;
+            }
+            this.gerando = false;
         }
-    })
-    .catch(err => {
-        status.textContent = 'Erro: ' + err.message;
-        status.classList.remove('text-gray-500');
-        status.classList.add('text-red-600');
-        btn.disabled = false;
-        btnTexto.textContent = 'Gerar Proposta para Cliente';
-        btn.classList.remove('opacity-60');
-    });
+    };
 }
 </script>
-@endpush
 @endsection

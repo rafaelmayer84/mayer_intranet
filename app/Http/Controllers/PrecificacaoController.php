@@ -8,6 +8,7 @@ use App\Models\Crm\CrmOpportunity;
 use App\Models\Crm\CrmAccount;
 use App\Services\PricingDataCollectorService;
 use App\Services\PricingAIService;
+use App\Services\ProposalClaudeService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -16,11 +17,13 @@ class PrecificacaoController extends Controller
 {
     private PricingDataCollectorService $collector;
     private PricingAIService $ai;
+    private ProposalClaudeService $proposalClaude;
 
-    public function __construct(PricingDataCollectorService $collector, PricingAIService $ai)
+    public function __construct(PricingDataCollectorService $collector, PricingAIService $ai, ProposalClaudeService $proposalClaude)
     {
         $this->collector = $collector;
         $this->ai = $ai;
+        $this->proposalClaude = $proposalClaude;
     }
 
     /**

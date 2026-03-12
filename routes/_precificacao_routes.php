@@ -30,6 +30,9 @@ Route::middleware(['auth', 'user.active', 'modulo:operacional.precificacao,visua
     // Gerar proposta persuasiva para cliente (IA)
     Route::post('/{id}/gerar-proposta-cliente', [PrecificacaoController::class, 'gerarPropostaCliente'])->name('precificacao.gerar-proposta-cliente')->whereNumber('id');
 
+    // SIPEX v2.0: sugestao de config para modal
+    Route::get('/{id}/sugerir-config', [PrecificacaoController::class, 'sugerirConfigProposta'])->name('precificacao.sugerir-config')->whereNumber('id');
+
     // Imprimir proposta para cliente (HTML → PDF via browser)
     Route::get('/{id}/proposta-print', [PrecificacaoController::class, 'imprimirProposta'])->name('precificacao.proposta.print')->whereNumber('id');
 
