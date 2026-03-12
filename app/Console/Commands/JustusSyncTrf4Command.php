@@ -8,6 +8,15 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
+/**
+ * ============================================================
+ * ARQUIVO ESTÁVEL desde 12/03/2026
+ * Scraper TRF4 via eproc — funcional e validado em produção.
+ * Este será o mecanismo base para scraping do TJSC (mesmo eproc).
+ * Alterações devem ser feitas SOMENTE após profundo estudo
+ * de sua pertinência e confiabilidade.
+ * ============================================================
+ */
 class JustusSyncTrf4Command extends Command
 {
     protected $signature = 'justus:sync-trf4
