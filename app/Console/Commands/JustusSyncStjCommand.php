@@ -7,6 +7,15 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * ============================================================
+ * ARQUIVO ESTÁVEL desde 12/03/2026
+ * Scraper STJ via Portal de Dados Abertos (CKAN) — funcional
+ * e validado em produção. 124.674 acórdãos importados.
+ * Alterações devem ser feitas SOMENTE após profundo estudo
+ * de sua pertinência e confiabilidade.
+ * ============================================================
+ */
 class JustusSyncStjCommand extends Command
 {
     protected $signature = 'justus:sync-stj {--dataset= : Sync apenas um dataset específico} {--force : Reimportar mesmo arquivos já processados} {--dry-run : Simular sem gravar}';

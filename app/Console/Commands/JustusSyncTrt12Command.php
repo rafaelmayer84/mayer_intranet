@@ -6,6 +6,15 @@ use App\Models\JustusJurisprudencia;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * ============================================================
+ * ARQUIVO ESTÁVEL desde 12/03/2026
+ * Scraper TRT12 via API REST Falcão — funcional e validado
+ * em produção. 4.629 acórdãos importados.
+ * Alterações devem ser feitas SOMENTE após profundo estudo
+ * de sua pertinência e confiabilidade.
+ * ============================================================
+ */
 class JustusSyncTrt12Command extends Command
 {
     protected $signature = 'justus:sync-trt12
