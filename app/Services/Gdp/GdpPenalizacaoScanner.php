@@ -49,6 +49,7 @@ class GdpPenalizacaoScanner
             'scanA01','scanA02','scanA03','scanA04','scanA05','scanA06','scanA07','scanA08',
             'scanD01','scanD02','scanD03','scanD04',
             'scanS01',
+            'scanV01','scanV02','scanV03',
         ];
 
         foreach ($methods as $method) {
@@ -969,6 +970,114 @@ class GdpPenalizacaoScanner
         return $count;
     }
 
+
+    // ================================================================
+    // EIXO VIGILIA (JURIDICO)
+    // ================================================================
+
+    /**
+     * PEN-V01: Conclusao suspeita - atividade Concluido sem andamento do escritorio
+     * Fonte: vigilia_cruzamentos (status_cruzamento=suspeito)
+     */
+    private function scanV01(int $userId): int
+    {
+        $cfg = $this->getTipo('PEN-V01');
+        if (!$cfg) return 0;
+
+        $djPropId = DB::table('users')->where('id', $userId)->value('datajuri_proprietario_id');
+        if (!$djPropId) return 0;
+
+        $suspeitos = DB::table('vigilia_cruzamentos as vc')
+            ->join('atividades_datajuri as ad', 'ad.id', '=', 'vc.atividade_datajuri_id')
+            ->where('vc.status_cruzamento', 'suspeito')
+            ->where('ad.proprietario_id', $djPropId)
+            ->where('ad.status', 'Concluído')
+            ->whereYear('ad.data_hora', $this->ano)
+            ->whereMonth('ad.data_hora', $this->mes)
+            ->select('vc.id', 'ad.processo_pasta', 'ad.tipo_atividade', 'ad.data_hora', 'vc.observacao')
+            ->get();
+
+        $count = 0;
+        foreach ($suspeitos as $s) {
+            $count += $this->registrar('PEN-V01', $userId, $cfg,
+                "Conclusao suspeita: " . ($s->tipo_atividade ?? 'atividade') . " pasta " . $s->processo_pasta . " em " . Carbon::parse($s->data_hora)->format('d/m') . " sem andamento do escritorio.",
+                'vigilia_cruzamento', $s->id);
+        }
+        return $count;
+    }
+
+    /**
+     * PEN-V02: Prazo vencido sem acao - atividade nao concluida e sem acao no processo
+     * Fonte: vigilia_cruzamentos (status_cruzamento=sem_acao)
+     */
+    private function scanV02(int $userId): int
+    {
+        $cfg = $this->getTipo('PEN-V02');
+        if (!$cfg) return 0;
+
+        $djPropId = DB::table('users')->where('id', $userId)->value('datajuri_proprietario_id');
+        if (!$djPropId) return 0;
+
+        $semAcao = DB::table('vigilia_cruzamentos as vc')
+            ->join('atividades_datajuri as ad', 'ad.id', '=', 'vc.atividade_datajuri_id')
+            ->where('vc.status_cruzamento', 'sem_acao')
+            ->where('ad.proprietario_id', $djPropId)
+            ->whereYear('ad.data_hora', $this->ano)
+            ->whereMonth('ad.data_hora', $this->mes)
+            ->select('vc.id', 'ad.processo_pasta', 'ad.tipo_atividade', 'ad.data_prazo_fatal', 'vc.observacao')
+            ->get();
+
+        $count = 0;
+        foreach ($semAcao as $s) {
+            $prazo = $s->data_prazo_fatal ? Carbon::parse($s->data_prazo_fatal)->format('d/m') : 'sem prazo';
+            $count += $this->registrar('PEN-V02', $userId, $cfg,
+                "Sem acao: " . ($s->tipo_atividade ?? 'atividade') . " pasta " . $s->processo_pasta . " (prazo: " . $prazo . ") sem conclusao e sem peticao no processo.",
+                'vigilia_cruzamento', $s->id);
+        }
+        return $count;
+    }
+
+    /**
+     * PEN-V03: Tarefa trigger vencida >48h sem conclusao
+     * Fonte: atividades_datajuri (tipo=Tarefa, assunto trigger, >48h sem conclusao)
+     */
+    private function scanV03(int $userId): int
+    {
+        $cfg = $this->getTipo('PEN-V03');
+        if (!$cfg) return 0;
+
+        $djPropId = DB::table('users')->where('id', $userId)->value('datajuri_proprietario_id');
+        if (!$djPropId) return 0;
+
+        $horas = $cfg['threshold'] ?: 48;
+        $corte = Carbon::now()->subHours($horas)->toDateTimeString();
+        $triggers = ['Analise de Decisao', 'Providencias Pos-Audiencia', 'Relatorio de Ocorrencia', 'Verificacao de Cumprimento',
+                     'Análise de Decisão', 'Providências Pós-Audiência', 'Relatório de Ocorrência', 'Verificação de Cumprimento'];
+
+        $tarefas = DB::table('atividades_datajuri')
+            ->where('proprietario_id', $djPropId)
+            ->where('tipo_atividade', 'Tarefa')
+            ->where(function($q) use ($triggers) {
+                $q->whereIn('assunto', $triggers);
+                if (in_array('assunto_original', \Schema::getColumnListing('atividades_datajuri'))) {
+                    $q->orWhereIn('assunto_original', $triggers);
+                }
+            })
+            ->whereIn('status', ['Nao iniciado', 'Não iniciado', 'Aguardando outra pessoa'])
+            ->where('created_at', '<=', $corte)
+            ->where('data_hora', '>=', Carbon::create($this->ano, $this->mes, 1)->startOfMonth()->toDateTimeString())
+            ->select('id', 'processo_pasta', 'assunto', 'data_hora', 'created_at')
+            ->get();
+
+        $count = 0;
+        foreach ($tarefas as $t) {
+            $h = Carbon::parse($t->created_at)->diffInHours(Carbon::now());
+            $count += $this->registrar('PEN-V03', $userId, $cfg,
+                "Trigger vencido: " . $t->assunto . " pasta " . ($t->processo_pasta ?? 'N/A') . " ha " . $h . "h sem conclusao.",
+                'atividade', $t->id);
+        }
+        return $count;
+    }
 
     // ================================================================
     // EIXO SIATE (ATENDIMENTO)
