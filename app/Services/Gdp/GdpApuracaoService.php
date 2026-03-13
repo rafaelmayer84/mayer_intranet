@@ -164,7 +164,7 @@ class GdpApuracaoService
         // ETAPA 3: Calcular descontos por eixo (com cap)
         foreach ($eixos as $eixo) {
             $totalDesconto = GdpPenalizacao::totalDescontoEixo(
-                $ciclo->id, $userId, $eixo->id, $mes, $ano
+                $userId, $eixo->id, $mes, $ano, self::CAP_PENALIZACAO_EIXO
             );
 
             // Cap de penalizacao por eixo

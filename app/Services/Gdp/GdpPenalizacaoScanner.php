@@ -48,6 +48,7 @@ class GdpPenalizacaoScanner
             'scanF01','scanF02','scanF03','scanF04',
             'scanA01','scanA02','scanA03','scanA04','scanA05','scanA06','scanA07','scanA08',
             'scanD01','scanD02','scanD03','scanD04',
+            'scanS01',
         ];
 
         foreach ($methods as $method) {
@@ -82,7 +83,7 @@ class GdpPenalizacaoScanner
 
         $processos = DB::table('processos as p')
             ->where('p.proprietario_id', $userId)
-            ->where('p.status', 'Em andamento')
+            ->where('p.status', 'Ativo')
             ->whereNotExists(function ($q) use ($corte) {
                 $q->select(DB::raw(1))
                   ->from('andamentos_fase as af')
@@ -145,7 +146,7 @@ class GdpPenalizacaoScanner
 
         $processos = DB::table('processos as p')
             ->where('p.proprietario_id', $userId)
-            ->where('p.status', 'Em andamento')
+            ->where('p.status', 'Ativo')
             ->whereNotExists(function ($q) use ($hoje) {
                 $q->select(DB::raw(1))
                   ->from('atividades_datajuri as at')
@@ -222,14 +223,17 @@ class GdpPenalizacaoScanner
         $inicioMes = Carbon::create($this->ano, $this->mes, 1)->startOfMonth()->toDateString();
         $fimMes    = Carbon::create($this->ano, $this->mes, 1)->endOfMonth()->toDateString();
 
+        $djPropId = DB::table('users')->where('id', $userId)->value('datajuri_proprietario_id');
+        if (!$djPropId) return 0;
+
         $andamentos = DB::table('andamentos_fase')
-            ->where('proprietario_id', $userId)
+            ->where('proprietario_id', $djPropId)
             ->whereBetween('data_andamento', [$inicioMes, $fimMes])
             ->where('data_andamento', '<=', Carbon::now()->subHours($horas)->toDateString())
             ->where(function ($q) {
-                $q->where('tipo', 'LIKE', '%intimac%')
-                  ->orWhere('tipo', 'LIKE', '%publicac%')
-                  ->orWhere('tipo', 'LIKE', '%citac%');
+                $q->where('descricao', 'LIKE', '%intimac%')
+                  ->orWhere('descricao', 'LIKE', '%publicac%')
+                  ->orWhere('descricao', 'LIKE', '%citac%');
             })
             ->select('datajuri_id', 'processo_pasta', 'data_andamento')
             ->get();
@@ -935,7 +939,7 @@ class GdpPenalizacaoScanner
 
         $processos = DB::table('processos')
             ->where('proprietario_id', $userId)
-            ->where('status', '!=', 'Em andamento')
+            ->where('status', 'Encerrado')
             ->whereNotNull('data_encerramento')
             ->whereBetween('data_encerramento', [$inicioMes, $fimMes])
             ->whereNotNull('tipo_encerramento')
@@ -961,6 +965,38 @@ class GdpPenalizacaoScanner
                     "Processo pasta {$proc->pasta} encerrado com '{$proc->tipo_encerramento}' sem justificativa registrada.",
                     'processo', $proc->id);
             }
+        }
+        return $count;
+    }
+
+
+    // ================================================================
+    // EIXO SIATE (ATENDIMENTO)
+    // ================================================================
+
+    /**
+     * PEN-S01: Chamado SIATE com SLA estourado
+     * Fonte: crm_service_requests (assigned_to_user_id, sla_deadline, status)
+     */
+    private function scanS01(int $userId): int
+    {
+        $cfg = $this->getTipo('PEN-S01');
+        if (!$cfg) return 0;
+
+        $chamados = DB::table('crm_service_requests')
+            ->where('assigned_to_user_id', $userId)
+            ->whereNotNull('sla_deadline')
+            ->where('sla_deadline', '<', Carbon::now()->toDateTimeString())
+            ->whereNotIn('status', ['resolvido', 'fechado', 'cancelado', 'concluido'])
+            ->select('id', 'protocolo', 'subject', 'sla_deadline', 'status')
+            ->get();
+
+        $count = 0;
+        foreach ($chamados as $ch) {
+            $horas = Carbon::parse($ch->sla_deadline)->diffInHours(Carbon::now());
+            $count += $this->registrar('PEN-S01', $userId, $cfg,
+                "Chamado " . $ch->protocolo . " com SLA estourado ha " . $horas . "h (status: " . $ch->status . ").",
+                'service_request', $ch->id);
         }
         return $count;
     }
