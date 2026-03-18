@@ -27,6 +27,9 @@ class VigiliaCruzar extends Command
         // Gerar notificações para alertas críticos
         $this->gerarNotificacoes($service);
 
+        // Verificar tarefas trigger vencidas
+        $this->verificarTriggers($service);
+
         return self::SUCCESS;
     }
 
@@ -89,4 +92,70 @@ class VigiliaCruzar extends Command
 
         $this->info('[VIGÍLIA] Notificações criadas com sucesso.');
     }
+
+    private function verificarTriggers(VigiliaService $service): void
+    {
+        $resumo = $service->getResumoTriggers();
+
+        if (empty($resumo['detalhes_vencidos'])) {
+            $this->info('[VIGÍLIA] Nenhuma tarefa trigger vencida.');
+            return;
+        }
+
+        $this->info('[VIGÍLIA] ' . count($resumo['detalhes_vencidos']) . ' tarefa(s) trigger vencida(s). Notificando gestor...');
+
+        $socioId = 1;
+
+        foreach ($resumo['detalhes_vencidos'] as $t) {
+            // Notificar o gestor (escalação)
+            $existe = DB::table('notifications_intranet')
+                ->where('tipo', 'vigilia_trigger_vencido')
+                ->where('link', 'LIKE', '%datajuri_id=' . $t['datajuri_id'] . '%')
+                ->where('created_at', '>=', now()->subHours(24))
+                ->exists();
+
+            if (!$existe) {
+                DB::table('notifications_intranet')->insert([
+                    'user_id' => $socioId,
+                    'tipo' => 'vigilia_trigger_vencido',
+                    'titulo' => 'VIGÍLIA: ' . $t['assunto'] . ' vencido — ' . $t['responsavel'],
+                    'mensagem' => $t['responsavel'] . ' não concluiu "' . $t['assunto'] . '" no processo ' . ($t['processo_pasta'] ?? 'N/A') . ' em ' . $t['prazo_horas'] . 'h.',
+                    'link' => '/vigilia?tab=triggers&datajuri_id=' . $t['datajuri_id'],
+                    'icone' => '⚠',
+                    'lida' => false,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            // Notificar o advogado responsável
+            $user = DB::table('users')
+                ->where('name', 'LIKE', '%' . explode(' ', $t['responsavel'])[0] . '%')
+                ->first();
+
+            if ($user && $user->id !== $socioId) {
+                $existeAdv = DB::table('notifications_intranet')
+                    ->where('user_id', $user->id)
+                    ->where('tipo', 'vigilia_trigger_pendente')
+                    ->where('link', 'LIKE', '%datajuri_id=' . $t['datajuri_id'] . '%')
+                    ->where('created_at', '>=', now()->subHours(24))
+                    ->exists();
+
+                if (!$existeAdv) {
+                    DB::table('notifications_intranet')->insert([
+                        'user_id' => $user->id,
+                        'tipo' => 'vigilia_trigger_pendente',
+                        'titulo' => 'Tarefa pendente: ' . $t['assunto'],
+                        'mensagem' => 'Você tem uma tarefa "' . $t['assunto'] . '" pendente no processo ' . ($t['processo_pasta'] ?? 'N/A') . '. Prazo excedido.',
+                        'link' => '/vigilia?tab=triggers&datajuri_id=' . $t['datajuri_id'],
+                        'icone' => '📋',
+                        'lida' => false,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+            }
+        }
+    }
+
 }

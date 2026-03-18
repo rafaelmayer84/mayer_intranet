@@ -82,6 +82,8 @@ Route::middleware(['auth'])->prefix('relatorios')->name('relatorios.')->group(fu
         Route::get('/sync', [ReportSistemaController::class, 'sync'])->name('sync');
         Route::get('/eventos', [ReportSistemaController::class, 'eventos'])->name('eventos');
         Route::get('/auditoria', [ReportSistemaController::class, 'auditoria'])->name('auditoria');
+        Route::get('/erros', [ReportSistemaController::class, 'erros'])->name('erros');
+        Route::get('/laravel-log', [ReportSistemaController::class, 'laravelLog'])->name('laravel-log');
     });
 
     // SISRH (2)

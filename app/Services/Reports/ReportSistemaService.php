@@ -111,6 +111,56 @@ class ReportSistemaService
         ];
     }
 
+    // ── REL-S04: Erros de Aplicação ─────────────────────────
+    public function erros(array $filters, int $perPage = 25)
+    {
+        $query = DB::table('system_error_logs')
+            ->select('id', 'level', 'message', 'module', 'file', 'line', 'url', 'user_name', 'ip_address', 'created_at');
+
+        if (!empty($filters['level'])) {
+            $query->where('level', $filters['level']);
+        }
+        if (!empty($filters['module'])) {
+            $query->where('module', $filters['module']);
+        }
+        if (!empty($filters['busca'])) {
+            $query->where(function ($q) use ($filters) {
+                $q->where('message', 'LIKE', '%' . $filters['busca'] . '%')
+                  ->orWhere('file', 'LIKE', '%' . $filters['busca'] . '%');
+            });
+        }
+        if (!empty($filters['periodo_de'])) {
+            $query->where('created_at', '>=', $filters['periodo_de'] . '-01');
+        }
+        if (!empty($filters['periodo_ate'])) {
+            $parts = explode('-', $filters['periodo_ate']);
+            if (count($parts) === 2) {
+                $lastDay = date('Y-m-t', mktime(0, 0, 0, (int)$parts[1], 1, (int)$parts[0]));
+                $query->where('created_at', '<=', $lastDay . ' 23:59:59');
+            }
+        }
+
+        $sort = $filters['sort'] ?? 'created_at';
+        $dir = $filters['dir'] ?? 'desc';
+        $allowed = ['created_at', 'level', 'module', 'file'];
+        if (!in_array($sort, $allowed)) $sort = 'created_at';
+        $query->orderBy($sort, $dir);
+
+        return $query->paginate($perPage);
+    }
+
+    public function errosTotals(): array
+    {
+        return [
+            'total'    => DB::table('system_error_logs')->count(),
+            'error'    => DB::table('system_error_logs')->where('level', 'error')->count(),
+            'critical' => DB::table('system_error_logs')->where('level', 'critical')->count(),
+            'alert'    => DB::table('system_error_logs')->where('level', 'alert')->count(),
+            'emergency'=> DB::table('system_error_logs')->where('level', 'emergency')->count(),
+            'hoje'     => DB::table('system_error_logs')->whereDate('created_at', today())->count(),
+        ];
+    }
+
     // ── REL-S03: Auditoria ───────────────────────────────────
     public function auditoria(array $filters, int $perPage = 25)
     {
@@ -143,4 +193,206 @@ class ReportSistemaService
 
         return $query->paginate($perPage);
     }
+
+    // ── REL-S05: Log Laravel ────────────────────────────────
+    public function laravelLog(array $filters, int $perPage = 50): array
+    {
+        $logPath = storage_path('logs/laravel.log');
+        
+        if (!file_exists($logPath)) {
+            return ['data' => [], 'total' => 0, 'page' => 1, 'per_page' => $perPage];
+        }
+
+        // Ler últimas N linhas do arquivo (para performance)
+        $maxLines = 5000;
+        $lines = $this->tailFile($logPath, $maxLines);
+        
+        // Parsear linhas em entradas estruturadas
+        $entries = $this->parseLogEntries($lines);
+        
+        // Aplicar filtros
+        $filtered = $this->filterLogEntries($entries, $filters);
+        
+        // Ordenar (mais recente primeiro por padrão)
+        $sort = $filters['sort'] ?? 'datetime';
+        $dir = $filters['dir'] ?? 'desc';
+        usort($filtered, function($a, $b) use ($sort, $dir) {
+            $cmp = strcmp($a[$sort] ?? '', $b[$sort] ?? '');
+            return $dir === 'desc' ? -$cmp : $cmp;
+        });
+        
+        // Paginar
+        $page = max(1, (int)($filters['page'] ?? 1));
+        $total = count($filtered);
+        $offset = ($page - 1) * $perPage;
+        $paged = array_slice($filtered, $offset, $perPage);
+        
+        return [
+            'data' => $paged,
+            'total' => $total,
+            'page' => $page,
+            'per_page' => $perPage,
+            'last_page' => max(1, ceil($total / $perPage)),
+        ];
+    }
+
+    public function laravelLogTotals(): array
+    {
+        $logPath = storage_path('logs/laravel.log');
+        
+        if (!file_exists($logPath)) {
+            return ['total' => 0, 'info' => 0, 'warning' => 0, 'error' => 0, 'critical' => 0, 'debug' => 0, 'hoje' => 0, 'size' => '0 B'];
+        }
+
+        $lines = $this->tailFile($logPath, 5000);
+        $entries = $this->parseLogEntries($lines);
+        
+        $hoje = date('Y-m-d');
+        $stats = ['total' => 0, 'info' => 0, 'warning' => 0, 'error' => 0, 'critical' => 0, 'debug' => 0, 'hoje' => 0];
+        
+        foreach ($entries as $e) {
+            $stats['total']++;
+            $level = strtolower($e['level'] ?? 'info');
+            if (isset($stats[$level])) {
+                $stats[$level]++;
+            }
+            if (strpos($e['datetime'] ?? '', $hoje) === 0) {
+                $stats['hoje']++;
+            }
+        }
+        
+        $size = filesize($logPath);
+        $stats['size'] = $this->formatBytes($size);
+        
+        return $stats;
+    }
+
+    protected function tailFile(string $filepath, int $lines): array
+    {
+        $result = [];
+        $fp = fopen($filepath, 'r');
+        if (!$fp) return $result;
+        
+        fseek($fp, 0, SEEK_END);
+        $pos = ftell($fp);
+        $buffer = '';
+        $lineCount = 0;
+        
+        while ($pos > 0 && $lineCount < $lines) {
+            $pos--;
+            fseek($fp, $pos);
+            $char = fgetc($fp);
+            if ($char === "\n") {
+                if ($buffer !== '') {
+                    array_unshift($result, $buffer);
+                    $lineCount++;
+                    $buffer = '';
+                }
+            } else {
+                $buffer = $char . $buffer;
+            }
+        }
+        if ($buffer !== '' && $lineCount < $lines) {
+            array_unshift($result, $buffer);
+        }
+        fclose($fp);
+        
+        return $result;
+    }
+
+    protected function parseLogEntries(array $lines): array
+    {
+        $entries = [];
+        $currentEntry = null;
+        $pattern = '/^\[(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})\]\s+(\w+)\.(\w+):\s*(.*)$/';
+        
+        foreach ($lines as $line) {
+            if (preg_match($pattern, $line, $m)) {
+                if ($currentEntry) {
+                    $entries[] = $currentEntry;
+                }
+                $currentEntry = [
+                    'datetime' => $m[1],
+                    'env' => $m[2],
+                    'level' => strtoupper($m[3]),
+                    'message' => $m[4],
+                    'module' => $this->extractModule($m[4]),
+                    'full' => $line,
+                ];
+            } elseif ($currentEntry && trim($line) !== '') {
+                $currentEntry['message'] .= ' ' . trim($line);
+                $currentEntry['full'] .= "\n" . $line;
+            }
+        }
+        if ($currentEntry) {
+            $entries[] = $currentEntry;
+        }
+        
+        return $entries;
+    }
+
+    protected function extractModule(string $message): string
+    {
+        $modulePatterns = [
+            'NEXO' => '/^(NEXO|NexoInactivity|Bot control|nexo:)/i',
+            'SendPulse' => '/^(Webhook SendPulse|SendPulse WA)/i',
+            'DataJuri' => '/^(DataJuri|processLead)/i',
+            'CRM' => '/^(CRM|crm:)/i',
+            'GDP' => '/^(GDP|gdp:)/i',
+            'Justus' => '/^(Justus|justus:)/i',
+            'Evidentia' => '/^(Evidentia|evidentia:)/i',
+            'Vigília' => '/^(Vigília|vigilia:)/i',
+            'SIATE' => '/^\[SIATE\]/i',
+            'Sync' => '/^(Sync|sync:)/i',
+        ];
+        
+        foreach ($modulePatterns as $module => $pattern) {
+            if (preg_match($pattern, $message)) {
+                return $module;
+            }
+        }
+        
+        return 'Sistema';
+    }
+
+    protected function filterLogEntries(array $entries, array $filters): array
+    {
+        return array_filter($entries, function($e) use ($filters) {
+            if (!empty($filters['level']) && strtolower($e['level']) !== strtolower($filters['level'])) {
+                return false;
+            }
+            if (!empty($filters['module']) && $e['module'] !== $filters['module']) {
+                return false;
+            }
+            if (!empty($filters['busca'])) {
+                $search = strtolower($filters['busca']);
+                if (strpos(strtolower($e['message']), $search) === false) {
+                    return false;
+                }
+            }
+            if (!empty($filters['data_de'])) {
+                if ($e['datetime'] < $filters['data_de']) {
+                    return false;
+                }
+            }
+            if (!empty($filters['data_ate'])) {
+                if ($e['datetime'] > $filters['data_ate'] . ' 23:59:59') {
+                    return false;
+                }
+            }
+            return true;
+        });
+    }
+
+    protected function formatBytes(int $bytes): string
+    {
+        $units = ['B', 'KB', 'MB', 'GB'];
+        $i = 0;
+        while ($bytes >= 1024 && $i < count($units) - 1) {
+            $bytes /= 1024;
+            $i++;
+        }
+        return round($bytes, 1) . ' ' . $units[$i];
+    }
+
 }

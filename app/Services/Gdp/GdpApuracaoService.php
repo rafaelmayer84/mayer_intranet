@@ -1,4 +1,46 @@
 <?php
+/**
+ * ESTAVEL desde 13/03/2026
+ *
+ * DOCUMENTACAO FUNCIONAL COMPLETA — GdpApuracaoService
+ *
+ * O QUE FAZ:
+ * Servico de apuracao mensal do GDP. Calcula scores positivos (indicadores)
+ * e negativos (penalidades) para cada advogado elegivel, gerando o score
+ * final que determina a faixa de remuneracao variavel.
+ *
+ * LOGICA DE NEGOCIO:
+ * 1. Obtem ciclo ativo (gdp_ciclos, status=aberto, periodo vigente)
+ * 2. Identifica usuarios elegiveis (ativo=true, datajuri_proprietario_id preenchido)
+ * 3. Para cada usuario:
+ *    a) ETAPA 1 — Scores positivos: GdpDataAdapter calcula valor real de cada
+ *       indicador (J1-J4, F1-F3, D1-D2, A1-A5). Compara com meta individual
+ *       (gdp_metas_individuais). Percentual de atingimento com cap (default 120%).
+ *       Score do indicador = (percentual/100) * peso. Grava em gdp_resultados_mensais.
+ *    b) ETAPA 2 — Penalizacoes: GdpPenalizacaoScanner executa 26 verificacoes.
+ *    c) ETAPA 3 — Desconto por eixo: totalDescontoEixo() soma pontos efetivos
+ *       com cap de 30 pts/eixo. Score final eixo = positivo - desconto (min 0).
+ *    d) ETAPA 4 — Score global: soma ponderada dos eixos (J30% F30% D20% A20%).
+ *    e) ETAPA 5 — Faixa remuneracao: GdpRemuneracaoFaixa::faixaParaScore()
+ *    f) Grava snapshot em gdp_snapshots + audit em gdp_audit_log.
+ * 4. Calcula ranking entre usuarios (arsort por score_global).
+ * 5. Limpa cache.
+ *
+ * DE ONDE PUXA DADOS: gdp_ciclos, gdp_eixos, gdp_indicadores,
+ *   gdp_metas_individuais, users, + todas as fontes do GdpDataAdapter e Scanner
+ *
+ * ONDE GRAVA: gdp_resultados_mensais, gdp_snapshots, gdp_audit_log, gdp_penalizacoes
+ *
+ * CRON: gdp:apurar — diario 00:30 BRT (routes/console.php linha 117)
+ *   Tambem rodado via botao manual no painel admin.
+ *
+ * CONSTANTES: CAP_PENALIZACAO_EIXO = 30 (maximo de desconto por eixo/mes)
+ *
+ * DEPENDENCIAS: GdpDataAdapter, GdpPenalizacaoScanner, GdpCiclo, GdpEixo,
+ *   GdpIndicador, GdpPenalizacao, GdpRemuneracaoFaixa
+ *
+ * ALERTA: alteracoes exigem estudo previo. Modulo ESTAVEL.
+ */
 
 namespace App\Services\Gdp;
 

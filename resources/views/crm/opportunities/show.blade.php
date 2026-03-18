@@ -314,8 +314,9 @@ function confirmarCadencia() {
     var notas = document.getElementById('cad-notas').value.trim();
     var objecao = document.getElementById('cad-objecao') ? document.getElementById('cad-objecao').value : '';
 
-    if ((resultado === 'objecao' || resultado === 'recusa') && !notas) {
+    if (!notas) {
         document.getElementById('cad-notas').classList.add('border-red-400');
+        document.getElementById('cad-notas').placeholder = 'Campo obrigatório — descreva o que aconteceu';
         document.getElementById('cad-notas').focus();
         return;
     }

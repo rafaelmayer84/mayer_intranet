@@ -78,6 +78,8 @@ class ReportsHubController extends Controller
                     ['route' => 'relatorios.sistema.sync', 'label' => 'Sincronização DataJuri'],
                     ['route' => 'relatorios.sistema.eventos', 'label' => 'Eventos do Sistema'],
                     ['route' => 'relatorios.sistema.auditoria', 'label' => 'Auditoria'],
+                    ['route' => 'relatorios.sistema.erros', 'label' => 'Erros de Aplicação'],
+                    ['route' => 'relatorios.sistema.laravel-log', 'label' => 'Log Laravel'],
                 ],
             ],
             [

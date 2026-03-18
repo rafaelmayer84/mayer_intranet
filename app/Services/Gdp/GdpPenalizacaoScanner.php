@@ -1,4 +1,63 @@
 <?php
+/**
+ * ESTAVEL desde 13/03/2026
+ *
+ * DOCUMENTACAO FUNCIONAL COMPLETA — GdpPenalizacaoScanner
+ *
+ * O QUE FAZ:
+ * Scanner automatizado de conformidade que verifica o comportamento dos advogados
+ * contra 26 regras de negocio (penalidades) distribuidas em 5 eixos:
+ * Juridico (J01-J05), Financeiro (F01-F03), Atendimento (A01-A08),
+ * Desenvolvimento (D01-D04), SIATE (S01) e Vigilia (V01-V03).
+ * J06 e F04 foram desativadas por falta de dados operacionais.
+ *
+ * LOGICA DE NEGOCIO:
+ * 1. Construtor recebe ciclo_id, mes e ano. Carrega tipos ativos com thresholds
+ *    e pontos efetivos (suporta override por ciclo via gdp_penalizacao_configs).
+ * 2. scanUsuario() executa todos os scan methods sequencialmente para um user.
+ * 3. Cada scan method: consulta fonte de verdade, verifica threshold, registra
+ *    penalidade se violacao detectada. Duplicatas evitadas por chave composta
+ *    (ciclo_id + user_id + tipo_id + mes + ano + referencia_tipo + referencia_id).
+ * 4. Penalidades gravadas em gdp_penalizacoes com pontos_desconto.
+ * 5. SystemEvent::gdp() registra log de ocorrencia para cada penalidade criada.
+ *
+ * DE ONDE PUXA DADOS:
+ * - processos (status, proprietario_id, data_encerramento, tipo_encerramento)
+ * - atividades_datajuri (data_prazo_fatal, data_conclusao, proprietario_id)
+ * - andamentos_fase (descricao, data_andamento, proprietario_id)
+ * - contas_receber + processos (inadimplencia)
+ * - wa_conversations + wa_messages (WhatsApp)
+ * - nexo_tickets + nexo_ticket_notas (tickets atendimento)
+ * - leads + crm_accounts + crm_activities (CRM)
+ * - crm_opportunities (pipeline CRM)
+ * - horas_trabalhadas_datajuri (registro de horas)
+ * - avisos + avisos_lidos (comunicacao interna)
+ * - gdp_snapshots + gdp_audit_log (acordo GDP)
+ * - vigilia_cruzamentos (conclusoes suspeitas, sem_acao)
+ * - crm_service_requests (SIATE SLA)
+ * - users.datajuri_proprietario_id (mapeamento user->proprietario DataJuri)
+ *
+ * ONDE GRAVA: gdp_penalizacoes, system_events
+ *
+ * CRON: gdp:penalizacoes — diario 08:00 BRT (routes/console.php linha 124)
+ *
+ * DEPENDENCIAS: GdpPenalizacao, GdpPenalizacaoTipo, SystemEvent, Carbon
+ *
+ * FLUXO DE CONTESTACAO:
+ * 1. Advogado ve penalidade em /gdp/penalizacoes ou /gdp/minha-performance
+ * 2. Clica "Contestar" -> POST /gdp/penalizacoes/{id}/contestar com texto
+ * 3. Status muda para contestada=true, contestacao_status='pendente'
+ * 4. Admin ve pendentes em /gdp/penalizacoes (filtro contestacao=pendente)
+ * 5. Admin julga: aceita (remove pontos) ou rejeita (mantem pontos)
+ * 6. Scope efetivas() exclui contestacoes aceitas do calculo de desconto
+ *
+ * IMPACTO NO SCORE:
+ * GdpApuracaoService chama GdpPenalizacao::totalDescontoEixo() que soma
+ * pontos_desconto das penalidades efetivas por eixo/mes, com cap de 30pts/eixo.
+ * Score final do eixo = score positivo - desconto (minimo 0).
+ *
+ * ALERTA: alteracoes exigem estudo previo. Modulo ESTAVEL.
+ */
 
 namespace App\Services\Gdp;
 

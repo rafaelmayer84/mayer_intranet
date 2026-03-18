@@ -25,6 +25,7 @@ Route::middleware(['auth'])->prefix('vigilia')->name('vigilia.')->group(function
         Route::get('/alertas', [VigiliaController::class, 'apiAlertas'])->name('api.alertas');
         Route::get('/compromissos', [VigiliaController::class, 'apiCompromissos'])->name('api.compromissos');
         Route::post('/cruzar', [VigiliaController::class, 'apiCruzar'])->name('api.cruzar');
+        Route::get('/triggers', [VigiliaController::class, 'apiTriggers'])->name('api.triggers');
     });
 
     // Relatórios (views renderizadas no servidor)

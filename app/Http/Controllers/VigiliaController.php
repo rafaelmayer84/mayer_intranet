@@ -175,6 +175,14 @@ class VigiliaController extends Controller
 
     // ─── HELPERS ─────────────────────────────────────────────────────
 
+
+    public function apiTriggers()
+    {
+        $this->checkAdmin();
+        $resumo = $this->service->getResumoTriggers();
+        return response()->json($resumo);
+    }
+
     private function parsePeriodo(Request $request): array
     {
         $periodo = $request->input('periodo', 'mes-atual');

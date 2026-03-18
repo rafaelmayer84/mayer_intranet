@@ -91,45 +91,54 @@ class ReportJustusService
     public function captura(): array
     {
         $stats = [];
-
-        $tribunalMap = [
-            'justus_tjsc' => ['nome' => 'TJSC', 'fonte' => 'Scraping busca.tjsc.jus.br'],
-            'justus_stj' => ['nome' => 'STJ', 'fonte' => 'Dados Abertos STJ'],
-            'justus_falcao' => ['nome' => 'TRT12', 'fonte' => 'API REST Falcão'],
-            'mysql' => ['nome' => 'TRF4/Outros', 'fonte' => 'Scraping eproc'],
+        
+        // Mapeamento por valor da coluna tribunal (não por conexão)
+        $fonteMap = [
+            'TJSC'  => 'Scraping eproc TJSC',
+            'STJ'   => 'Dados Abertos STJ',
+            'TRT12' => 'API REST Falcão',
+            'TRF4'  => 'Scraping eproc',
         ];
-
+        
         foreach ($this->connections as $conn) {
-            $info = $tribunalMap[$conn] ?? ['nome' => $conn, 'fonte' => 'Desconhecido'];
             try {
-                $q = DB::connection($conn)->table('justus_jurisprudencia');
-                $total = $q->count();
-
-                if ($total === 0) continue;
-
-                $minDate = (clone $q)->min('data_decisao');
-                $maxDate = (clone $q)->max('data_decisao');
-                $lastImport = (clone $q)->max('created_at');
-                $thisMonth = (clone $q)->where('created_at', '>=', now()->startOfMonth())->count();
-
-                $stats[] = [
-                    'tribunal' => $info['nome'],
-                    'total' => $total,
-                    'periodo_de' => $minDate,
-                    'periodo_ate' => $maxDate,
-                    'ultima_importacao' => $lastImport,
-                    'novos_mes' => $thisMonth,
-                    'fonte' => $info['fonte'],
-                ];
+                // Agrupa por coluna tribunal dentro de cada conexão
+                $grupos = DB::connection($conn)->table('justus_jurisprudencia')
+                    ->select(
+                        'tribunal',
+                        DB::raw('COUNT(*) as total'),
+                        DB::raw('MIN(data_decisao) as min_date'),
+                        DB::raw('MAX(data_decisao) as max_date'),
+                        DB::raw('MAX(created_at) as last_import'),
+                        DB::raw('SUM(CASE WHEN created_at >= "' . now()->startOfMonth()->toDateString() . '" THEN 1 ELSE 0 END) as this_month')
+                    )
+                    ->groupBy('tribunal')
+                    ->get();
+                
+                foreach ($grupos as $g) {
+                    $trib = $g->tribunal ?: 'Outros';
+                    $stats[] = [
+                        'tribunal' => $trib,
+                        'total' => (int) $g->total,
+                        'periodo_de' => $g->min_date,
+                        'periodo_ate' => $g->max_date,
+                        'ultima_importacao' => $g->last_import,
+                        'novos_mes' => (int) $g->this_month,
+                        'fonte' => $fonteMap[$trib] ?? 'Desconhecido',
+                    ];
+                }
             } catch (\Exception $e) {
                 continue;
             }
         }
-
+        
+        // Ordenar por total desc
+        usort($stats, function($a, $b) { return $b['total'] - $a['total']; });
+        
         return $stats;
     }
 
-    // ── REL-J03: Distribuição por Área ───────────────────────
+    // ── REL-J03    // ── REL-J03: Distribuição por Área ───────────────────────
     public function distribuicao(): array
     {
         $matrix = [];

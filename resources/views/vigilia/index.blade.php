@@ -39,6 +39,7 @@
             <button onclick="switchTab('dashboard')" data-tab="dashboard" class="tab-btn px-4 py-2.5 text-sm font-semibold border-b-2 border-[#385776] text-[#1B334A]">📊 Dashboard</button>
             <button onclick="switchTab('alertas')" data-tab="alertas" class="tab-btn px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-gray-400 hover:text-gray-600">🚨 Alertas <span id="alertas-badge" class="inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-xs font-bold bg-red-500 text-white ml-1">0</span></button>
             <button onclick="switchTab('compromissos')" data-tab="compromissos" class="tab-btn px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-gray-400 hover:text-gray-600">📋 Compromissos</button>
+            <button onclick="switchTab('triggers')" data-tab="triggers" class="tab-btn px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-gray-400 hover:text-gray-600">⚡ Cobranças <span id="triggers-badge" class="inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-white ml-1">0</span></button>
             <button onclick="switchTab('relatorios')" data-tab="relatorios" class="tab-btn px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-gray-400 hover:text-gray-600">📑 Relatórios</button>
         </nav>
     </div>
@@ -145,6 +146,32 @@
         <div id="compromissos-pagination" class="mt-3 flex justify-center"></div>
     </div>
 
+    {{-- ═══ TAB COBRANÇAS (TRIGGERS) ═══ --}}
+    <div id="panel-triggers" class="tab-panel hidden">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" id="trigger-kpis">
+            <div class="bg-white rounded-xl shadow-sm border-l-4 border-amber-400 p-4">
+                <p class="text-xs text-gray-500 uppercase font-bold tracking-wide">Total Tarefas Sensíveis</p>
+                <p class="text-3xl font-extrabold text-[#1B334A] mt-1" id="trig-total">—</p>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border-l-4 border-orange-500 p-4">
+                <p class="text-xs text-gray-500 uppercase font-bold tracking-wide">Pendentes</p>
+                <p class="text-3xl font-extrabold text-orange-500 mt-1" id="trig-pendentes">—</p>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border-l-4 border-red-500 p-4">
+                <p class="text-xs text-gray-500 uppercase font-bold tracking-wide">Vencidos (48h+)</p>
+                <p class="text-3xl font-extrabold text-red-600 mt-1" id="trig-vencidos">—</p>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border-l-4 border-green-500 p-4">
+                <p class="text-xs text-gray-500 uppercase font-bold tracking-wide">Concluídos</p>
+                <p class="text-3xl font-extrabold text-green-600 mt-1" id="trig-concluidos">—</p>
+            </div>
+        </div>
+
+        <div id="trigger-list">
+            <p class="text-center text-gray-400 py-8">Carregando...</p>
+        </div>
+    </div>
+
     {{-- ═══ TAB RELATÓRIOS ═══ --}}
     <div id="panel-relatorios" class="tab-panel hidden">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -216,6 +243,7 @@ function switchTab(tabId) {
     btn.classList.remove('border-transparent', 'text-gray-400');
     if (tabId === 'alertas') loadAlertas();
     if (tabId === 'compromissos') loadCompromissos();
+    if (tabId === 'triggers') loadTriggers();
 }
 
 const periodo = () => document.getElementById('vigilia-periodo').value;
@@ -360,6 +388,53 @@ function updateRelLinks() {
 document.getElementById('rel-adv').addEventListener('change', updateRelLinks);
 loadDashboard();
 updateRelLinks();
+loadTriggers();
+
+function loadTriggers() {
+    fetch('/vigilia/api/triggers')
+        .then(r => r.json())
+        .then(d => {
+            document.getElementById('trig-total').textContent = d.total;
+            document.getElementById('trig-pendentes').textContent = d.pendentes;
+            document.getElementById('trig-vencidos').textContent = d.vencidos;
+            document.getElementById('trig-concluidos').textContent = d.concluidos;
+            document.getElementById('triggers-badge').textContent = d.pendentes + d.vencidos;
+
+            let html = '';
+            const todos = [...(d.detalhes_pendentes || []), ...(d.detalhes_vencidos || [])];
+
+            if (todos.length === 0) {
+                html = '<div class="bg-white rounded-xl border p-8 text-center text-gray-400">✅ Nenhuma tarefa sensível pendente.</div>';
+            } else {
+                html = '<div class="space-y-3">';
+                todos.forEach(t => {
+                    const isVencido = t.vencido;
+                    const borderColor = isVencido ? 'border-l-red-500 bg-red-50/30' : 'border-l-amber-400 bg-amber-50/20';
+                    const statusBadge = isVencido
+                        ? '<span class="text-xs font-bold text-white bg-red-500 px-2 py-0.5 rounded">VENCIDO ' + Math.round(t.horas_desde_criacao) + 'h</span>'
+                        : '<span class="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded">PENDENTE ' + Math.round(t.horas_desde_criacao) + 'h/' + t.prazo_horas + 'h</span>';
+                    const parecerBadge = t.tem_parecer
+                        ? '<span class="text-green-600 font-semibold text-xs">✓ Parecer preenchido</span>'
+                        : '<span class="text-red-500 font-semibold text-xs">✕ Sem parecer no DataJuri</span>';
+
+                    html += '<div class="rounded-xl border-l-4 ' + borderColor + ' bg-white shadow-sm p-4">' +
+                        '<div class="flex justify-between items-start mb-2">' +
+                            '<div class="flex items-center gap-2">' + statusBadge + ' <strong class="text-sm text-[#1B334A]">' + t.assunto + '</strong></div>' +
+                        '</div>' +
+                        '<div class="flex flex-wrap gap-4 text-xs text-gray-500">' +
+                            '<span>👤 ' + t.responsavel + '</span>' +
+                            '<span>📁 ' + (t.processo_pasta || '—') + '</span>' +
+                            '<span>📅 ' + (t.data_hora ? new Date(t.data_hora).toLocaleDateString('pt-BR') : '—') + '</span>' +
+                            (t.assunto_alterado ? '<span class="text-purple-600 font-semibold text-xs">🔄 Assunto alterado de: ' + t.assunto_original + '</span>' : '') +
+                            parecerBadge +
+                        '</div>' +
+                    '</div>';
+                });
+                html += '</div>';
+            }
+            document.getElementById('trigger-list').innerHTML = html;
+        });
+}
 </script>
 @endpush
 @endsection

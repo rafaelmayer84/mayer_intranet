@@ -442,6 +442,12 @@ class EvidentiaSearchService
                 continue;
             }
 
+            // Se connection é o banco legado (evidentia), usar formato JSON (vector_json)
+            if ($embConn === 'evidentia') {
+                $this->searchEmbeddingsLegacy($chunkIds, $queryVector, $queryNorm, $scores, $bestChunks);
+                continue;
+            }
+
             // Carrega embeddings (float16 binário) em lotes
             $batchSize = 500;
             foreach (array_chunk($chunkIds, $batchSize) as $batch) {

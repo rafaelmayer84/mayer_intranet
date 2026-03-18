@@ -54,7 +54,7 @@ return [
 
         'stack' => [
             'driver' => 'stack',
-            'channels' => explode(',', (string) env('LOG_STACK', 'single')),
+            'channels' => array_merge(explode(',', (string) env('LOG_STACK', 'single')), ['database']),
             'ignore_exceptions' => false,
         ],
 
@@ -125,6 +125,12 @@ return [
 
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
+        ],
+
+        'database' => [
+            'driver' => 'custom',
+            'via'    => App\Logging\DatabaseLogChannel::class,
+            'level'  => 'error',
         ],
 
     ],

@@ -564,6 +564,16 @@ class DataJuriSyncOrchestrator
         }
 
         // =====================================================================
+        // VIGÍLIA: Preservar assunto_original na primeira inserção
+        if ($config['table'] === 'atividades_datajuri') {
+            $existingRecord = DB::table('atividades_datajuri')->where('datajuri_id', $dbData['datajuri_id'] ?? null)->first();
+            if (!$existingRecord) {
+                // Primeiro insert: gravar assunto_original
+                $dbData['assunto_original'] = $dbData['assunto'] ?? null;
+            }
+            // Se já existe, NÃO sobrescrever assunto_original (preserva o valor original)
+        }
+
         // SANITIZACAO HTML: strip_tags em campos texto (FIX v2.4 - 21/02/2026)
         // DataJuri retorna HTML em campo "prazo" (ex: <span style='color:red'>Vencido há X dias</span>)
         // =====================================================================

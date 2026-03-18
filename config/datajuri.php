@@ -214,7 +214,7 @@ return [
             'label' => 'Atividades',
             'icon' => '📅',
             'table' => 'atividades_datajuri',
-            'campos' => 'id,status,tipoAtividade,dataHora,dataConclusao,dataVencimento,dataPrazoFatal,processo.pasta,processoId,proprietario.id,proprietario.nome,particular,dataCadastro',
+            'campos' => 'id,status,tipoAtividade,assunto,categoria,descricao,dataHora,dataConclusao,dataVencimento,dataPrazoFatal,processo.pasta,processoId,proprietario.id,proprietario.nome,particular,dataCadastro',
             'criterio' => null,
             'mapping' => [
                 'id' => 'datajuri_id',

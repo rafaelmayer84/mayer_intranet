@@ -115,11 +115,13 @@ class CrmPulsoService
         $dateStr = $date->toDateString();
 
         // wa_messages -> wa_conversations.phone -> normalizar -> phoneMap
+        // CORRIGIDO 16/03/2026: Conta SESSÕES (conversas distintas), não mensagens individuais
+        // Uma conversa com 50 msgs = 1 contato, conforme contrato de atendimento
         $rows = DB::table('wa_messages as m')
             ->join('wa_conversations as c', 'm.conversation_id', '=', 'c.id')
             ->where('m.direction', 1) // incoming
             ->whereDate('m.created_at', $dateStr)
-            ->select('c.phone', DB::raw('COUNT(*) as total'))
+            ->select('c.phone', DB::raw('COUNT(DISTINCT m.conversation_id) as total'))
             ->groupBy('c.phone')
             ->get();
 

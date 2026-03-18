@@ -261,6 +261,8 @@
                     @elseif($pen->contestacao_status === 'rejeitada')
                         <span class="text-xs text-red-600">Rejeitada</span>
                         <button onclick="contestar({{ $pen->id }})" class="rounded px-2 py-1 text-xs font-medium text-white" style="background-color:#385776">Contestar</button>
+                    @else
+                        <button onclick="contestar({{ $pen->id }})" class="rounded px-2 py-1 text-xs font-medium text-white" style="background-color:#385776">Contestar</button>
                     @endif
                 </div>
             </div>

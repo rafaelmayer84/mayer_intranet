@@ -148,6 +148,12 @@ Schedule::call(function () {
     AuditLog::olderThan(90)->delete();
 })->dailyAt('03:00')->name('audit-log-cleanup');
 
+// Cleanup erros de aplicação > 90 dias
+use App\Models\SystemErrorLog;
+Schedule::call(function () {
+    SystemErrorLog::olderThan(90)->delete();
+})->dailyAt('03:05')->name('error-log-cleanup');
+
 // --- NEXO QA: Pesquisa de Qualidade ---
 use App\Models\NexoQaCampaign;
 use App\Jobs\NexoQaWeeklySamplingJob;
@@ -181,8 +187,9 @@ Schedule::command('justus:sync-stj')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/cron-justus-stj.log'));
 
-// TJSC via scraping — diário 04:30 BRT (último mês + mês atual)
-Schedule::command('justus:sync-tjsc --meses-atras=1 --ps=50')
+// TJSC via eproc — diário 04:30 BRT (último mês + mês atual)
+// Migrado de busca.tjsc.jus.br para eproc em 18/03/2026
+Schedule::command('justus:sync-tjsc-eproc --meses-atras=1 --ps=50')
     ->dailyAt('04:30')
     ->timezone('America/Sao_Paulo')
     ->withoutOverlapping()

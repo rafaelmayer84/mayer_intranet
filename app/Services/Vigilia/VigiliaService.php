@@ -26,6 +26,23 @@ class VigiliaService
         'Tarefa',
     ];
 
+    /**
+     * Assuntos de TAREFA que ativam cobrança obrigatória no VIGÍLIA.
+     * Quando detectados, o advogado deve preencher parecer no DataJuri.
+     * Escalação automática se não resolver no prazo.
+     */
+    const ASSUNTOS_TRIGGER = [
+        'Análise de Decisão',
+        'Providências Pós-Audiência',
+        'Relatório de Ocorrência',
+        'Verificação de Cumprimento',
+    ];
+
+    /**
+     * Prazo em horas para o advogado resolver a tarefa trigger.
+     */
+    const PRAZO_TRIGGER_HORAS = 48;
+
     const TIPOS_NAO_APLICAVEIS = [
         'Compromisso (Reunião)',
         'Compromisso (Reunião Interna)',
@@ -716,4 +733,101 @@ class VigiliaService
             ->pluck('qtd', 'tipo_atividade')
             ->toArray();
     }
+
+
+    // ─── TAREFAS TRIGGER (COBRANÇA OBRIGATÓRIA) ─────────────────────
+
+    /**
+     * Retorna tarefas com assuntos trigger que requerem ação.
+     * Filtra: tipo_atividade=Tarefa, assunto in ASSUNTOS_TRIGGER, 2026+
+     */
+    public function getTarefasTrigger(?string $responsavel = null): array
+    {
+        $query = DB::table('atividades_datajuri')
+            ->where('tipo_atividade', 'Tarefa')
+            ->where(function($q) { $q->whereIn('assunto', self::ASSUNTOS_TRIGGER)->orWhereIn('assunto_original', self::ASSUNTOS_TRIGGER); })
+            ->where('data_hora', '>=', '2026-01-01 00:00:00')
+            ->orderByDesc('data_hora');
+
+        if ($responsavel) {
+            $query->where('responsavel_nome', $responsavel);
+        }
+
+        return $query->get()->map(function ($row) {
+            $horasDesdeCreacao = null;
+            if ($row->created_at) {
+                $horasDesdeCreacao = Carbon::parse($row->created_at)->diffInHours(Carbon::now());
+            }
+
+            $vencido = $horasDesdeCreacao !== null && $horasDesdeCreacao > self::PRAZO_TRIGGER_HORAS;
+            $status_trigger = 'pendente';
+
+            if ($row->status === 'Concluído') {
+                $status_trigger = 'concluido';
+            } elseif ($row->status === 'Cancelado') {
+                $status_trigger = 'cancelado';
+            } elseif ($vencido) {
+                $status_trigger = 'vencido';
+            }
+
+            // Verificar se tem parecer no andamento do processo
+            $temParecer = false;
+            if ($row->processo_pasta) {
+                $faseId = DB::table('fases_processo')
+                    ->where('processo_pasta', $row->processo_pasta)
+                    ->value('datajuri_id');
+
+                if ($faseId) {
+                    $temParecer = DB::table('andamentos_fase')
+                        ->where('fase_processo_id_datajuri', $faseId)
+                        ->where(function ($q) {
+                            $q->where('parecer', '!=', '')
+                              ->whereNotNull('parecer')
+                              ->where('parecer', '!=', 'Não');
+                        })
+                        ->where('data_andamento', '>=', Carbon::parse($row->data_hora)->subDays(5)->toDateString())
+                        ->exists();
+                }
+            }
+
+            return [
+                'id' => $row->id,
+                'datajuri_id' => $row->datajuri_id,
+                'assunto' => $row->assunto,
+                'tipo_atividade' => $row->tipo_atividade,
+                'status' => $row->status,
+                'status_trigger' => $status_trigger,
+                'responsavel' => $row->responsavel_nome,
+                'processo_pasta' => $row->processo_pasta,
+                'data_hora' => $row->data_hora,
+                'data_conclusao' => $row->data_conclusao,
+                'horas_desde_criacao' => $horasDesdeCreacao,
+                'prazo_horas' => self::PRAZO_TRIGGER_HORAS,
+                'vencido' => $vencido,
+                'tem_parecer' => $temParecer,
+                'created_at' => $row->created_at,
+            ];
+        })->toArray();
+    }
+
+    /**
+     * Retorna resumo das tarefas trigger para o dashboard.
+     */
+    public function getResumoTriggers(): array
+    {
+        $triggers = $this->getTarefasTrigger();
+        $pendentes = array_filter($triggers, fn($t) => $t['status_trigger'] === 'pendente');
+        $vencidos = array_filter($triggers, fn($t) => $t['status_trigger'] === 'vencido');
+        $concluidos = array_filter($triggers, fn($t) => $t['status_trigger'] === 'concluido');
+
+        return [
+            'total' => count($triggers),
+            'pendentes' => count($pendentes),
+            'vencidos' => count($vencidos),
+            'concluidos' => count($concluidos),
+            'detalhes_pendentes' => array_values($pendentes),
+            'detalhes_vencidos' => array_values($vencidos),
+        ];
+    }
+
 }

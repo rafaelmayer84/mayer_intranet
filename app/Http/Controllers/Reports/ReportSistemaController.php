@@ -168,6 +168,83 @@ class ReportSistemaController extends Controller
         return ReportExportService::export($type, 'Eventos do Sistema', $columns, collect($data->items()), [], 'landscape');
     }
 
+    // ── REL-S04: Erros de Aplicação ─────────────────────────
+    public function erros(Request $request)
+    {
+        $filters = $request->only(['level', 'module', 'busca', 'periodo_de', 'periodo_ate', 'sort', 'dir']);
+        $perPage = (int) $request->get('per_page', 25);
+        $data = $this->service->erros($filters, $perPage);
+        $stats = $this->service->errosTotals();
+
+        $columns = [
+            ['key' => 'created_at', 'label' => 'Data/Hora', 'format' => 'text', 'sortable' => true],
+            ['key' => 'level', 'label' => 'Nível', 'format' => 'badge', 'sortable' => true,
+             'badge_colors' => [
+                'error' => 'bg-red-100 text-red-700',
+                'critical' => 'bg-red-300 text-red-900',
+                'alert' => 'bg-orange-200 text-orange-800',
+                'emergency' => 'bg-red-500 text-white',
+                'warning' => 'bg-yellow-100 text-yellow-700',
+             ]],
+            ['key' => 'module', 'label' => 'Módulo', 'format' => 'badge', 'sortable' => true,
+             'badge_colors' => [
+                'evidentia' => 'bg-indigo-100 text-indigo-700',
+                'justus' => 'bg-violet-100 text-violet-700',
+                'nexo' => 'bg-green-100 text-green-700',
+                'crm' => 'bg-blue-100 text-blue-700',
+                'gdp' => 'bg-rose-100 text-rose-700',
+                'datajuri' => 'bg-cyan-100 text-cyan-700',
+                'financeiro' => 'bg-emerald-100 text-emerald-700',
+                'sistema' => 'bg-slate-100 text-slate-700',
+             ]],
+            ['key' => 'message', 'label' => 'Mensagem', 'format' => 'text', 'sortable' => false, 'limit' => 100],
+            ['key' => 'file', 'label' => 'Arquivo', 'format' => 'text', 'sortable' => true, 'limit' => 60],
+            ['key' => 'line', 'label' => 'Linha', 'format' => 'text', 'sortable' => false],
+            ['key' => 'user_name', 'label' => 'Usuário', 'format' => 'text', 'sortable' => false],
+            ['key' => 'url', 'label' => 'URL', 'format' => 'text', 'sortable' => false, 'limit' => 50],
+        ];
+
+        $modules = \DB::table('system_error_logs')->distinct()->pluck('module')->filter()->sort()->toArray();
+
+        $filterDefs = [
+            ['name' => 'level', 'label' => 'Nível', 'type' => 'select', 'options' => ['error' => 'Error', 'critical' => 'Critical', 'alert' => 'Alert', 'emergency' => 'Emergency']],
+            ['name' => 'module', 'label' => 'Módulo', 'type' => 'select', 'options' => array_combine($modules ?: [''], $modules ?: [''])],
+            ['name' => 'busca', 'label' => 'Busca', 'type' => 'text', 'placeholder' => 'Buscar na mensagem/arquivo...'],
+            ['name' => 'periodo_de', 'label' => 'Período De', 'type' => 'month'],
+            ['name' => 'periodo_ate', 'label' => 'Período Até', 'type' => 'month'],
+        ];
+
+        $exportRoute = route('relatorios.export', ['domain' => 'sistema', 'report' => 'erros']) . '?' . http_build_query($request->all());
+
+        return view('reports.sistema.erros', [
+            'reportTitle' => 'Erros de Aplicação',
+            'domainLabel' => 'Saúde do Sistema',
+            'columns' => $columns,
+            'data' => $data,
+            'totals' => [],
+            'filters' => $filterDefs,
+            'exportRoute' => $exportRoute,
+            'stats' => $stats,
+        ]);
+    }
+
+    public function exportErros(Request $request, string $type)
+    {
+        $filters = $request->only(['level', 'module', 'busca', 'periodo_de', 'periodo_ate', 'sort', 'dir']);
+        $data = $this->service->erros($filters, 999999);
+        $columns = [
+            ['key' => 'created_at', 'label' => 'Data/Hora', 'format' => 'text'],
+            ['key' => 'level', 'label' => 'Nível', 'format' => 'text'],
+            ['key' => 'module', 'label' => 'Módulo', 'format' => 'text'],
+            ['key' => 'message', 'label' => 'Mensagem', 'format' => 'text'],
+            ['key' => 'file', 'label' => 'Arquivo', 'format' => 'text'],
+            ['key' => 'line', 'label' => 'Linha', 'format' => 'text'],
+            ['key' => 'user_name', 'label' => 'Usuário', 'format' => 'text'],
+            ['key' => 'url', 'label' => 'URL', 'format' => 'text'],
+        ];
+        return ReportExportService::export($type, 'Erros de Aplicação', $columns, collect($data->items()), [], 'landscape');
+    }
+
     // ── REL-S03: Auditoria ───────────────────────────────────
     public function auditoria(Request $request)
     {
@@ -249,4 +326,79 @@ class ReportSistemaController extends Controller
         ];
         return ReportExportService::export($type, 'Auditoria', $columns, collect($data->items()), [], 'landscape');
     }
+
+    // ── REL-S05: Log Laravel ────────────────────────────────
+    public function laravelLog(Request $request)
+    {
+        $filters = $request->only(['level', 'module', 'busca', 'data_de', 'data_ate', 'sort', 'dir', 'page']);
+        $perPage = (int) $request->get('per_page', 50);
+        $result = $this->service->laravelLog($filters, $perPage);
+        $stats = $this->service->laravelLogTotals();
+
+        $columns = [
+            ['key' => 'datetime', 'label' => 'Data/Hora', 'format' => 'text', 'sortable' => true],
+            ['key' => 'level', 'label' => 'Nível', 'format' => 'badge', 'sortable' => true,
+             'badge_colors' => [
+                'INFO' => 'bg-blue-100 text-blue-700',
+                'WARNING' => 'bg-yellow-100 text-yellow-700',
+                'ERROR' => 'bg-red-100 text-red-700',
+                'CRITICAL' => 'bg-red-300 text-red-900',
+                'DEBUG' => 'bg-gray-100 text-gray-600',
+                'EMERGENCY' => 'bg-red-500 text-white',
+                'ALERT' => 'bg-orange-200 text-orange-800',
+             ]],
+            ['key' => 'module', 'label' => 'Módulo', 'format' => 'badge', 'sortable' => true,
+             'badge_colors' => [
+                'NEXO' => 'bg-green-100 text-green-700',
+                'SendPulse' => 'bg-purple-100 text-purple-700',
+                'DataJuri' => 'bg-cyan-100 text-cyan-700',
+                'CRM' => 'bg-violet-100 text-violet-700',
+                'GDP' => 'bg-rose-100 text-rose-700',
+                'Justus' => 'bg-indigo-100 text-indigo-700',
+                'Evidentia' => 'bg-amber-100 text-amber-700',
+                'Vigília' => 'bg-teal-100 text-teal-700',
+                'SIATE' => 'bg-orange-100 text-orange-700',
+                'Sync' => 'bg-blue-100 text-blue-700',
+                'Sistema' => 'bg-slate-100 text-slate-700',
+             ]],
+            ['key' => 'message', 'label' => 'Mensagem', 'format' => 'text', 'sortable' => false, 'limit' => 120],
+        ];
+
+        $modules = ['NEXO', 'SendPulse', 'DataJuri', 'CRM', 'GDP', 'Justus', 'Evidentia', 'Vigília', 'SIATE', 'Sync', 'Sistema'];
+
+        $filterDefs = [
+            ['name' => 'level', 'label' => 'Nível', 'type' => 'select', 'options' => ['info' => 'Info', 'warning' => 'Warning', 'error' => 'Error', 'critical' => 'Critical', 'debug' => 'Debug']],
+            ['name' => 'module', 'label' => 'Módulo', 'type' => 'select', 'options' => array_combine($modules, $modules)],
+            ['name' => 'busca', 'label' => 'Busca', 'type' => 'text', 'placeholder' => 'Buscar na mensagem...'],
+            ['name' => 'data_de', 'label' => 'Data De', 'type' => 'date'],
+            ['name' => 'data_ate', 'label' => 'Data Até', 'type' => 'date'],
+        ];
+
+        $exportRoute = route('relatorios.export', ['domain' => 'sistema', 'report' => 'laravel-log']) . '?' . http_build_query($request->all());
+
+        return view('reports.sistema.laravel-log', [
+            'reportTitle' => 'Log Laravel',
+            'domainLabel' => 'Saúde do Sistema',
+            'columns' => $columns,
+            'data' => $result['data'],
+            'pagination' => $result,
+            'filters' => $filterDefs,
+            'exportRoute' => $exportRoute,
+            'stats' => $stats,
+        ]);
+    }
+
+    public function exportLaravelLog(Request $request, string $type)
+    {
+        $filters = $request->only(['level', 'module', 'busca', 'data_de', 'data_ate', 'sort', 'dir']);
+        $result = $this->service->laravelLog($filters, 99999);
+        $columns = [
+            ['key' => 'datetime', 'label' => 'Data/Hora', 'format' => 'text'],
+            ['key' => 'level', 'label' => 'Nível', 'format' => 'text'],
+            ['key' => 'module', 'label' => 'Módulo', 'format' => 'text'],
+            ['key' => 'message', 'label' => 'Mensagem', 'format' => 'text'],
+        ];
+        return ReportExportService::export($type, 'Log Laravel', $columns, collect($result['data']), [], 'landscape');
+    }
+
 }

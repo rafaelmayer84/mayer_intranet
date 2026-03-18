@@ -146,7 +146,7 @@ Formato obrigatorio:
         $userPrompt = "DADOS DO CASO:\n" . json_encode($dadosCaso, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
         $userPrompt .= "\n\nCONFIGURACOES CONFIRMADAS PELO ADVOGADO:\n" . json_encode($config, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 
-        $result = $this->callClaude($systemPrompt, $userPrompt, 4096);
+        $result = $this->callClaude($systemPrompt, $userPrompt, 8192);
 
         if (isset($result['erro'])) {
             return ['error' => $result['erro']];
@@ -232,14 +232,16 @@ REGRAS CRITICAS:
     /**
      * Chama a API Anthropic (Claude)
      */
-    private function callClaude(string $systemPrompt, string $userPrompt, int $maxTokens = 4000): array
+    private function callClaude(string $systemPrompt, string $userPrompt, int $maxTokens = 4000, int $attempt = 1): array
     {
         if (empty($this->apiKey)) {
             return ['erro' => 'JUSTUS_ANTHROPIC_API_KEY nao configurada no .env'];
         }
 
+        $maxRetries = 2;
+
         try {
-            $response = Http::connectTimeout(10)->timeout(180)
+            $response = Http::connectTimeout(15)->timeout(200)
                 ->withHeaders([
                     'x-api-key' => $this->apiKey,
                     'anthropic-version' => '2023-06-01',
@@ -267,11 +269,27 @@ REGRAS CRITICAS:
 
             $status = $response->status();
             $body = $response->body();
-            Log::error('SIPEX ProposalClaude: API erro', ['status' => $status, 'body' => $body]);
-            return ['erro' => "API Anthropic retornou status {$status}"];
+            Log::error('SIPEX ProposalClaude: API erro', ['status' => $status, 'body' => $body, 'attempt' => $attempt]);
+            
+            // Retry em erros 502, 503, 504 (upstream/timeout)
+            if (in_array($status, [502, 503, 504]) && $attempt < $maxRetries) {
+                Log::info('SIPEX ProposalClaude: retry apos erro ' . $status, ['attempt' => $attempt + 1]);
+                sleep(2 * $attempt); // Backoff: 2s, 4s
+                return $this->callClaude($systemPrompt, $userPrompt, $maxTokens, $attempt + 1);
+            }
+            
+            return ['erro' => "API Anthropic retornou status {$status}. Tente novamente em alguns instantes."];
 
         } catch (\Exception $e) {
-            Log::error('SIPEX ProposalClaude: Exception', ['msg' => $e->getMessage()]);
+            Log::error('SIPEX ProposalClaude: Exception', ['msg' => $e->getMessage(), 'attempt' => $attempt]);
+            
+            // Retry em timeout/connection errors
+            if ($attempt < $maxRetries && (str_contains($e->getMessage(), 'timeout') || str_contains($e->getMessage(), 'Connection'))) {
+                Log::info('SIPEX ProposalClaude: retry apos exception', ['attempt' => $attempt + 1]);
+                sleep(2 * $attempt);
+                return $this->callClaude($systemPrompt, $userPrompt, $maxTokens, $attempt + 1);
+            }
+            
             return ['erro' => 'Erro de conexao com API Anthropic: ' . $e->getMessage()];
         }
     }
@@ -279,23 +297,89 @@ REGRAS CRITICAS:
     private function parseJson(string $raw): array
     {
         $clean = trim($raw);
-        // Remover blocos markdown ```json ... ``` em qualquer posicao
-        if (preg_match('/```(?:json)?\s*\n?(\{.*\})\s*\n?```/s', $clean, $m)) {
-            $clean = $m[1];
-        } else {
-            $clean = preg_replace('/^```json\s*/', '', $clean);
-            $clean = preg_replace('/^```\s*/', '', $clean);
-            $clean = preg_replace('/\s*```$/', '', $clean);
+        
+        // Remover markdown wrappers
+        if (preg_match('/```(?:json)?\s*\n?([\s\S]+?)\n?\s*```/s', $clean, $m)) {
+            $clean = trim($m[1]);
         }
+        
+        // Extrair JSON se houver texto antes/depois
+        if (substr(ltrim($clean), 0, 1) !== '{') {
+            $s = strpos($clean, '{');
+            $e = strrpos($clean, '}');
+            if ($s !== false && $e !== false && $e > $s) {
+                $clean = substr($clean, $s, $e - $s + 1);
+            }
+        }
+        
         $clean = trim($clean);
-
+        
+        // Detectar truncamento: JSON incompleto (não termina com })
+        $lastChar = substr(rtrim($clean), -1);
+        if ($lastChar !== '}') {
+            Log::warning('SIPEX ProposalClaude: JSON truncado detectado', [
+                'last_chars' => substr($clean, -100),
+            ]);
+            // Tentar fechar JSON truncado (heurística)
+            $clean = $this->tentarFecharJsonTruncado($clean);
+        }
+        
         $parsed = json_decode($clean, true);
-
+        
         if (json_last_error() !== JSON_ERROR_NONE) {
-            Log::error('SIPEX ProposalClaude: JSON parse error', ['error' => json_last_error_msg(), 'raw' => substr($raw, 0, 500)]);
+            Log::error('SIPEX ProposalClaude: JSON parse error', [
+                'error' => json_last_error_msg(),
+                'raw'   => substr($raw, 0, 500),
+            ]);
             return [];
         }
-
+        
         return $parsed;
+    }
+    
+    /**
+     * Tenta fechar um JSON truncado adicionando aspas/chaves faltantes.
+     * Heurística simples para recuperar respostas cortadas pela API.
+     */
+    private function tentarFecharJsonTruncado(string $json): string
+    {
+        $original = $json;
+        
+        // Contar chaves e colchetes abertos
+        $openBraces = substr_count($json, '{') - substr_count($json, '}');
+        $openBrackets = substr_count($json, '[') - substr_count($json, ']');
+        
+        // Se termina no meio de uma string, fechar a string
+        $lastQuotePos = strrpos($json, '"');
+        $lastColonPos = strrpos($json, ':');
+        $lastCommaPos = strrpos($json, ',');
+        
+        // Se o último caractere significativo indica string incompleta
+        $trimmed = rtrim($json);
+        $lastChar = substr($trimmed, -1);
+        
+        // Se termina com letra/número (meio de valor string), fechar string
+        if (preg_match('/[a-zA-Z0-9À-ú.,;!?]$/', $trimmed)) {
+            // Verificar se estamos dentro de uma string (número ímpar de aspas desde última chave)
+            $afterLastBrace = substr($json, max(strrpos($json, '{'), strrpos($json, ',')) ?: 0);
+            $quotesAfter = substr_count($afterLastBrace, '"');
+            if ($quotesAfter % 2 === 1) {
+                $json .= '"';
+            }
+        }
+        
+        // Fechar colchetes pendentes
+        $json .= str_repeat(']', max(0, $openBrackets));
+        
+        // Fechar chaves pendentes
+        $json .= str_repeat('}', max(0, $openBraces));
+        
+        if ($json !== $original) {
+            Log::info('SIPEX ProposalClaude: JSON truncado recuperado', [
+                'added' => substr($json, strlen($original)),
+            ]);
+        }
+        
+        return $json;
     }
 }

@@ -238,7 +238,7 @@ require __DIR__ . '/_sisrh_routes.php';
     require __DIR__ . '/_sisrh_advogados_routes.php';
     require __DIR__ . '/_sisrh_documentos_routes.php';
 
-require __DIR__.'/_ocorrencias_routes.php';
+// require __DIR__.'/_ocorrencias_routes.php'; // Migrado para Relatórios > Saúde do Sistema > Eventos
 require __DIR__.'/_home_routes.php';
 require_once __DIR__.'/_justus_routes.php';
 
