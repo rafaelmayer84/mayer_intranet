@@ -85,7 +85,7 @@ class NexoQaSurveyService
         $tokenShort = strtoupper(substr($target->token, 0, 8));
 
         $lines = [];
-        $lines[] = '📊 *Pesquisa de Qualidade — Mayer Albanez Advogados*';
+        $lines[] = '📊 *Pesquisa de Qualidade — Mayer Advogados*';
         $lines[] = '';
         $lines[] = 'Olá! Gostaríamos de saber sua opinião sobre o atendimento do nosso escritório.';
         $lines[] = '';

@@ -1,0 +1,56 @@
+<?php
+return [
+    'postmark' => [
+        'key' => env('POSTMARK_API_KEY'),
+    ],
+    'resend' => [
+        'key' => env('RESEND_API_KEY'),
+    ],
+    'ses' => [
+        'key' => env('AWS_ACCESS_KEY_ID'),
+        'secret' => env('AWS_SECRET_ACCESS_KEY'),
+        'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
+    ],
+    'slack' => [
+        'notifications' => [
+            'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
+            'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
+        ],
+    ],
+    'datajuri' => [
+        'base_url' => env('DATAJURI_BASE_URL', 'https://api.datajuri.com.br'),
+        'api_key' => env('DATAJURI_API_KEY', 'sua_api_key_aqui'),
+        'client_id' => env('DATAJURI_CLIENT_ID'),
+        'secret_id' => env('DATAJURI_SECRET_ID'),
+        'email' => env('DATAJURI_EMAIL', 'rafaelmayer@mayeradvogados.adv.br'),
+        'password' => env('DATAJURI_PASSWORD'),
+    ],
+    // espocrm removido em 13/02/2026 - substituído por CRM Nativo
+    'sendpulse' => [
+        'api_id' => env('SENDPULSE_API_ID'),
+        'api_secret' => env('SENDPULSE_API_SECRET'),
+        'bot_id' => env('SENDPULSE_BOT_ID'),
+        'webhook_secret' => env('SENDPULSE_WEBHOOK_SECRET'),
+        'webhook_token' => env('SENDPULSE_WEBHOOK_TOKEN'),
+    ],
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+        'model' => env('OPENAI_MODEL', 'gpt-4o-mini'),
+    ],
+
+    // ── SIRIC - Análise de Crédito ──
+    'siric' => [
+        'openai_model' => env('SIRIC_OPENAI_MODEL', 'gpt-5.2'),
+        'openai_fallback' => env('SIRIC_OPENAI_FALLBACK', 'gpt-5'),
+        'openai_max_tokens' => env('SIRIC_OPENAI_MAX_TOKENS', 4000),
+        'openai_temperature' => env('SIRIC_OPENAI_TEMPERATURE', 0.3),
+        'openai_api_key' => env('SIRIC_OPENAI_API_KEY', env('OPENAI_API_KEY')),
+    ],
+
+    // ── Asaas (Serasa via Credit Bureau) ──
+    'asaas' => [
+        'api_key' => env('ASAAS_API_KEY', ''),
+        'environment' => env('ASAAS_ENVIRONMENT', 'production'),
+    ],
+
+];

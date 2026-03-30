@@ -255,4 +255,53 @@ class LeadTrackingService
 
         return $variations;
     }
+
+    /**
+     * Busca tracking pelo token de referencia (Ref. xxxxxxxx).
+     *
+     * @param string $token Token hex de 8 caracteres
+     * @return array Dados de tracking ou array vazio
+     */
+    public static function findByToken(string $token): array
+    {
+        if (empty($token) || strlen($token) < 6) {
+            return [];
+        }
+
+        try {
+            $tracking = DB::table('lead_tracking')
+                ->where('token', $token)
+                ->orderBy('created_at', 'desc')
+                ->first();
+
+            if (!$tracking) {
+                return [];
+            }
+
+            Log::info('[LeadTracking] Match por token', [
+                'token' => $token,
+                'gclid' => $tracking->gclid ? 'presente' : 'ausente',
+                'utm_source' => $tracking->utm_source,
+                'tracking_id' => $tracking->id,
+            ]);
+
+            return [
+                'gclid'        => $tracking->gclid,
+                'fbclid'       => $tracking->fbclid,
+                'utm_source'   => $tracking->utm_source,
+                'utm_medium'   => $tracking->utm_medium,
+                'utm_campaign' => $tracking->utm_campaign,
+                'utm_content'  => $tracking->utm_content,
+                'utm_term'     => $tracking->utm_term,
+                'landing_page' => $tracking->landing_page,
+                'referrer_url' => $tracking->referrer,
+            ];
+        } catch (\Throwable $e) {
+            Log::warning('[LeadTracking] Erro ao buscar por token', [
+                'token' => $token,
+                'error' => $e->getMessage(),
+            ]);
+            return [];
+        }
+    }
 }

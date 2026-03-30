@@ -322,7 +322,7 @@ class NexoQaWebhookController extends Controller
         try {
             $normalized = NexoQaResolverService::normalizePhone($phone);
             $service = app(\App\Services\SendPulseWhatsAppService::class);
-            $service->sendMessageByPhone($normalized, '✅ Obrigado pela sua avaliação! Sua opinião é muito importante para melhorarmos nossos serviços. — Equipe Mayer Albanez');
+            $service->sendMessageByPhone($normalized, '✅ Obrigado pela sua avaliação! Sua opinião é muito importante para melhorarmos nossos serviços. — Equipe Mayer Advogados');
         } catch (\Throwable $e) {
             Log::error('[NexoQA Webhook] Falha ao enviar agradecimento', [
                 'error' => $e->getMessage(),

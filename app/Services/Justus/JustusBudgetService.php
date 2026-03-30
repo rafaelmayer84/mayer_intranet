@@ -92,7 +92,7 @@ class JustusBudgetService
         $usage->increment('total_requests');
         DB::table('justus_usage_monthly')
             ->where('id', $usage->id)
-            ->update(['total_cost_brl' => DB::raw('total_cost_brl + ' . $costBrl)]);
+            ->increment('total_cost_brl', (float) $costBrl);
     }
 
     public function calculateCost(int $inputTokens, int $outputTokens, string $model = null): float

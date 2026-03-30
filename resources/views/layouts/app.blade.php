@@ -205,7 +205,7 @@
         }
     </style>
 
-            <!-- Mayer Albanez: Montserrat Font -->
+            <!-- Mayer Advogados: Montserrat Font -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap" rel="stylesheet">
@@ -218,7 +218,7 @@
 
             <!-- Logo/Nome do Sistema -->
             <div class="sidebar-logo p-5 border-b border-white/10 flex items-center justify-center">
-                <img src="{{ asset('img/logo-icon-white.svg') }}" alt="Mayer Albanez" class="h-10 w-auto menu-text" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
+                <img src="{{ asset('img/logo-icon-white.svg') }}" alt="Mayer Advogados" class="h-10 w-auto menu-text" style="filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));">
             </div>
 
             <!-- Toggle Sidebar (topo) -->

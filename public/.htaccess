@@ -1,3 +1,38 @@
+
+# === SECURITY HEADERS (Auditoria 21/03/2026) ===
+<IfModule mod_headers.c>
+    # Ocultar versao do servidor
+    Header unset Server
+    Header always unset X-Powered-By
+    Header unset X-Powered-By
+
+    # Headers de seguranca
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+</IfModule>
+
+# Bloquear acesso a arquivos sensiveis
+<FilesMatch "\.(env|bak|old|orig|save|swp|sql|log|lock)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order deny,allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# Bloquear composer.*
+<FilesMatch "^composer\.(json|lock)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+</FilesMatch>
+# === END SECURITY HEADERS ===
+
 <IfModule mod_rewrite.c>
     <IfModule mod_negotiation.c>
         Options -MultiViews -Indexes

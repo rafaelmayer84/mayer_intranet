@@ -78,7 +78,7 @@
                 <td class="text-center text-success">{{ $r['concluidos'] }}</td>
                 <td class="text-center text-warning">{{ $r['nao_iniciados'] }}</td>
                 <td class="text-center text-muted">{{ $r['cancelados'] }}</td>
-                <td class="text-center">{!! $r['alertas'] > 0 ? '<span class="rel-badge rel-badge-red">'.$r['alertas'].'</span>' : '—' !!}</td>
+                <td class="text-center">@if($r['alertas'] > 0)<span class="rel-badge rel-badge-red">{{ $r['alertas'] }}</span>@else — @endif</td>
                 <td>
                     <span class="rel-bar" style="width:60px;"><span class="rel-bar-fill" style="width:{{ $r['taxa'] }}%;background:{{ $r['taxa'] >= 80 ? '#1b5e20' : ($r['taxa'] >= 50 ? '#f57f17' : '#b71c1c') }};"></span></span>
                     <span class="{{ $r['taxa'] >= 80 ? 'text-success' : ($r['taxa'] >= 50 ? 'text-warning' : 'text-danger') }} font-bold" style="font-size:11px;">{{ $r['taxa'] }}%</span>

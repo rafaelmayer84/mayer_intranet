@@ -251,6 +251,7 @@ class LeadProcessingService
 
             // Remover referência ao GCLID do texto
             $text = preg_replace('/Ref\.\s*GCLID:.*$/i', '', $text);
+            $text = preg_replace('/\[mayer-track\s+[^\]]+\]/', '', $text);
             $line = "- " . trim($text);
 
             $allLines[] = $line;
@@ -1052,6 +1053,20 @@ PROMPT;
                 return $lead;
             }
 
+            // Extrair token de referencia (Ref. xxxxxxxx) e buscar tracking
+            $refToken = $this->extractRefToken($chatMessages);
+            if ($refToken) {
+                $webTrack = \App\Services\LeadTrackingService::findByToken($refToken);
+                if (!empty($webTrack)) {
+                    Log::info('processLead: tracking via token', ['token' => $refToken, 'gclid' => !empty($webTrack['gclid'])]);
+                }
+            } else {
+                $webTrack = $this->extractWebTracking($chatMessages);
+            }
+            if (empty($gclid) && !empty($webTrack['gclid'])) {
+                $gclid = $webTrack['gclid'];
+            }
+
             // Processar com OpenAI
             Log::info('Processando com OpenAI...');
             $aiResult = $this->processWithOpenAI($chatMessages);
@@ -1103,6 +1118,18 @@ PROMPT;
 
 
             // === TRACKING DE ORIGEM (GCLID/UTM) ===
+            // --- Website UTM (mu-plugin mayer-lead-tracking v2) ---
+            if (!empty($webTrack)) {
+                $__utmUp = [];
+                foreach (['utm_source','utm_medium','utm_campaign','utm_content','utm_term','fbclid','landing_page','referrer_url'] as $__f) {
+                    if (empty($lead->$__f) && !empty($webTrack[$__f])) $__utmUp[$__f] = $webTrack[$__f];
+                }
+                if (!empty($__utmUp)) {
+                    $lead->timestamps = false;
+                    $lead->update($__utmUp);
+                    \Log::info('processLead: UTM website aplicados', ['lead_id' => $lead->id, 'fields' => array_keys($__utmUp)]);
+                }
+            }
             try { \App\Services\LeadTrackingService::applyToLead($lead); } catch (\Throwable $e) { \Illuminate\Support\Facades\Log::warning("[Lead] Tracking: " . $e->getMessage()); }
 
             // Salvar mensagens
@@ -1281,4 +1308,37 @@ PROMPT;
             return false;
         }
     }
+
+    /**
+     * Extrair tracking UTM do website (mu-plugin mayer-lead-tracking v2)
+     * Formato: [mayer-track gclid=xxx&utm_source=google&utm_medium=cpc&...]
+     */
+    /**
+     * Extrair token de referencia (Ref. xxxxxxxx) das mensagens inbound.
+     */
+    protected function extractRefToken(array $messages): ?string
+    {
+        foreach ($messages as $msg) {
+            if (!$this->isInbound($msg)) continue;
+            $text = $this->extractText($msg);
+            if (preg_match('/\bRef\.\s*([a-f0-9]{8})\b/i', $text, $m)) {
+                return $m[1];
+            }
+        }
+        return null;
+    }
+
+        protected function extractWebTracking(array $messages): array
+    {
+        foreach ($messages as $msg) {
+            if (!$this->isInbound($msg)) continue;
+            $text = $this->extractText($msg);
+            if (preg_match('/\[mayer-track\s+([^\]]+)\]/', $text, $m)) {
+                parse_str($m[1], $result);
+                return $result;
+            }
+        }
+        return [];
+    }
+
 }

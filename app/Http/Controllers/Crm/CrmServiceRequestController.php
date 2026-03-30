@@ -475,7 +475,7 @@ class CrmServiceRequestController extends Controller
         </div>
       </td></tr>
 <tr><td style='background:#f9fafb;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 12px 12px;padding:16px 32px;text-align:center;'>
-        <p style='margin:0;font-size:11px;color:#9ca3af;'>Este e-mail foi gerado automaticamente pelo <strong>RESULTADOS! Intranet</strong> · Mayer Albanez Sociedade de Advogados</p>
+        <p style='margin:0;font-size:11px;color:#9ca3af;'>Este e-mail foi gerado automaticamente pelo <strong>RESULTADOS! Intranet</strong> · Mayer Sociedade de Advogados</p>
         <p style='margin:4px 0 0;font-size:11px;color:#9ca3af;'>Não responda este e-mail. Acesse o sistema para interagir com o chamado.</p>
       </td></tr>
 

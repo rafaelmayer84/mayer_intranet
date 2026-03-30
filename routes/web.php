@@ -69,7 +69,7 @@ Route::middleware(["auth"])->group(function () {
     Route::post("/api/sync/movimentos/batch", [SyncController::class, "syncMovimentosBatch"]);
     Route::get("/api/sync/diagnostico", [SyncController::class, "diagnosticoApi"]);
     Route::get("/api/sync/movimentos/db", [SyncController::class, "dbMovimentos"]);
-    Route::get("/sync/debug-log", [SyncController::class, "debugLog"]);
+    Route::get("/sync/debug-log", [SyncController::class, "debugLog"])->middleware("admin");
     
     // Configurações - AMBAS as rotas necessárias
     Route::get("/configuracoes", [ConfiguracaoController::class, "index"])->name("configuracoes")->middleware("admin");

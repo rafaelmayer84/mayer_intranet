@@ -25,7 +25,7 @@ class NexoConsultaController extends Controller
         $token = $request->header('X-Sendpulse-Token');
         $esperado = config('services.nexo_consulta.token', env('NEXO_CONSULTA_TOKEN', 'token_secreto'));
 
-        return $token === $esperado;
+        return is_string($token) && is_string($esperado) && hash_equals($esperado, $token);
     }
 
 

@@ -8,7 +8,7 @@ use App\Http\Controllers\Api\NexoAutoatendimentoController;
 use App\Http\Controllers\Api\NexoInactivityController;
 use App\Http\Controllers\Nexo\NexoTrackingController;
 
-Route::prefix('sync')->group(function () {
+Route::prefix('sync')->middleware(['throttle:30,1', 'internal.api'])->group(function () {
     Route::get('/test-connection', [SyncController::class, 'testConnection']);
     Route::get('/status', [SyncController::class, 'status']);
     Route::get('/auth', [SyncController::class, 'auth']);
@@ -23,7 +23,7 @@ Route::prefix('sync')->group(function () {
     Route::get('/dados/{tipo}', [SyncController::class, 'getDados']);
 });
 
-Route::prefix('clientes-mercado')->group(function () {
+Route::prefix('clientes-mercado')->middleware('internal.api')->group(function () {
     Route::get('/top-clientes', [ClientesMercadoController::class, 'topClientes']);
     Route::get('/leads-recentes', [ClientesMercadoController::class, 'leadsRecentes']);
     Route::get('/resumo-executivo', [ClientesMercadoController::class, 'resumoExecutivo']);
@@ -31,7 +31,7 @@ Route::prefix('clientes-mercado')->group(function () {
     Route::get('/mix-pf-pj', [ClientesMercadoController::class, 'mixPfPj']);
 });
 
-Route::prefix('integracao')->group(function () {
+Route::prefix('integracao')->middleware('internal.api')->group(function () {
     Route::get('/dados', [IntegracaoController::class, 'dados']);
     Route::post('/sincronizar-datajuri', [IntegracaoController::class, 'sincronizarDataJuri']);
     Route::get('/detalhes/{id}', [IntegracaoController::class, 'detalhes']);

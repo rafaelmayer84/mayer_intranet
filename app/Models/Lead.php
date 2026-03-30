@@ -116,14 +116,23 @@ class Lead extends Model
 
     public function getOrigemLabelAttribute(): string
     {
-        return match ($this->origem_canal) {
-            'google_ads' => 'Google Ads',
-            'indicacao' => 'Indicação',
-            'redes_sociais' => 'Redes Sociais',
-            'organico' => 'Orgânico',
-            'outro' => 'Outro',
-            default => 'Não identificado',
-        };
+        $map = [
+            'google_ads'       => 'Google Ads',
+            'indicacao'        => 'Indicacao',
+            'redes_sociais'    => 'Redes Sociais',
+            'organico'         => 'Organico',
+            'nao_identificado' => 'Nao identificado',
+            'WhatsApp Bot'     => 'WhatsApp Bot',
+            'Call'             => 'Ligacao',
+            'Email'            => 'E-mail',
+            'Partner'          => 'Parceiro',
+            'Public Relations' => 'Relacoes Publicas',
+            'Other'            => 'Outro',
+            'relacionamento'   => 'Relacionamento',
+            'telefone'         => 'Telefone',
+        ];
+        $origem = $this->origem_canal ?? '';
+        return $map[$origem] ?? ($origem ?: 'Nao identificado');
     }
 
     public function getUrgenciaColorAttribute(): string

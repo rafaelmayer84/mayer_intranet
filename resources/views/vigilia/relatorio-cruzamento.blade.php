@@ -72,7 +72,7 @@
                 <td class="font-semibold">{{ $r->responsavel_nome }}</td>
                 <td class="text-center font-bold">{{ $r->total_concluidos }}</td>
                 <td class="text-center text-success font-semibold">{{ $r->verificados }}</td>
-                <td class="text-center">{!! $r->suspeitos > 0 ? '<span class="text-danger font-bold">'.$r->suspeitos.'</span>' : '—' !!}</td>
+                <td class="text-center">@if($r->suspeitos > 0)<span class="text-danger font-bold">{{ $r->suspeitos }}</span>@else — @endif</td>
                 <td class="text-center text-muted">{{ $r->nao_aplicavel }}</td>
                 <td>
                     @if($r->confiabilidade !== null)

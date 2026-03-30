@@ -20,10 +20,10 @@ return [
     'datajuri' => [
         'base_url' => env('DATAJURI_BASE_URL', 'https://api.datajuri.com.br'),
         'api_key' => env('DATAJURI_API_KEY', 'sua_api_key_aqui'),
-        'client_id' => env('DATAJURI_CLIENT_ID', 'a79mtxvdhsq0pgob733z'),
-        'secret_id' => env('DATAJURI_SECRET_ID', '829c2e85-8b6e-45e0-98d6-749033f62c1a'),
+        'client_id' => env('DATAJURI_CLIENT_ID'),
+        'secret_id' => env('DATAJURI_SECRET_ID'),
         'email' => env('DATAJURI_EMAIL', 'rafaelmayer@mayeradvogados.adv.br'),
-        'password' => env('DATAJURI_PASSWORD', 'Mayer01.'),
+        'password' => env('DATAJURI_PASSWORD'),
     ],
     // espocrm removido em 13/02/2026 - substituído por CRM Nativo
     'sendpulse' => [
@@ -51,6 +51,10 @@ return [
     'asaas' => [
         'api_key' => env('ASAAS_API_KEY', ''),
         'environment' => env('ASAAS_ENVIRONMENT', 'production'),
+    ],
+
+    'internal_api' => [
+        'token' => env('API_INTERNAL_TOKEN'),
     ],
 
 ];

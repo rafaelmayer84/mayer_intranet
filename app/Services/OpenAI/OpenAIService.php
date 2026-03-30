@@ -33,7 +33,7 @@ class OpenAIService
                 'messages' => [
                     [
                         'role' => 'system',
-                        'content' => 'Você é uma secretária experiente do escritório Mayer Albanez Sociedade de Advogados. Seu papel é explicar andamentos processuais de forma clara, profissional e acessível para clientes leigos. Use linguagem simples, seja empática e objetiva.'
+                        'content' => 'Você é uma secretária experiente do escritório Mayer Sociedade de Advogados. Seu papel é explicar andamentos processuais de forma clara, profissional e acessível para clientes leigos. Use linguagem simples, seja empática e objetiva.'
                     ],
                     [
                         'role' => 'user',
@@ -144,7 +144,7 @@ PROMPT;
             ])->timeout(30)->post($this->baseUrl . '/chat/completions', [
                 'model' => $this->model,
                 'messages' => [
-                    ['role' => 'system', 'content' => 'Voce e uma secretaria experiente do escritorio Mayer Albanez. Explique andamentos para clientes leigos. NUNCA exponha dados pessoais. NUNCA faca promessas.'],
+                    ['role' => 'system', 'content' => 'Voce e uma secretaria experiente do escritorio Mayer Advogados. Explique andamentos para clientes leigos. NUNCA exponha dados pessoais. NUNCA faca promessas.'],
                     ['role' => 'user', 'content' => $prompt]
                 ],
                 'temperature' => 0.6,

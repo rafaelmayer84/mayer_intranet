@@ -546,13 +546,16 @@ class LeadController extends Controller
             // UTF-8 BOM para compatibilidade Excel
             fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
 
-            // Header Google Ads Customer Match
+            // Header Google Ads Customer Match + Tracking
             fputcsv($file, [
                 'Phone', 'Email', 'First Name', 'Last Name',
                 'Country', 'Zip',
                 // Colunas extras para contexto (Google Ads ignora colunas desconhecidas)
                 'Area Juridica', 'Intencao Contratar', 'Potencial Honorarios',
-                'Origem Canal', 'Cidade', 'Data Entrada'
+                'Origem Canal', 'Cidade', 'Data Entrada',
+                // Tracking
+                'GCLID', 'UTM Source', 'UTM Medium', 'UTM Campaign', 'UTM Content', 'UTM Term',
+                'FBCLID', 'Landing Page', 'Referrer URL'
             ], ',');
 
             foreach ($leads as $lead) {
@@ -583,7 +586,17 @@ class LeadController extends Controller
                     $lead->potencial_honorarios ?? '',
                     $lead->origem_canal ?? '',
                     $lead->cidade ?? '',
-                    $lead->data_entrada ? $lead->data_entrada->format('Y-m-d') : ''
+                    $lead->data_entrada ? $lead->data_entrada->format('Y-m-d') : '',
+                    // Tracking
+                    $lead->gclid ?? '',
+                    $lead->utm_source ?? '',
+                    $lead->utm_medium ?? '',
+                    $lead->utm_campaign ?? '',
+                    $lead->utm_content ?? '',
+                    $lead->utm_term ?? '',
+                    $lead->fbclid ?? '',
+                    $lead->landing_page ?? '',
+                    $lead->referrer_url ?? ''
                 ], ',');
             }
 

@@ -62,7 +62,7 @@
 
 <div class="header">
     <div class="header-logo">
-        <img src="{{ asset('img/timbrado-mayer.png') }}?v=2" alt="Mayer Albanez - Sociedade de Advogados">
+        <img src="{{ asset('img/timbrado-mayer.png') }}?v=2" alt="Mayer Sociedade de Advogados">
     </div>
     <div class="header-right">
         <div class="phone">(47) 3842-1050</div>

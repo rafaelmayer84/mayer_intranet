@@ -654,6 +654,8 @@ class GdpPenalizacaoScanner
     /**
      * PEN-A04: Bot assumido e abandonado (sem resposta em Xmin)
      * Fonte: wa_conversations (bot_ativo=0, assigned_at) + wa_messages
+     * Logica: Penaliza se havia msg pendente do cliente no momento de assumir
+     *         e nao foi respondida em X minutos apos essa msg (nao apos assigned_at)
      */
     private function scanA04(int $userId): int
     {
@@ -675,22 +677,49 @@ class GdpPenalizacaoScanner
         $count = 0;
         foreach ($conversas as $conv) {
             $assignedAt = Carbon::parse($conv->assigned_at);
-            $deadline = $assignedAt->copy()->addMinutes($minutos);
-            if (!$deadline->isPast()) continue; // Ainda dentro do prazo
 
             // Ignorar assumidas fora do horario comercial (8h-18h seg-sex)
             if ($assignedAt->isWeekend() || $assignedAt->hour < 8 || $assignedAt->hour >= 18) continue;
 
+            // Buscar ultima msg do CLIENTE antes ou no momento de assumir
+            $ultimaMsgCliente = DB::table('wa_messages')
+                ->where('conversation_id', $conv->id)
+                ->where('direction', 1)
+                ->where('sent_at', '<=', $conv->assigned_at)
+                ->orderByDesc('sent_at')
+                ->first();
+
+            // Se nao havia msg do cliente, nada a responder
+            if (!$ultimaMsgCliente) continue;
+
+            $msgClienteAt = Carbon::parse($ultimaMsgCliente->sent_at);
+
+            // Verificar se JA havia resposta humana APOS essa msg do cliente (antes de assumir)
+            $jaRespondida = DB::table('wa_messages')
+                ->where('conversation_id', $conv->id)
+                ->where('direction', 2)
+                ->where('sent_at', '>', $ultimaMsgCliente->sent_at)
+                ->where('sent_at', '<=', $conv->assigned_at)
+                ->exists();
+
+            // Se ja tinha resposta antes de assumir, nao penalizar
+            if ($jaRespondida) continue;
+
+            // Deadline: X minutos apos a msg do cliente (nao apos assigned_at)
+            $deadline = $msgClienteAt->copy()->addMinutes($minutos);
+            if (!$deadline->isPast()) continue; // Ainda dentro do prazo
+
+            // Verificar se respondeu dentro do prazo
             $respondeu = DB::table('wa_messages')
                 ->where('conversation_id', $conv->id)
                 ->where('direction', 2)
-                ->where('sent_at', '>=', $conv->assigned_at)
+                ->where('sent_at', '>', $ultimaMsgCliente->sent_at)
                 ->where('sent_at', '<=', $deadline->toDateTimeString())
                 ->exists();
 
             if (!$respondeu) {
                 $count += $this->registrar('PEN-A04', $userId, $cfg,
-                    "Bot assumido para {$conv->name} ({$conv->phone}) em " . Carbon::parse($conv->assigned_at)->format('d/m H:i') . " sem resposta em {$minutos}min.",
+                    "Bot assumido para {$conv->name} ({$conv->phone}) em " . $assignedAt->format('d/m H:i') . " sem resposta em {$minutos}min.",
                     'wa_conversation', $conv->id);
             }
         }
@@ -885,6 +914,10 @@ class GdpPenalizacaoScanner
         $cfg = $this->getTipo('PEN-D01');
         if (!$cfg) return 0;
 
+        // Buscar datajuri_proprietario_id do usuario (tabela horas usa ID do DataJuri, nao da Intranet)
+        $proprietarioId = DB::table('users')->where('id', $userId)->value('datajuri_proprietario_id');
+        if (!$proprietarioId) return 0; // Usuario sem vinculo DataJuri
+
         $inicioMes = Carbon::create($this->ano, $this->mes, 1)->startOfMonth();
         $fimMes    = Carbon::create($this->ano, $this->mes, 1)->endOfMonth();
         $hoje      = Carbon::now();
@@ -897,7 +930,7 @@ class GdpPenalizacaoScanner
             if ($fimSemana->gt($hoje)) break; // Nao penalizar semana em andamento
 
             $temRegistro = DB::table('horas_trabalhadas_datajuri')
-                ->where('proprietario_id', $userId)
+                ->where('proprietario_id', $proprietarioId)
                 ->whereBetween('data', [$semana->toDateString(), $fimSemana->toDateString()])
                 ->exists();
 

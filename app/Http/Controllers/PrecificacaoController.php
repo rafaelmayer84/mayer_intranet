@@ -375,7 +375,12 @@ class PrecificacaoController extends Controller
      */
     public function imprimirProposta(int $id)
     {
-        $proposal = PricingProposal::where('user_id', Auth::id())->findOrFail($id);
+        $user = Auth::user();
+        $query = PricingProposal::query();
+        if ($user->role !== 'admin') {
+            $query->where('user_id', $user->id);
+        }
+        $proposal = $query->findOrFail($id);
 
         if (!$proposal->texto_proposta_cliente) {
             return redirect()->route('precificacao.show', $id)
