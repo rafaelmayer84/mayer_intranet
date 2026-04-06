@@ -172,8 +172,13 @@ class JustusSyncTjscEprocCommand extends Command
             $params['dtDecisaoInicio'] = $dataInicio;
             $params['dtDecisaoFim'] = $dataFim;
         } else {
-            $mesesAtras = (int) $this->option('meses-atras');
-            $inicio = Carbon::now('America/Sao_Paulo')->subMonths($mesesAtras)->startOfMonth();
+            $ultimoImportado = \App\Models\JustusJurisprudencia::where('tribunal', 'TJSC')->max('created_at');
+            if ($ultimoImportado) {
+                $inicio = Carbon::parse($ultimoImportado, 'America/Sao_Paulo')->subDays(7)->startOfDay();
+            } else {
+                $mesesAtras = (int) $this->option('meses-atras');
+                $inicio = Carbon::now('America/Sao_Paulo')->subMonths($mesesAtras)->startOfMonth();
+            }
             $fim = Carbon::now('America/Sao_Paulo');
             $params['dtDecisaoInicio'] = $inicio->format('d/m/Y');
             $params['dtDecisaoFim'] = $fim->format('d/m/Y');

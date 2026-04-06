@@ -174,9 +174,15 @@ class JustusSyncTrf4Command extends Command
             $params['dtDecisaoInicio'] = $dataInicio;
             $params['dtDecisaoFim'] = $dataFim;
         } else {
-            // Usar meses-atras
-            $mesesAtras = (int) $this->option('meses-atras');
-            $inicio = Carbon::now('America/Sao_Paulo')->subMonths($mesesAtras)->startOfMonth();
+            // Calcular inicio a partir do ultimo registro importado (overlap 7 dias)
+            // Evita early-stop em virada de mes quando registros recentes ja existem
+            $ultimoImportado = \App\Models\JustusJurisprudencia::where('tribunal', 'TRF4')->max('created_at');
+            if ($ultimoImportado) {
+                $inicio = Carbon::parse($ultimoImportado, 'America/Sao_Paulo')->subDays(7)->startOfDay();
+            } else {
+                $mesesAtras = (int) $this->option('meses-atras');
+                $inicio = Carbon::now('America/Sao_Paulo')->subMonths($mesesAtras)->startOfMonth();
+            }
             $fim = Carbon::now('America/Sao_Paulo');
             $params['dtDecisaoInicio'] = $inicio->format('d/m/Y');
             $params['dtDecisaoFim'] = $fim->format('d/m/Y');
