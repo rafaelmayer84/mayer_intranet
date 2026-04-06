@@ -160,6 +160,72 @@
         </div>
     </div>
 
+    {{-- ====== PAINEL COMERCIAL ====== --}}
+    @if(auth()->user()->role === 'admin' || auth()->user()->role === 'socio')
+    <div class="mb-5">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm font-bold text-gray-500 uppercase tracking-widest">📊 Painel Comercial — {{ now()->locale('pt_BR')->isoFormat('MMMM [de] YYYY') }}</h2>
+            <a href="{{ url('/crm') }}" class="text-xs text-blue-500 hover:underline font-medium">Ver CRM →</a>
+        </div>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            {{-- Leads novos no mês --}}
+            <div class="home-card p-4 anim-card">
+                <p class="text-xs text-gray-400 font-medium mb-1">Leads no mês</p>
+                <p class="text-3xl font-black text-[#1B334A]">{{ $painelComercial['leadsTotal'] }}</p>
+                <div class="flex flex-wrap gap-1 mt-2">
+                    <span class="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded font-medium">{{ $painelComercial['leadsNovos'] }} novos</span>
+                    <span class="text-[10px] px-1.5 py-0.5 bg-yellow-50 text-yellow-600 rounded font-medium">{{ $painelComercial['leadsContatados'] }} contato</span>
+                    <span class="text-[10px] px-1.5 py-0.5 bg-red-50 text-red-500 rounded font-medium">{{ $painelComercial['leadsDescart'] }} descart.</span>
+                </div>
+            </div>
+            {{-- Conversão --}}
+            <div class="home-card p-4 anim-card">
+                <p class="text-xs text-gray-400 font-medium mb-1">Taxa de conversão</p>
+                <p class="text-3xl font-black {{ $painelComercial['taxaConversao'] >= 10 ? 'text-emerald-600' : 'text-amber-500' }}">{{ $painelComercial['taxaConversao'] }}%</p>
+                <p class="text-xs text-gray-400 mt-2">{{ $painelComercial['leadsConvert'] }} convertidos de {{ $painelComercial['leadsTotal'] }}</p>
+            </div>
+            {{-- Ganhos no mês --}}
+            <div class="home-card p-4 anim-card">
+                <p class="text-xs text-gray-400 font-medium mb-1">Ganhos no mês</p>
+                <p class="text-3xl font-black text-emerald-600">{{ $painelComercial['ganhosMes']->total ?? 0 }}</p>
+                @if(($painelComercial['ganhosMes']->valor ?? 0) > 0)
+                <p class="text-xs text-emerald-500 mt-2 font-medium">R$ {{ number_format($painelComercial['ganhosMes']->valor, 0, ',', '.') }}</p>
+                @else
+                <p class="text-xs text-gray-300 mt-2">Nenhum registro</p>
+                @endif
+            </div>
+            {{-- Clientes ativos --}}
+            <div class="home-card p-4 anim-card">
+                <p class="text-xs text-gray-400 font-medium mb-1">Base de clientes</p>
+                <p class="text-3xl font-black text-[#1B334A]">{{ $painelComercial['clientesAtivos'] }}</p>
+                <div class="flex flex-wrap gap-1 mt-2">
+                    <span class="text-[10px] px-1.5 py-0.5 bg-purple-50 text-purple-600 rounded font-medium">{{ $painelComercial['clientesOnboarding'] }} onboard</span>
+                    @if($painelComercial['adormSemContato'] > 0)
+                    <span class="text-[10px] px-1.5 py-0.5 bg-red-50 text-red-500 rounded font-medium">⚠ {{ $painelComercial['adormSemContato'] }} adorm. 30d+</span>
+                    @endif
+                </div>
+            </div>
+        </div>
+        {{-- Pipeline --}}
+        <div class="home-card p-4 anim-card">
+            <p class="text-xs text-gray-400 font-medium mb-3">Pipeline CRM — oportunidades em aberto</p>
+            <div class="flex items-end gap-2 overflow-x-auto pb-1">
+                @foreach($painelComercial['pipeline'] as $stage)
+                @php $maxVal = max(array_column($painelComercial['pipeline'], 'total'), 1); @endphp
+                <div class="flex flex-col items-center min-w-[80px] flex-1">
+                    <span class="text-xs font-black text-[#1B334A] mb-1">{{ $stage['total'] }}</span>
+                    <div class="w-full rounded-t-md transition-all" style="height: {{ max(4, intval(($stage['total'] / $maxVal) * 60)) }}px; background: linear-gradient(180deg,#385776,#1B334A)"></div>
+                    <span class="text-[10px] text-gray-400 mt-1 text-center leading-tight">{{ $stage['nome'] }}</span>
+                    @if($stage['valor'] > 0)
+                    <span class="text-[9px] text-emerald-500 font-medium">R$ {{ number_format($stage['valor']/1000, 0) }}k</span>
+                    @endif
+                </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+    @endif
+
     {{-- ====== CARDS: GDP + FINANCEIRO + AVISOS ====== --}}
     <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4">
 

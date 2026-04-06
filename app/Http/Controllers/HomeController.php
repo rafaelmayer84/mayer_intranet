@@ -28,6 +28,7 @@ class HomeController extends Controller
         $avisos           = $this->service->getAvisosNaoLidos($userId);
         $volumetria       = $this->service->getVolumetria();
         $solicitacoes     = $this->service->getSolicitacoes($userId);
+        $painelComercial  = $this->service->getPainelComercial();
 
         $hora = (int) now()->format('H');
         if ($hora < 12) $saudacao = 'Bom dia';
@@ -43,7 +44,7 @@ class HomeController extends Controller
             'user', 'saudacao', 'primeiroNome',
             'gdpScore', 'alertasCrm', 'ticketsAbertos',
             'resumoFinanceiro', 'avisos', 'volumetria', 'solicitacoes',
-            'shortcuts', 'availableModules'
+            'shortcuts', 'availableModules', 'painelComercial'
         ));
     }
 

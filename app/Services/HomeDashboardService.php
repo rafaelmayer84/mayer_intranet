@@ -425,4 +425,61 @@ class HomeDashboardService
         }
     }
 
+    public function getPainelComercial(): array
+    {
+        $mes = now()->month;
+        $ano = now()->year;
+
+        // Leads do mes
+        $leadsmes = \Illuminate\Support\Facades\DB::table('leads')
+            ->whereYear('created_at', $ano)->whereMonth('created_at', $mes)
+            ->selectRaw('status, count(*) as total')
+            ->groupBy('status')->get()->keyBy('status');
+
+        $leadsNovos      = (int) ($leadsmes->get('novo')->total      ?? 0);
+        $leadsContatados = (int) ($leadsmes->get('contatado')->total  ?? 0);
+        $leadsQualif     = (int) ($leadsmes->get('qualificado')->total ?? 0);
+        $leadsConvert    = (int) ($leadsmes->get('convertido')->total  ?? 0);
+        $leadsDescart    = (int) ($leadsmes->get('descartado')->total  ?? 0);
+        $leadsTotal      = $leadsNovos + $leadsContatados + $leadsQualif + $leadsConvert + $leadsDescart;
+        $taxaConversao   = $leadsTotal > 0 ? round(($leadsConvert / $leadsTotal) * 100, 1) : 0;
+
+        // Pipeline CRM (todas as oportunidades ativas)
+        $stages = \Illuminate\Support\Facades\DB::table('crm_stages')->orderBy('order')->get(['id','name']);
+        $opps   = \Illuminate\Support\Facades\DB::table('crm_opportunities')
+            ->whereNotIn('status', ['lost','won'])
+            ->selectRaw('stage_id, count(*) as total, coalesce(sum(value_estimated),0) as valor')
+            ->groupBy('stage_id')->get()->keyBy('stage_id');
+
+        $pipeline = $stages->map(fn($s) => [
+            'nome'  => $s->name,
+            'total' => (int) ($opps->get($s->id)->total ?? 0),
+            'valor' => (float) ($opps->get($s->id)->valor ?? 0),
+        ])->values()->toArray();
+
+        // Ganhos e perdidos no mes
+        $ganhosMes  = \Illuminate\Support\Facades\DB::table('crm_opportunities')
+            ->whereYear('won_at', $ano)->whereMonth('won_at', $mes)
+            ->selectRaw('count(*) as total, coalesce(sum(value_closed),0) as valor')->first();
+        $perdidosMes = \Illuminate\Support\Facades\DB::table('crm_opportunities')
+            ->whereYear('lost_at', $ano)->whereMonth('lost_at', $mes)
+            ->selectRaw('count(*) as total, coalesce(sum(value_estimated),0) as valor')->first();
+
+        // Base de clientes
+        $clientesAtivos     = (int) \Illuminate\Support\Facades\DB::table('crm_accounts')->where('kind','client')->where('lifecycle','ativo')->count();
+        $clientesAdorm      = (int) \Illuminate\Support\Facades\DB::table('crm_accounts')->where('kind','client')->where('lifecycle','adormecido')->count();
+        $clientesOnboarding = (int) \Illuminate\Support\Facades\DB::table('crm_accounts')->where('kind','prospect')->where('lifecycle','onboarding')->count();
+        $adormSemContato    = (int) \Illuminate\Support\Facades\DB::table('crm_accounts')
+            ->where('lifecycle','adormecido')
+            ->where('updated_at', '<', now()->subDays(30))
+            ->count();
+
+        return compact(
+            'leadsNovos','leadsContatados','leadsQualif','leadsConvert','leadsDescart',
+            'leadsTotal','taxaConversao','pipeline',
+            'ganhosMes','perdidosMes',
+            'clientesAtivos','clientesAdorm','clientesOnboarding','adormSemContato'
+        );
+    }
+
 }
