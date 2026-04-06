@@ -57,6 +57,23 @@ class NexoAtendimentoController extends Controller
         return response()->json($query->paginate(30));
     }
 
+    public function buscarConversas(Request $request)
+    {
+        $q = trim($request->get('q', ''));
+        if (strlen($q) < 2) return response()->json(['data' => []]);
+        $clean = preg_replace('/\D/', '', $q);
+        $query = WaConversation::with('assignedUser')->orderByDesc('last_message_at')->limit(20);
+        if ($clean && strlen($clean) >= 8) {
+            $query->where('phone', 'like', "%{$clean}%");
+        } else {
+            $query->where(function ($qb) use ($q, $clean) {
+                $qb->where('name', 'like', "%{$q}%");
+                if ($clean) $qb->orWhere('phone', 'like', "%{$clean}%");
+            });
+        }
+        return response()->json(['data' => $query->get()]);
+    }
+
     public function conversa(int $id)
     {
         $conversation = WaConversation::with('assignedUser')->findOrFail($id);

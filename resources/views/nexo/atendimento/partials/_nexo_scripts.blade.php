@@ -39,7 +39,7 @@ window.refreshContexto360=function(convId){
 // ═══ NexoApp Core ═══
 const NexoApp = {
     conversas:[],conversaAtual:null,lastMsgId:null,lastMsgCount:0,
-    filters:{status:'',unread:'',minhas:''},searchTerm:'',pollTimer:null,inboxTimer:null,flowsCache:null,_abortCtrl:null,
+    filters:{status:'',unread:'',minhas:''},searchTerm:'',pollTimer:null,inboxTimer:null,flowsCache:null,_abortCtrl:null,_searchOverride:null,_searchTimer2:null,
     priorityLevels:['normal','alta','urgente','critica'],
     csrf:document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')||'',
 
@@ -80,8 +80,8 @@ const NexoApp = {
     renderInbox(){
         const c=document.getElementById('inbox-items'),em=document.getElementById('inbox-empty');
         const s=this.searchTerm.toLowerCase();
-        let list=this.conversas;
-        if(s)list=list.filter(x=>(x.name||'').toLowerCase().includes(s)||(x.phone||'').includes(s));
+        let list=this._searchOverride!=null?this._searchOverride:this.conversas;
+        if(this._searchOverride==null&&s)list=list.filter(x=>(x.name||'').toLowerCase().includes(s)||(x.phone||'').includes(s));
         if(!list.length){c.innerHTML='';em.classList.remove('hidden');return}
         em.classList.add('hidden');
         const newHtml=list.map(x=>this.inboxItem(x)).join('');if(c._lastHtml===newHtml)return;c._lastHtml=newHtml;c.innerHTML=newHtml;
@@ -112,7 +112,17 @@ const NexoApp = {
         else{const fk=k==='minhas'?'minhas':(k==='unread'?'unread':v);const t=document.querySelector(`[data-filter="${fk}"]`);if(t)t.classList.add('active')}
         this.loadConversas();
     },
-    filterLocal(t){this.searchTerm=t;this.renderInbox()},
+    filterLocal(t){
+        this.searchTerm=t;
+        clearTimeout(this._searchTimer2);
+        const digits=t.replace(/\D/g,'');
+        if(digits.length>=8){
+            this._searchTimer2=setTimeout(async()=>{
+                try{const j=await this.api(`/nexo/atendimento/conversas/buscar?q=${encodeURIComponent(t)}`);this._searchOverride=j.data||[];}catch(e){this._searchOverride=null;}
+                this.renderInbox();
+            },400);
+        }else{this._searchOverride=null;this.renderInbox();}
+    },
 
     // ═══ SELECT CONVERSA (v2 — abort pending) ═══
     async selectConversa(id){

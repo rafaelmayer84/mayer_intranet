@@ -9,6 +9,7 @@ Route::middleware(['auth', 'user.active'])->group(function () {
         // -- Rotas existentes (INTOCADAS) ------------------------------
         Route::get('/', [NexoAtendimentoController::class, 'index'])->name('nexo.atendimento');
         Route::get('/conversas', [NexoAtendimentoController::class, 'conversas'])->name('nexo.atendimento.conversas');
+        Route::get('/conversas/buscar', [NexoAtendimentoController::class, 'buscarConversas'])->name('nexo.atendimento.buscar');
         Route::get('/conversas/{id}', [NexoAtendimentoController::class, 'conversa'])->name('nexo.atendimento.conversa')->whereNumber('id');
         Route::post('/conversas/{id}/mensagens', [NexoAtendimentoController::class, 'enviarMensagem'])->name('nexo.atendimento.enviar')->whereNumber('id');
         Route::post('/conversas/{id}/media', [NexoAtendimentoController::class, 'enviarMedia'])->name('nexo.atendimento.enviar-media')->whereNumber('id');
