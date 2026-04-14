@@ -54,7 +54,7 @@ class NexoNotificacaoController extends Controller
      */
     public function descartar(Request $request, $id)
     {
-        $ok = $this->service->descartarNotificacao((int) $id);
+        $ok = $this->service->descartarNotificacao((int) $id, Auth::id());
         return response()->json(['success' => $ok]);
     }
 

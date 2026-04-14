@@ -87,8 +87,19 @@ class CrmAccountController extends Controller
             ->get();
         $srCategorias = \App\Models\Crm\CrmServiceRequest::categorias();
 
+        // Notificações WhatsApp pendentes (Nexo) vinculadas a este cliente
+        $nexoPendentes = collect();
+        $clienteLocal = $djContext['cliente'] ?? null;
+        if ($clienteLocal && isset($clienteLocal->id)) {
+            $nexoPendentes = DB::table('nexo_notificacoes')
+                ->where('cliente_id', $clienteLocal->id)
+                ->where('status', 'pending')
+                ->orderByDesc('created_at')
+                ->get();
+        }
+
         return view('crm.accounts.show', compact(
-            'account', 'timeline', 'djContext', 'commContext', 'users', 'segmentation', 'finSummary', 'documents', 'docCategorias', 'serviceRequests', 'srCategorias'
+            'account', 'timeline', 'djContext', 'commContext', 'users', 'segmentation', 'finSummary', 'documents', 'docCategorias', 'serviceRequests', 'srCategorias', 'nexoPendentes'
         ));
     }
 

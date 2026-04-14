@@ -4,8 +4,10 @@ namespace App\Services\Nexo;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
 use Carbon\Carbon;
 use App\Services\SendPulseWhatsAppService;
+use App\Models\NotificationIntranet;
 
 class NexoNotificacaoService
 {
@@ -56,14 +58,29 @@ class NexoNotificacaoService
 
     /**
      * Verifica se o andamento é relevante para notificação ao cliente.
+     * Checa tanto a descrição principal quanto o campo observacao dentro do payload_raw
+     * (necessário para capturar sentenças publicadas via Diário de Justiça, onde o DataJuri
+     * registra descricao = "Publicação DJe" mas o texto da decisão está em observacao).
      */
-    protected function andamentoRelevante(?string $descricao): bool
+    protected function andamentoRelevante(?string $descricao, ?string $payloadRaw = null): bool
     {
-        if (empty($descricao)) return false;
-        $lower = mb_strtolower($descricao);
+        $textos = [];
+        if (!empty($descricao)) {
+            $textos[] = mb_strtolower($descricao);
+        }
+        if ($payloadRaw) {
+            $payload = json_decode($payloadRaw, true);
+            if (!empty($payload['observacao'])) {
+                $textos[] = mb_strtolower($payload['observacao']);
+            }
+        }
+        if (empty($textos)) return false;
+
         foreach (self::ANDAMENTOS_RELEVANTES as $keyword) {
-            if (str_contains($lower, $keyword)) {
-                return true;
+            foreach ($textos as $texto) {
+                if (str_contains($texto, $keyword)) {
+                    return true;
+                }
             }
         }
         return false;
@@ -342,9 +359,9 @@ class NexoNotificacaoService
         Log::info("NexoNotificacao: {$stats['total']} andamentos novos desde {$desde}");
 
         foreach ($andamentos as $and) {
-            // Idempotência
-            // Filtrar apenas andamentos relevantes para o cliente
-            if (!$this->andamentoRelevante($and->descricao ?? null)) {
+            // Filtrar apenas andamentos relevantes para o cliente.
+            // Passa também o payload_raw para checar o campo observacao (captura sentenças via DJe).
+            if (!$this->andamentoRelevante($and->descricao ?? null, $and->payload_raw ?? null)) {
                 continue;
             }
 
@@ -396,12 +413,41 @@ class NexoNotificacaoService
                 $userId = 1;
             }
 
-            // Truncar descrição para 1024 chars (limite SendPulse)
-            $descricao = mb_substr(strip_tags($and->descricao ?? 'Movimentação processual'), 0, 300);
+            // Montar descrição para o template.
+            // Se a descrição principal é burocrática (publicação DJe etc.) mas a relevância
+            // vem do campo observacao, extrai um trecho próximo à keyword encontrada.
+            $descricaoPrincipal = $and->descricao ?? 'Movimentação processual';
+            $descricaoDisplay   = $descricaoPrincipal;
+            if ($and->payload_raw && !$this->andamentoRelevante($descricaoPrincipal)) {
+                $payload = json_decode($and->payload_raw, true);
+                $obs = trim(strip_tags($payload['observacao'] ?? ''));
+                if ($obs) {
+                    $obsLower = mb_strtolower($obs);
+                    // Encontrar a posição MAIS CEDO entre todas as keywords
+                    // (evita pegar uma keyword que aparece no meio/fim da decisão, como "decisão do STF")
+                    $earliestPos = null;
+                    foreach (self::ANDAMENTOS_RELEVANTES as $kw) {
+                        $pos = mb_strpos($obsLower, $kw);
+                        if ($pos !== false && ($earliestPos === null || $pos < $earliestPos)) {
+                            $earliestPos = $pos;
+                        }
+                    }
+                    // Começar exatamente na keyword (sem prefixo), pois o que vem antes
+                    // costuma ser cabeçalho de publicação (advogados, número, órgão)
+                    $startPos = $earliestPos ?? 0;
+                    $descricaoDisplay = mb_substr($obs, $startPos, 300);
+                }
+            }
+            // Normalizar espaços múltiplos e quebras de linha excessivas do texto do DJe
+            $descricao = preg_replace('/\s+/', ' ', mb_substr(strip_tags($descricaoDisplay), 0, 300));
+            $descricao = trim($descricao);
+
+            // Reescrever com IA para tom de marketing jurídico (fallback silencioso se falhar)
+            $descricao = $this->reescreverComIA($descricao, $cliente->nome, $pastaProceso ?? '');
 
             $templateVars = [
                 ['type' => 'text', 'text' => $this->primeiroNome($cliente->nome)],
-                ['type' => 'text', 'text' => $and->processo_pasta],
+                ['type' => 'text', 'text' => $pastaProceso ?? ''],   // fix: usar $pastaProceso, não $and->processo_pasta (que é null)
                 ['type' => 'text', 'text' => $descricao],
             ];
 
@@ -424,6 +470,16 @@ class NexoNotificacaoService
                 ->where('tipo', 'andamento')
                 ->where('entidade_id', $and->id)
                 ->update(['user_id' => $userId]);
+
+            // Notificar o advogado no sininho da intranet
+            NotificationIntranet::enviar(
+                $userId,
+                'Andamento para notificar: ' . $cliente->nome,
+                mb_substr($descricao, 0, 120) . ($pastaProceso ? ' | ' . $pastaProceso : ''),
+                url('/nexo/notificacoes'),
+                'warning',
+                'whatsapp'
+            );
 
             $stats['criados']++;
         }
@@ -509,16 +565,39 @@ class NexoNotificacaoService
 
     /**
      * Descartar notificação (advogado decide não enviar).
+     * Registra a decisão no CRM como atividade de tipo 'note'.
      */
-    public function descartarNotificacao(int $notificacaoId): bool
+    public function descartarNotificacao(int $notificacaoId, ?int $userId = null): bool
     {
-        return DB::table('nexo_notificacoes')
+        $notif = DB::table('nexo_notificacoes')
             ->where('id', $notificacaoId)
             ->where('status', 'pending')
+            ->first();
+
+        if (!$notif) return false;
+
+        $updated = DB::table('nexo_notificacoes')
+            ->where('id', $notificacaoId)
             ->update([
                 'status'     => 'skipped',
                 'updated_at' => now(),
             ]) > 0;
+
+        if ($updated && $notif->cliente_id) {
+            $vars = json_decode($notif->template_vars, true);
+            $descAndamento = $vars[2]['text'] ?? ($notif->processo_pasta ?? 'andamento processual');
+            $responsavelId = $userId ?? $notif->user_id ?? null;
+            $this->registrarAtividadeCRM(
+                $notificacaoId,
+                $notif->cliente_id,
+                $notif->cliente_nome,
+                'WhatsApp não enviado — decisão do advogado',
+                'Advogado optou por não notificar o cliente sobre este andamento. Processo: ' . ($notif->processo_pasta ?? '—') . ' | Andamento: ' . mb_substr($descAndamento, 0, 200),
+                $responsavelId
+            );
+        }
+
+        return $updated;
     }
 
     /**
@@ -555,6 +634,72 @@ class NexoNotificacaoService
         }
 
         return $query->get();
+    }
+
+    /**
+     * Reescreve o texto do andamento com IA (Claude Sonnet) para tom de marketing jurídico.
+     * Preserva os fatos mas transforma em linguagem próxima, clara e de reforço de marca.
+     * Retorna o texto original em caso de falha (nunca bloqueia o fluxo).
+     */
+    public function reescreverComIA(string $textoOriginal, string $clienteNome, string $processoPasta): string
+    {
+        $apiKey = config('justus.anthropic_api_key', env('JUSTUS_ANTHROPIC_API_KEY', ''));
+        if (empty($apiKey)) {
+            return $textoOriginal;
+        }
+
+        $system = <<<PROMPT
+Você é o assistente de comunicação do escritório Mayer Sociedade de Advogados.
+Sua função é transformar textos jurídicos técnicos em mensagens de WhatsApp que:
+- Sejam claras e acessíveis para o cliente leigo
+- Transmitam a notícia de forma positiva e próxima (quando favorável) ou cuidadosa e tranquilizadora (quando desfavorável)
+- Reforcem a presença e cuidado do escritório com o cliente
+- Usem linguagem humana, sem jargão excessivo
+- Sejam curtas: máximo 220 caracteres
+- NÃO incluam saudação (já está no template) nem assinatura (já está no template)
+- NÃO inventem fatos além do que foi informado
+- NÃO prometam resultados futuros incertos
+- Preservem a juridicidade: não distorçam o conteúdo da decisão
+Responda APENAS com o texto da mensagem, sem explicações, sem aspas, sem prefixos.
+PROMPT;
+
+        $user = "Processo: {$processoPasta}\nCliente: {$clienteNome}\n\nMovimentação:\n{$textoOriginal}";
+
+        try {
+            $response = Http::withHeaders([
+                'x-api-key'         => $apiKey,
+                'anthropic-version' => '2023-06-01',
+                'content-type'      => 'application/json',
+            ])->timeout(30)->post('https://api.anthropic.com/v1/messages', [
+                'model'      => 'claude-sonnet-4-6',
+                'max_tokens' => 300,
+                'system'     => $system,
+                'messages'   => [
+                    ['role' => 'user', 'content' => $user],
+                ],
+            ]);
+
+            if (!$response->successful()) {
+                Log::warning('NexoNotificacao: Claude rewrite falhou', ['status' => $response->status()]);
+                return $textoOriginal;
+            }
+
+            $texto = trim($response->json('content.0.text') ?? '');
+            if (empty($texto)) {
+                return $textoOriginal;
+            }
+
+            Log::info('NexoNotificacao: texto reescrito pela IA', [
+                'processo' => $processoPasta,
+                'original_chars' => mb_strlen($textoOriginal),
+                'rewritten_chars' => mb_strlen($texto),
+            ]);
+
+            return mb_substr($texto, 0, 300);
+        } catch (\Throwable $e) {
+            Log::warning('NexoNotificacao: Claude rewrite exception', ['error' => $e->getMessage()]);
+            return $textoOriginal;
+        }
     }
 
     /**
@@ -618,6 +763,17 @@ class NexoNotificacaoService
                 ->where('tipo', 'os')
                 ->where('entidade_id', $os->datajuri_id)
                 ->update(['user_id' => $userId, 'template_name' => 'atualizacao_servico']);
+
+            // Notificar o advogado no sininho da intranet
+            NotificationIntranet::enviar(
+                $userId,
+                'OS aguardando notificação: #' . $os->numero,
+                'Ordem de serviço com movimentação recente. Selecione o cliente e envie a mensagem.',
+                url('/nexo/notificacoes'),
+                'warning',
+                'whatsapp'
+            );
+
             $stats['criados']++;
         }
 

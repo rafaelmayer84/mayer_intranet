@@ -124,6 +124,74 @@
     </div>
     @endif
 
+    {{-- BANNER NEXO — Notificações WhatsApp pendentes --}}
+    @if($nexoPendentes->isNotEmpty())
+    <div class="mb-6" id="nexo-pendentes-banner">
+        <div class="bg-gradient-to-r from-green-50 via-emerald-50 to-teal-50 border border-green-300 rounded-xl shadow-sm overflow-hidden">
+            {{-- Header do banner --}}
+            <div class="flex items-center justify-between px-5 py-3 border-b border-green-200 bg-green-100/50">
+                <div class="flex items-center gap-2">
+                    <svg class="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
+                    </svg>
+                    <span class="text-sm font-semibold text-green-800">
+                        {{ $nexoPendentes->count() === 1 ? '1 notificação WhatsApp aguardando decisão' : $nexoPendentes->count() . ' notificações WhatsApp aguardando decisão' }}
+                    </span>
+                </div>
+                <a href="{{ url('/nexo/notificacoes') }}" class="text-xs text-green-700 underline hover:text-green-900">
+                    Ver todas no painel Nexo
+                </a>
+            </div>
+
+            {{-- Cards de cada notificação pendente --}}
+            <div class="divide-y divide-green-100">
+            @foreach($nexoPendentes as $np)
+            @php $npVars = json_decode($np->template_vars, true); @endphp
+            <div class="px-5 py-4" id="crm-nexo-card-{{ $np->id }}">
+                <div class="flex items-start gap-3">
+                    {{-- Ícone e meta --}}
+                    <div class="flex-shrink-0 mt-0.5">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+                            {{ $np->tipo === 'audiencia' ? 'bg-purple-100 text-purple-700' : ($np->tipo === 'andamento' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700') }}">
+                            {{ $np->tipo === 'audiencia' ? 'Audiência' : ($np->tipo === 'andamento' ? 'Andamento' : 'OS') }}
+                        </span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        {{-- Preview do andamento --}}
+                        <div class="text-sm text-gray-700 leading-relaxed mb-1">
+                            {{ $npVars[2]['text'] ?? ($np->error_message ?? 'Movimentação processual') }}
+                        </div>
+                        <div class="text-xs text-gray-400 mb-3">
+                            Processo: <span class="font-mono">{{ $np->processo_pasta ?? '—' }}</span>
+                            · Detectado em {{ \Carbon\Carbon::parse($np->created_at)->format('d/m H:i') }}
+                        </div>
+
+                        {{-- Área de ação: textarea editável + botões --}}
+                        <div id="crm-nexo-action-{{ $np->id }}">
+                            <textarea id="crm-nexo-msg-{{ $np->id }}" rows="2" maxlength="300"
+                                class="w-full text-sm border border-green-300 rounded-lg px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white mb-2"
+                                placeholder="Edite a mensagem que será enviada ao cliente...">{{ $npVars[2]['text'] ?? '' }}</textarea>
+                            <div class="flex items-center gap-2">
+                                <button onclick="crmNexoEnviar({{ $np->id }})"
+                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-colors">
+                                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/></svg>
+                                    Enviar WhatsApp ao cliente
+                                </button>
+                                <button onclick="crmNexoDescartar({{ $np->id }})"
+                                    class="px-3 py-1.5 border border-gray-300 text-gray-600 hover:bg-gray-50 text-xs font-medium rounded-lg transition-colors">
+                                    Não notificar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endforeach
+            </div>
+        </div>
+    </div>
+    @endif
+
     {{-- KPI CARDS --}}
     @if($hasDj)
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
@@ -1318,6 +1386,83 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     });
 });
+
+// =====================================================================
+// NEXO — ações inline na ficha do cliente
+// =====================================================================
+function crmNexoEnviar(notifId) {
+    const msg = document.getElementById('crm-nexo-msg-' + notifId).value.trim();
+    if (!msg) { alert('Escreva ou confirme a mensagem antes de enviar.'); return; }
+    if (!confirm('Enviar esta mensagem via WhatsApp ao cliente?')) return;
+
+    const btn = event.target.closest('button');
+    btn.disabled = true;
+    btn.textContent = 'Enviando...';
+
+    fetch(`/nexo/notificacoes/${notifId}/aprovar`, {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ descricao_custom: msg }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        const card = document.getElementById('crm-nexo-card-' + notifId);
+        if (data.success) {
+            card.innerHTML = '<div class="px-5 py-3 flex items-center gap-2 text-green-700 text-sm"><svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>WhatsApp enviado — registrado na linha do tempo do cliente.</div>';
+            setTimeout(() => {
+                card.style.transition = 'opacity 0.4s';
+                card.style.opacity = '0';
+                setTimeout(() => {
+                    card.remove();
+                    if (document.querySelectorAll('[id^="crm-nexo-card-"]').length === 0) {
+                        const banner = document.getElementById('nexo-pendentes-banner');
+                        if (banner) banner.remove();
+                    }
+                }, 400);
+            }, 2500);
+        } else {
+            btn.disabled = false;
+            btn.textContent = 'Enviar WhatsApp ao cliente';
+            alert('Erro ao enviar: ' + (data.error || data.message || 'Falha desconhecida'));
+        }
+    })
+    .catch(e => {
+        btn.disabled = false;
+        btn.textContent = 'Enviar WhatsApp ao cliente';
+        alert('Erro de rede: ' + e.message);
+    });
+}
+
+function crmNexoDescartar(notifId) {
+    if (!confirm('Confirma que não irá notificar o cliente sobre este andamento?\n\nA decisão será registrada na linha do tempo do CRM.')) return;
+
+    fetch(`/nexo/notificacoes/${notifId}/descartar`, {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+            'Content-Type': 'application/json'
+        },
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            const card = document.getElementById('crm-nexo-card-' + notifId);
+            card.style.transition = 'opacity 0.3s';
+            card.style.opacity = '0';
+            setTimeout(() => {
+                card.remove();
+                if (document.querySelectorAll('[id^="crm-nexo-card-"]').length === 0) {
+                    const banner = document.getElementById('nexo-pendentes-banner');
+                    if (banner) banner.remove();
+                }
+            }, 300);
+        }
+    })
+    .catch(e => alert('Erro de rede: ' + e.message));
+}
 </script>
 @endpush
 
