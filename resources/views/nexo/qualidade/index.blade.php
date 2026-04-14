@@ -144,7 +144,7 @@
                             </span>
                             @endif
                             @if($r->nps !== null)
-                            <span class="text-xs font-medium {{ $r->nps >= 4 ? 'text-green-600' : ($r->nps == 3 ? 'text-gray-500' : 'text-red-600') }}">NPS {{ $r->nps }}</span>
+                            <span class="text-xs font-medium {{ $r->nps == 5 ? 'text-green-600' : ($r->nps == 4 ? 'text-gray-500' : 'text-red-600') }}">NPS {{ $r->nps }}</span>
                             @endif
                         </div>
                     </div>
@@ -170,23 +170,37 @@
             <div class="bg-white rounded-xl shadow-sm border">
                 <div class="px-5 py-4 border-b">
                     <h2 class="font-semibold text-gray-700">Ranking por Advogado</h2>
-                    <p class="text-xs text-gray-400">Últimas 4 semanas</p>
+                    <p class="text-xs text-gray-400">Últimas 4 semanas &middot; tempo real</p>
                 </div>
                 <div class="divide-y">
                     @forelse($ranking as $i => $r)
-                    <div class="px-5 py-3 flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <span class="text-sm font-bold {{ $i === 0 ? 'text-yellow-500' : 'text-gray-400' }}">{{ $i + 1 }}º</span>
-                            <div>
-                                <p class="text-sm font-medium text-gray-800">{{ $r->name }}</p>
-                                <p class="text-xs text-gray-400">{{ $r->total_responses }} respostas</p>
+                    <div class="px-5 py-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <span class="text-sm font-bold {{ $i === 0 ? 'text-yellow-500' : 'text-gray-400' }}">{{ $i + 1 }}º</span>
+                                <div>
+                                    <p class="text-sm font-medium text-gray-800">{{ $r->name }}</p>
+                                    <p class="text-xs text-gray-400">
+                                        {{ $r->total_responses }} respostas / {{ $r->sent_count }} enviadas
+                                        @if(!$r->sufficient_data)
+                                        <span class="text-orange-500 font-medium">&middot; dados insuficientes</span>
+                                        @endif
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-bold {{ $r->avg_score >= 4 ? 'text-green-600' : ($r->avg_score >= 3 ? 'text-yellow-600' : 'text-red-600') }}">
+                                    {{ number_format($r->avg_score, 1, ',', '.') }}
+                                </p>
+                                <p class="text-[10px] text-gray-400">NPS {{ number_format($r->nps_score ?? 0, 0) }}</p>
                             </div>
                         </div>
-                        <div class="text-right">
-                            <p class="text-sm font-bold {{ $r->avg_score >= 4 ? 'text-green-600' : ($r->avg_score >= 3 ? 'text-yellow-600' : 'text-red-600') }}">
-                                {{ number_format($r->avg_score, 1, ',', '.') }}
-                            </p>
-                            <p class="text-[10px] text-gray-400">NPS {{ number_format($r->nps_score, 0) }}</p>
+                        {{-- Barra de taxa de resposta --}}
+                        <div class="mt-1.5 flex items-center gap-2">
+                            <div class="flex-1 bg-gray-100 rounded-full h-1.5">
+                                <div class="h-1.5 rounded-full {{ $r->response_rate >= 30 ? 'bg-green-400' : ($r->response_rate >= 15 ? 'bg-yellow-400' : 'bg-red-400') }}" style="width: {{ min($r->response_rate, 100) }}%"></div>
+                            </div>
+                            <span class="text-[10px] text-gray-400 w-10 text-right">{{ $r->response_rate }}%</span>
                         </div>
                     </div>
                     @empty
@@ -194,6 +208,29 @@
                     @endforelse
                 </div>
             </div>
+
+            {{-- Distribuição da Amostra (última semana) --}}
+            @if($sampleDistribution->isNotEmpty())
+            <div class="bg-white rounded-xl shadow-sm border">
+                <div class="px-5 py-4 border-b">
+                    <h2 class="font-semibold text-gray-700">Distribuição da Amostra</h2>
+                    <p class="text-xs text-gray-400">Últimos 7 dias &middot; amostragem estratificada</p>
+                </div>
+                <div class="divide-y">
+                    @foreach($sampleDistribution as $name => $dist)
+                    <div class="px-5 py-2.5 flex items-center justify-between">
+                        <p class="text-sm text-gray-700">{{ $name }}</p>
+                        <div class="flex items-center gap-2 text-[10px]">
+                            <span class="text-green-600">{{ $dist->sent }} env</span>
+                            @if($dist->pending > 0)<span class="text-yellow-600">{{ $dist->pending }} pend</span>@endif
+                            @if($dist->failed > 0)<span class="text-red-600">{{ $dist->failed }} falha</span>@endif
+                            <span class="font-medium text-gray-500">{{ $dist->total }} total</span>
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+            </div>
+            @endif
 
             {{-- Configuração --}}
             @if(auth()->user()->role === 'admin')
@@ -270,7 +307,7 @@ document.addEventListener('DOMContentLoaded', function() {
             interaction: { mode: 'index', intersect: false },
             scales: {
                 y: { position: 'left', min: 1, max: 5, title: { display: true, text: 'Nota (1-5)' } },
-                y1: { position: 'right', min: -100, max: 100, title: { display: true, text: 'NPS (0-5)' }, grid: { drawOnChartArea: false } }
+                y1: { position: 'right', min: -100, max: 100, title: { display: true, text: 'NPS (-100 a +100)' }, grid: { drawOnChartArea: false } }
             },
             plugins: { legend: { position: 'bottom' } }
         }

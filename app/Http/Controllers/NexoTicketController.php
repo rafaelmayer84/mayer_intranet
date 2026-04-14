@@ -22,8 +22,9 @@ class NexoTicketController extends Controller
             'busca', 'data_inicio', 'data_fim',
         ]);
 
-        if (empty($filtros['status'])) {
-            $filtros['status'] = 'ativos';
+        // Mostrar todos os tickets por padrão
+        if (!array_key_exists('status', $filtros)) {
+            $filtros['status'] = '';
         }
 
         $tickets = $this->service->listar($filtros);

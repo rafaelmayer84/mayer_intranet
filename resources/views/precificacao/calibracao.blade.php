@@ -17,6 +17,27 @@
             </p>
         </div>
 
+        {{-- Seletor de Modelo de IA --}}
+        <div class="mb-8 p-5 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-200 dark:border-indigo-700">
+            <div class="flex items-center justify-between mb-3">
+                <div>
+                    <h3 class="text-sm font-semibold text-gray-800 dark:text-white flex items-center gap-2">
+                        <svg class="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                        Modelo de IA
+                    </h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Modelo utilizado para gerar as propostas de precificacao</p>
+                </div>
+                <span class="text-xs px-2 py-1 rounded-full {{ $modeloAtual && str_starts_with($modeloAtual, 'claude-') ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' : 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' }}">
+                    {{ $modeloAtual && str_starts_with($modeloAtual, 'claude-') ? 'Anthropic' : 'OpenAI' }}
+                </span>
+            </div>
+            <select id="modelo-ia" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white text-sm focus:ring-indigo-500 focus:border-indigo-500">
+                @foreach($modelosDisponiveis as $value => $label)
+                    <option value="{{ $value }}" {{ $modeloAtual === $value ? 'selected' : '' }}>{{ $label }}</option>
+                @endforeach
+            </select>
+        </div>
+
         <form id="form-calibracao">
             <div class="space-y-8">
                 @foreach($eixos as $eixo)
@@ -62,6 +83,8 @@ document.getElementById('form-calibracao').addEventListener('submit', function(e
         if (match) eixos[match[1]] = parseInt(value);
     }
 
+    const modeloIa = document.getElementById('modelo-ia').value;
+
     fetch('{{ route("precificacao.calibracao.salvar") }}', {
         method: 'POST',
         headers: {
@@ -69,7 +92,7 @@ document.getElementById('form-calibracao').addEventListener('submit', function(e
             'Accept': 'application/json',
             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content,
         },
-        body: JSON.stringify({ eixos }),
+        body: JSON.stringify({ eixos, modelo_ia: modeloIa }),
     })
     .then(r => r.json())
     .then(data => {

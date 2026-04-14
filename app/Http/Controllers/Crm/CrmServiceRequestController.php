@@ -125,6 +125,13 @@ class CrmServiceRequestController extends Controller
     {
         $sr = CrmServiceRequest::findOrFail($id);
 
+        // Chamados concluídos ou cancelados são imutáveis
+        if (in_array($sr->status, ['concluido', 'cancelado'])) {
+            return back()->withErrors([
+                'status' => "O chamado {$sr->protocolo} está " . $sr->status . " e não pode ser alterado.",
+            ]);
+        }
+
         $request->validate([
             'status'              => 'nullable|in:aberto,em_andamento,aguardando_aprovacao,aprovado,rejeitado,concluido,cancelado,devolvido',
             'assigned_to_user_id' => 'nullable|exists:users,id',
@@ -147,13 +154,12 @@ class CrmServiceRequestController extends Controller
                 $updates['resolved_at'] = now();
             }
 
-            // Salvar notas de resolução em qualquer mudança de status
-            if ($request->filled('resolution_notes')) {
+            // Salvar notas de resolução apenas se ainda não existe — resolução não pode ser sobrescrita
+            if ($request->filled('resolution_notes') && empty($sr->resolution_notes)) {
                 $updates['resolution_notes'] = $request->resolution_notes;
             }
 
             if ($request->status === 'aguardando_aprovacao') {
-                // Notificar sócios/admin
                 $this->notifyApprovers($sr);
             }
 
@@ -165,12 +171,28 @@ class CrmServiceRequestController extends Controller
                 $updates['approved_by_user_id'] = auth()->id();
                 $updates['approved_at'] = now();
             }
+
+            if ($request->status === 'concluido') {
+                $this->notifyConcluido($sr, $request->resolution_notes);
+            }
+
+            if ($request->status === 'rejeitado') {
+                $this->notifyRejeitado($sr, $request->resolution_notes);
+            }
+
+            if ($request->status === 'aprovado') {
+                $this->notifyAprovado($sr);
+            }
         }
 
+        // Atribuição: notificar apenas se o responsável realmente mudou
         if ($request->filled('assigned_to_user_id')) {
-            $updates['assigned_to_user_id'] = $request->assigned_to_user_id;
-            $updates['assigned_at'] = now();
-            $this->notifyAssigned($sr, $request->assigned_to_user_id);
+            $newAssignee = (int) $request->assigned_to_user_id;
+            if ($newAssignee !== (int) $sr->assigned_to_user_id) {
+                $updates['assigned_to_user_id'] = $newAssignee;
+                $updates['assigned_at'] = now();
+                $this->notifyAssigned($sr, $newAssignee);
+            }
         }
 
         if ($request->filled('priority')) {
@@ -420,6 +442,135 @@ class CrmServiceRequestController extends Controller
         }
     }
 
+
+    /**
+     * Notificar solicitante que o chamado foi concluído com a resposta
+     */
+    private function notifyConcluido(CrmServiceRequest $sr, ?string $resolucao = null)
+    {
+        try {
+            $requester = User::find($sr->requested_by_user_id);
+            if (!$requester || !$requester->email) return;
+
+            $account = $sr->account ?? CrmAccount::find($sr->account_id);
+            $categorias = CrmServiceRequest::categorias();
+            $catLabel = $categorias[$sr->category]['label'] ?? $sr->category;
+            $operador = auth()->user()->name;
+            $link = url('/chamados/' . $sr->id);
+
+            $html = $this->buildEmailHtml(
+                destinatario: $requester->name,
+                titulo: 'Chamado concluído',
+                subtitulo: 'Sua solicitação foi respondida pela administração.',
+                cor: '#16a34a',
+                protocolo: $sr->protocolo,
+                campos: [
+                    'Assunto'        => $sr->subject,
+                    'Categoria'      => $catLabel,
+                    'Cliente'        => $account ? $account->name : 'Interno',
+                    'Concluído por'  => $operador,
+                ],
+                descricao: $resolucao ?: $sr->resolution_notes,
+                link: $link,
+                labelLink: 'Ver Chamado'
+            );
+
+            Mail::html($html, function ($message) use ($requester, $sr) {
+                $message->to($requester->email)
+                        ->subject("[CONCLUÍDO] SIATE {$sr->protocolo} — {$sr->subject}");
+            });
+        } catch (\Exception $e) {
+            Log::warning('[CRM] Falha ao notificar conclusão: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Notificar solicitante que o chamado foi rejeitado
+     */
+    private function notifyRejeitado(CrmServiceRequest $sr, ?string $motivo = null)
+    {
+        try {
+            $requester = User::find($sr->requested_by_user_id);
+            if (!$requester || !$requester->email) return;
+
+            $account = $sr->account ?? CrmAccount::find($sr->account_id);
+            $categorias = CrmServiceRequest::categorias();
+            $catLabel = $categorias[$sr->category]['label'] ?? $sr->category;
+            $operador = auth()->user()->name;
+            $link = url('/chamados/' . $sr->id);
+
+            $html = $this->buildEmailHtml(
+                destinatario: $requester->name,
+                titulo: 'Chamado rejeitado',
+                subtitulo: 'Sua solicitação não foi aprovada pela administração.',
+                cor: '#dc2626',
+                protocolo: $sr->protocolo,
+                campos: [
+                    'Assunto'       => $sr->subject,
+                    'Categoria'     => $catLabel,
+                    'Cliente'       => $account ? $account->name : 'Interno',
+                    'Rejeitado por' => $operador,
+                    'Motivo'        => $motivo ?: '—',
+                ],
+                descricao: null,
+                link: $link,
+                labelLink: 'Ver Chamado'
+            );
+
+            Mail::html($html, function ($message) use ($requester, $sr) {
+                $message->to($requester->email)
+                        ->subject("[REJEITADO] SIATE {$sr->protocolo} — {$sr->subject}");
+            });
+        } catch (\Exception $e) {
+            Log::warning('[CRM] Falha ao notificar rejeição: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Notificar atribuído que o chamado foi aprovado e pode prosseguir
+     */
+    private function notifyAprovado(CrmServiceRequest $sr)
+    {
+        try {
+            $assignedUser = User::find($sr->assigned_to_user_id);
+            if (!$assignedUser || !$assignedUser->email) return;
+
+            // Não notificar se o próprio aprovador é o atribuído
+            if ($assignedUser->id === auth()->id()) return;
+
+            $account = $sr->account ?? CrmAccount::find($sr->account_id);
+            $categorias = CrmServiceRequest::categorias();
+            $catLabel = $categorias[$sr->category]['label'] ?? $sr->category;
+            $requester = $sr->requestedBy ?? User::find($sr->requested_by_user_id);
+            $link = url('/chamados/' . $sr->id);
+
+            $html = $this->buildEmailHtml(
+                destinatario: $assignedUser->name,
+                titulo: 'Chamado aprovado — pode prosseguir',
+                subtitulo: 'A solicitação abaixo foi aprovada pela administração.',
+                cor: '#16a34a',
+                protocolo: $sr->protocolo,
+                campos: [
+                    'Assunto'      => $sr->subject,
+                    'Categoria'    => $catLabel,
+                    'Prioridade'   => ucfirst($sr->priority),
+                    'Cliente'      => $account ? $account->name : 'Interno',
+                    'Solicitante'  => $requester ? $requester->name : '—',
+                    'Aprovado por' => auth()->user()->name,
+                ],
+                descricao: $sr->description,
+                link: $link,
+                labelLink: 'Abrir Chamado'
+            );
+
+            Mail::html($html, function ($message) use ($assignedUser, $sr) {
+                $message->to($assignedUser->email)
+                        ->subject("[APROVADO] SIATE {$sr->protocolo} — {$sr->subject}");
+            });
+        } catch (\Exception $e) {
+            Log::warning('[CRM] Falha ao notificar aprovação: ' . $e->getMessage());
+        }
+    }
 
     private function buildEmailHtml(
         string $destinatario,

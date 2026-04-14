@@ -553,13 +553,26 @@ PROMPT;
                 $messageType = 'video';
             }
 
+            $sentAt = isset($msg['created_at']) ? $msg['created_at'] : now();
+
+            // Idempotente: não salva se já existe mensagem com mesmo texto + direção + timestamp
+            $exists = LeadMessage::where('lead_id', $lead->id)
+                ->where('direction', $direction)
+                ->where('message_text', $text)
+                ->where('sent_at', $sentAt)
+                ->exists();
+
+            if ($exists) {
+                continue;
+            }
+
             LeadMessage::create([
-                'lead_id' => $lead->id,
-                'direction' => $direction,
+                'lead_id'      => $lead->id,
+                'direction'    => $direction,
                 'message_text' => $text,
                 'message_type' => $messageType,
-                'raw_data' => $msg,
-                'sent_at' => isset($msg['created_at']) ? $msg['created_at'] : now()
+                'raw_data'     => $msg,
+                'sent_at'      => $sentAt,
             ]);
         }
     }
@@ -890,6 +903,18 @@ PROMPT;
                 return null;
             }
 
+            // ========== FILTRO 2a: Nome é saudação/primeira mensagem ==========
+            // Não descarta — substitui por placeholder para não perder o lead
+            $saudacoes = ['tudo bem', 'tudo certo', 'olá', 'ola', 'oi ', 'oi!', 'oi,', 'bom dia', 'boa tarde', 'boa noite', 'alô', 'alo'];
+            $nomeLower = mb_strtolower(trim($nome));
+            foreach ($saudacoes as $s) {
+                if ($nomeLower === trim($s) || str_starts_with($nomeLower, $s)) {
+                    Log::info('processLead: nome é saudação, substituindo por placeholder', ['nome' => $nome]);
+                    $nome = 'Não identificado';
+                    break;
+                }
+            }
+
             // ========== FILTRO 2b: Telefone institucional (blacklist) ==========
             $blacklistPhones = [
                 '554733986287',  // 2a Delegacia Itajai
@@ -1107,7 +1132,7 @@ PROMPT;
                 'gatilho_emocional' => $aiResult['gatilho_emocional'] ?? '',
                 'perfil_socioeconomico' => $aiResult['perfil_socioeconomico'] ?? '',
                 'potencial_honorarios' => $aiResult['potencial_honorarios'] ?? '',
-                'origem_canal' => $aiResult['origem_canal'] ?? 'nao_identificado',
+                'origem_canal' => !empty($gclid) ? 'google_ads' : ($aiResult['origem_canal'] ?? 'nao_identificado'),
                 'gclid' => $gclid ?: ($aiResult['gclid_extracted'] ?? ''),
                 'status' => 'novo',
                 'erro_processamento' => ($aiResult['success'] ?? false) ? null : ($aiResult['error'] ?? 'Erro OpenAI'),
@@ -1267,7 +1292,9 @@ PROMPT;
                 'gatilho_emocional' => $aiResult['gatilho_emocional'] ?? '',
                 'perfil_socioeconomico' => $aiResult['perfil_socioeconomico'] ?? '',
                 'potencial_honorarios' => $aiResult['potencial_honorarios'] ?? '',
-                'origem_canal' => $aiResult['origem_canal'] ?? $lead->origem_canal,
+                'origem_canal' => (empty($lead->origem_canal) || $lead->origem_canal === 'nao_identificado')
+                    ? ($aiResult['origem_canal'] ?? $lead->origem_canal)
+                    : $lead->origem_canal,
                 'erro_processamento' => null
             ];
 

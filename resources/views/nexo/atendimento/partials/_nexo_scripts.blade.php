@@ -304,7 +304,7 @@ const NexoApp = {
     async assumirConversa(){
         if(!this.conversaAtual)return;
         if(!confirm('Assumir esta conversa e desativar o bot?'))return;
-        try{await this.api('/nexo/atendimento/conversas/'+this.conversaAtual.id+'/assumir',{method:'POST'});this.conversaAtual.bot_ativo=false;this.toggleBotUI(false);this.loadConversas(true)}catch(e){alert('Erro: '+e.message)}
+        try{const r=await this.api('/nexo/atendimento/conversas/'+this.conversaAtual.id+'/assumir',{method:'POST'});this.conversaAtual.bot_ativo=false;this.toggleBotUI(false);this.loadConversas(true);if(r&&r.bot_pausado===false){alert('⚠️ Conversa assumida localmente, mas o bot pode NÃO ter sido pausado no SendPulse. Monitore se o cliente recebe mensagens automáticas.')}}catch(e){alert('Erro: '+e.message)}
     },
     async devolverAoBot(){
         if(!this.conversaAtual)return;
@@ -598,7 +598,14 @@ const NexoApp = {
                 html+=`<div class="ctx-row"><span class="ctx-label">Doc</span><span class="ctx-value">${this.esc(cl.cpf_cnpj||cl.documento||'N/A')}</span></div>`;
                 if(cl.processos_ativos?.length){html+=`<div class="mt-2 pt-2 border-t border-gray-100"><p class="text-[10px] text-gray-500 font-medium mb-1">Processos (${cl.processos_ativos.length})</p>`;cl.processos_ativos.forEach(p=>{html+=`<div class="text-xs text-gray-600 py-0.5 truncate">• ${this.esc(p.numero||p.titulo||'Processo')}</div>`});html+=`</div>`}
                 if(cl.contas_abertas?.length){html+=`<div class="mt-2 pt-2 border-t border-gray-100"><p class="text-[10px] text-gray-500 font-medium mb-1">Contas (${cl.contas_abertas.length})</p>`;cl.contas_abertas.forEach(ct=>{html+=`<div class="text-xs text-gray-600 py-0.5">• R$ ${this.esc(ct.valor||'0')} — ${this.esc(ct.descricao||'')}</div>`});html+=`</div>`}
+                if(cl.crm_account){const ca=cl.crm_account;html+=`<div class="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between"><span class="text-[10px] text-teal-600 font-medium">CRM: ${this.esc(ca.name)}</span><a href="/crm/accounts/${ca.id}" target="_blank" class="text-[10px] px-2 py-0.5 bg-teal-50 text-teal-700 rounded border border-teal-200 hover:bg-teal-100">Ver perfil →</a></div>`;}
+                if(cl.crm_service_requests?.length){html+=`<div class="mt-2 pt-1 border-t border-gray-100"><p class="text-[10px] text-gray-500 font-medium mb-1">Solicitações (${cl.crm_service_requests.length})</p>`;cl.crm_service_requests.forEach(sr=>{html+=`<div class="text-xs text-gray-600 py-0.5 flex justify-between"><span class="truncate flex-1">${this.esc(sr.subject||sr.protocolo)}</span><span class="text-[10px] ml-1 text-gray-400">${this.esc(sr.status)}</span></div>`});html+=`</div>`}
                 html+=`</div></div>`;
+            }
+
+            // Botão "Ver no CRM" global quando há account vinculado
+            if(j.crm_account_id){
+                html+=`<div class="mt-3"><a href="/crm/accounts/${j.crm_account_id}" target="_blank" class="block w-full text-center text-xs px-3 py-2 bg-[#385776] text-white rounded-lg hover:bg-[#1B334A] transition font-medium">Ver perfil CRM completo →</a></div>`;
             }
 
             if(j.link_type==='indefinido')lk.classList.remove('hidden');else{lk.classList.remove('hidden')}

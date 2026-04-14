@@ -488,7 +488,7 @@ class CrmAccountController extends Controller
     }
 
     /**
-     * Carrega contexto de comunicação: WhatsApp + Tickets NEXO.
+     * Carrega contexto de comunicação: WhatsApp + CRM Service Requests.
      */
     private function loadCommunicationContext(CrmAccount $account, array $djContext): array
     {
@@ -519,59 +519,61 @@ class CrmAccountController extends Controller
                 }
             }
 
-            // WhatsApp — match por últimos 9 dígitos do telefone
-            if (!empty($phones)) {
+            // WhatsApp — match direto por linked_crm_account_id (prioritário)
+            $wa = DB::table('wa_conversations')
+                ->where('linked_crm_account_id', $account->id)
+                ->orderByDesc('last_message_at')
+                ->first(['id', 'phone', 'name', 'status', 'last_message_at', 'assigned_user_id', 'bot_ativo', 'priority']);
+
+            // Fallback: match por últimos 9 dígitos do telefone
+            if (!$wa && !empty($phones)) {
                 foreach ($phones as $phone) {
                     $last9 = substr(preg_replace('/\D/', '', $phone), -9);
-                    if (strlen($last9) < 8) {
-                        continue;
-                    }
+                    if (strlen($last9) < 8) continue;
 
                     $wa = DB::table('wa_conversations')
                         ->where('phone', 'like', '%' . $last9)
                         ->orderByDesc('last_message_at')
                         ->first(['id', 'phone', 'name', 'status', 'last_message_at', 'assigned_user_id', 'bot_ativo', 'priority']);
 
-                    if ($wa) {
-                        $ctx['whatsapp'] = $wa;
-                        $ctx['has_wa']   = true;
-
-                        // Últimas 20 mensagens inline
-                        $ctx['wa_messages'] = DB::table('wa_messages')
-                            ->where('conversation_id', $wa->id)
-                            ->orderByDesc('created_at')
-                            ->limit(20)
-                            ->get(['id', 'direction', 'body', 'message_type', 'created_at'])
-                            ->reverse()
-                            ->values()
-                            ->toArray();
-
-                        break;
-                    }
+                    if ($wa) break;
                 }
             }
 
-            // Tickets NEXO — match por datajuri_id ou telefone
-            $djId = $account->datajuri_pessoa_id;
+            if ($wa) {
+                $ctx['whatsapp'] = $wa;
+                $ctx['has_wa']   = true;
 
-            if ($djId) {
-                $tickets = DB::table('nexo_tickets')
-                    ->where('datajuri_id', $djId)
+                // Últimas 20 mensagens inline
+                $ctx['wa_messages'] = DB::table('wa_messages')
+                    ->where('conversation_id', $wa->id)
                     ->orderByDesc('created_at')
-                    ->limit(10)
-                    ->get(['id', 'protocolo', 'assunto', 'status', 'prioridade', 'tipo', 'created_at', 'resolvido_at']);
-            } elseif (!empty($phones)) {
-                $last9   = substr(preg_replace('/\D/', '', $phones[0]), -9);
-                $tickets = DB::table('nexo_tickets')
-                    ->where('telefone', 'like', '%' . $last9)
-                    ->orderByDesc('created_at')
-                    ->limit(10)
-                    ->get(['id', 'protocolo', 'assunto', 'status', 'prioridade', 'tipo', 'created_at', 'resolvido_at']);
-            } else {
-                $tickets = collect();
+                    ->limit(20)
+                    ->get(['id', 'direction', 'body', 'message_type', 'created_at'])
+                    ->reverse()
+                    ->values()
+                    ->toArray();
             }
 
-            $ctx['tickets']     = $tickets->toArray();
+            // CRM Service Requests — match direto por account_id
+            $srQuery = DB::table('crm_service_requests')
+                ->where('account_id', $account->id)
+                ->orderByDesc('created_at')
+                ->limit(10)
+                ->get(['id', 'protocolo', 'subject', 'status', 'priority', 'category', 'origem', 'created_at', 'resolved_at']);
+
+            // Fallback: tickets de autoatendimento com phone_contato (cliente sem account ainda)
+            if ($srQuery->isEmpty() && !empty($phones)) {
+                $last9 = substr(preg_replace('/\D/', '', $phones[0]), -9);
+                $srQuery = DB::table('crm_service_requests')
+                    ->where('phone_contato', 'like', '%' . $last9)
+                    ->where('origem', 'autoatendimento')
+                    ->orderByDesc('created_at')
+                    ->limit(10)
+                    ->get(['id', 'protocolo', 'subject', 'status', 'priority', 'category', 'origem', 'created_at', 'resolved_at']);
+            }
+
+            $ctx['tickets']     = $srQuery->toArray();
             $ctx['has_tickets'] = count($ctx['tickets']) > 0;
 
         } catch (\Exception $e) {

@@ -322,20 +322,57 @@ class VigiliaService
      * Padrões de andamento que indicam AÇÃO DO ESCRITÓRIO (advogada trabalhou).
      * Tudo que não bater aqui é considerado ação do tribunal (não conta).
      */
+    /**
+     * Padroes ampliados com base nos andamentos reais dos tribunais SC.
+     * Usa LIKE parcial - basta conter o trecho para reconhecer.
+     */
     const ANDAMENTO_ESCRITORIO = [
-        'Juntada de Petição',
-        'Petição Juntada',
-        'PETIÇÃO',
-        'Petição juntada',
-        'CIÊNCIA, COM RENÚNCIA AO PRAZO',
-        'Ciência',
+        'PETI',
+        'Peti',
+        'peti',
+        'Juntada de Peti',
+        'Juntada a peti',
+        'Juntada - Peti',
+        'Tipo Movimento: Juntada - Peti',
+        'RECURSO',
+        'Recurso',
+        'APELA',
+        'Apela',
+        'AGRAVO',
+        'Agravo',
+        'EMBARGOS',
+        'Embargos',
+        'REPLICA',
+        'Replica',
+        'IMPUGNA',
+        'Impugna',
+        'CONTESTA',
+        'Contesta',
+        'MANIFESTA',
+        'Manifesta',
+        'CONTRARRAZ',
+        'Contrarraz',
+        'SUBSTABELECIMENTO',
+        'Substabelecimento',
+        'Confirmada a intima',
+        'COM RENUN',
+        'Protocolo',
+        'PROTOCOLO',
+        'Juntado(a)',
+        'JUNTADA',
+        'CUMPRIMENTO',
+        'Cumprimento',
+        'Requerimento',
+        'REQUERIMENTO',
+        'Dilig',
+        'DILIG',
     ];
-
     const ANDAMENTO_AUDIENCIA = [
-        'Audiência',
-        'audiência',
-        'Realizada audiência',
-        'Ata de Audiência',
+        'Audiencia',
+        'AUDIENCIA',
+        'Realizada audiencia',
+        'Ata de Audiencia',
+        'Ata audiencia',
     ];
 
     /**
@@ -382,10 +419,12 @@ class VigiliaService
             'observacao' => null,
         ];
 
-        // 1. Tipo não-jurídico → N/A
-        if (in_array($ativ->tipo_atividade, self::TIPOS_NAO_APLICAVEIS) || !in_array($ativ->tipo_atividade, self::TIPOS_JURIDICOS)) {
+        // 1. Tipo nao-juridico -> N/A
+        // Logica: bloqueia apenas o que esta explicitamente listado como nao-aplicavel.
+        // Qualquer tipo nao mapeado eh auditado (evita falsos N/A por lista incompleta).
+        if (in_array($ativ->tipo_atividade, self::TIPOS_NAO_APLICAVEIS)) {
             $default['status_cruzamento'] = 'nao_aplicavel';
-            $default['observacao'] = 'Tipo não-jurídico: ' . ($ativ->tipo_atividade ?? 'desconhecido');
+            $default['observacao'] = 'Tipo n\xc3\xa3o-jur\xc3\xaddico: ' . ($ativ->tipo_atividade ?? 'desconhecido');
             return $default;
         }
 
@@ -418,11 +457,19 @@ class VigiliaService
             return $default;
         }
 
-        // 5. Buscar andamentos COMPATÍVEIS na janela de tempo
+        // 5. Buscar andamentos COMPATIVEIS na janela de tempo
+        //    Janela varia por tipo: analises e recursos precisam de mais tempo apos a atividade
         $dataRef = $dataAtiv ?? Carbon::today();
+        $tipoLower = strtolower($ativ->tipo_atividade ?? '');
+        if (str_contains($tipoLower, 'an\xc3\xa1lise') || str_contains($tipoLower, 'analise') || str_contains($tipoLower, 'dilig\xc3\xaancia')) {
+            $janelaApos = 25; // analises podem resultar em peticao dias depois
+        } elseif (str_contains($tipoLower, 'recurso') || str_contains($tipoLower, 'interposi\xc3\xa7\xc3\xa3o')) {
+            $janelaApos = 20;
+        } else {
+            $janelaApos = self::JANELA_DIAS_APOS; // padrao 15
+        }
         $inicio = $dataRef->copy()->subDays(self::JANELA_DIAS_ANTES);
-        $fim = $dataRef->copy()->addDays(self::JANELA_DIAS_APOS);
-
+        $fim = $dataRef->copy()->addDays($janelaApos);
         $padroesEsperados = $this->getPadroesEsperados($ativ->tipo_atividade);
 
         // Query: buscar andamentos na janela que contenham algum dos padrões esperados
@@ -437,23 +484,28 @@ class VigiliaService
             ->orderByDesc('data_andamento')
             ->first();
 
-        // 6. Buscar último andamento DO ESCRITÓRIO (sem janela) para calcular gap
-        $ultimoAndEscritorio = DB::table('andamentos_fase')
-            ->whereIn('fase_processo_id_datajuri', $faseIds)
-            ->where(function ($q) {
-                foreach (self::ANDAMENTO_ESCRITORIO as $padrao) {
-                    $q->orWhere('descricao', 'LIKE', '%' . $padrao . '%');
-                }
-            })
-            ->orderByDesc('data_andamento')
-            ->first();
-
-        $dataUltimoAnd = $ultimoAndEscritorio ? $ultimoAndEscritorio->data_andamento : null;
+        // 6. dias_gap: distancia entre atividade e andamento encontrado na janela
+        //    Se nao achou andamento: dias desde a atividade ate hoje (indica urgencia)
+        $dataUltimoAnd = $andamentoQuery ? $andamentoQuery->data_andamento : null;
         $diasGap = null;
-        if ($dataUltimoAnd && $dataAtiv) {
-            $diasGap = abs(Carbon::parse($dataUltimoAnd)->diffInDays($dataAtiv));
+        if ($andamentoQuery && $dataAtiv) {
+            $diasGap = abs(Carbon::parse($andamentoQuery->data_andamento)->diffInDays($dataAtiv));
+        } elseif ($dataAtiv && $dataAtiv->isPast()) {
+            $diasGap = $dataAtiv->diffInDays(Carbon::today());
         }
-
+        // Fallback: buscar ultimo andamento do escritorio apenas para preencher data_ultimo_andamento
+        if (!$dataUltimoAnd) {
+            $ultimoAndEscritorio = DB::table('andamentos_fase')
+                ->whereIn('fase_processo_id_datajuri', $faseIds)
+                ->where(function ($q) {
+                    foreach (self::ANDAMENTO_ESCRITORIO as $padrao) {
+                        $q->orWhere('descricao', 'LIKE', '%' . $padrao . '%');
+                    }
+                })
+                ->orderByDesc('data_andamento')
+                ->first();
+            $dataUltimoAnd = $ultimoAndEscritorio ? $ultimoAndEscritorio->data_andamento : null;
+        }
         // 7. Determinar status
         if ($ativ->status === 'Concluído') {
             if ($andamentoQuery) {

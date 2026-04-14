@@ -415,4 +415,40 @@ class SisrhController extends Controller
             'created_at' => now(),
         ]);
     }
+
+    // ──────────────────────────────────────────
+    // FOLHA PDF /sisrh/folha-pdf/{ano}/{mes}
+    // ──────────────────────────────────────────
+    public function folhaPdf(int $ano, int $mes)
+    {
+        $this->checkAdmin();
+
+        $apuracoes = SisrhApuracao::where('ano', $ano)
+            ->where('mes', $mes)
+            ->with('user')
+            ->orderBy('user_id')
+            ->get();
+
+        if ($apuracoes->isEmpty()) {
+            return back()->with('error', 'Nenhuma apuração encontrada para este período.');
+        }
+
+        $ciclo = DB::table('gdp_ciclos')->where('status', 'Aberto')->first();
+
+        $totais = [
+            'rb' => $apuracoes->sum('rb_valor'),
+            'captacao' => $apuracoes->sum('captacao_valor'),
+            'rv_bruta' => $apuracoes->sum('rv_bruta'),
+            'rv_aplicada' => $apuracoes->sum('rv_aplicada'),
+            'total_bruto' => $apuracoes->sum(fn($a) => $a->rb_valor + $a->rv_aplicada),
+        ];
+
+        $pdf = app('dompdf.wrapper');
+        $pdf->loadView('sisrh.folha-pdf', compact('apuracoes', 'ano', 'mes', 'ciclo', 'totais'));
+        $pdf->setPaper('A4', 'landscape');
+
+        $filename = 'folha_' . str_pad($mes, 2, '0', STR_PAD_LEFT) . '_' . $ano . '.pdf';
+        return $pdf->stream($filename);
+    }
+
 }

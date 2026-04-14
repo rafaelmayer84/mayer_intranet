@@ -52,6 +52,11 @@ class CrmAccount extends Model
         return $this->hasMany(CrmServiceRequest::class, 'account_id');
     }
 
+    public function waConversations(): HasMany
+    {
+        return $this->hasMany(\App\Models\WaConversation::class, 'linked_crm_account_id');
+    }
+
     public function documents(): HasMany
     {
         return $this->hasMany(CrmDocument::class, 'account_id');

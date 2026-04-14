@@ -16,6 +16,7 @@
     $contasAbertas = collect($djContext['contas_receber'])->filter(fn($c) => !in_array($c->status ?? '', ['Concluído', 'Concluido', 'Excluido', 'Excluído']))->values();
     $contasVencidas = $contasAbertas->filter(fn($c) => $c->data_vencimento && $c->data_vencimento < date('Y-m-d'));
     $activities = $account->activities()->with('createdBy')->orderByDesc('created_at')->get();
+    $lastInsight = \App\Models\CrmAiInsight::where('account_id', $account->id)->where('status', 'active')->where('tipo', 'account_action')->orderByDesc('created_at')->first();
 @endphp
 
 <div class="max-w-full mx-auto px-6 py-6">
@@ -100,15 +101,64 @@
         </div>
     </div>
 
+    {{-- BANNER IA — Ação pendente --}}
+    @if($lastInsight)
+    <div class="mb-6 bg-gradient-to-r from-amber-50 via-orange-50 to-yellow-50 border border-amber-300 rounded-xl p-5 shadow-sm" id="ai-action-banner">
+        <div class="flex items-center justify-between flex-wrap gap-4">
+            <div class="flex items-start gap-3 flex-1 min-w-0">
+                <span class="flex-shrink-0 w-10 h-10 bg-amber-400 text-white rounded-full flex items-center justify-center text-lg font-bold shadow-sm">✦</span>
+                <div class="min-w-0">
+                    <p class="text-sm font-bold text-amber-900">{{ $lastInsight->titulo }}</p>
+                    @if($lastInsight->action_suggested)
+                        <p class="text-sm text-amber-700 mt-1">→ {{ $lastInsight->action_suggested }}</p>
+                    @endif
+                    <p class="text-[10px] text-amber-500 mt-1">Gerado em {{ $lastInsight->created_at->timezone('America/Sao_Paulo')->format('d/m/Y H:i') }}</p>
+                </div>
+            </div>
+            <button onclick="document.getElementById('ai-insight-box').scrollIntoView({behavior:'smooth', block:'center'})"
+                    class="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-semibold shadow transition-colors whitespace-nowrap flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+                Executar ação recomendada
+            </button>
+        </div>
+    </div>
+    @endif
+
     {{-- KPI CARDS --}}
     @if($hasDj)
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-        <div class="bg-white rounded-lg shadow-sm border p-4"><p class="text-xs text-gray-400 mb-1">Receita Total</p><p class="text-lg font-bold text-[#1B334A]">R$ {{ number_format($djContext['receita_total'], 2, ',', '.') }}</p></div>
-        <div class="bg-white rounded-lg shadow-sm border p-4"><p class="text-xs text-gray-400 mb-1">Processos Ativos</p><p class="text-lg font-bold text-[#1B334A]">{{ $processosAtivos }}</p><p class="text-xs text-gray-400">de {{ count($djContext['processos']) }} total</p></div>
-        <div class="bg-white rounded-lg shadow-sm border p-4"><p class="text-xs text-gray-400 mb-1">Contratos</p><p class="text-lg font-bold text-[#1B334A]">{{ count($djContext['contratos']) }}</p></div>
-        <div class="bg-white rounded-lg shadow-sm border p-4"><p class="text-xs text-gray-400 mb-1">A Receber</p><p class="text-lg font-bold text-[#1B334A]">R$ {{ number_format($contasAbertas->sum('valor'), 2, ',', '.') }}</p><p class="text-xs text-gray-400">{{ $contasAbertas->count() }} título(s)</p></div>
-        <div class="bg-white rounded-lg shadow-sm border p-4"><p class="text-xs text-gray-400 mb-1">Vencidos</p><p class="text-lg font-bold {{ $contasVencidas->count() > 0 ? 'text-red-600' : 'text-green-600' }}">R$ {{ number_format($contasVencidas->sum('valor'), 2, ',', '.') }}</p><p class="text-xs {{ $contasVencidas->count() > 0 ? 'text-red-400' : 'text-gray-400' }}">{{ $contasVencidas->count() }} título(s)</p></div>
-        <div class="bg-white rounded-lg shadow-sm border p-4"><p class="text-xs text-gray-400 mb-1">Último Movimento</p>@if($djContext['ultimo_movimento'])<p class="text-lg font-bold text-[#1B334A]">{{ \Carbon\Carbon::parse($djContext['ultimo_movimento']->data)->format('d/m/Y') }}</p><p class="text-xs text-gray-400">R$ {{ number_format(abs($djContext['ultimo_movimento']->valor), 2, ',', '.') }}</p>@else<p class="text-lg font-bold text-gray-300">—</p>@endif</div>
+        <div class="bg-white rounded-lg shadow-sm border p-4 {{ $djContext['receita_total'] == 0 ? 'opacity-50' : '' }}">
+            <p class="text-xs text-gray-400 mb-1">{{ $djContext['receita_total'] == 0 ? '⚠ ' : '' }}Receita Total</p>
+            <p class="text-lg font-bold text-[#1B334A]">R$ {{ number_format($djContext['receita_total'], 2, ',', '.') }}</p>
+        </div>
+        <div class="bg-white rounded-lg shadow-sm border p-4 {{ $processosAtivos == 0 ? 'opacity-50' : '' }}">
+            <p class="text-xs text-gray-400 mb-1">{{ $processosAtivos == 0 ? '⚠ ' : '' }}Processos Ativos</p>
+            <p class="text-lg font-bold text-[#1B334A]">{{ $processosAtivos }}</p>
+            <p class="text-xs text-gray-400">de {{ count($djContext['processos']) }} total</p>
+        </div>
+        <div class="bg-white rounded-lg shadow-sm border p-4 {{ count($djContext['contratos']) == 0 ? 'opacity-50' : '' }}">
+            <p class="text-xs text-gray-400 mb-1">{{ count($djContext['contratos']) == 0 ? '⚠ ' : '' }}Contratos</p>
+            <p class="text-lg font-bold text-[#1B334A]">{{ count($djContext['contratos']) }}</p>
+        </div>
+        <div class="bg-white rounded-lg shadow-sm border p-4 {{ $contasAbertas->sum('valor') == 0 ? 'opacity-50' : '' }}">
+            <p class="text-xs text-gray-400 mb-1">{{ $contasAbertas->sum('valor') == 0 ? '⚠ ' : '' }}A Receber</p>
+            <p class="text-lg font-bold text-[#1B334A]">R$ {{ number_format($contasAbertas->sum('valor'), 2, ',', '.') }}</p>
+            <p class="text-xs text-gray-400">{{ $contasAbertas->count() }} título(s)</p>
+        </div>
+        <div class="bg-white rounded-lg shadow-sm border p-4">
+            <p class="text-xs text-gray-400 mb-1">Vencidos</p>
+            <p class="text-lg font-bold {{ $contasVencidas->count() > 0 ? 'text-red-600' : 'text-green-600' }}">R$ {{ number_format($contasVencidas->sum('valor'), 2, ',', '.') }}</p>
+            <p class="text-xs {{ $contasVencidas->count() > 0 ? 'text-red-400' : 'text-gray-400' }}">{{ $contasVencidas->count() }} título(s)</p>
+        </div>
+        <div class="bg-white rounded-lg shadow-sm border p-4 {{ !$djContext['ultimo_movimento'] ? 'opacity-50' : '' }}">
+            <p class="text-xs text-gray-400 mb-1">{{ !$djContext['ultimo_movimento'] ? '⚠ ' : '' }}Último Movimento</p>
+            @if($djContext['ultimo_movimento'])
+                <p class="text-lg font-bold text-[#1B334A]">{{ \Carbon\Carbon::parse($djContext['ultimo_movimento']->data)->format('d/m/Y') }}</p>
+                <p class="text-xs text-gray-400">R$ {{ number_format(abs($djContext['ultimo_movimento']->valor), 2, ',', '.') }}</p>
+            @else
+                <p class="text-lg font-bold text-gray-300">—</p>
+            @endif
+        </div>
     </div>
     @endif
 
@@ -155,14 +205,68 @@
     <div id="tab-resumo" class="tab-content">
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div class="lg:col-span-2 space-y-6">
-                {{-- Segmentação IA --}}
+                {{-- Alerta de Tickets/Solicitações abertas --}}
+                @php
+                    $ticketsAbertos = collect($commContext['tickets'])->filter(fn($t) => !in_array($t->status ?? ($t['status'] ?? ''), ['concluido', 'cancelado']));
+                    $ticketsWa = $ticketsAbertos->filter(fn($t) => ($t->origem ?? ($t['origem'] ?? '')) === 'autoatendimento');
+                @endphp
+                @if($ticketsAbertos->count() > 0)
+                <div class="bg-orange-50 border border-orange-300 rounded-lg p-4">
+                    <div class="flex items-center gap-3">
+                        <span class="flex-shrink-0 w-10 h-10 bg-orange-400 text-white rounded-full flex items-center justify-center text-lg shadow-sm">🎫</span>
+                        <div class="flex-1">
+                            <p class="text-sm font-bold text-orange-900">
+                                {{ $ticketsAbertos->count() }} {{ $ticketsAbertos->count() === 1 ? 'solicitação aberta' : 'solicitações abertas' }}
+                                @if($ticketsWa->count() > 0)
+                                    <span class="text-xs font-normal text-orange-700">({{ $ticketsWa->count() }} via WhatsApp)</span>
+                                @endif
+                            </p>
+                            <div class="flex flex-wrap gap-2 mt-2">
+                                @foreach($ticketsAbertos->take(3) as $tkt)
+                                @php $tktObj = is_array($tkt) ? (object) $tkt : $tkt; @endphp
+                                <a href="{{ route('crm.service-requests.show', $tktObj->id) }}" class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-orange-200 rounded-lg text-xs hover:bg-orange-100 transition">
+                                    @if(($tktObj->origem ?? '') === 'autoatendimento')
+                                        <svg class="w-3.5 h-3.5 text-green-600" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/></svg>
+                                    @endif
+                                    <span class="font-medium text-orange-800">#{{ $tktObj->protocolo ?? $tktObj->id }}</span>
+                                    <span class="text-orange-600 truncate max-w-[180px]">{{ $tktObj->subject ?? 'Sem assunto' }}</span>
+                                    <span class="px-1.5 py-0.5 rounded text-[10px] {{ \App\Models\Crm\CrmServiceRequest::statusBadge($tktObj->status ?? 'aberto') }}">{{ \App\Models\Crm\CrmServiceRequest::statusLabel($tktObj->status ?? 'aberto') }}</span>
+                                </a>
+                                @endforeach
+                                @if($ticketsAbertos->count() > 3)
+                                    <button onclick="switchTab('solicitacoes')" class="text-xs text-orange-700 font-medium hover:underline">+{{ $ticketsAbertos->count() - 3 }} mais</button>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                @endif
+
+                {{-- Diagnóstico + Ação (Segmentação + IA unificados) --}}
                 @if(isset($segmentation) && $segmentation)
-                <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                    <div class="flex items-center gap-2 mb-1">
-                        <span class="text-purple-700 font-semibold text-sm">🤖 Segmentação</span>
+                <div class="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-200 rounded-lg overflow-hidden">
+                    <div class="px-4 py-3 bg-purple-100/60 border-b border-purple-200 flex items-center gap-2">
+                        <span class="text-purple-700 font-semibold text-sm">🤖 Diagnóstico + Ação</span>
                         <span class="px-2 py-0.5 rounded-full text-xs bg-purple-200 text-purple-800">{{ $segmentation['segment'] }}</span>
                     </div>
-                    <p class="text-sm text-purple-700/80">{{ $segmentation['summary'] }}</p>
+                    <div class="px-4 py-3 space-y-3">
+                        <p class="text-sm text-purple-800">{{ $segmentation['summary'] }}</p>
+                        @if($lastInsight)
+                            <div class="border-t border-purple-200 pt-3">
+                                <p class="text-sm font-semibold text-[#1B334A]">{{ $lastInsight->titulo }}</p>
+                                <p class="text-sm text-gray-700 mt-1 leading-relaxed">{{ $lastInsight->insight_text }}</p>
+                                @if($lastInsight->action_suggested)
+                                    <p class="text-xs text-[#385776] font-medium mt-2">→ {{ $lastInsight->action_suggested }}</p>
+                                @endif
+                            </div>
+                        @else
+                            <div class="border-t border-purple-200 pt-3 text-center">
+                                <button onclick="gerarSugestaoIA()" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-white bg-[#385776] hover:bg-[#1B334A]">
+                                    🤖 Gerar recomendação
+                                </button>
+                            </div>
+                        @endif
+                    </div>
                 </div>
                 @endif
 
@@ -195,12 +299,12 @@
                     </div>
                     @endif
                     @if($commContext['has_tickets'])
-                    <h3 class="text-sm font-medium text-gray-600 mb-2">Tickets NEXO ({{ count($commContext['tickets']) }})</h3>
+                    <h3 class="text-sm font-medium text-gray-600 mb-2">Solicitações CRM ({{ count($commContext['tickets']) }})</h3>
                     <div class="space-y-2">
                         @foreach($commContext['tickets'] as $tk)
                         <div class="flex items-center justify-between border rounded-lg p-2.5 hover:bg-gray-50 text-sm">
-                            <div><span class="font-medium text-gray-700">{{ $tk->assunto ?? 'Sem assunto' }}</span>@if($tk->protocolo ?? null)<span class="text-xs text-gray-400 ml-2">#{{ $tk->protocolo }}</span>@endif</div>
-                            <div class="flex items-center gap-2"><span class="px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-500">{{ str_replace('_', ' ', ucfirst($tk->status ?? '—')) }}</span><span class="text-xs text-gray-400">{{ $tk->created_at ? \Carbon\Carbon::parse($tk->created_at)->format('d/m/Y') : '' }}</span></div>
+                            <div><span class="font-medium text-gray-700">{{ $tk->subject ?? 'Sem assunto' }}</span>@if($tk->protocolo ?? null)<span class="text-xs text-gray-400 ml-2">#{{ $tk->protocolo }}</span>@endif</div>
+                            <div class="flex items-center gap-2"><span class="px-1.5 py-0.5 rounded text-xs {{ \App\Models\Crm\CrmServiceRequest::statusBadge($tk->status ?? 'aberto') }}">{{ \App\Models\Crm\CrmServiceRequest::statusLabel($tk->status ?? 'aberto') }}</span><span class="text-xs text-gray-400">{{ $tk->created_at ? \Carbon\Carbon::parse($tk->created_at)->format('d/m/Y') : '' }}</span></div>
                         </div>
                         @endforeach
                     </div>
@@ -223,6 +327,9 @@
                                         <div class="flex gap-2 mt-1">
                                             <span class="text-xs px-1.5 py-0.5 rounded" style="background-color: {{ $opp->stage?->color ?? '#eee' }}20; color: {{ $opp->stage?->color ?? '#666' }}">{{ $opp->stage?->name ?? '?' }}</span>
                                             <span class="text-xs px-1.5 py-0.5 rounded {{ $opp->status === 'won' ? 'bg-green-100 text-green-700' : ($opp->status === 'lost' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600') }}">{{ ucfirst($opp->status) }}</span>
+                                            @if($opp->status === 'won' && (!$account->last_touch_at || \Carbon\Carbon::parse($account->last_touch_at)->lt(now()->subDays(30))))
+                                                <span class="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">⚠ Sem follow-up registrado</span>
+                                            @endif
                                         </div>
                                     </div>
                                     @if($opp->value_estimated)<span class="text-sm font-medium text-gray-700">R$ {{ number_format($opp->value_estimated, 2, ',', '.') }}</span>@endif
@@ -239,21 +346,67 @@
                     @if($timeline->isEmpty())
                         <p class="text-gray-400 text-sm">Nenhum evento registrado.</p>
                     @else
-                        <div class="space-y-3">
+                        <div class="divide-y divide-gray-100">
                             @foreach($timeline as $item)
                             @php
-                                $borderColor = match($item['subtype'] ?? $item['type']) { 'call' => 'border-blue-400', 'meeting' => 'border-purple-400', 'whatsapp' => 'border-green-400', 'task' => 'border-orange-400', 'note' => 'border-gray-300', 'event' => 'border-blue-300', default => 'border-gray-200' };
-                                $icon = match($item['subtype'] ?? '') { 'call' => '📞', 'meeting' => '🤝', 'whatsapp' => '💬', 'task' => '✅', 'note' => '📝', default => '•' };
+                                $subtype = $item['subtype'] ?? '';
+                                $isActivity = ($item['type'] === 'activity');
+
+                                if ($isActivity) {
+                                    // Atividades (interações humanas)
+                                    [$tlIcon, $tlBorder, $tlBadge, $tlLabel] = match($subtype) {
+                                        'call'     => ['📞', 'border-blue-500',   'bg-blue-100 text-blue-700',     'Ligação'],
+                                        'meeting'  => ['🤝', 'border-purple-500', 'bg-purple-100 text-purple-700', 'Reunião'],
+                                        'whatsapp' => ['💬', 'border-green-500',  'bg-green-100 text-green-700',   'WhatsApp'],
+                                        'email'    => ['✉️', 'border-indigo-500', 'bg-indigo-100 text-indigo-700', 'E-mail'],
+                                        'visit'    => ['🏢', 'border-teal-500',   'bg-teal-100 text-teal-700',     'Visita'],
+                                        'note'     => ['📝', 'border-gray-400',   'bg-gray-200 text-gray-600',     'Nota'],
+                                        'task'     => ['✅', 'border-orange-500', 'bg-orange-100 text-orange-700', 'Tarefa'],
+                                        default    => ['📋', 'border-gray-400',   'bg-gray-200 text-gray-600',     'Atividade'],
+                                    };
+                                } else {
+                                    // Eventos de sistema — cada subtipo com visual próprio
+                                    [$tlIcon, $tlBorder, $tlBadge, $tlLabel] = match($subtype) {
+                                        'health_score_changed'       => ['💊', 'border-rose-400',    'bg-rose-100 text-rose-700',       'Saúde'],
+                                        'account_updated'            => ['✏️', 'border-sky-400',     'bg-sky-100 text-sky-700',          'Atualização'],
+                                        'account_archived'           => ['📦', 'border-gray-500',    'bg-gray-200 text-gray-700',        'Arquivamento'],
+                                        'account_unarchived'         => ['📤', 'border-emerald-500', 'bg-emerald-100 text-emerald-700',  'Reativação'],
+                                        'lead_status_changed'        => ['🏷️', 'border-cyan-400',    'bg-cyan-100 text-cyan-700',        'Status Lead'],
+                                        'lead_qualified'             => ['⭐', 'border-amber-500',   'bg-amber-100 text-amber-700',      'Lead Qualificado'],
+                                        'opportunity_created'        => ['💼', 'border-violet-500',  'bg-violet-100 text-violet-700',    'Oportunidade'],
+                                        'opportunity_imported'       => ['📥', 'border-violet-400',  'bg-violet-100 text-violet-700',    'Importação'],
+                                        'opportunity_lost'           => ['❌', 'border-red-400',     'bg-red-100 text-red-700',          'Oportunidade Perdida'],
+                                        'stage_changed'              => ['🔀', 'border-blue-400',    'bg-blue-100 text-blue-700',        'Estágio'],
+                                        'owner_transferred'          => ['🔄', 'border-indigo-400',  'bg-indigo-100 text-indigo-700',    'Transferência'],
+                                        'segment_changed'            => ['🎯', 'border-purple-400',  'bg-purple-100 text-purple-700',    'Segmentação'],
+                                        'document_uploaded'          => ['📎', 'border-sky-400',     'bg-sky-100 text-sky-700',          'Documento'],
+                                        'document_deleted'           => ['🗑️', 'border-gray-400',    'bg-gray-200 text-gray-600',        'Doc. Removido'],
+                                        'service_request_created'    => ['🎫', 'border-orange-500',  'bg-orange-100 text-orange-700',    'Ticket Criado'],
+                                        'service_request_updated'    => ['🎫', 'border-orange-400',  'bg-orange-100 text-orange-700',    'Ticket Atualizado'],
+                                        'nexo_opened_chat'           => ['💬', 'border-green-500',   'bg-green-100 text-green-700',      'Chat NEXO'],
+                                        'prospect_converted'         => ['🎉', 'border-emerald-500', 'bg-emerald-100 text-emerald-700',  'Conversão'],
+                                        'account_created_from_lead'  => ['🆕', 'border-blue-500',    'bg-blue-100 text-blue-700',        'Nova Conta'],
+                                        default                      => ['🔹', 'border-slate-400',   'bg-slate-100 text-slate-600',      'Evento'],
+                                    };
+                                }
+
+                                $isHighlight = in_array($subtype, ['service_request_created', 'opportunity_lost', 'account_archived']);
                             @endphp
-                            <div class="flex gap-3 text-sm border-l-2 {{ $borderColor }} pl-3 py-1">
-                                <span class="flex-shrink-0">{{ $icon }}</span>
-                                <div class="flex-1">
-                                    <p class="text-gray-800">{{ $item['title'] }}</p>
-                                    @if(!empty($item['body']))<p class="text-gray-500 text-xs mt-0.5">{{ \Illuminate\Support\Str::limit($item['body'], 120) }}</p>@endif
+                            <div class="flex gap-3 text-sm border-l-4 {{ $tlBorder }} pl-3 py-3 {{ $isHighlight ? 'bg-amber-50/50' : '' }}">
+                                <span class="flex-shrink-0 w-8 h-8 rounded-full {{ $tlBadge }} flex items-center justify-center text-sm shadow-sm">{{ $tlIcon }}</span>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide {{ $tlBadge }}">{{ $tlLabel }}</span>
+                                        @if($isHighlight)
+                                            <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+                                        @endif
+                                    </div>
+                                    <p class="text-gray-900 mt-1 {{ $isActivity ? 'font-medium' : '' }}">{{ $item['title'] }}</p>
+                                    @if(!empty($item['body']))<p class="text-gray-600 text-xs mt-0.5">{{ \Illuminate\Support\Str::limit($item['body'], 120) }}</p>@endif
                                 </div>
-                                <div class="text-xs text-gray-400 flex-shrink-0 text-right">
+                                <div class="text-xs text-gray-500 flex-shrink-0 text-right">
                                     {{ $item['date'] ? (is_string($item['date']) ? \Carbon\Carbon::parse($item['date'])->format('d/m H:i') : $item['date']->format('d/m H:i')) : '' }}
-                                    @if($item['user'] ?? null)<br>{{ $item['user'] }}@endif
+                                    @if($item['user'] ?? null)<br><span class="text-gray-400">{{ $item['user'] }}</span>@endif
                                 </div>
                             </div>
                             @endforeach
@@ -275,10 +428,9 @@
                         </button>
                     </div>
                     <div id="ai-insight-content">
-                        @php $lastInsight = \App\Models\CrmAiInsight::where('account_id', $account->id)->where('status', 'active')->where('tipo', 'account_action')->orderByDesc('created_at')->first(); @endphp
                         @if($lastInsight)
                             <div class="text-sm font-semibold text-[#1B334A] mb-2">{{ $lastInsight->titulo }}</div>
-                            <div class="text-xs text-gray-600 leading-relaxed">{{ $lastInsight->insight_text }}</div>
+                            <div class="text-sm text-gray-700 leading-relaxed">{{ $lastInsight->insight_text }}</div>
                             @if($lastInsight->action_suggested)
                                 <div class="mt-3 pt-3 border-t border-gray-100">
                                     <div class="text-xs text-[#385776] font-medium">→ {{ $lastInsight->action_suggested }}</div>
@@ -307,7 +459,7 @@
                     .then(data => {
                         if (data.success && data.insight) {
                             let h = '<div class="text-sm font-semibold text-[#1B334A] mb-2">' + data.insight.titulo + '</div>';
-                            h += '<div class="text-xs text-gray-600 leading-relaxed">' + data.insight.insight_text + '</div>';
+                            h += '<div class="text-sm text-gray-700 leading-relaxed">' + data.insight.insight_text + '</div>';
                             if (data.insight.action_suggested) {
                                 h += '<div class="mt-3 pt-3 border-t border-gray-100"><div class="text-xs text-[#385776] font-medium">→ ' + data.insight.action_suggested + '</div></div>';
                             }
@@ -326,19 +478,31 @@
                     });
                 }
                 </script>
-                <div class="bg-white rounded-lg shadow-sm border p-6">
-                    <h2 class="text-lg font-semibold text-[#1B334A] mb-4">Gestão CRM</h2>
-                    <form id="form-crm-update" class="space-y-4">
-                        @csrf
-                        <div><label class="text-xs text-gray-500">Responsável</label><select name="owner_user_id" class="w-full border rounded-lg px-3 py-2 text-sm mt-1"><option value="">Sem responsável</option>@foreach($users as $u)<option value="{{ $u->id }}" {{ $account->owner_user_id == $u->id ? 'selected' : '' }}>{{ $u->name }}</option>@endforeach</select></div>
-                        <div><label class="text-xs text-gray-500">Ciclo de Vida</label><select name="lifecycle" class="w-full border rounded-lg px-3 py-2 text-sm mt-1">@foreach(['onboarding','ativo','adormecido','arquivado','risco'] as $lc)<option value="{{ $lc }}" {{ $account->lifecycle === $lc ? 'selected' : '' }}>{{ ucfirst($lc) }}</option>@endforeach</select></div>
-                        <div><label class="text-xs text-gray-500">Saúde</label><div class="flex items-center gap-2 mt-1">@php $hs = $account->health_score; @endphp<div class="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden"><div class="h-full rounded-full flex items-center justify-center text-xs font-medium text-white" style="width: {{ max(15, $hs ?? 0) }}%; background-color: {{ ($hs ?? 0) >= 70 ? '#22C55E' : (($hs ?? 0) >= 40 ? '#F59E0B' : '#EF4444') }}">{{ $hs ?? '—' }}</div></div><span class="text-xs text-gray-400">auto</span></div></div>
-                        <div><label class="text-xs text-gray-500">Próxima ação</label><input type="date" name="next_touch_at" value="{{ $account->next_touch_at?->format('Y-m-d') }}" class="w-full border rounded-lg px-3 py-2 text-sm mt-1"></div>
-                        <div><label class="text-xs text-gray-500">Notas</label><textarea name="notes" rows="4" class="w-full border rounded-lg px-3 py-2 text-sm mt-1">{{ $account->notes }}</textarea></div>
-                        <div><label class="text-xs text-gray-500">Tags (separar por vírgula)</label><input type="text" name="tags" value="{{ implode(', ', $account->getTagsArray()) }}" class="w-full border rounded-lg px-3 py-2 text-sm mt-1"></div>
-                        <button type="button" onclick="saveAccountCrm()" class="w-full px-4 py-2 bg-[#385776] text-white rounded-lg text-sm hover:bg-[#1B334A]">Salvar Alterações</button>
-                        <p id="save-feedback" class="text-xs text-green-600 hidden text-center">Salvo com sucesso!</p>
-                    </form>
+                <div class="bg-white rounded-lg shadow-sm border" x-data="{ crmOpen: false }">
+                    <div class="p-4 flex items-center justify-between cursor-pointer" x-on:click="crmOpen = !crmOpen">
+                        <div>
+                            <h2 class="text-sm font-semibold text-[#1B334A]">Gestão CRM</h2>
+                            <p class="text-xs text-gray-500 mt-1" x-show="!crmOpen">
+                                Responsável: <span class="font-medium text-gray-700">{{ $account->owner?->name ?? '—' }}</span>
+                                &nbsp;|&nbsp; Ciclo: <span class="font-medium text-gray-700">{{ ucfirst($account->lifecycle ?? 'onboarding') }}</span>
+                                &nbsp;|&nbsp; Saúde: <span class="font-medium text-gray-700">{{ $account->health_score ?? '—' }}</span>
+                            </p>
+                        </div>
+                        <button class="text-xs text-[#385776] font-medium hover:underline" x-text="crmOpen ? 'Fechar' : 'Editar gestão'"></button>
+                    </div>
+                    <div x-show="crmOpen" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="px-6 pb-6 border-t border-gray-100">
+                        <form id="form-crm-update" class="space-y-4 pt-4">
+                            @csrf
+                            <div><label class="text-xs text-gray-500">Responsável</label><select name="owner_user_id" class="w-full border rounded-lg px-3 py-2 text-sm mt-1"><option value="">Sem responsável</option>@foreach($users as $u)<option value="{{ $u->id }}" {{ $account->owner_user_id == $u->id ? 'selected' : '' }}>{{ $u->name }}</option>@endforeach</select></div>
+                            <div><label class="text-xs text-gray-500">Ciclo de Vida</label><select name="lifecycle" class="w-full border rounded-lg px-3 py-2 text-sm mt-1">@foreach(['onboarding','ativo','adormecido','arquivado','risco'] as $lc)<option value="{{ $lc }}" {{ $account->lifecycle === $lc ? 'selected' : '' }}>{{ ucfirst($lc) }}</option>@endforeach</select></div>
+                            <div><label class="text-xs text-gray-500">Saúde</label><div class="flex items-center gap-2 mt-1">@php $hs = $account->health_score; @endphp<div class="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden"><div class="h-full rounded-full flex items-center justify-center text-xs font-medium text-white" style="width: {{ max(15, $hs ?? 0) }}%; background-color: {{ ($hs ?? 0) >= 70 ? '#22C55E' : (($hs ?? 0) >= 40 ? '#F59E0B' : '#EF4444') }}">{{ $hs ?? '—' }}</div></div><span class="text-xs text-gray-400">auto</span></div></div>
+                            <div><label class="text-xs text-gray-500">Próxima ação</label><input type="date" name="next_touch_at" value="{{ $account->next_touch_at?->format('Y-m-d') }}" class="w-full border rounded-lg px-3 py-2 text-sm mt-1"></div>
+                            <div><label class="text-xs text-gray-500">Notas</label><textarea name="notes" rows="4" class="w-full border rounded-lg px-3 py-2 text-sm mt-1">{{ $account->notes }}</textarea></div>
+                            <div><label class="text-xs text-gray-500">Tags (separar por vírgula)</label><input type="text" name="tags" value="{{ implode(', ', $account->getTagsArray()) }}" class="w-full border rounded-lg px-3 py-2 text-sm mt-1"></div>
+                            <button type="button" onclick="saveAccountCrm()" class="w-full px-4 py-2 bg-[#385776] text-white rounded-lg text-sm hover:bg-[#1B334A]">Salvar Alterações</button>
+                            <p id="save-feedback" class="text-xs text-green-600 hidden text-center">Salvo com sucesso!</p>
+                        </form>
+                    </div>
                 </div>
                 <div class="bg-gray-50 rounded-lg border p-4 text-xs text-gray-500 space-y-1">
                     <p><strong>Account ID:</strong> {{ $account->id }}</p>
@@ -347,10 +511,9 @@
                 </div>
 
                 @if(in_array(auth()->user()->role, ['admin', 'coordenador', 'socio']))
-                <div class="bg-white rounded-lg shadow-sm border p-4 space-y-3">
-                    
-                    <h3 class="text-sm font-semibold text-gray-700">Ações Administrativas</h3>
-                    {{-- Transferir --}}
+                {{-- Ações Administrativas — Transferir (ação segura) --}}
+                <div class="bg-white rounded-lg shadow-sm border p-4">
+                    <h3 class="text-sm font-semibold text-gray-700 mb-3">Ações Administrativas</h3>
                     <div>
                         <label class="text-xs text-gray-500">Transferir para</label>
                         <div class="flex gap-2 mt-1">
@@ -366,17 +529,41 @@
                         </div>
                         <input type="text" id="transfer-reason" placeholder="Motivo (opcional)" class="w-full border rounded-lg px-2 py-1.5 text-sm mt-1">
                     </div>
-                    {{-- Arquivar --}}
-                    @if($account->lifecycle !== 'arquivado')
-                    <div class="border-t pt-3">
-                        <input type="text" id="archive-reason" placeholder="Motivo do arquivamento" class="w-full border rounded-lg px-2 py-1.5 text-sm">
-                        <button onclick="archiveAccount()" class="w-full mt-1 px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs hover:bg-gray-600">Arquivar Conta</button>
+                </div>
+
+                {{-- Zona de Perigo (colapsável) --}}
+                <div class="border border-red-200 rounded-lg" x-data="{ dangerOpen: false }">
+                    <button x-on:click="dangerOpen = !dangerOpen"
+                            class="w-full px-4 py-3 flex items-center justify-between text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                        <span>⚠ Zona de Perigo</span>
+                        <svg class="w-4 h-4 transition-transform duration-200" :class="{ 'rotate-180': dangerOpen }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="dangerOpen" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" class="px-4 pb-4 space-y-4">
+                        {{-- Arquivar --}}
+                        @if($account->lifecycle !== 'arquivado')
+                        <div class="border-t border-red-100 pt-3">
+                            <p class="text-xs text-gray-500 mb-2">Arquivar esta conta (reversível)</p>
+                            <input type="text" id="archive-reason" placeholder="Motivo do arquivamento" class="w-full border rounded-lg px-2 py-1.5 text-sm">
+                            <button onclick="archiveAccount()" class="w-full mt-2 px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs hover:bg-gray-600">Arquivar Conta</button>
+                        </div>
+                        @else
+                        <div class="border-t border-red-100 pt-3">
+                            <button onclick="unarchiveAccount()" class="w-full px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700">Reativar Conta</button>
+                        </div>
+                        @endif
+
+                        {{-- Excluir (movido do botão flutuante) --}}
+                        @if(auth()->user()->isAdmin())
+                        <div class="border-t border-red-100 pt-3">
+                            <p class="text-xs text-red-500 mb-2">Exclusão permanente — esta ação não pode ser desfeita</p>
+                            <button onclick="document.getElementById('delete-modal').classList.remove('hidden')"
+                                class="w-full px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                Excluir Conta Permanentemente
+                            </button>
+                        </div>
+                        @endif
                     </div>
-                    @else
-                    <div class="border-t pt-3">
-                        <button onclick="unarchiveAccount()" class="w-full px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700">Reativar Conta</button>
-                    </div>
-                    @endif
                 </div>
                 @endif
             </div>
@@ -450,7 +637,7 @@
                                 $actColor = match($act->type) { 'call' => 'border-blue-400 bg-blue-50', 'meeting' => 'border-purple-400 bg-purple-50', 'whatsapp' => 'border-green-400 bg-green-50', 'note' => 'border-gray-300 bg-gray-50', 'email' => 'border-indigo-400 bg-indigo-50', 'visit' => 'border-teal-400 bg-teal-50', default => 'border-gray-200 bg-gray-50' };
                                 $purposeLabel = match($act->purpose ?? '') { 'acompanhamento' => 'Acompanhamento', 'comercial' => 'Comercial', 'cobranca' => 'Cobrança', 'orientacao' => 'Orientação', 'documental' => 'Documental', 'agendamento' => 'Agendamento', 'retorno' => 'Retorno', 'registro_interno' => 'Registro Interno', 'relacionamento' => 'Relacionamento', 'assinatura' => 'Assinatura', 'estrategica' => 'Estratégica', default => '' };
                             @endphp
-                            <div class="border-l-4 {{ $actColor }} rounded-r-lg p-4">
+                            <div id="activity-{{ $act->id }}" class="border-l-4 {{ $actColor }} rounded-r-lg p-4 transition-all duration-500">
                                 <div class="flex items-start justify-between">
                                     <div class="flex items-start gap-2">
                                         <span class="text-lg">{{ $actIcon }}</span>
@@ -628,32 +815,35 @@
                 @endif
             </div>
 
-            {{-- Tickets NEXO --}}
+            {{-- Solicitações CRM --}}
             <div class="bg-white rounded-lg shadow-sm border p-6">
-                <h2 class="text-lg font-semibold text-[#1B334A] mb-4">🎫 Tickets NEXO</h2>
+                <h2 class="text-lg font-semibold text-[#1B334A] mb-4">🎫 Solicitações</h2>
                 @if($commContext['has_tickets'])
                 <div class="space-y-2">
                     @foreach($commContext['tickets'] as $tk)
                     @php
                         $tkObj = (object) $tk;
                         $tkStatus = $tkObj->status ?? 'aberto';
-                        $tkCor = match(strtolower($tkStatus)) { 'resolvido','fechado' => 'bg-green-100 text-green-700', 'em andamento','em_andamento' => 'bg-blue-100 text-blue-700', default => 'bg-yellow-100 text-yellow-700' };
+                        $tkCor = \App\Models\Crm\CrmServiceRequest::statusBadge($tkStatus);
+                        $tkLabel = \App\Models\Crm\CrmServiceRequest::statusLabel($tkStatus);
+                        $cats = \App\Models\Crm\CrmServiceRequest::categorias();
+                        $catLabel = $cats[$tkObj->category ?? '']['label'] ?? ($tkObj->category ?? '');
                     @endphp
                     <div class="border rounded-lg p-3 hover:bg-gray-50">
                         <div class="flex items-center justify-between">
-                            <span class="font-medium text-gray-800 text-sm">{{ $tkObj->assunto ?? 'Ticket #' . ($tkObj->protocolo ?? $tkObj->id ?? '?') }}</span>
-                            <span class="px-1.5 py-0.5 rounded text-xs {{ $tkCor }}">{{ ucfirst($tkStatus) }}</span>
+                            <span class="font-medium text-gray-800 text-sm">{{ $tkObj->subject ?? 'Solicitação #' . ($tkObj->protocolo ?? $tkObj->id ?? '?') }}</span>
+                            <span class="px-1.5 py-0.5 rounded text-xs {{ $tkCor }}">{{ $tkLabel }}</span>
                         </div>
                         <div class="flex items-center gap-3 mt-1 text-xs text-gray-400">
                             @if($tkObj->protocolo ?? null)<span>#{{ $tkObj->protocolo }}</span>@endif
-                            @if($tkObj->tipo ?? null)<span>{{ $tkObj->tipo }}</span>@endif
+                            @if($catLabel)<span>{{ $catLabel }}</span>@endif
                             @if($tkObj->created_at ?? null)<span>{{ \Carbon\Carbon::parse($tkObj->created_at)->format('d/m/Y') }}</span>@endif
                         </div>
                     </div>
                     @endforeach
                 </div>
                 @else
-                <p class="text-gray-400 text-sm">Nenhum ticket encontrado.</p>
+                <p class="text-gray-400 text-sm">Nenhuma solicitação encontrada.</p>
                 @endif
             </div>
         </div>
@@ -773,7 +963,7 @@
 <div id="tab-solicitacoes" class="tab-content hidden">
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div class="flex items-center justify-between mb-6">
-            <h2 class="text-lg font-semibold text-[#1B334A]">Solicitações Internas</h2>
+            <h2 class="text-lg font-semibold text-[#1B334A]">Solicitações</h2>
             <button onclick="document.getElementById('form-new-sr').classList.toggle('hidden')" class="px-3 py-1.5 bg-[#385776] text-white rounded-lg text-xs hover:bg-[#1B334A] transition">+ Nova Solicitação</button>
         </div>
 
@@ -786,7 +976,9 @@
                     <select name="category" required class="w-full border rounded-lg px-3 py-2 text-sm bg-white" onchange="this.form.querySelector('[data-approval-info]').textContent = this.selectedOptions[0]?.dataset?.approval === '1' ? '⚠️ Requer aprovação da diretoria' : ''">
                         <option value="">Selecione...</option>
                         @foreach($srCategorias as $key => $cat)
+                            @if(!str_starts_with($key, 'cliente_'))
                             <option value="{{ $key }}" data-approval="{{ $cat['approval'] ? '1' : '0' }}">{{ $cat['label'] }}</option>
+                            @endif
                         @endforeach
                     </select>
                     <p data-approval-info class="text-xs text-orange-600 mt-1"></p>
@@ -840,8 +1032,11 @@
                                     <span class="px-2 py-0.5 rounded-full {{ App\Models\Crm\CrmServiceRequest::statusBadge($sr->status) }}">{{ App\Models\Crm\CrmServiceRequest::statusLabel($sr->status) }}</span>
                                     <span class="px-2 py-0.5 rounded-full {{ App\Models\Crm\CrmServiceRequest::priorityBadge($sr->priority) }}">{{ ucfirst($sr->priority) }}</span>
                                     <span class="text-gray-400">{{ $srCategorias[$sr->category]['label'] ?? $sr->category }}</span>
+                                    @if($sr->origem === 'autoatendimento')
+                                        <span class="px-1.5 py-0.5 rounded bg-teal-50 text-teal-600">cliente</span>
+                                    @endif
                                     <span class="text-gray-400">•</span>
-                                    <span class="text-gray-400">por {{ $sr->requestedBy->name ?? '-' }}</span>
+                                    <span class="text-gray-400">por {{ $sr->requestedBy->name ?? 'cliente' }}</span>
                                     @if($sr->assignedTo)
                                         <span class="text-gray-400">→ {{ $sr->assignedTo->name }}</span>
                                     @endif
@@ -984,13 +1179,7 @@
 
 
 @if(auth()->user()->isAdmin())
-{{-- Botao excluir no header --}}
-<style>#delete-account-btn { position: fixed; bottom: 2rem; right: 2rem; z-index: 40; }</style>
-<button id="delete-account-btn" onclick="document.getElementById('delete-modal').classList.remove('hidden')"
-    class="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium shadow-lg transition flex items-center gap-2">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-    Excluir Conta
-</button>
+{{-- Modal de confirmação de exclusão --}}
 <div id="delete-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/50">
     <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4">
         <h2 class="text-lg font-bold text-red-600 mb-2">Excluir conta permanentemente</h2>
@@ -1149,8 +1338,21 @@ function switchTab(tab) {
 
 // Ativar aba da URL hash
 if (window.location.hash) {
-    const tab = window.location.hash.replace('#', '');
-    if (document.getElementById('tab-' + tab)) switchTab(tab);
+    const hash = window.location.hash.replace('#', '');
+    if (hash.startsWith('activity-')) {
+        switchTab('atividades');
+        setTimeout(() => {
+            const el = document.getElementById(hash);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.style.outline = '2px solid #385776';
+                el.style.outlineOffset = '3px';
+                setTimeout(() => { el.style.outline = ''; el.style.outlineOffset = ''; }, 3000);
+            }
+        }, 100);
+    } else if (document.getElementById('tab-' + hash)) {
+        switchTab(hash);
+    }
 }
 
 function saveAccountCrm() {

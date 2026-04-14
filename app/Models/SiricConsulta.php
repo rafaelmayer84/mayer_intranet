@@ -1,5 +1,24 @@
 <?php
 
+/**
+ * ============================================================================
+ * SIRIC v2 — SiricConsulta (Model)
+ * ============================================================================
+ *
+ * Modelo principal do sistema de análise de crédito. Representa uma consulta
+ * de crédito completa, desde o cadastro até a decisão humana final.
+ *
+ * Responsabilidades:
+ * - Armazenar dados do formulário (CPF/CNPJ, nome, valor, parcelas, renda, etc.)
+ * - Armazenar dados pessoais expandidos (profissão, patrimônio, referências)
+ * - Guardar snapshot_interno JSON (coleta de dados do BD)
+ * - Guardar actions_ia JSON (gate decision + relatório da IA)
+ * - Rastrear rating (A-E), score (0-1000), recomendação, decisão humana
+ * - Relacionamentos: User, Cliente, Evidências, Relatórios
+ * - Gerenciar ciclo de vida: rascunho → coletado → analisando → analisado → decidido
+ * ============================================================================
+ */
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;

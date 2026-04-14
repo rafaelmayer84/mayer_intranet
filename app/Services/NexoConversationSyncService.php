@@ -145,6 +145,26 @@ class NexoConversationSyncService
                 'msg_type'   => $parsed['message_type'],
             ]);
 
+            // ── SAFEGUARD: Re-pausar bot no SendPulse se conversa está em atendimento humano ──
+            // Isso impede que o bot responda mesmo quando a automacao deveria estar pausada
+            if ($conversation->bot_ativo === false && $conversation->assigned_user_id) {
+                $contactIdPausa = $parsed['contact_id'] ?: $conversation->contact_id;
+                if ($contactIdPausa) {
+                    try {
+                        $this->sendpulse->pausarAutomacao($contactIdPausa);
+                        \Log::info('NEXO-AUDIT: bot re-pausado via webhook safeguard', [
+                            'conv_id' => $conversation->id,
+                            'contact_id' => $contactIdPausa,
+                        ]);
+                    } catch (\Throwable $e) {
+                        \Log::warning('NEXO-AUDIT: falha ao re-pausar bot no webhook', [
+                            'conv_id' => $conversation->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+            }
+
             // ── DOR 3: Auto-sync WhatsApp → CRM ──
             if (!$msgExists && $conversation->phone) {
                 try {

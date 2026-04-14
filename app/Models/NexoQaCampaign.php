@@ -74,10 +74,10 @@ class NexoQaCampaign extends Model
             ],
             [
                 'key' => 'nps',
-                'text' => 'De 0 a 10, qual a probabilidade de recomendar nosso escritório a um amigo ou familiar?',
+                'text' => 'De 1 a 5, qual a probabilidade de recomendar nosso escritório a um amigo ou familiar?',
                 'type' => 'scale',
-                'min' => 0,
-                'max' => 10,
+                'min' => 1,
+                'max' => 5,
             ],
         ];
     }

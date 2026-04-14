@@ -365,13 +365,20 @@ function limparSelecao() {
 function gerarPropostas() {
     if (!proponenteSelecionado) return;
 
+    // Popup de confirmacao antes de gerar
+    const nome = proponenteSelecionado.nome || 'proponente';
+    if (!confirm(`Gerar propostas de honorários para "${nome}"?`)) return;
+
     const btn = document.getElementById('btn-gerar');
     const txt = document.getElementById('btn-gerar-text');
     const spinner = document.getElementById('btn-gerar-spinner');
 
     btn.disabled = true;
-    txt.textContent = 'Analisando dados...';
+    txt.textContent = 'Analisando...';
     spinner.classList.remove('hidden');
+
+    // Mostrar overlay de status
+    mostrarStatusIA();
 
     const payload = {
         tipo_proponente: proponenteSelecionado.tipo,
@@ -384,6 +391,10 @@ function gerarPropostas() {
         contexto_adicional: document.getElementById('contexto-adicional').value,
     };
 
+    // Timeout de 3 minutos para evitar request pendurado
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 180000);
+
     fetch('{{ route("precificacao.gerar") }}', {
         method: 'POST',
         headers: {
@@ -392,12 +403,28 @@ function gerarPropostas() {
             'X-CSRF-TOKEN': csrfToken,
         },
         body: JSON.stringify(payload),
+        signal: controller.signal,
     })
-    .then(r => r.json())
+    .then(r => {
+        clearTimeout(timeoutId);
+        if (!r.ok) {
+            return r.text().then(body => {
+                let msg = 'Erro do servidor (HTTP ' + r.status + ')';
+                try {
+                    const j = JSON.parse(body);
+                    if (j.erro) msg = j.erro;
+                    else if (j.message) msg = j.message;
+                } catch(e) {}
+                throw new Error(msg);
+            });
+        }
+        return r.json();
+    })
     .then(data => {
         btn.disabled = false;
         txt.textContent = 'Gerar Propostas';
         spinner.classList.add('hidden');
+        fecharStatusIA();
 
         if (data.erro) {
             alert('Erro: ' + data.erro);
@@ -405,14 +432,28 @@ function gerarPropostas() {
         }
 
         proposalId = data.proposal_id;
-        exibirPropostas(data.resultado);
+
+        try {
+            exibirPropostas(data.resultado);
+        } catch(renderErr) {
+            console.error('SIPEX: Erro ao renderizar propostas', renderErr);
+            alert('Propostas geradas com sucesso, mas houve um erro ao exibir. A página será recarregada.');
+            window.location.href = '{{ url("/precificacao") }}/' + proposalId;
+        }
     })
     .catch(err => {
+        clearTimeout(timeoutId);
         btn.disabled = false;
         txt.textContent = 'Gerar Propostas';
         spinner.classList.add('hidden');
-        alert('Erro de conexão. Tente novamente.');
-        console.error(err);
+        fecharStatusIA();
+
+        if (err.name === 'AbortError') {
+            alert('A análise excedeu o tempo limite (3 minutos). Tente novamente ou selecione um modelo mais rápido na Calibração.');
+        } else {
+            alert('Erro: ' + (err.message || 'Falha na comunicação com o servidor. Tente novamente.'));
+        }
+        console.error('SIPEX fetch error:', err);
     });
 }
 
@@ -426,23 +467,51 @@ function exibirPropostas(resultado) {
         { key: 'premium', label: 'Premium', color: 'amber', icon: '👑' },
     ];
 
+    // Guardar resultado completo para uso no modal
+    window._sipexResultado = resultado;
+
     grid.innerHTML = tipos.map(t => {
         const p = resultado['proposta_' + t.key];
         const isRecommended = resultado.recomendacao === t.key;
         const borderClass = isRecommended ? `ring-2 ring-${t.color}-500` : '';
         const valor = Number(p.valor_honorarios).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+        // Dados de parcelas (novo formato v3)
+        const parc = p.parcelas || {};
+        const parcTotal = parc.total || p.parcelas_sugeridas || 1;
+        const parcEntrada = parc.entrada ? 'R$ ' + Number(parc.entrada).toLocaleString('pt-BR') : '';
+        const parcValor = parc.valor_parcela ? 'R$ ' + Number(parc.valor_parcela).toLocaleString('pt-BR') : '';
+        const descAVista = parc.desconto_avista_percentual ? parc.desconto_avista_percentual + '% desc. à vista' : '';
+        const valorAVista = parc.valor_avista ? 'R$ ' + Number(parc.valor_avista).toLocaleString('pt-BR') : '';
+
+        // Metricas de yield
+        const prob = p.probabilidade_conversao_estimada || '';
+        const er = p.expected_revenue ? 'R$ ' + Number(p.expected_revenue).toLocaleString('pt-BR') : '';
+
         return `
         <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 ${borderClass} relative hover:shadow-md transition">
             ${isRecommended ? '<div class="absolute -top-2 left-1/2 -translate-x-1/2 px-3 py-0.5 bg-brand text-white text-xs rounded-full font-semibold">Recomendada</div>' : ''}
-            <div class="text-center mb-4">
+            <div class="text-center mb-3">
                 <span class="text-2xl">${t.icon}</span>
                 <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wider">${t.label}</h3>
                 <p class="text-3xl font-bold text-gray-800 dark:text-white mt-2">${valor}</p>
-                <p class="text-xs text-gray-500 mt-1">${p.tipo_cobranca || 'fixo'} | ${p.parcelas_sugeridas || 1}x</p>
+                <p class="text-xs text-gray-500 mt-1">${p.tipo_cobranca || 'fixo'} | ${parcTotal}x</p>
             </div>
-            <p class="text-sm text-gray-600 dark:text-gray-300 mb-4 leading-relaxed">${p.justificativa_estrategica || ''}</p>
-            <button onclick="escolherProposta('${t.key}', ${p.valor_honorarios})"
+
+            ${prob ? `
+            <div class="flex justify-between text-xs mb-3 px-2 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                <span class="text-gray-500 dark:text-gray-400">Conv. <strong class="text-gray-700 dark:text-gray-200">${prob}%</strong></span>
+                <span class="text-gray-500 dark:text-gray-400">ER <strong class="text-gray-700 dark:text-gray-200">${er}</strong></span>
+            </div>` : ''}
+
+            ${parcEntrada ? `
+            <div class="text-xs text-gray-500 dark:text-gray-400 mb-3 space-y-0.5">
+                <p>Entrada: <strong class="text-gray-700 dark:text-gray-200">${parcEntrada}</strong> + ${parcTotal - 1}x <strong class="text-gray-700 dark:text-gray-200">${parcValor}</strong></p>
+                ${valorAVista ? `<p>À vista: <strong class="text-gray-700 dark:text-gray-200">${valorAVista}</strong> <span class="text-green-600">(${descAVista})</span></p>` : ''}
+            </div>` : ''}
+
+            <p class="text-xs text-gray-600 dark:text-gray-300 mb-4 leading-relaxed line-clamp-4">${p.justificativa_estrategica || ''}</p>
+            <button onclick="abrirModalEscolha('${t.key}')"
                 class="btn-mayer font-semibold">
                 Selecionar
             </button>
@@ -452,18 +521,131 @@ function exibirPropostas(resultado) {
 
     // Justificativa
     document.getElementById('justificativa-texto').textContent = resultado.justificativa_recomendacao || '';
+
+    // Analise Yield
+    const yield_data = resultado.analise_yield;
+    let yieldHtml = '';
+    if (yield_data) {
+        const labels = {
+            segmento_cliente: 'Segmento',
+            elasticidade_estimada: 'Elasticidade',
+            load_factor_escritorio: 'Load Factor',
+            estrategia_dominante: 'Estratégia',
+            faixa_historica_aplicada: 'Faixa Histórica',
+        };
+        yieldHtml = '<div class="flex flex-wrap gap-2 mt-3">';
+        for (const [k, label] of Object.entries(labels)) {
+            if (yield_data[k]) {
+                yieldHtml += `<span class="px-2 py-1 text-xs rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700">${label}: <strong>${yield_data[k]}</strong></span>`;
+            }
+        }
+        yieldHtml += '</div>';
+    }
+
     if (resultado.observacoes_estrategicas) {
         document.getElementById('observacoes-estrategicas').innerHTML =
-            '<p class="font-semibold text-gray-600 dark:text-gray-400 mt-2">Observações:</p><p>' + resultado.observacoes_estrategicas + '</p>';
+            yieldHtml +
+            '<p class="font-semibold text-gray-600 dark:text-gray-400 mt-3">Observações:</p><p class="text-sm text-gray-600 dark:text-gray-300 mt-1">' + resultado.observacoes_estrategicas + '</p>';
+    } else {
+        document.getElementById('observacoes-estrategicas').innerHTML = yieldHtml;
     }
 
     // Scroll suave
     document.getElementById('etapa-resultado').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function escolherProposta(tipo, valor) {
+// ===== MODAL DE CONFIRMAÇÃO DE ESCOLHA =====
+function abrirModalEscolha(tipo) {
+    if (!proposalId || !window._sipexResultado) return;
+    const p = window._sipexResultado['proposta_' + tipo];
+    if (!p) return;
+
+    const nomes = { rapida: 'Fechamento Rápido', equilibrada: 'Equilibrada', premium: 'Premium' };
+    const icons = { rapida: '⚡', equilibrada: '⚖️', premium: '👑' };
+    const valor = Number(p.valor_honorarios);
+    const valorFmt = valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+    const parc = p.parcelas || {};
+    const parcTotal = parc.total || p.parcelas_sugeridas || 1;
+    const parcEntrada = parc.entrada ? 'R$ ' + Number(parc.entrada).toLocaleString('pt-BR') : '';
+    const parcValor = parc.valor_parcela ? 'R$ ' + Number(parc.valor_parcela).toLocaleString('pt-BR') : '';
+    const valorAVista = parc.valor_avista ? 'R$ ' + Number(parc.valor_avista).toLocaleString('pt-BR') : '';
+    const descAVista = parc.desconto_avista_percentual || 0;
+
+    let parcelasHtml = '';
+    if (parcEntrada) {
+        parcelasHtml = `
+            <div class="text-sm text-gray-600 dark:text-gray-300 space-y-1">
+                <p>Entrada: <strong>${parcEntrada}</strong></p>
+                <p>${parcTotal - 1}x de <strong>${parcValor}</strong></p>
+                ${valorAVista ? `<p>À vista: <strong>${valorAVista}</strong> <span class="text-green-600">(-${descAVista}%)</span></p>` : ''}
+            </div>`;
+    } else {
+        parcelasHtml = `<p class="text-sm text-gray-600 dark:text-gray-300">${parcTotal}x parcelas</p>`;
+    }
+
+    const modalHtml = `
+    <div id="modal-escolha-overlay" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);backdrop-filter:blur(2px);">
+        <div style="background:#fff;border-radius:16px;width:95%;max-width:520px;box-shadow:0 25px 50px rgba(0,0,0,0.25);overflow:hidden;" class="dark:bg-gray-800">
+            <div style="padding:24px;">
+                <div class="text-center mb-4">
+                    <span class="text-3xl">${icons[tipo]}</span>
+                    <h3 class="text-lg font-bold text-gray-800 dark:text-white mt-2">Confirmar Proposta ${nomes[tipo]}</h3>
+                </div>
+
+                <div class="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 mb-4">
+                    <div class="text-center mb-3">
+                        <p class="text-3xl font-bold text-gray-800 dark:text-white">${valorFmt}</p>
+                        <p class="text-sm text-gray-500 mt-1">${p.tipo_cobranca || 'fixo'}</p>
+                    </div>
+                    ${parcelasHtml}
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Valor Final (ajuste se necessário)</label>
+                    <input type="number" id="modal-valor-final" value="${valor}" step="1"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white text-lg font-semibold">
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Observação do advogado <span class="text-gray-400">(opcional)</span></label>
+                    <textarea id="modal-observacao" rows="2"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white text-sm"
+                        placeholder="Ajuste de escopo, condição especial, etc."></textarea>
+                </div>
+
+                <div class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800 mb-4">
+                    <p class="text-sm text-blue-800 dark:text-blue-200 flex items-start gap-2">
+                        <svg class="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        Ao confirmar, esta proposta será registrada como escolhida e uma <strong>oportunidade será atualizada no CRM</strong> com o valor aprovado.
+                    </p>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="fecharModalEscolha()" class="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl text-sm font-medium hover:bg-gray-200 transition">
+                        Cancelar
+                    </button>
+                    <button onclick="confirmarEscolha('${tipo}')" class="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition" style="background-color:#1B334A;">
+                        Confirmar Proposta
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>`;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function fecharModalEscolha() {
+    document.getElementById('modal-escolha-overlay')?.remove();
+}
+
+function confirmarEscolha(tipo) {
     if (!proposalId) return;
-    if (!confirm(`Confirma a escolha da proposta "${tipo}" no valor de R$ ${valor.toLocaleString('pt-BR')}?`)) return;
+    const valorFinal = document.getElementById('modal-valor-final')?.value || 0;
+    const observacao = document.getElementById('modal-observacao')?.value || '';
+
+    fecharModalEscolha();
 
     fetch(`{{ url('/precificacao') }}/${proposalId}/escolher`, {
         method: 'POST',
@@ -474,16 +656,17 @@ function escolherProposta(tipo, valor) {
         },
         body: JSON.stringify({
             proposta_escolhida: tipo,
-            valor_final: valor,
+            valor_final: valorFinal,
+            observacao: observacao,
         }),
     })
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            alert('Proposta registrada com sucesso!');
-            window.location.reload();
+            window.location.href = `{{ url('/precificacao') }}/${proposalId}`;
         }
-    });
+    })
+    .catch(() => alert('Erro de conexão. Tente novamente.'));
 }
 
 // ===== TABELA OAB/SC - TIPOS DE AÇÃO POR ÁREA =====
@@ -767,6 +950,101 @@ function filtrarTiposAcao() {
         });
     } else {
         selectTipo.innerHTML = '<option value="">Selecione primeiro a área...</option>';
+    }
+}
+
+// ===== STATUS IA — OVERLAY COM ETAPAS =====
+let _statusInterval = null;
+
+function mostrarStatusIA() {
+    const etapas = [
+        { texto: 'Coletando dados do proponente...', tempo: 0 },
+        { texto: 'Consultando histórico do CRM...', tempo: 3000 },
+        { texto: 'Analisando dados de conversão...', tempo: 6000 },
+        { texto: 'Segmentando perfil do cliente...', tempo: 9000 },
+        { texto: 'Calculando load factor do escritório...', tempo: 12000 },
+        { texto: 'Gerando proposta Rápida...', tempo: 16000 },
+        { texto: 'Gerando proposta Equilibrada...', tempo: 22000 },
+        { texto: 'Gerando proposta Premium...', tempo: 28000 },
+        { texto: 'Calculando Expected Revenue...', tempo: 34000 },
+        { texto: 'Finalizando análise de yield...', tempo: 40000 },
+        { texto: 'Aguardando resposta da IA...', tempo: 50000 },
+    ];
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sipex-status-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);';
+    overlay.innerHTML = `
+        <div style="background:#fff;border-radius:20px;width:90%;max-width:420px;padding:32px;box-shadow:0 25px 60px rgba(0,0,0,0.3);text-align:center;" class="dark:bg-gray-800">
+            <div style="margin-bottom:20px;">
+                <svg class="animate-spin mx-auto" style="width:48px;height:48px;color:#4F46E5;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+            </div>
+            <h3 class="text-lg font-bold text-gray-800 dark:text-white mb-2">SIPEX Analisando</h3>
+            <p id="sipex-status-texto" class="text-sm text-gray-600 dark:text-gray-300 mb-4" style="transition:opacity 0.2s ease;">${etapas[0].texto}</p>
+            <div style="background:#E5E7EB;border-radius:9999px;height:6px;overflow:hidden;margin-bottom:12px;" class="dark:bg-gray-600">
+                <div id="sipex-status-barra" style="background:linear-gradient(90deg,#4F46E5,#7C3AED);height:100%;width:5%;border-radius:9999px;transition:width 0.8s ease;"></div>
+            </div>
+            <p id="sipex-status-tempo" class="text-xs text-gray-400">0s</p>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    let inicio = Date.now();
+    let etapaAtual = 0;
+
+    _statusInterval = setInterval(() => {
+        const elapsed = Date.now() - inicio;
+        const segundos = Math.floor(elapsed / 1000);
+
+        // Atualizar tempo
+        const tempoEl = document.getElementById('sipex-status-tempo');
+        if (tempoEl) tempoEl.textContent = segundos + 's';
+
+        // Atualizar barra (max 95%)
+        const progresso = Math.min(95, (elapsed / 60000) * 100);
+        const barraEl = document.getElementById('sipex-status-barra');
+        if (barraEl) barraEl.style.width = progresso + '%';
+
+        // Avançar etapa
+        for (let i = etapas.length - 1; i >= 0; i--) {
+            if (elapsed >= etapas[i].tempo && i > etapaAtual) {
+                etapaAtual = i;
+                const textoEl = document.getElementById('sipex-status-texto');
+                if (textoEl) {
+                    textoEl.style.opacity = '0';
+                    setTimeout(() => {
+                        textoEl.textContent = etapas[i].texto;
+                        textoEl.style.opacity = '1';
+                    }, 200);
+                }
+                break;
+            }
+        }
+    }, 500);
+}
+
+function fecharStatusIA() {
+    if (_statusInterval) {
+        clearInterval(_statusInterval);
+        _statusInterval = null;
+    }
+    const overlay = document.getElementById('sipex-status-overlay');
+    if (overlay) {
+        // Barra a 100% antes de fechar
+        const barra = document.getElementById('sipex-status-barra');
+        const texto = document.getElementById('sipex-status-texto');
+        if (barra) barra.style.width = '100%';
+        if (texto) {
+            texto.style.opacity = '0';
+            setTimeout(() => {
+                texto.textContent = 'Propostas prontas!';
+                texto.style.opacity = '1';
+            }, 200);
+        }
+        setTimeout(() => overlay.remove(), 600);
     }
 }
 

@@ -51,12 +51,12 @@
             <div>
                 <label class="text-xs text-gray-600">Status</label>
                 <select name="status" class="w-full mt-1 bg-white border-gray-300 text-gray-700 text-sm rounded-lg focus:ring-[#385776] focus:border-[#385776]">
+                    <option value="" {{ empty($filtros['status']) ? 'selected' : '' }}>Todos</option>
                     <option value="ativos" {{ ($filtros['status'] ?? '') === 'ativos' ? 'selected' : '' }}>Ativos</option>
                     <option value="aberto" {{ ($filtros['status'] ?? '') === 'aberto' ? 'selected' : '' }}>Aberto</option>
                     <option value="em_andamento" {{ ($filtros['status'] ?? '') === 'em_andamento' ? 'selected' : '' }}>Em andamento</option>
                     <option value="concluido" {{ ($filtros['status'] ?? '') === 'concluido' ? 'selected' : '' }}>Concluído</option>
                     <option value="cancelado" {{ ($filtros['status'] ?? '') === 'cancelado' ? 'selected' : '' }}>Cancelado</option>
-                    <option value="" {{ empty($filtros['status']) ? 'selected' : '' }}>Todos</option>
                 </select>
             </div>
             <div>
@@ -128,7 +128,11 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100">
                     @forelse($tickets as $ticket)
-                    <tr class="hover:bg-gray-50 transition-colors {{ $ticket->prioridade === 'urgente' && $ticket->isAberto() ? 'border-l-2 border-red-500' : '' }}" id="row-{{ $ticket->id }}">
+                    <tr class="transition-colors
+                        {{ $ticket->status === 'em_andamento' ? 'bg-yellow-50 border-l-4 border-yellow-400 hover:bg-yellow-100' : '' }}
+                        {{ $ticket->status === 'aberto' ? 'bg-white hover:bg-gray-50' : '' }}
+                        {{ in_array($ticket->status, ['concluido', 'cancelado']) ? 'bg-gray-50 opacity-50 hover:opacity-75' : '' }}
+                        {{ $ticket->prioridade === 'urgente' && $ticket->isAberto() ? 'border-l-4 border-red-500' : '' }}" id="row-{{ $ticket->id }}">
                         <td class="px-4 py-3">
                             <span class="font-mono text-xs text-[#385776] font-semibold">{{ $ticket->protocolo ?? '—' }}</span>
                         </td>

@@ -19,6 +19,7 @@ class PricingProposal extends Model
         'recomendacao_ia', 'justificativa_ia',
         'proposta_escolhida', 'valor_final', 'status', 'observacao_advogado',
         'texto_proposta_cliente',
+        'modelo_ia_utilizado', 'analise_yield',
     ];
 
     protected $casts = [
@@ -32,6 +33,7 @@ class PricingProposal extends Model
         'proposta_equilibrada' => 'array',
         'proposta_premium' => 'array',
         'texto_proposta_cliente' => 'array',
+        'analise_yield' => 'array',
     ];
 
     public function user()

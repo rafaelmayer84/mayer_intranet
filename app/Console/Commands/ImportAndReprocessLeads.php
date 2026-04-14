@@ -247,7 +247,11 @@ class ImportAndReprocessLeads extends Command
                     'gatilho_emocional' => $aiResult['gatilho_emocional'] ?? '',
                     'perfil_socioeconomico' => $aiResult['perfil_socioeconomico'] ?? '',
                     'potencial_honorarios' => $aiResult['potencial_honorarios'] ?? '',
-                    'origem_canal' => $aiResult['origem_canal'] ?? 'nao_identificado',
+                    'origem_canal' => !empty($lead->gclid)
+                        ? 'google_ads'
+                        : ((empty($lead->origem_canal) || $lead->origem_canal === 'nao_identificado')
+                            ? ($aiResult['origem_canal'] ?? 'nao_identificado')
+                            : $lead->origem_canal),
                     'erro_processamento' => null,
                 ]);
 

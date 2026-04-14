@@ -130,6 +130,7 @@ class Lead extends Model
             'Other'            => 'Outro',
             'relacionamento'   => 'Relacionamento',
             'telefone'         => 'Telefone',
+            'presencial'       => 'Presencial',
         ];
         $origem = $this->origem_canal ?? '';
         return $map[$origem] ?? ($origem ?: 'Nao identificado');

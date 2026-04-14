@@ -1,5 +1,28 @@
 <?php
 
+/**
+ * ============================================================================
+ * SIRIC v2 — SiricService
+ * ============================================================================
+ *
+ * Serviço principal de coleta e métricas do SIRIC (Sistema de Análise de Crédito).
+ *
+ * Responsabilidades:
+ * - Localizar cliente(s) no BD por CPF/CNPJ, telefone ou email (fallback em cascata)
+ * - Coletar dados internos: Contas a Receber, Movimentos, Processos, Leads, WhatsApp
+ * - Calcular métricas financeiras (totais pagos, atrasos, ticket médio, recorrência)
+ * - Avaliar nível de relacionamento com o escritório (forte/moderado/fraco/desconhecido)
+ * - Calcular gate_score DETERMINÍSTICO (v2) — regras fixas no PHP, sem depender da IA
+ * - Persistir snapshot JSON + evidências individuais por tipo
+ * - Listar consultas com filtros para a tela index
+ *
+ * v2 mudanças:
+ * - Gate score agora é calculado aqui (calcularGateScore) em vez de pela IA
+ * - Threshold Serasa subiu de 30 para 50
+ * - Bypass de Serasa para clientes com histórico forte (>= 12 meses, sem atrasos)
+ * ============================================================================
+ */
+
 namespace App\Services;
 
 use App\Models\Cliente;
@@ -463,6 +486,218 @@ $consulta->update(['cliente_id' => $clienteIds[0]]);
                 $ultimaMsg ? $ultimaMsg->format('d/m/Y') : '?'
             ),
         ];
+    }
+
+    // ========================================================================
+    // GATE SCORE DETERMINÍSTICO (v2)
+    // ========================================================================
+
+    /**
+     * Calcula o gate_score de forma determinística no PHP.
+     * Retorna array com score, breakdown, decisão sobre Serasa e justificativas.
+     *
+     * Regras de pontuação (quanto maior = mais risco):
+     * - Histórico: +35 sem cliente no BD, +40 inadimplência, +25 atraso>=15d, +25 acordo quebrado
+     * - Bom histórico: -30 se >= 12 meses, >= 6 parcelas sem atraso, saldo_vencido = 0
+     * - Renda: +25 ausente, +15 parcela/renda > 20%, +30 se > 30%, +25 se folga negativa
+     * - Completude: +15 se faltam >= 2 campos-chave, +30 se >= 4
+     * - Consistência: +25 se telefone/email divergem do BD
+     * - Exposição: -10 se < R$400, +15 se >= R$800, +25 se >= R$2.000
+     *
+     * Decisão (v2 — threshold 50, com bypass):
+     * - Bypass Serasa se histórico forte (>= 12 meses, >= 6 parcelas pagas, 0 atrasos)
+     * - gate_score >= 50 → need_serasa = true (antes era 30)
+     * - 25 <= gate_score < 50 → need_web_intel = true
+     * - gate_score < 25 → nenhuma consulta externa
+     */
+    public function calcularGateScore(SiricConsulta $consulta, array $snapshot): array
+    {
+        $breakdown = [
+            'historico' => 0,
+            'bom_historico_desconto' => 0,
+            'renda' => 0,
+            'completude' => 0,
+            'consistencia' => 0,
+            'exposicao' => 0,
+        ];
+        $riscos = [];
+        $dadosFaltantes = [];
+
+        $contas = $snapshot['contas_receber'] ?? [];
+        $relacao = $snapshot['relacao_escritorio'] ?? [];
+        $movimentos = $snapshot['movimentos'] ?? [];
+
+        $valorPretendido = (float) ($consulta->valor_total ?? 0);
+        $numParcelas = max(1, (int) ($consulta->parcelas_desejadas ?? 1));
+        $parcelaEstimada = round($valorPretendido / $numParcelas, 2);
+        $renda = $consulta->renda_declarada ? (float) $consulta->renda_declarada : null;
+
+        // ── HISTÓRICO ──
+        $clienteEncontrado = ($snapshot['clientes_encontrados'] ?? 0) > 0;
+        if (!$clienteEncontrado) {
+            $breakdown['historico'] += 35;
+            $riscos[] = 'Cliente não encontrado no banco de dados interno';
+        }
+
+        $saldoVencido = (float) ($contas['saldo_aberto'] ?? 0); // contas abertas = potencial vencido
+        $qtdAtrasos = (int) ($contas['qtd_atrasos'] ?? 0);
+        $maxDiasAtraso = (int) ($contas['max_dias_atraso'] ?? 0);
+
+        if ($qtdAtrasos > 0 && $saldoVencido > 0) {
+            $breakdown['historico'] += 40;
+            $riscos[] = "Inadimplência ativa: {$qtdAtrasos} atraso(s), saldo R$ " . number_format($saldoVencido, 2, ',', '.');
+        }
+
+        if ($maxDiasAtraso >= 15) {
+            $breakdown['historico'] += 25;
+            $riscos[] = "Atraso máximo de {$maxDiasAtraso} dias (>= 15)";
+        }
+
+        // ── BOM HISTÓRICO (desconto) ──
+        $recorrenciaMeses = (int) ($movimentos['recorrencia_meses'] ?? 0);
+        $totalPago = (float) ($contas['total_pago'] ?? 0);
+        $ticketMedio = (float) ($contas['ticket_medio_pago'] ?? 0);
+        $totalRegistros = (int) ($contas['total_registros'] ?? 0);
+
+        $temBomHistorico = $recorrenciaMeses >= 12
+            && $totalRegistros >= 6
+            && $qtdAtrasos === 0
+            && $saldoVencido <= 0;
+
+        if ($temBomHistorico) {
+            $breakdown['bom_historico_desconto'] = -30;
+        }
+
+        // ── RENDA ──
+        if ($renda === null || $renda <= 0) {
+            $breakdown['renda'] += 25;
+            $dadosFaltantes[] = 'renda_declarada';
+            $riscos[] = 'Renda não declarada';
+        } else {
+            $comprometimento = $parcelaEstimada / $renda;
+            if ($comprometimento > 0.30) {
+                $breakdown['renda'] += 30;
+                $riscos[] = sprintf('Comprometimento de renda %.1f%% (> 30%%)', $comprometimento * 100);
+            } elseif ($comprometimento > 0.20) {
+                $breakdown['renda'] += 15;
+                $riscos[] = sprintf('Comprometimento de renda %.1f%% (> 20%%)', $comprometimento * 100);
+            }
+
+            $despesas = (float) ($consulta->despesas_mensais ?? 0);
+            if ($despesas > 0 && ($renda - $despesas) < $parcelaEstimada) {
+                $breakdown['renda'] += 25;
+                $riscos[] = 'Folga de caixa insuficiente (renda - despesas < parcela)';
+            }
+        }
+
+        // ── COMPLETUDE DE DADOS ──
+        $camposChave = [
+            'telefone' => $consulta->telefone,
+            'email' => $consulta->email,
+            'endereco_cep' => $consulta->endereco_cep,
+            'profissao' => $consulta->profissao,
+            'empresa_empregador' => $consulta->empresa_empregador,
+            'tempo_emprego' => $consulta->tempo_emprego,
+        ];
+
+        $faltantes = 0;
+        foreach ($camposChave as $campo => $valor) {
+            if (empty($valor)) {
+                $faltantes++;
+                $dadosFaltantes[] = $campo;
+            }
+        }
+
+        if ($faltantes >= 4) {
+            $breakdown['completude'] += 30;
+            $riscos[] = "{$faltantes} campos-chave ausentes (>= 4)";
+        } elseif ($faltantes >= 2) {
+            $breakdown['completude'] += 15;
+            $riscos[] = "{$faltantes} campos-chave ausentes (>= 2)";
+        }
+
+        // ── CONSISTÊNCIA ──
+        if ($clienteEncontrado) {
+            $clienteInfo = $snapshot['cliente'] ?? [];
+            // Verificar divergência de telefone
+            if ($consulta->telefone && !empty($clienteInfo['telefone'])) {
+                $telForm = preg_replace('/\D/', '', $consulta->telefone);
+                $telBD = preg_replace('/\D/', '', $clienteInfo['telefone']);
+                if ($telForm && $telBD && !str_contains($telBD, $telForm) && !str_contains($telForm, $telBD)) {
+                    $breakdown['consistencia'] += 25;
+                    $riscos[] = 'Telefone do formulário diverge do cadastrado no BD';
+                }
+            }
+            // Verificar divergência de email
+            if ($consulta->email && !empty($clienteInfo['email'])) {
+                if (strtolower(trim($consulta->email)) !== strtolower(trim($clienteInfo['email']))) {
+                    $breakdown['consistencia'] += 25;
+                    $riscos[] = 'Email do formulário diverge do cadastrado no BD';
+                }
+            }
+        }
+
+        // ── EXPOSIÇÃO ──
+        if ($valorPretendido >= 2000) {
+            $breakdown['exposicao'] += 25;
+        } elseif ($valorPretendido >= 800) {
+            $breakdown['exposicao'] += 15;
+        } elseif ($valorPretendido < 400) {
+            $breakdown['exposicao'] -= 10;
+        }
+
+        // ── CÁLCULO FINAL ──
+        $gateScore = max(0, array_sum($breakdown));
+
+        // ── DECISÃO SERASA (v2) ──
+        $needSerasa = false;
+        $needWebIntel = false;
+        $serasaBypass = false;
+        $cpfValido = in_array(strlen(preg_replace('/\D/', '', $consulta->cpf_cnpj)), [11, 14]);
+        $autorizou = (bool) $consulta->autorizou_consultas_externas;
+
+        if (!$autorizou || !$cpfValido) {
+            // Sem autorização ou CPF inválido
+            $needSerasa = false;
+        } elseif ($temBomHistorico && $gateScore < 70) {
+            // BYPASS v2: cliente com histórico forte não precisa de Serasa (a menos que score muito alto)
+            $serasaBypass = true;
+            $needSerasa = false;
+        } elseif ($gateScore >= 50) {
+            $needSerasa = true;
+        } elseif ($gateScore >= 25) {
+            $needWebIntel = true;
+        }
+
+        $justificativa = $this->gerarJustificativaGate($gateScore, $needSerasa, $needWebIntel, $serasaBypass, $temBomHistorico);
+
+        return [
+            'gate_score' => $gateScore,
+            'gate_score_breakdown' => $breakdown,
+            'need_serasa' => $needSerasa,
+            'need_web_intel' => $needWebIntel,
+            'serasa_bypass' => $serasaBypass,
+            'bom_historico' => $temBomHistorico,
+            'justificativa' => $justificativa,
+            'riscos_preliminares' => $riscos,
+            'dados_faltantes' => $dadosFaltantes,
+            'parcela_estimada' => $parcelaEstimada,
+            'comprometimento_pct' => $renda && $renda > 0 ? round(($parcelaEstimada / $renda) * 100, 1) : null,
+        ];
+    }
+
+    private function gerarJustificativaGate(int $score, bool $serasa, bool $webIntel, bool $bypass, bool $bomHist): string
+    {
+        if ($bypass) {
+            return "Gate score {$score}. Serasa dispensado: cliente com histórico forte no escritório (>= 12 meses, sem atrasos).";
+        }
+        if ($serasa) {
+            return "Gate score {$score} (>= 50). Consulta Serasa recomendada para mitigar riscos identificados.";
+        }
+        if ($webIntel) {
+            return "Gate score {$score} (25-49). Web intelligence recomendada antes de Serasa.";
+        }
+        return "Gate score {$score} (< 25). Risco baixo, nenhuma consulta externa necessária.";
     }
 
     public function listar(array $filtros = [], int $perPage = 15)

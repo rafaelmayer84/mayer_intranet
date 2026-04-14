@@ -2,7 +2,7 @@
 @section('title', 'CRM - Distribuição de Carteira')
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 py-6">
+<div class="px-4 py-6">
     <div class="flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-[#1B334A]">Distribuição de Carteira</h1>

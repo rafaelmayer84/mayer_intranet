@@ -255,6 +255,13 @@ class NexoAtendimentoController extends Controller
         $cid = $conversation->id;
         $sinceId = (int) $request->input('since_id', 0);
 
+        // Se a conversa está fechada mas o usuário está ativamente visualizando,
+        // reabrir para permitir sync (o usuário quer interagir)
+        if ($conversation->status === 'closed') {
+            $conversation->update(['status' => 'open']);
+            \Log::info('NEXO: conversa reaberta por poll ativo', ['conv_id' => $cid]);
+        }
+
         // Sync leve: a cada 30s, captura mensagens outgoing do bot
         // Não bloqueia se falhar — serve dados locais de qualquer forma
         $syncKey = "nexo_light_sync_{$cid}";
@@ -398,8 +405,18 @@ class NexoAtendimentoController extends Controller
         $request->validate(['lead_id' => 'required|integer|exists:leads,id']);
         $c = WaConversation::findOrFail($id);
         $c->linked_lead_id = $request->lead_id;
+
+        // Propagar para crm_account via lead.crm_account_id
+        $crmAccountId = \Illuminate\Support\Facades\DB::table('leads')
+            ->where('id', $request->lead_id)
+            ->whereNotNull('crm_account_id')
+            ->value('crm_account_id');
+        if ($crmAccountId) {
+            $c->linked_crm_account_id = $crmAccountId;
+        }
+
         $c->save();
-        return response()->json(['success' => true]);
+        return response()->json(['success' => true, 'crm_account_id' => $c->linked_crm_account_id]);
     }
 
     public function linkCliente(Request $request, int $id)
@@ -407,8 +424,23 @@ class NexoAtendimentoController extends Controller
         $request->validate(['cliente_id' => 'required|integer|exists:clientes,id']);
         $c = WaConversation::findOrFail($id);
         $c->linked_cliente_id = $request->cliente_id;
+
+        // Propagar para crm_account via datajuri_pessoa_id
+        $datajuriId = \Illuminate\Support\Facades\DB::table('clientes')
+            ->where('id', $request->cliente_id)
+            ->whereNotNull('datajuri_id')
+            ->value('datajuri_id');
+        if ($datajuriId) {
+            $crmAccountId = \Illuminate\Support\Facades\DB::table('crm_accounts')
+                ->where('datajuri_pessoa_id', $datajuriId)
+                ->value('id');
+            if ($crmAccountId) {
+                $c->linked_crm_account_id = $crmAccountId;
+            }
+        }
+
         $c->save();
-        return response()->json(['success' => true]);
+        return response()->json(['success' => true, 'crm_account_id' => $c->linked_crm_account_id]);
     }
 
     /**
@@ -419,6 +451,10 @@ class NexoAtendimentoController extends Controller
     {
         $c = WaConversation::findOrFail($id);
         $c->linked_lead_id = null;
+        // Limpa crm_account_id somente se não veio de outro caminho (cliente)
+        if (!$c->linked_cliente_id) {
+            $c->linked_crm_account_id = null;
+        }
         $c->save();
         return response()->json(['success' => true]);
     }
@@ -432,6 +468,10 @@ class NexoAtendimentoController extends Controller
         $c = WaConversation::findOrFail($id);
         $c->linked_cliente_id = null;
         $c->linked_processo_id = null;
+        // Limpa crm_account_id somente se não veio de outro caminho (lead)
+        if (!$c->linked_lead_id) {
+            $c->linked_crm_account_id = null;
+        }
         $c->save();
         return response()->json(['success' => true]);
     }
@@ -439,18 +479,20 @@ class NexoAtendimentoController extends Controller
     public function contexto360(int $id)
     {
         $conv = WaConversation::findOrFail($id);
-        $ctx = ['link_type' => $conv->link_type, 'lead' => null, 'cliente' => null];
+        $ctx = ['link_type' => $conv->link_type, 'lead' => null, 'cliente' => null, 'crm_account_id' => $conv->linked_crm_account_id];
 
         try {
             if ($conv->linked_lead_id && $conv->lead) {
                 $leadData = $conv->lead->toArray();
                 // CRM integration: buscar account e oportunidades vinculadas
-                if ($conv->lead->crm_account_id) {
+                $crmId = $conv->lead->crm_account_id ?? $conv->linked_crm_account_id;
+                if ($crmId) {
                     $account = \App\Models\Crm\CrmAccount::with(['opportunities' => function($q) {
                         $q->orderByDesc('created_at')->limit(10);
-                    }, 'opportunities.stage'])->find($conv->lead->crm_account_id);
+                    }, 'opportunities.stage'])->find($crmId);
                     if ($account) {
                         $leadData['crm_account'] = $account->toArray();
+                        $ctx['crm_account_id'] = $account->id;
                     }
                 }
                 $ctx['lead'] = $leadData;
@@ -461,6 +503,19 @@ class NexoAtendimentoController extends Controller
             if ($conv->linked_cliente_id && $conv->cliente) {
                 $cl = $conv->cliente;
                 $d = $cl->toArray();
+                // CRM account via cliente (linked_crm_account_id já populado pelo backfill)
+                if ($conv->linked_crm_account_id && !isset($leadData['crm_account'])) {
+                    $account = \App\Models\Crm\CrmAccount::with(['serviceRequests' => function($q) {
+                        $q->latest()->limit(5);
+                    }])->find($conv->linked_crm_account_id);
+                    if ($account) {
+                        $d['crm_account'] = ['id' => $account->id, 'name' => $account->name, 'lifecycle' => $account->lifecycle];
+                        $d['crm_service_requests'] = $account->serviceRequests->map(fn($sr) => [
+                            'id' => $sr->id, 'protocolo' => $sr->protocolo, 'subject' => $sr->subject,
+                            'status' => $sr->status, 'category' => $sr->category, 'created_at' => $sr->created_at,
+                        ])->toArray();
+                    }
+                }
                 // Bug 2 fix: buscar processos sem filtro restritivo
                 try {
                     if (method_exists($cl, 'processos')) {
@@ -790,14 +845,35 @@ class NexoAtendimentoController extends Controller
             'assigned_at' => now(),
         ]);
 
-        // Pausar automacao no SendPulse
+        // Pausar automacao no SendPulse (com fallback por telefone)
+        $sp = app(\App\Services\SendPulseWhatsAppService::class);
+        $botPausado = false;
+
         if ($conversation->contact_id) {
             try {
-                $sp = app(\App\Services\SendPulseWhatsAppService::class);
-                $sp->pausarAutomacao($conversation->contact_id);
+                $botPausado = $sp->pausarAutomacao($conversation->contact_id);
                 \Log::info('Bot control: automacao pausada no SendPulse', ['contact_id' => $conversation->contact_id]);
             } catch (\Throwable $e) {
-                \Log::warning('Bot control: falha ao pausar automacao SendPulse', ['error' => $e->getMessage()]);
+                \Log::warning('Bot control: falha ao pausar automacao SendPulse por contact_id', ['error' => $e->getMessage()]);
+            }
+        }
+
+        // Fallback: se não pausou por contact_id, tentar por telefone
+        if (!$botPausado && $conversation->phone) {
+            try {
+                $resolvedContactId = $sp->pausarAutomacaoByPhone($conversation->phone);
+                if ($resolvedContactId) {
+                    $botPausado = true;
+                    // Atualizar contact_id se estava vazio ou divergente
+                    if (empty($conversation->contact_id) || $conversation->contact_id !== $resolvedContactId) {
+                        $conversation->update(['contact_id' => $resolvedContactId]);
+                        \Log::info('Bot control: contact_id atualizado via fallback telefone', [
+                            'conv_id' => $id, 'old' => $conversation->contact_id, 'new' => $resolvedContactId,
+                        ]);
+                    }
+                }
+            } catch (\Throwable $e) {
+                \Log::warning('Bot control: falha ao pausar automacao por telefone', ['error' => $e->getMessage()]);
             }
         }
 
@@ -805,8 +881,14 @@ class NexoAtendimentoController extends Controller
             'conv_id' => $id,
             'user_id' => $user->id,
             'user_name' => $user->name,
+            'bot_pausado_sendpulse' => $botPausado,
         ]);
-        return response()->json(['success' => true, 'message' => 'Conversa assumida']);
+
+        $msg = $botPausado
+            ? 'Conversa assumida e bot pausado com sucesso.'
+            : 'Conversa assumida localmente, mas o bot pode não ter sido pausado no SendPulse. Verifique se o cliente recebe mensagens automáticas.';
+
+        return response()->json(['success' => true, 'message' => $msg, 'bot_pausado' => $botPausado]);
     }
 
     public function devolverAoBot(Request $request, int $id)

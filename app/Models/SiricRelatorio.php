@@ -1,5 +1,17 @@
 <?php
 
+/**
+ * ============================================================================
+ * SIRIC v2 — SiricRelatorio (Model)
+ * ============================================================================
+ *
+ * Armazena relatórios finais gerados para consultas de crédito.
+ * Suporta conteúdo em Markdown e exportação para PDF.
+ *
+ * Relacionamentos: pertence a SiricConsulta e ao User que gerou.
+ * ============================================================================
+ */
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;

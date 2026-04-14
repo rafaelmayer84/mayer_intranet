@@ -45,7 +45,7 @@ class NexoQaController extends Controller
     }
 
     /**
-     * Dashboard de monitoramento.
+     * Dashboard de monitoramento — KPIs em TEMPO REAL.
      * GET /nexo/qualidade
      */
     public function index(Request $request)
@@ -58,25 +58,98 @@ class NexoQaController extends Controller
 
         $campaign = $this->getOrCreateAutoCampaign();
 
-        // KPIs globais (últimas 4 semanas)
         $fourWeeksAgo = Carbon::now('America/Sao_Paulo')->subWeeks(4)->startOfWeek(Carbon::MONDAY);
 
-        $globalStats = DB::table('nexo_qa_aggregates_weekly')
-            ->where('week_start', '>=', $fourWeeksAgo->format('Y-m-d'))
-            ->selectRaw('SUM(responses_count) as total_responses')
-            ->selectRaw('SUM(targets_sent) as total_sent')
-            ->selectRaw('AVG(avg_score) as global_avg_score')
-            ->selectRaw('AVG(nps_score) as global_nps')
-            ->selectRaw('SUM(promoters) as total_promoters')
-            ->selectRaw('SUM(detractors) as total_detractors')
-            ->selectRaw('SUM(passives) as total_passives')
+        // ── KPIs globais em TEMPO REAL (direto das respostas) ──
+        $globalStats = DB::table('nexo_qa_sampled_targets as t')
+            ->join('nexo_qa_responses_content as c', 'c.target_id', '=', 't.id')
+            ->join('nexo_qa_responses_identity as i', 'i.target_id', '=', 't.id')
+            ->where('t.campaign_id', $campaign->id)
+            ->where('i.answered_at', '>=', $fourWeeksAgo)
+            ->selectRaw('COUNT(*) as total_responses')
+            ->selectRaw('AVG(c.score_1_5) as global_avg_score')
+            ->selectRaw('SUM(CASE WHEN c.nps = 5 THEN 1 ELSE 0 END) as total_promoters')
+            ->selectRaw('SUM(CASE WHEN c.nps = 4 THEN 1 ELSE 0 END) as total_passives')
+            ->selectRaw('SUM(CASE WHEN c.nps IS NOT NULL AND c.nps <= 3 THEN 1 ELSE 0 END) as total_detractors')
             ->first();
 
-        $responseRate = ($globalStats->total_sent > 0)
-            ? round(($globalStats->total_responses / $globalStats->total_sent) * 100, 1)
+        $totalSent = NexoQaSampledTarget::where('campaign_id', $campaign->id)
+            ->where('send_status', 'SENT')
+            ->where('sampled_at', '>=', $fourWeeksAgo)
+            ->count();
+
+        $globalStats->total_sent = $totalSent;
+
+        // Calcular NPS score (-100 a +100)
+        $totalNps = ($globalStats->total_promoters ?? 0) + ($globalStats->total_passives ?? 0) + ($globalStats->total_detractors ?? 0);
+        $globalStats->global_nps = $totalNps > 0
+            ? round((($globalStats->total_promoters - $globalStats->total_detractors) / $totalNps) * 100, 0)
+            : null;
+
+        $responseRate = ($totalSent > 0)
+            ? round(($globalStats->total_responses / $totalSent) * 100, 1)
             : 0;
 
-        // Agregados semanais para gráfico (últimas 8 semanas)
+        // ── Ranking por advogado — TEMPO REAL ──
+        $ranking = DB::table('nexo_qa_sampled_targets as t')
+            ->join('nexo_qa_responses_content as c', 'c.target_id', '=', 't.id')
+            ->join('nexo_qa_responses_identity as i', 'i.target_id', '=', 't.id')
+            ->join('users as u', 'u.id', '=', 't.responsible_user_id')
+            ->where('t.campaign_id', $campaign->id)
+            ->where('i.answered_at', '>=', $fourWeeksAgo)
+            ->selectRaw('u.id, u.name')
+            ->selectRaw('AVG(c.score_1_5) as avg_score')
+            ->selectRaw('COUNT(*) as total_responses')
+            ->selectRaw('SUM(CASE WHEN c.nps = 5 THEN 1 ELSE 0 END) as promoters')
+            ->selectRaw('SUM(CASE WHEN c.nps = 4 THEN 1 ELSE 0 END) as passives')
+            ->selectRaw('SUM(CASE WHEN c.nps IS NOT NULL AND c.nps <= 3 THEN 1 ELSE 0 END) as detractors')
+            ->groupBy('u.id', 'u.name')
+            ->orderByDesc('avg_score')
+            ->get()
+            ->map(function ($r) {
+                $total = $r->promoters + $r->passives + $r->detractors;
+                $r->nps_score = $total > 0 ? round((($r->promoters - $r->detractors) / $total) * 100, 0) : null;
+                $r->sufficient_data = $r->total_responses >= 5;
+                return $r;
+            });
+
+        // ── Taxa de resposta por advogado ──
+        $sentByLawyer = DB::table('nexo_qa_sampled_targets')
+            ->where('campaign_id', $campaign->id)
+            ->where('send_status', 'SENT')
+            ->where('sampled_at', '>=', $fourWeeksAgo)
+            ->whereNotNull('responsible_user_id')
+            ->selectRaw('responsible_user_id, COUNT(*) as sent_count')
+            ->groupBy('responsible_user_id')
+            ->pluck('sent_count', 'responsible_user_id');
+
+        foreach ($ranking as $r) {
+            $sent = $sentByLawyer->get($r->id, 0);
+            $r->response_rate = $sent > 0 ? round(($r->total_responses / $sent) * 100, 1) : 0;
+            $r->sent_count = $sent;
+        }
+
+        // ── Distribuição da amostra (ciclo atual = última semana) ──
+        $lastWeek = Carbon::now('America/Sao_Paulo')->subWeek();
+        $sampleDistribution = DB::table('nexo_qa_sampled_targets as t')
+            ->leftJoin('users as u', 'u.id', '=', 't.responsible_user_id')
+            ->where('t.campaign_id', $campaign->id)
+            ->where('t.sampled_at', '>=', $lastWeek)
+            ->selectRaw('COALESCE(u.name, "Sem responsável") as name, COUNT(*) as total, t.send_status')
+            ->groupBy('u.name', 't.send_status')
+            ->get()
+            ->groupBy('name')
+            ->map(function ($rows) {
+                return (object) [
+                    'total' => $rows->sum('total'),
+                    'sent' => $rows->where('send_status', 'SENT')->sum('total'),
+                    'pending' => $rows->where('send_status', 'PENDING')->sum('total'),
+                    'failed' => $rows->where('send_status', 'FAILED')->sum('total'),
+                    'skipped' => $rows->where('send_status', 'SKIPPED')->sum('total'),
+                ];
+            });
+
+        // ── Gráfico tendência (dados históricos da agregação semanal) ──
         $weeklyTrend = DB::table('nexo_qa_aggregates_weekly')
             ->where('week_start', '>=', Carbon::now('America/Sao_Paulo')->subWeeks(8)->format('Y-m-d'))
             ->selectRaw('week_start, SUM(responses_count) as responses, AVG(avg_score) as avg_score, AVG(nps_score) as nps')
@@ -84,23 +157,14 @@ class NexoQaController extends Controller
             ->orderBy('week_start')
             ->get();
 
-        // Ranking por advogado (últimas 4 semanas)
-        $ranking = DB::table('nexo_qa_aggregates_weekly as a')
-            ->join('users as u', 'u.id', '=', 'a.responsible_user_id')
-            ->where('a.week_start', '>=', $fourWeeksAgo->format('Y-m-d'))
-            ->selectRaw('u.id, u.name, AVG(a.avg_score) as avg_score, AVG(a.nps_score) as nps_score, SUM(a.responses_count) as total_responses')
-            ->groupBy('u.id', 'u.name')
-            ->orderByDesc('avg_score')
-            ->get();
-
-        // Últimos disparos (10 mais recentes)
+        // ── Últimos disparos (10 mais recentes) ──
         $recentTargets = NexoQaSampledTarget::where('campaign_id', $campaign->id)
             ->with('responsibleUser')
             ->orderByDesc('sampled_at')
             ->limit(10)
             ->get();
 
-        // Últimas respostas (10 mais recentes)
+        // ── Últimas respostas (10 mais recentes) ──
         $recentRespostas = DB::table('nexo_qa_sampled_targets as t')
             ->join('nexo_qa_responses_content as c', 'c.target_id', '=', 't.id')
             ->join('nexo_qa_responses_identity as i', 'i.target_id', '=', 't.id')
@@ -111,7 +175,7 @@ class NexoQaController extends Controller
             ->limit(10)
             ->get();
 
-        // Contadores rápidos
+        // ── Contadores rápidos ──
         $counters = (object) [
             'total_targets' => NexoQaSampledTarget::where('campaign_id', $campaign->id)->count(),
             'pending' => NexoQaSampledTarget::where('campaign_id', $campaign->id)->where('send_status', 'PENDING')->count(),
@@ -122,7 +186,7 @@ class NexoQaController extends Controller
 
         return view('nexo.qualidade.index', compact(
             'campaign', 'globalStats', 'responseRate', 'weeklyTrend', 'ranking',
-            'recentTargets', 'recentRespostas', 'counters'
+            'recentTargets', 'recentRespostas', 'counters', 'sampleDistribution'
         ));
     }
 

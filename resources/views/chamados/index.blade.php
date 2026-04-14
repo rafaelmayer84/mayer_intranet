@@ -202,7 +202,16 @@
                 <option value="{{ $key }}" {{ request('category') === $key ? 'selected' : '' }}>{{ $cat['label'] }}</option>
             @endforeach
         </select>
-        @if(request()->hasAny(['status','tipo','category']))
+        @if($isAdmin)
+        <select name="responsavel" onchange="this.form.submit()" class="border rounded-xl px-3 py-2 text-xs bg-white">
+            <option value="">Todos os responsáveis</option>
+            <option value="sem_responsavel" {{ request('responsavel') === 'sem_responsavel' ? 'selected' : '' }}>Sem responsável</option>
+            @foreach($users as $u)
+                <option value="{{ $u->id }}" {{ request('responsavel') == $u->id ? 'selected' : '' }}>{{ $u->name }}</option>
+            @endforeach
+        </select>
+        @endif
+        @if(request()->hasAny(['status','tipo','category','responsavel']))
             <a href="{{ route('chamados.index') }}" class="text-xs text-red-500 hover:underline">Limpar</a>
         @endif
     </form>

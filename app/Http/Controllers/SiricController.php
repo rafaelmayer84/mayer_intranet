@@ -1,8 +1,34 @@
 <?php
 
+/**
+ * ============================================================================
+ * SIRIC v2 — SiricController
+ * ============================================================================
+ *
+ * Controller principal que orquestra o fluxo completo de análise de crédito.
+ *
+ * Responsabilidades:
+ * - CRUD de consultas (index, create, store, show, destroy)
+ * - Coleta de dados internos do BD (coletarDados)
+ * - Orquestração da análise de crédito em 4 passos (analisarIA):
+ *   1. Coleta interna (se não feita)
+ *   2. Gate Decision DETERMINÍSTICO (v2 — calculado no PHP, não pela IA)
+ *   3. Consulta Serasa condicionada (se gate >= 50 e autorizado, sem bypass)
+ *   4. Relatório Final via IA (único estágio de IA na v2)
+ * - Registro da decisão humana final (salvarDecisao)
+ *
+ * v2 mudanças:
+ * - Gate decision agora usa SiricService::calcularGateScore() (determinístico)
+ * - Evidência Serasa persistida como SiricEvidencia (fonte: asaas_serasa)
+ * - Dados Serasa não são mais duplicados dentro do gate_result
+ * - Threshold Serasa: 50 (antes 30) com bypass para bom histórico
+ * ============================================================================
+ */
+
 namespace App\Http\Controllers;
 
 use App\Models\SiricConsulta;
+use App\Models\SiricEvidencia;
 use App\Services\SiricService;
 use App\Services\SiricOpenAIService;
 use App\Services\SiricAsaasService;
@@ -136,13 +162,13 @@ class SiricController extends Controller
     }
 
     /**
-     * AÇÃO PRINCIPAL: Rodar Análise de Crédito (IA)
+     * AÇÃO PRINCIPAL: Rodar Análise de Crédito (v2)
      *
-     * Fluxo unificado:
+     * Fluxo v2:
      * 1. Coleta dados internos (se ainda não coletou)
-     * 2. Chama OpenAI Gate Decision (gate_score -> precisa Serasa?)
-     * 3. Se IA decidiu Serasa -> chama Asaas API automaticamente
-     * 4. Chama OpenAI Relatório Final (com ou sem Serasa)
+     * 2. Gate Decision DETERMINÍSTICO (PHP, não IA)
+     * 3. Se gate >= 50 E autorizado E sem bypass → consulta Serasa
+     * 4. Relatório Final via IA (único estágio de IA)
      * 5. Salva resultado + rating + score
      */
     public function analisarIA(int $id)
@@ -159,7 +185,7 @@ class SiricController extends Controller
         try {
             $consulta->update(['status' => 'analisando']);
 
-            // Passo 1: Coleta interna (se não feita)
+            // ── Passo 1: Coleta interna (se não feita) ──
             if (empty($consulta->snapshot_interno)) {
                 $this->service->coletarDadosInternos($consulta);
                 $consulta->refresh();
@@ -178,23 +204,21 @@ class SiricController extends Controller
                 'autorizou_consultas_externas' => (bool) $consulta->autorizou_consultas_externas,
             ];
 
-            $openAI = app(SiricOpenAIService::class);
+            // ── Passo 2: Gate Decision DETERMINÍSTICO (v2) ──
+            $gateResult = $this->service->calcularGateScore($consulta, $snapshot);
 
-            // Passo 2: Gate Decision
-            $gate = $openAI->executarGateDecision($dadosFormulario, $snapshot);
+            Log::info('SIRIC Gate v2 (determinístico)', [
+                'consulta_id' => $id,
+                'gate_score' => $gateResult['gate_score'],
+                'need_serasa' => $gateResult['need_serasa'],
+                'serasa_bypass' => $gateResult['serasa_bypass'],
+                'bom_historico' => $gateResult['bom_historico'],
+            ]);
 
-            if (!$gate['success']) {
-                $consulta->update(['status' => 'erro']);
-                return redirect()
-                    ->route('siric.show', $consulta->id)
-                    ->with('error', 'Erro no Gate Decision: ' . ($gate['error'] ?? 'desconhecido'));
-            }
-
-            $gateResult = $gate['data'];
             $dadosSerasa = null;
 
-            // Passo 3: Se IA decidiu Serasa E há autorização
-            if (($gateResult['need_serasa'] ?? false) && $consulta->autorizou_consultas_externas) {
+            // ── Passo 3: Consulta Serasa condicionada (v2) ──
+            if ($gateResult['need_serasa']) {
                 try {
                     $asaas = app(SiricAsaasService::class);
                     $serasaResult = $asaas->solicitarRelatorio($consulta->cpf_cnpj);
@@ -202,8 +226,11 @@ class SiricController extends Controller
                     if ($serasaResult['success'] ?? false) {
                         $dadosSerasa = $serasaResult['data'] ?? null;
                         $gateResult['serasa_consultado'] = true;
-                        $gateResult['serasa_data'] = $dadosSerasa;
-                        Log::info('SIRIC Serasa consultado com sucesso', ['consulta_id' => $id]);
+
+                        // v2: Persistir evidência Serasa
+                        $this->salvarEvidenciaSerasa($consulta, $dadosSerasa);
+
+                        Log::info('SIRIC Serasa consultado + evidência salva', ['consulta_id' => $id]);
                     } else {
                         $gateResult['serasa_consultado'] = false;
                         $gateResult['serasa_erro'] = $serasaResult['error'] ?? 'Falha na API Asaas';
@@ -214,12 +241,19 @@ class SiricController extends Controller
                     $gateResult['serasa_erro'] = $e->getMessage();
                     Log::warning('SIRIC Serasa exception', ['consulta_id' => $id, 'error' => $e->getMessage()]);
                 }
-            } elseif (($gateResult['need_serasa'] ?? false) && !$consulta->autorizou_consultas_externas) {
+            } elseif ($gateResult['serasa_bypass']) {
+                $gateResult['serasa_consultado'] = false;
+                $gateResult['serasa_motivo'] = 'Bypass v2: cliente com histórico forte no escritório';
+            } elseif (!$consulta->autorizou_consultas_externas) {
                 $gateResult['serasa_consultado'] = false;
                 $gateResult['serasa_motivo'] = 'Cliente não autorizou consultas externas';
+            } else {
+                $gateResult['serasa_consultado'] = false;
+                $gateResult['serasa_motivo'] = "Gate score {$gateResult['gate_score']} abaixo do threshold (50)";
             }
 
-            // Passo 4: Relatório Final
+            // ── Passo 4: Relatório Final via IA (v2 — único estágio de IA) ──
+            $openAI = app(SiricOpenAIService::class);
             $relatorio = $openAI->gerarRelatorioFinal($dadosFormulario, $snapshot, $gateResult, $dadosSerasa);
 
             if (!$relatorio['success']) {
@@ -234,7 +268,7 @@ class SiricController extends Controller
 
             $rel = $relatorio['relatorio'] ?? [];
 
-            // Passo 5: Salvar tudo
+            // ── Passo 5: Salvar tudo ──
             $ratingLabels = [
                 'A' => 'Excelente', 'B' => 'Bom', 'C' => 'Regular',
                 'D' => 'Ruim', 'E' => 'Crítico',
@@ -257,13 +291,14 @@ class SiricController extends Controller
                     'gate_decision' => $gateResult,
                     'relatorio'     => $rel,
                     'model_used'    => $relatorio['model_used'] ?? null,
+                    'versao'        => 'v2',
                     'timestamp'     => now()->toISOString(),
                 ],
             ]);
 
             return redirect()
                 ->route('siric.show', $consulta->id)
-                ->with('success', "Análise concluída! Rating: " . ($rel['rating'] ?? '?') . " ({$ratingLabel}) — Score: " . ($rel['score_final'] ?? 0));
+                ->with('success', "Análise v2 concluída! Rating: " . ($rel['rating'] ?? '?') . " ({$ratingLabel}) — Score: " . ($rel['score_final'] ?? 0));
 
         } catch (\Throwable $e) {
             Log::error('SIRIC analisarIA exception: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
@@ -272,6 +307,59 @@ class SiricController extends Controller
                 ->route('siric.show', $consulta->id)
                 ->with('error', 'Erro na análise: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * v2: Salva evidência Serasa como SiricEvidencia.
+     * Inclui dados estruturados extraídos do PDF.
+     */
+    private function salvarEvidenciaSerasa(SiricConsulta $consulta, ?array $dadosSerasa): void
+    {
+        if (!$dadosSerasa) return;
+
+        // Limpar evidências Serasa anteriores (permite "reanalisar")
+        $consulta->evidencias()->where('fonte', 'asaas_serasa')->delete();
+
+        $estruturados = $dadosSerasa['dados_estruturados'] ?? [];
+        $score = $estruturados['score'] ?? null;
+        $protestos = $estruturados['protestos']['qtd'] ?? 0;
+        $pendInternas = $estruturados['pendencias_internas']['qtd'] ?? 0;
+        $pendFinanceiras = $estruturados['pendencias_financeiras']['qtd'] ?? 0;
+        $totalPendencias = $pendInternas + $pendFinanceiras + $protestos;
+
+        // Determinar impacto
+        $impacto = 'neutro';
+        if ($score !== null) {
+            if ($score >= 600 && $totalPendencias === 0) {
+                $impacto = 'positivo';
+            } elseif ($score < 400 || $totalPendencias >= 3) {
+                $impacto = 'negativo';
+            } elseif ($score < 300 || $protestos > 0) {
+                $impacto = 'risco';
+            }
+        }
+
+        // Resumo legível
+        $partes = [];
+        if ($score !== null) $partes[] = "Score Serasa: {$score}";
+        if ($pendInternas > 0) $partes[] = "Pendências internas: {$pendInternas}";
+        if ($pendFinanceiras > 0) $partes[] = "Pendências financeiras: {$pendFinanceiras}";
+        if ($protestos > 0) $partes[] = "Protestos: {$protestos}";
+        if (empty($partes)) $partes[] = 'Consulta Serasa realizada (sem dados estruturados extraídos)';
+
+        SiricEvidencia::create([
+            'consulta_id' => $consulta->id,
+            'fonte'       => 'asaas_serasa',
+            'tipo'        => 'serasa_report',
+            'payload'     => [
+                'report_id'          => $dadosSerasa['id'] ?? null,
+                'date_created'       => $dadosSerasa['dateCreated'] ?? null,
+                'dados_estruturados' => $estruturados,
+                'download_url'       => $dadosSerasa['downloadUrl'] ?? null,
+            ],
+            'impacto'     => $impacto,
+            'resumo'      => implode('. ', $partes) . '.',
+        ]);
     }
 
     /**

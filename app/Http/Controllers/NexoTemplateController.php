@@ -231,7 +231,9 @@ public function listar(Request $request)
                     'contact_name'     => $contactName,
                     'contact_id'       => $spContactId,
                     'status'           => 'open',
+                    'bot_ativo'        => false,
                     'assigned_user_id' => Auth::id(),
+                    'assigned_at'      => now(),
                     'last_message_at'  => now(),
                     'first_response_at'=> now(),
                     'unread_count'     => 0,
@@ -245,6 +247,8 @@ public function listar(Request $request)
             } else {
                 // Reabrir conversa existente
                 $conversation->status = 'open';
+                $conversation->bot_ativo = false;
+                $conversation->assigned_at = now();
                 $conversation->last_message_at = now();
                 if (!$conversation->assigned_user_id) {
                     $conversation->assigned_user_id = Auth::id();
@@ -265,6 +269,42 @@ public function listar(Request $request)
                     }
                 }
                 $conversation->save();
+            }
+
+            // CRÍTICO: Pausar automacao do bot no SendPulse ao iniciar conversa por template.
+            // Um humano está iniciando esta conversa, o bot NÃO deve interferir.
+            $botPausado = false;
+            $contactIdParaPausa = $spContactId ?: $conversation->contact_id;
+            if ($contactIdParaPausa) {
+                try {
+                    $botPausado = $service->pausarAutomacao($contactIdParaPausa);
+                    Log::info('NexoTemplate: bot pausado via contact_id', [
+                        'conversation_id' => $conversation->id,
+                        'contact_id' => $contactIdParaPausa,
+                    ]);
+                } catch (\Throwable $e) {
+                    Log::warning('NexoTemplate: falha ao pausar bot via contact_id', [
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+            // Fallback: se não conseguiu pausar por contact_id, tentar por telefone
+            if (!$botPausado) {
+                try {
+                    $resolvedContactId = $service->pausarAutomacaoByPhone($telefone);
+                    if ($resolvedContactId && empty($conversation->contact_id)) {
+                        $conversation->update(['contact_id' => $resolvedContactId]);
+                        Log::info('NexoTemplate: contact_id resolvido e salvo via pausarAutomacaoByPhone', [
+                            'conversation_id' => $conversation->id,
+                            'contact_id' => $resolvedContactId,
+                        ]);
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('NexoTemplate: falha ao pausar bot por telefone', [
+                        'telefone' => $telefone,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
             }
 
             // Registrar mensagem de template enviada

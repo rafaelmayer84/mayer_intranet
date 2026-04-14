@@ -10,69 +10,49 @@ Artisan::command('inspire', function () {
 
 // ===== CRON JOBS - SINCRONIZAÇÃO AUTOMÁTICA =====
 
-// DataJuri → 3x/dia (2h, 10h, 18h) - Horário de Brasília
+// DataJuri → 2x/dia (2h, 12h) - Horário de Brasília
 Schedule::command('cron:sync-datajuri')
     ->dailyAt('02:00')
     ->timezone('America/Sao_Paulo')
     ->appendOutputTo(storage_path('logs/cron-datajuri.log'));
 
 Schedule::command('cron:sync-datajuri')
-    ->dailyAt('10:00')
-    ->timezone('America/Sao_Paulo')
-    ->appendOutputTo(storage_path('logs/cron-datajuri.log'));
-
-Schedule::command('cron:sync-datajuri')
-    ->dailyAt('18:00')
+    ->dailyAt('12:00')
     ->timezone('America/Sao_Paulo')
     ->appendOutputTo(storage_path('logs/cron-datajuri.log'));
 
 // ESPO CRM removido em 13/02/2026 - substituído por CRM Nativo
 
-// Contas a Receber → 3x/dia (logo após DataJuri)
+// Contas a Receber → 2x/dia (logo após DataJuri)
 Schedule::command('sync:contas-receber-rapido')
     ->dailyAt('02:05')
     ->timezone('America/Sao_Paulo')
     ->appendOutputTo(storage_path('logs/cron-contas-receber.log'));
 
 Schedule::command('sync:contas-receber-rapido')
-    ->dailyAt('10:05')
+    ->dailyAt('12:05')
     ->timezone('America/Sao_Paulo')
     ->appendOutputTo(storage_path('logs/cron-contas-receber.log'));
 
-Schedule::command('sync:contas-receber-rapido')
-    ->dailyAt('18:05')
-    ->timezone('America/Sao_Paulo')
-    ->appendOutputTo(storage_path('logs/cron-contas-receber.log'));
-
-// CRM Sync Carteira → 3x/dia após sync DataJuri (02:06, 10:06, 18:06)
+// CRM Sync Carteira → 2x/dia após sync DataJuri (02:06, 12:06)
 Schedule::command('crm:sync-carteira')
     ->dailyAt('02:06')
     ->timezone('America/Sao_Paulo')
     ->appendOutputTo(storage_path('logs/cron-crm-sync-carteira.log'));
 
 Schedule::command('crm:sync-carteira')
-    ->dailyAt('10:06')
+    ->dailyAt('12:06')
     ->timezone('America/Sao_Paulo')
     ->appendOutputTo(storage_path('logs/cron-crm-sync-carteira.log'));
 
-Schedule::command('crm:sync-carteira')
-    ->dailyAt('18:06')
-    ->timezone('America/Sao_Paulo')
-    ->appendOutputTo(storage_path('logs/cron-crm-sync-carteira.log'));
-
-// CRM Carteira → 3x/dia após sync (02:08, 10:08, 18:08)
+// CRM Carteira → 2x/dia após sync (02:08, 12:08)
 Schedule::command('crm:recalcular-carteira')
     ->dailyAt('02:08')
     ->timezone('America/Sao_Paulo')
     ->appendOutputTo(storage_path('logs/cron-crm-carteira.log'));
 
 Schedule::command('crm:recalcular-carteira')
-    ->dailyAt('10:08')
-    ->timezone('America/Sao_Paulo')
-    ->appendOutputTo(storage_path('logs/cron-crm-carteira.log'));
-
-Schedule::command('crm:recalcular-carteira')
-    ->dailyAt('18:08')
+    ->dailyAt('12:08')
     ->timezone('America/Sao_Paulo')
     ->appendOutputTo(storage_path('logs/cron-crm-carteira.log'));
 
@@ -91,19 +71,14 @@ Schedule::command('nexo:verificar-audiencias')
     ->appendOutputTo(storage_path('logs/cron-nexo-audiencias.log'));
 
 // ===== NEXO: Detecção de andamentos processuais novos =====
-// 3x/dia após sync DataJuri (02:10, 10:10, 18:10) — cria notificações pendentes
+// 2x/dia após sync DataJuri (02:10, 12:10) — cria notificações pendentes
 Schedule::command('nexo:verificar-andamentos')
     ->dailyAt('02:10')
     ->timezone('America/Sao_Paulo')
     ->appendOutputTo(storage_path('logs/cron-nexo-andamentos.log'));
 
 Schedule::command('nexo:verificar-andamentos')
-    ->dailyAt('10:10')
-    ->timezone('America/Sao_Paulo')
-    ->appendOutputTo(storage_path('logs/cron-nexo-andamentos.log'));
-
-Schedule::command('nexo:verificar-andamentos')
-    ->dailyAt('18:10')
+    ->dailyAt('12:10')
     ->timezone('America/Sao_Paulo')
     ->appendOutputTo(storage_path('logs/cron-nexo-andamentos.log'));
 

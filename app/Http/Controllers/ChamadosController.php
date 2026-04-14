@@ -41,6 +41,15 @@ class ChamadosController extends Controller
             $query->whereNull('account_id');
         }
 
+        // Filtro por responsável
+        if ($isAdmin && $request->filled('responsavel')) {
+            if ($request->input('responsavel') === 'sem_responsavel') {
+                $query->whereNull('assigned_to_user_id');
+            } else {
+                $query->where('assigned_to_user_id', $request->responsavel);
+            }
+        }
+
         $chamados = $query->orderByDesc('created_at')->paginate(20);
 
         // Contadores
@@ -59,10 +68,10 @@ class ChamadosController extends Controller
         ];
 
         $categorias = CrmServiceRequest::categorias();
-        $users = User::orderBy('name')->get(['id', 'name']);
+        $users = User::where('ativo', true)->orderBy('name')->get(['id', 'name']);
         $accounts = CrmAccount::where('lifecycle', 'client')->orderBy('name')->get(['id', 'name']);
 
-        return view('chamados.index', compact('chamados', 'contadores', 'categorias', 'users', 'accounts'));
+        return view('chamados.index', compact('chamados', 'contadores', 'categorias', 'users', 'accounts', 'isAdmin'));
     }
 
     public function store(Request $request)

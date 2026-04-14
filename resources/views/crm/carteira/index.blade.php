@@ -22,7 +22,7 @@
 @endphp
 
 @section('content')
-<div class="max-w-[1400px] mx-auto px-4 py-6">
+<div class="px-4 py-6">
 
     {{-- Header --}}
     <div class="flex items-center justify-between mb-6">

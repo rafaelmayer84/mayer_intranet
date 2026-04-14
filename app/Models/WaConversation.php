@@ -14,7 +14,7 @@ class WaConversation extends Model
         'provider', 'contact_id', 'chat_id', 'phone', 'name', 'status',
         'assigned_user_id', 'last_message_at', 'last_incoming_at',
         'first_response_at', 'unread_count', 'linked_lead_id', 'linked_cliente_id',
-        'linked_processo_id', 'category', 'priority', 'bot_ativo',
+        'linked_crm_account_id', 'linked_processo_id', 'category', 'priority', 'bot_ativo',
     ];
 
     protected $casts = [
@@ -32,6 +32,7 @@ class WaConversation extends Model
     public function tags() { return $this->belongsToMany(\App\Models\WaTag::class, 'wa_conversation_tag', 'conversation_id', 'tag_id')->withTimestamps(); }
     public function cliente(): BelongsTo { return $this->belongsTo(Cliente::class, 'linked_cliente_id'); }
     public function processo(): BelongsTo { return $this->belongsTo(Processo::class, 'linked_processo_id'); }
+    public function crmAccount(): BelongsTo { return $this->belongsTo(\App\Models\Crm\CrmAccount::class, 'linked_crm_account_id'); }
 
     public function scopeOpen($query) { return $query->where('status', 'open'); }
     public function scopeClosed($query) { return $query->where('status', 'closed'); }
@@ -45,6 +46,7 @@ class WaConversation extends Model
 
     public function getLinkTypeAttribute(): string
     {
+        if ($this->linked_crm_account_id) return 'crm_account';
         if ($this->linked_cliente_id) return 'cliente';
         if ($this->linked_lead_id) return 'lead';
         return 'indefinido';

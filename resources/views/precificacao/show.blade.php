@@ -77,6 +77,12 @@
                 $isChosen = $proposta->proposta_escolhida === $tipo['key'];
                 $p = $tipo['data'] ?? [];
             @endphp
+            @php
+                $parc = $p['parcelas'] ?? [];
+                $parcTotal = $parc['total'] ?? ($p['parcelas_sugeridas'] ?? 1);
+                $prob = $p['probabilidade_conversao_estimada'] ?? null;
+                $er = $p['expected_revenue'] ?? null;
+            @endphp
             <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 relative
                 {{ $isRecommended ? 'ring-2 ring-indigo-500' : '' }}
                 {{ $isChosen ? 'ring-2 ring-green-500' : '' }}">
@@ -92,12 +98,61 @@
                     <p class="text-2xl font-bold text-gray-800 dark:text-white mt-1">
                         R$ {{ number_format($p['valor_honorarios'] ?? 0, 0, ',', '.') }}
                     </p>
-                    <p class="text-xs text-gray-500">{{ $p['tipo_cobranca'] ?? 'fixo' }} | {{ $p['parcelas_sugeridas'] ?? 1 }}x</p>
+                    <p class="text-xs text-gray-500">{{ $p['tipo_cobranca'] ?? 'fixo' }} | {{ $parcTotal }}x</p>
                 </div>
+
+                @if($prob)
+                <div class="flex justify-between text-xs mb-3 px-2 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                    <span class="text-gray-500 dark:text-gray-400">Conv. <strong class="text-gray-700 dark:text-gray-200">{{ $prob }}%</strong></span>
+                    @if($er)
+                    <span class="text-gray-500 dark:text-gray-400">ER <strong class="text-gray-700 dark:text-gray-200">R$ {{ number_format($er, 0, ',', '.') }}</strong></span>
+                    @endif
+                </div>
+                @endif
+
+                @if(!empty($parc['entrada']))
+                <div class="text-xs text-gray-500 dark:text-gray-400 mb-3 space-y-0.5">
+                    <p>Entrada: <strong class="text-gray-700 dark:text-gray-200">R$ {{ number_format($parc['entrada'], 0, ',', '.') }}</strong> + {{ $parcTotal - 1 }}x <strong class="text-gray-700 dark:text-gray-200">R$ {{ number_format($parc['valor_parcela'] ?? 0, 0, ',', '.') }}</strong></p>
+                    @if(!empty($parc['valor_avista']))
+                    <p>A vista: <strong class="text-gray-700 dark:text-gray-200">R$ {{ number_format($parc['valor_avista'], 0, ',', '.') }}</strong> <span class="text-green-600">(-{{ $parc['desconto_avista_percentual'] ?? 0 }}%)</span></p>
+                    @endif
+                </div>
+                @endif
+
                 <p class="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">{{ $p['justificativa_estrategica'] ?? '' }}</p>
             </div>
         @endforeach
     </div>
+
+    {{-- Análise Yield --}}
+    @if($proposta->analise_yield)
+    @php $yield = $proposta->analise_yield; @endphp
+    <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 mb-6">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Análise Yield</h2>
+            @if($proposta->modelo_ia_utilizado)
+            <span class="text-xs px-2 py-1 rounded-full {{ str_starts_with($proposta->modelo_ia_utilizado, 'claude-') ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' : 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' }}">
+                {{ $proposta->modelo_ia_utilizado }}
+            </span>
+            @endif
+        </div>
+        <div class="flex flex-wrap gap-2">
+            @foreach([
+                'segmento_cliente' => 'Segmento',
+                'elasticidade_estimada' => 'Elasticidade',
+                'load_factor_escritorio' => 'Load Factor',
+                'estrategia_dominante' => 'Estratégia',
+                'faixa_historica_aplicada' => 'Faixa Histórica',
+            ] as $key => $label)
+                @if(!empty($yield[$key]))
+                <span class="px-2 py-1 text-xs rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700">
+                    {{ $label }}: <strong>{{ $yield[$key] }}</strong>
+                </span>
+                @endif
+            @endforeach
+        </div>
+    </div>
+    @endif
 
     {{-- Justificativa IA --}}
     @if($proposta->justificativa_ia)

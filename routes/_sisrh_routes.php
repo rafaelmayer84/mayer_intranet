@@ -49,4 +49,8 @@ Route::middleware(['auth'])->prefix('gdp/acompanhamento')->group(function () {
     Route::post('/submeter', [GdpAcompanhamentoController::class, 'submeter'])->name('gdp.acompanhamento.submeter');
     Route::get('/admin', [GdpAcompanhamentoController::class, 'admin'])->name('gdp.acompanhamento.admin');
     Route::post('/validar/{id}', [GdpAcompanhamentoController::class, 'validar'])->name('gdp.acompanhamento.validar');
+
+    // Relatório Folha PDF
+    Route::get('/folha-pdf/{ano}/{mes}', [SisrhController::class, 'folhaPdf'])->name('sisrh.folha-pdf');
+
 });

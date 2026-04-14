@@ -1,13 +1,27 @@
 <?php
 
+/**
+ * ============================================================================
+ * SIRIC v2 — Rotas
+ * ============================================================================
+ *
+ * Define os endpoints HTTP do sistema de análise de crédito.
+ * Todas as rotas são protegidas por auth + user.active + permissão de módulo.
+ *
+ * Endpoints:
+ *   GET  /siric/           → index (listar consultas com filtros)
+ *   GET  /siric/nova       → create (formulário de nova consulta)
+ *   POST /siric/           → store (salvar nova consulta)
+ *   GET  /siric/{id}       → show (detalhe de uma consulta)
+ *   DEL  /siric/{id}       → destroy (excluir consulta)
+ *   POST /siric/{id}/coletar  → coletarDados (coleta interna do BD)
+ *   POST /siric/{id}/analisar → analisarIA (análise completa: gate + serasa + IA)
+ *   POST /siric/{id}/decisao  → salvarDecisao (decisão humana final)
+ * ============================================================================
+ */
+
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SiricController;
-
-/*
-|--------------------------------------------------------------------------
-| SIRIC - Sistema de Análise de Crédito
-|--------------------------------------------------------------------------
-*/
 
 Route::middleware(['auth', 'user.active', 'modulo:operacional.siric,visualizar'])->prefix('siric')->name('siric.')->group(function () {
 

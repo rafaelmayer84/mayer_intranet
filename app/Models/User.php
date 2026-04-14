@@ -277,11 +277,15 @@ class User extends Authenticatable
     }
 
     /**
-     * Verifica se a senha nunca foi alterada (primeiro acesso)
+     * Verifica se a senha expirou (nunca alterada ou passaram mais de 30 dias)
      */
     public function senhaExpirada(): bool
     {
-        return is_null($this->password_changed_at);
+        if (is_null($this->password_changed_at)) {
+            return true;
+        }
+
+        return \Carbon\Carbon::parse($this->password_changed_at)->addDays(30)->isPast();
     }
 
     /**

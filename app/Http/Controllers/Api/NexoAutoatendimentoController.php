@@ -331,6 +331,24 @@ class NexoAutoatendimentoController extends Controller
             \Log::info('Bot control: bot_ativo=false via endpoint desativar-bot', [
                 'conv_id' => $conv->id, 'phone' => $telefone
             ]);
+
+            // Pausar automacao também no SendPulse (não apenas flag local)
+            try {
+                $sp = app(\App\Services\SendPulseWhatsAppService::class);
+                if ($conv->contact_id) {
+                    $sp->pausarAutomacao($conv->contact_id);
+                } else {
+                    $resolvedId = $sp->pausarAutomacaoByPhone($telefone);
+                    if ($resolvedId) {
+                        $conv->update(['contact_id' => $resolvedId]);
+                    }
+                }
+            } catch (\Throwable $e) {
+                \Log::warning('Bot control: falha ao pausar automacao SendPulse via desativar-bot', [
+                    'phone' => $telefone, 'error' => $e->getMessage(),
+                ]);
+            }
+
             return response()->json(['success' => true, 'bot_desativado' => 'sim']);
         }
 

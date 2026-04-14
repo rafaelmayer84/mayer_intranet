@@ -227,6 +227,11 @@ class SendPulseWhatsAppService
         if (!empty($b) && is_string($b)) return $b;
         $m2 = data_get($msg, 'message');
         if (!empty($m2) && is_string($m2)) return $m2;
+        // Botão de resposta rápida (template button / quick reply)
+        $btnText = data_get($msg, 'data.button.text')
+                ?? data_get($msg, 'data.button.payload')
+                ?? data_get($msg, 'info.message.channel_data.message.button.text');
+        if (!empty($btnText) && is_string($btnText)) return $btnText;
         $btnTitle = data_get($msg, 'info.message.channel_data.message.interactive.button_reply.title')
                  ?? data_get($msg, 'data.interactive.button_reply.title');
         if (!empty($btnTitle) && is_string($btnTitle)) return $btnTitle;
@@ -346,6 +351,18 @@ class SendPulseWhatsAppService
         $botId       = data_get($event, 'bot.id', '');
 
         if (empty($textBody)) {
+            // Botão de resposta rápida (template quick reply / button)
+            $textBody = data_get($event, 'info.message.channel_data.message.button.text', '');
+        }
+        if (empty($textBody)) {
+            // Botão interativo
+            $textBody = data_get($event, 'info.message.channel_data.message.interactive.button_reply.title', '');
+        }
+        if (empty($textBody)) {
+            // Lista interativa
+            $textBody = data_get($event, 'info.message.channel_data.message.interactive.list_reply.title', '');
+        }
+        if (empty($textBody)) {
             $textBody = data_get($event, 'contact.last_message', '');
         }
 
@@ -457,8 +474,21 @@ class SendPulseWhatsAppService
     }
 
     // ═══════════════════════════════════════════════════════
-    // FECHAR CHAT (REATIVAR BOT)
+    // ABRIR / FECHAR CHAT (CONTROLE DO BOT)
     // ═══════════════════════════════════════════════════════
+
+    /**
+     * Abre o live chat para um contato (PAUSA o bot).
+     * Quando is_chat_opened=true, o SendPulse NÃO dispara flows automáticos.
+     * POST /whatsapp/contacts/openChat
+     */
+    public function openChat(string $contactId): array
+    {
+        return $this->apiPost('/whatsapp/contacts/openChat', [
+            'bot_id'     => $this->botId,
+            'contact_id' => $contactId,
+        ]);
+    }
 
     /**
      * Fecha o chat (desativa live chat / reativa bot) para um contato.
@@ -517,10 +547,24 @@ class SendPulseWhatsAppService
     }
 
     /**
-     * Pausar automacao do contato (seta variavel + abre chat ao vivo)
+     * Pausar automacao do contato (abre live chat + seta variáveis de controle).
+     * O openChat é o mecanismo PRIMÁRIO que impede o bot de responder.
+     * As variáveis são backup para flows que checam condições.
      */
     public function pausarAutomacao(string $contactId): bool
     {
+        // 1. ABRIR LIVE CHAT — este é o mecanismo que efetivamente impede o bot
+        $chatResult = $this->openChat($contactId);
+        if (!($chatResult['success'] ?? false)) {
+            Log::warning('SendPulse: falha ao abrir live chat (openChat)', [
+                'contact_id' => $contactId,
+                'error' => $chatResult['error'] ?? 'unknown',
+            ]);
+        } else {
+            Log::info('SendPulse: live chat aberto com sucesso', ['contact_id' => $contactId]);
+        }
+
+        // 2. Setar variáveis como camada extra de segurança (flows podem checar)
         $r1 = $this->setContactVariable($contactId, 'atendimento_humano', 'sim');
         $r2 = $this->setContactVariable($contactId, 'sessao_ativa', 'sim');
         if (!$r1['success']) {
@@ -529,7 +573,56 @@ class SendPulseWhatsAppService
         if (!$r2['success']) {
             Log::warning('SendPulse: falha ao setar sessao_ativa', ['contact_id' => $contactId, 'error' => $r2['error']]);
         }
-        return ($r1['success'] ?? false) && ($r2['success'] ?? false);
+
+        // Sucesso se o live chat abriu OU se pelo menos as variáveis foram setadas
+        return ($chatResult['success'] ?? false) || (($r1['success'] ?? false) && ($r2['success'] ?? false));
+    }
+
+    /**
+     * Pausar automacao por telefone (resolve contact_id automaticamente).
+     * Tenta variantes do telefone (com/sem nono dígito) para encontrar o contato.
+     * Retorna o contact_id encontrado ou null se falhou.
+     */
+    public function pausarAutomacaoByPhone(string $phone): ?string
+    {
+        try {
+            $contact = $this->getContactByPhone($phone);
+            $contactId = $contact['id'] ?? null;
+
+            // Fallback: tentar variante do telefone (nono dígito)
+            if (!$contactId && strlen($phone) >= 12) {
+                $ddd = substr($phone, 2, 2);
+                $numero = substr($phone, 4);
+
+                $variant = null;
+                if (strlen($numero) === 9 && $numero[0] === '9') {
+                    // Tem nono dígito: tentar sem
+                    $variant = '55' . $ddd . substr($numero, 1);
+                } elseif (strlen($numero) === 8) {
+                    // Não tem nono dígito: tentar com
+                    $variant = '55' . $ddd . '9' . $numero;
+                }
+
+                if ($variant) {
+                    Log::info('SendPulse: tentando variante de telefone', ['original' => $phone, 'variante' => $variant]);
+                    $contact = $this->getContactByPhone($variant);
+                    $contactId = $contact['id'] ?? null;
+                }
+            }
+
+            if (!$contactId) {
+                Log::warning('SendPulse: pausarAutomacaoByPhone - contato nao encontrado', ['phone' => $phone]);
+                return null;
+            }
+            $ok = $this->pausarAutomacao($contactId);
+            if ($ok) {
+                Log::info('SendPulse: automacao pausada por telefone', ['phone' => $phone, 'contact_id' => $contactId]);
+            }
+            return $contactId;
+        } catch (\Throwable $e) {
+            Log::warning('SendPulse: pausarAutomacaoByPhone erro', ['phone' => $phone, 'error' => $e->getMessage()]);
+            return null;
+        }
     }
 
     /**

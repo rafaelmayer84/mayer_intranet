@@ -8,7 +8,7 @@ class CrmServiceRequest extends Model
     protected $table = 'crm_service_requests';
 
     protected $fillable = [
-        'account_id', 'protocolo', 'category', 'subject', 'description', 'priority', 'status',
+        'account_id', 'protocolo', 'category', 'origem', 'phone_contato', 'subject', 'description', 'priority', 'status',
         'requested_by_user_id', 'assigned_to_user_id', 'approved_by_user_id',
         'requires_approval', 'resolution_notes', 'assigned_at', 'approved_at', 'resolved_at',
         'sla_deadline', 'sla_hours', 'sla_complexity', 'sla_justification', 'sla_analyzed_at',
@@ -68,32 +68,59 @@ class CrmServiceRequest extends Model
     }
 
     /**
-     * Categorias com flag de aprovação obrigatória
+     * Categorias com flag de aprovação obrigatória.
+     *
+     * Origens:
+     * - 'crm'           → criadas internamente pela equipe
+     * - 'autoatendimento' → originadas pelo cliente via WhatsApp (NEXO)
      */
     public static function categorias(): array
     {
         return [
-            'renuncia_mandato'     => ['label' => 'Renúncia de Mandato', 'approval' => true],
-            'substabelecimento'    => ['label' => 'Substabelecimento', 'approval' => true],
-            'alteracao_cadastral'  => ['label' => 'Alteração Cadastral', 'approval' => false],
-            'emissao_procuracao'   => ['label' => 'Emissão de Procuração', 'approval' => false],
-            'solicitacao_documentos' => ['label' => 'Solicitação de Documentos', 'approval' => false],
-            'cobranca_honorarios'  => ['label' => 'Cobrança de Honorários', 'approval' => true],
-            'acordo_judicial'      => ['label' => 'Acordo Judicial', 'approval' => true],
-            'encerramento_caso'    => ['label' => 'Encerramento de Caso', 'approval' => true],
+            // ── Jurídico / Caso ──────────────────────────────────
+            'renuncia_mandato'          => ['label' => 'Renúncia de Mandato', 'approval' => true],
+            'substabelecimento'         => ['label' => 'Substabelecimento', 'approval' => true],
+            'emissao_procuracao'        => ['label' => 'Emissão de Procuração', 'approval' => false],
+            'acordo_judicial'           => ['label' => 'Acordo Judicial', 'approval' => true],
+            'encerramento_caso'         => ['label' => 'Encerramento de Caso', 'approval' => true],
             'transferencia_responsavel' => ['label' => 'Transferência de Responsável', 'approval' => true],
-            'solicitacao_ti'       => ['label' => 'Solicitação de TI', 'approval' => false],
-            'solicitacao_financeiro' => ['label' => 'Solicitação Financeira', 'approval' => false],
-            'solicitacao_rh'       => ['label' => 'Solicitação de RH', 'approval' => false],
-            'outra'                => ['label' => 'Outra Solicitacao', 'approval' => false],
-            // Categorias operacionais (sem vinculo obrigatorio com cliente)
-            'compra_materiais'     => ['label' => 'Compra de Materiais', 'approval' => true],
-            'manutencao'           => ['label' => 'Manutencao/Reparos', 'approval' => false],
-            'suprimentos'          => ['label' => 'Suprimentos de Escritorio', 'approval' => false],
-            'infraestrutura_ti'    => ['label' => 'Infraestrutura de TI', 'approval' => false],
-            'servicos_terceiros'   => ['label' => 'Contratacao de Servicos', 'approval' => true],
-            'logistica'            => ['label' => 'Logistica/Entregas', 'approval' => false],
+
+            // ── Cadastro / Documentos ────────────────────────────
+            'alteracao_cadastral'       => ['label' => 'Alteração Cadastral', 'approval' => false],
+            'solicitacao_documentos'    => ['label' => 'Solicitação de Documentos', 'approval' => false],
+
+            // ── Financeiro ───────────────────────────────────────
+            'cobranca_honorarios'       => ['label' => 'Cobrança de Honorários', 'approval' => true],
+            'solicitacao_financeiro'    => ['label' => 'Solicitação Financeira', 'approval' => false],
+
+            // ── Cliente via Autoatendimento (NEXO) ───────────────
+            'cliente_agendamento'       => ['label' => 'Agendamento (cliente)', 'approval' => false],
+            'cliente_documento'         => ['label' => 'Documento (cliente)', 'approval' => false],
+            'cliente_documento_envio'   => ['label' => 'Envio de Documento (cliente)', 'approval' => false],
+            'cliente_duvida'            => ['label' => 'Dúvida / Consulta (cliente)', 'approval' => false],
+            'cliente_financeiro'        => ['label' => 'Financeiro (cliente)', 'approval' => false],
+            'cliente_retorno'           => ['label' => 'Pedido de Retorno (cliente)', 'approval' => false],
+            'cliente_geral'             => ['label' => 'Solicitação Geral (cliente)', 'approval' => false],
+
+            // ── Interno / Operacional ────────────────────────────
+            'solicitacao_ti'            => ['label' => 'Solicitação de TI', 'approval' => false],
+            'solicitacao_rh'            => ['label' => 'Solicitação de RH', 'approval' => false],
+            'compra_materiais'          => ['label' => 'Compra de Materiais', 'approval' => true],
+            'manutencao'                => ['label' => 'Manutenção/Reparos', 'approval' => false],
+            'suprimentos'               => ['label' => 'Suprimentos de Escritório', 'approval' => false],
+            'infraestrutura_ti'         => ['label' => 'Infraestrutura de TI', 'approval' => false],
+            'servicos_terceiros'        => ['label' => 'Contratação de Serviços', 'approval' => true],
+            'logistica'                 => ['label' => 'Logística/Entregas', 'approval' => false],
+            'outra'                     => ['label' => 'Outra Solicitação', 'approval' => false],
         ];
+    }
+
+    /**
+     * Categorias originadas por cliente (autoatendimento NEXO).
+     */
+    public static function categoriasCliente(): array
+    {
+        return array_filter(self::categorias(), fn($k) => str_starts_with($k, 'cliente_'), ARRAY_FILTER_USE_KEY);
     }
 
     /**

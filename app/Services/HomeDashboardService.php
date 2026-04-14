@@ -257,22 +257,40 @@ class HomeDashboardService
     public function getAvisosNaoLidos(int $userId): array
     {
         try {
-            $naoLidos = DB::table('avisos')
+            $now = now();
+
+            // Apenas avisos que estão realmente visíveis (mesma lógica do getAvisosAtivos)
+            $baseQuery = fn () => DB::table('avisos')
                 ->leftJoin('avisos_lidos', function ($join) use ($userId) {
                     $join->on('avisos.id', '=', 'avisos_lidos.aviso_id')
                          ->where('avisos_lidos.usuario_id', '=', $userId);
                 })
                 ->whereNull('avisos_lidos.id')
+                ->where(function ($q) use ($now) {
+                    $q->where('avisos.status', 'ativo')
+                      ->orWhere(function ($q2) use ($now) {
+                          $q2->where('avisos.status', 'agendado')
+                             ->where(function ($q3) use ($now) {
+                                 $q3->whereNull('avisos.data_inicio')
+                                    ->orWhere('avisos.data_inicio', '<=', $now);
+                             });
+                      });
+                })
+                ->where(function ($q) use ($now) {
+                    $q->whereNull('avisos.data_inicio')
+                      ->orWhere('avisos.data_inicio', '<=', $now);
+                })
+                ->where(function ($q) use ($now) {
+                    $q->whereNull('avisos.data_fim')
+                      ->orWhere('avisos.data_fim', '>=', $now);
+                });
+
+            $naoLidos = $baseQuery()
                 ->select('avisos.id', 'avisos.titulo', 'avisos.prioridade', 'avisos.created_at', 'avisos.destaque')
                 ->orderByDesc('avisos.destaque')->orderByDesc('avisos.created_at')
                 ->limit(5)->get();
 
-            $total = DB::table('avisos')
-                ->leftJoin('avisos_lidos', function ($join) use ($userId) {
-                    $join->on('avisos.id', '=', 'avisos_lidos.aviso_id')
-                         ->where('avisos_lidos.usuario_id', '=', $userId);
-                })
-                ->whereNull('avisos_lidos.id')->count();
+            $total = $baseQuery()->count();
 
             return [
                 'total' => $total,

@@ -1,5 +1,22 @@
 <?php
 
+/**
+ * ============================================================================
+ * SIRIC v2 — SiricEvidencia (Model)
+ * ============================================================================
+ *
+ * Armazena evidências/provas coletadas durante a análise de crédito.
+ * Cada evidência vem de uma fonte específica e tem impacto classificado.
+ *
+ * Fontes: 'interno' (BD do escritório), 'asaas_serasa' (v2), 'web_intel'
+ * Tipos: contas_receber, movimentos, processos, leads, serasa_report (v2)
+ * Impacto: positivo, neutro, negativo, risco
+ *
+ * v2: Adicionada fonte 'asaas_serasa' com tipo 'serasa_report' para
+ *     persistir dados estruturados extraídos do PDF Serasa.
+ * ============================================================================
+ */
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;

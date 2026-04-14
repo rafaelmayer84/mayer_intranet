@@ -2,15 +2,20 @@
 
 namespace App\Services\Nexo;
 
+use App\Mail\NexoTicketAtribuido;
 use App\Models\NexoAutomationLog;
 use App\Models\NexoClienteValidacao;
 use App\Models\NexoTicket;
+use App\Models\Crm\CrmServiceRequest;
 use App\Models\Cliente;
+use App\Models\NotificationIntranet;
 use App\Models\Processo;
+use App\Models\User;
 use App\Services\OpenAI\OpenAIService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class NexoAutoatendimentoService
 {
@@ -370,9 +375,10 @@ class NexoAutoatendimentoService
             $nomeCliente = $cliente->nome;
         }
 
-        // Rate limit: máximo 3 tickets abertos por telefone
-        $ticketsAbertos = NexoTicket::where('telefone', $telefoneNormalizado)
-            ->where('status', 'aberto')
+        // Rate limit: máximo 3 tickets abertos por telefone (CRM service requests)
+        $ticketsAbertos = CrmServiceRequest::where('phone_contato', $telefoneNormalizado)
+            ->whereIn('status', ['aberto', 'em_andamento'])
+            ->where('origem', 'autoatendimento')
             ->count();
 
         if ($ticketsAbertos >= 3) {
@@ -447,46 +453,56 @@ class NexoAutoatendimentoService
             ]);
         }
 
-        // Gerar protocolo sequencial do dia
-        $protocolo = 'TK-' . date('Ymd') . '-' . str_pad(
-            NexoTicket::whereDate('created_at', today())->count() + 1, 3, '0', STR_PAD_LEFT
-        );
+        // Resolver crm_account_id para vincular ao CRM
+        $crmAccountId = $crmAccount ? DB::table('crm_accounts')
+            ->where('datajuri_pessoa_id', $datajuriId ?: 0)
+            ->orWhere('phone_e164', $telefoneNormalizado)
+            ->value('id') : null;
 
-        $ticket = NexoTicket::create([
-            'cliente_id' => $clienteId,
-            'datajuri_id' => $datajuriId,
-            'telefone' => $telefoneNormalizado,
-            'nome_cliente' => $nomeCliente,
-            'assunto' => mb_substr($assunto, 0, 255),
-            'mensagem' => $mensagem ? mb_substr($mensagem, 0, 2000) : null,
-            'status' => $statusInicial,
-            'responsavel_id' => $responsavelId,
-            'protocolo' => $protocolo,
-            'origem' => 'whatsapp',
+        $ticket = CrmServiceRequest::create([
+            'account_id'           => $crmAccountId,
+            'phone_contato'        => $telefoneNormalizado,
+            'category'             => 'cliente_geral',
+            'origem'               => 'autoatendimento',
+            'subject'              => mb_substr($assunto, 0, 255),
+            'description'          => $mensagem ? mb_substr($mensagem, 0, 2000) : ($assunto),
+            'priority'             => 'normal',
+            'status'               => $statusInicial === 'em_andamento' ? 'em_andamento' : 'aberto',
+            'assigned_to_user_id'  => $responsavelId,
+            'requested_by_user_id' => null,
+            'ai_triage'            => ['nome_cliente' => $nomeCliente, 'datajuri_id' => $datajuriId],
         ]);
 
         $this->logarAcao($telefoneNormalizado, 'ticket_aberto', [
             'ticket_id' => $ticket->id,
+            'protocolo' => $ticket->protocolo,
             'assunto' => $assunto,
-            'cliente_id' => $clienteId,
+            'crm_account_id' => $crmAccountId,
             'responsavel_id' => $responsavelId,
         ]);
+
+        // Notificação bell + email para o responsável atribuído via CRM
+        if ($responsavelId) {
+            $this->notificarResponsavelServiceRequest($ticket, $responsavelId, $nomeCliente, $telefoneNormalizado);
+        }
 
         $saudacao = $nomeCliente ? "Olá {$nomeCliente}!" : "Olá!";
 
         return [
             'sucesso' => true,
             'ticket_id' => $ticket->id,
-            'mensagem' => "{$saudacao} Sua solicitação #{$ticket->id} foi registrada com sucesso. Assunto: \"{$assunto}\". Nossa equipe entrará em contato em breve.",
+            'protocolo' => $ticket->protocolo,
+            'mensagem' => "{$saudacao} Sua solicitação {$ticket->protocolo} foi registrada com sucesso. Assunto: \"{$assunto}\". Nossa equipe entrará em contato em breve.",
         ];
     }
 
     public function listarTickets(?string $telefone = null, ?string $status = null, int $limit = 20): array
     {
-        $query = NexoTicket::query()->orderBy('created_at', 'desc');
+        $query = CrmServiceRequest::where('origem', 'autoatendimento')
+            ->orderBy('created_at', 'desc');
 
         if ($telefone) {
-            $query->where('telefone', $this->normalizarTelefone($telefone));
+            $query->where('phone_contato', $this->normalizarTelefone($telefone));
         }
 
         if ($status) {
@@ -498,12 +514,14 @@ class NexoAutoatendimentoService
         return [
             'total' => $tickets->count(),
             'tickets' => $tickets->map(function ($t) {
+                $nomeCliente = $t->ai_triage['nome_cliente'] ?? '(Sem identificação)';
                 return [
                     'id' => $t->id,
-                    'nome_cliente' => $t->nome_cliente ?? '(Sem identificação)',
-                    'telefone' => $t->telefone,
-                    'assunto' => $t->assunto,
-                    'mensagem' => $t->mensagem,
+                    'protocolo' => $t->protocolo,
+                    'nome_cliente' => $nomeCliente,
+                    'telefone' => $t->phone_contato,
+                    'assunto' => $t->subject,
+                    'mensagem' => $t->description,
                     'status' => $t->status,
                     'data' => $t->created_at->format('d/m/Y H:i'),
                 ];
@@ -806,24 +824,27 @@ class NexoAutoatendimentoService
         ];
         $tipoLabel = $tipoLabels[$tipoLimpo];
 
-        $protocolo = 'DOC-' . date('Ymd') . '-' . str_pad(
-            NexoTicket::whereDate('created_at', today())->count() + 1, 3, '0', STR_PAD_LEFT
-        );
+        $crmAccountId = $this->resolverCrmAccountId($cliente->datajuri_id, $telefoneNormalizado);
 
-        NexoTicket::create([
-            'cliente_id' => $cliente->id, 'datajuri_id' => $cliente->datajuri_id,
-            'telefone' => $telefoneNormalizado, 'nome_cliente' => $cliente->nome,
-            'assunto' => "📄 Solicitação de documento: {$tipoLabel}",
-            'mensagem' => "Tipo: {$tipoLabel}\nObservação: " . ($observacao ?? 'Nenhuma') . "\nProtocolo: {$protocolo}",
-            'status' => 'aberto',
+        $sr = CrmServiceRequest::create([
+            'account_id'           => $crmAccountId,
+            'phone_contato'        => $telefoneNormalizado,
+            'category'             => 'cliente_documento',
+            'origem'               => 'autoatendimento',
+            'subject'              => "Solicitação de documento: {$tipoLabel}",
+            'description'          => "Tipo: {$tipoLabel}\nObservação: " . ($observacao ?? 'Nenhuma'),
+            'priority'             => 'normal',
+            'status'               => 'aberto',
+            'requested_by_user_id' => null,
+            'ai_triage'            => ['nome_cliente' => $cliente->nome, 'tipo_documento' => $tipoLimpo],
         ]);
 
         $tempoMs = (int)((microtime(true) - $inicio) * 1000);
-        $this->logarAcao($telefoneNormalizado, 'solicitar_documento', ['tipo' => $tipoLimpo, 'protocolo' => $protocolo], null, $tempoMs);
+        $this->logarAcao($telefoneNormalizado, 'solicitar_documento', ['tipo' => $tipoLimpo, 'protocolo' => $sr->protocolo], null, $tempoMs);
 
         return [
-            'sucesso' => true, 'protocolo' => $protocolo,
-            'mensagem' => "Solicitação registrada com sucesso!\n\n📋 Protocolo: {$protocolo}\n📄 Documento: {$tipoLabel}\n\nNossa equipe providenciará o documento e entrará em contato em até 24 horas úteis.",
+            'sucesso' => true, 'protocolo' => $sr->protocolo,
+            'mensagem' => "Solicitação registrada com sucesso!\n\n📋 Protocolo: {$sr->protocolo}\n📄 Documento: {$tipoLabel}\n\nNossa equipe providenciará o documento e entrará em contato em até 24 horas úteis.",
             'nome_cliente' => $cliente->nome,
         ];
     }
@@ -839,28 +860,31 @@ class NexoAutoatendimentoService
         $cliente = $this->obterClienteAutenticado($telefoneNormalizado);
         if (isset($cliente['erro'])) { return $cliente; }
 
-        $protocolo = 'ENV-' . date('Ymd') . '-' . str_pad(
-            NexoTicket::whereDate('created_at', today())->count() + 1, 3, '0', STR_PAD_LEFT
-        );
+        $descricao = "Documento enviado pelo cliente via WhatsApp";
+        if ($urlArquivo) { $descricao .= "\nArquivo: {$urlArquivo}"; }
+        if ($observacao) { $descricao .= "\nObservação: {$observacao}"; }
 
-        $msg = "📥 Documento enviado pelo cliente via WhatsApp";
-        if ($urlArquivo) { $msg .= "\nArquivo: {$urlArquivo}"; }
-        if ($observacao) { $msg .= "\nObservação: {$observacao}"; }
-        $msg .= "\nProtocolo: {$protocolo}";
+        $crmAccountId = $this->resolverCrmAccountId($cliente->datajuri_id, $telefoneNormalizado);
 
-        NexoTicket::create([
-            'cliente_id' => $cliente->id, 'datajuri_id' => $cliente->datajuri_id,
-            'telefone' => $telefoneNormalizado, 'nome_cliente' => $cliente->nome,
-            'assunto' => "📥 Documento recebido do cliente",
-            'mensagem' => $msg, 'status' => 'aberto',
+        $sr = CrmServiceRequest::create([
+            'account_id'           => $crmAccountId,
+            'phone_contato'        => $telefoneNormalizado,
+            'category'             => 'cliente_documento_envio',
+            'origem'               => 'autoatendimento',
+            'subject'              => 'Documento recebido do cliente',
+            'description'          => $descricao,
+            'priority'             => 'normal',
+            'status'               => 'aberto',
+            'requested_by_user_id' => null,
+            'ai_triage'            => ['nome_cliente' => $cliente->nome, 'tem_arquivo' => !empty($urlArquivo)],
         ]);
 
         $tempoMs = (int)((microtime(true) - $inicio) * 1000);
-        $this->logarAcao($telefoneNormalizado, 'enviar_documento', ['protocolo' => $protocolo, 'tem_arquivo' => !empty($urlArquivo)], null, $tempoMs);
+        $this->logarAcao($telefoneNormalizado, 'enviar_documento', ['protocolo' => $sr->protocolo, 'tem_arquivo' => !empty($urlArquivo)], null, $tempoMs);
 
         return [
-            'sucesso' => true, 'protocolo' => $protocolo,
-            'mensagem' => "Documento recebido com sucesso!\n\n📋 Protocolo: {$protocolo}\n\nNossa equipe analisará o documento e entrará em contato caso necessite de informações adicionais.",
+            'sucesso' => true, 'protocolo' => $sr->protocolo,
+            'mensagem' => "Documento recebido com sucesso!\n\n📋 Protocolo: {$sr->protocolo}\n\nNossa equipe analisará o documento e entrará em contato caso necessite de informações adicionais.",
             'nome_cliente' => $cliente->nome,
         ];
     }
@@ -888,31 +912,35 @@ class NexoAutoatendimentoService
         $prefLabels = ['manha' => '🌅 Manhã (8h-12h)', 'tarde' => '🌆 Tarde (13h-18h)', 'sem_preferencia' => '🕐 Sem preferência'];
         $preferenciaLabel = $prefLabels[$preferencia] ?? $prefLabels['sem_preferencia'];
 
-        $protocolo = 'AGD-' . date('Ymd') . '-' . str_pad(
-            NexoTicket::whereDate('created_at', today())->count() + 1, 3, '0', STR_PAD_LEFT
-        );
-
-        $msg = "Motivo: {$motivoLabel}\nUrgência: {$urgenciaLabel}\nPreferência: {$preferenciaLabel}";
+        $descricao = "Motivo: {$motivoLabel}\nUrgência: {$urgenciaLabel}\nPreferência: {$preferenciaLabel}";
         if ($observacao && !in_array(strtolower(trim($observacao)), ['não', 'nao', ''])) {
-            $msg .= "\nObservação: {$observacao}";
+            $descricao .= "\nObservação: {$observacao}";
         }
-        $msg .= "\nProtocolo: {$protocolo}";
 
-        NexoTicket::create([
-            'cliente_id' => $cliente->id, 'datajuri_id' => $cliente->datajuri_id,
-            'telefone' => $telefoneNormalizado, 'nome_cliente' => $cliente->nome,
-            'assunto' => "📅 Agendamento: {$motivoLabel}",
-            'mensagem' => $msg, 'status' => 'aberto',
+        $prioridade = $urgencia === 'urgente' ? 'alta' : 'normal';
+        $crmAccountId = $this->resolverCrmAccountId($cliente->datajuri_id, $telefoneNormalizado);
+
+        $sr = CrmServiceRequest::create([
+            'account_id'           => $crmAccountId,
+            'phone_contato'        => $telefoneNormalizado,
+            'category'             => 'cliente_agendamento',
+            'origem'               => 'autoatendimento',
+            'subject'              => "Agendamento: {$motivoLabel}",
+            'description'          => $descricao,
+            'priority'             => $prioridade,
+            'status'               => 'aberto',
+            'requested_by_user_id' => null,
+            'ai_triage'            => ['nome_cliente' => $cliente->nome, 'motivo' => $motivoLimpo, 'urgencia' => $urgencia],
         ]);
 
         $tempoMs = (int)((microtime(true) - $inicio) * 1000);
         $this->logarAcao($telefoneNormalizado, 'solicitar_agendamento', [
-            'motivo' => $motivoLimpo, 'urgencia' => $urgencia, 'protocolo' => $protocolo,
+            'motivo' => $motivoLimpo, 'urgencia' => $urgencia, 'protocolo' => $sr->protocolo,
         ], null, $tempoMs);
 
         return [
-            'sucesso' => true, 'protocolo' => $protocolo,
-            'mensagem' => "Solicitação de agendamento registrada!\n\n📋 Protocolo: {$protocolo}\n📌 Motivo: {$motivoLabel}\n⏰ Urgência: {$urgenciaLabel}\n🕐 Preferência: {$preferenciaLabel}\n\nNossa equipe entrará em contato para confirmar a melhor data e horário.",
+            'sucesso' => true, 'protocolo' => $sr->protocolo,
+            'mensagem' => "Solicitação de agendamento registrada!\n\n📋 Protocolo: {$sr->protocolo}\n📌 Motivo: {$motivoLabel}\n⏰ Urgência: {$urgenciaLabel}\n🕐 Preferência: {$preferenciaLabel}\n\nNossa equipe entrará em contato para confirmar a melhor data e horário.",
             'nome_cliente' => $cliente->nome,
         ];
     }
@@ -1191,6 +1219,29 @@ class NexoAutoatendimentoService
         return preg_replace('/\D/', '', $telefone);
     }
 
+    /**
+     * Resolve o crm_accounts.id a partir do datajuri_id ou telefone.
+     * Usado para vincular tickets de autoatendimento à conta CRM correta.
+     */
+    private function resolverCrmAccountId(?int $datajuriId, string $telefone): ?int
+    {
+        if ($datajuriId) {
+            $id = DB::table('crm_accounts')
+                ->where('datajuri_pessoa_id', $datajuriId)
+                ->value('id');
+            if ($id) return (int) $id;
+        }
+
+        // Fallback via phone (últimos 8 dígitos)
+        $parcial = substr(preg_replace('/\D/', '', $telefone), -8);
+        $id = DB::table('crm_accounts')
+            ->where('phone_e164', 'LIKE', '%' . $parcial)
+            ->where('lifecycle', '!=', 'arquivado')
+            ->value('id');
+
+        return $id ? (int) $id : null;
+    }
+
     private function converterDataBR(string $dataBR): string
     {
         if (empty($dataBR)) {
@@ -1395,6 +1446,55 @@ class NexoAutoatendimentoService
             'ticket_resumo' => $fallback,
             'fonte' => 'fallback',
         ];
+    }
+
+    /**
+     * Envia notificação bell + email para o advogado responsável
+     * quando um ticket de autoatendimento (WhatsApp) é criado.
+     */
+    private function notificarResponsavelServiceRequest(
+        CrmServiceRequest $ticket,
+        int $responsavelId,
+        ?string $nomeCliente,
+        ?string $telefone
+    ): void {
+        $responsavel = User::find($responsavelId);
+        if (!$responsavel) return;
+
+        $protocolo  = $ticket->protocolo ?? "#{$ticket->id}";
+        $cliente    = $nomeCliente ?? 'Cliente não identificado';
+        $linkTicket = route('nexo.tickets') . '?busca=' . urlencode($protocolo);
+
+        // Notificação no sininho
+        NotificationIntranet::enviar(
+            userId: $responsavel->id,
+            titulo: "🎫 Novo ticket: {$protocolo}",
+            mensagem: "{$cliente} — {$ticket->subject}",
+            link: $linkTicket,
+            icone: 'ticket'
+        );
+
+        // Email
+        try {
+            if ($responsavel->email) {
+                Mail::to($responsavel->email)->send(new NexoTicketAtribuido($responsavel, [
+                    'protocolo'    => $protocolo,
+                    'assunto'      => $ticket->subject,
+                    'nome_cliente' => $nomeCliente,
+                    'telefone'     => $telefone,
+                    'tipo'         => null,
+                    'prioridade'   => $ticket->priority ?? 'normal',
+                    'mensagem'     => $ticket->description,
+                    'link'         => $linkTicket,
+                ]));
+            }
+        } catch (\Exception $e) {
+            Log::warning('NEXO-AUTOATENDIMENTO: Falha ao enviar email de atribuição', [
+                'ticket_id'      => $ticket->id,
+                'responsavel_id' => $responsavelId,
+                'erro'           => $e->getMessage(),
+            ]);
+        }
     }
 
 }

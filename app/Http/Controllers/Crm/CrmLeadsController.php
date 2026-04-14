@@ -172,7 +172,7 @@ class CrmLeadsController extends Controller
             'email'           => 'nullable|email|max:255',
             'area_interesse'  => 'nullable|string|max:255',
             'resumo_demanda'  => 'nullable|string|max:2000',
-            'origem_canal'    => 'required|in:relacionamento,indicacao,telefone,presencial',
+            'origem_canal'    => 'required|in:relacionamento,indicacao,telefone,presencial,google_ads,redes_sociais,organico,nao_identificado',
             'owner_user_id'   => 'required|exists:users,id',
         ]);
 

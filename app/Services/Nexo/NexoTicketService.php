@@ -2,11 +2,16 @@
 
 namespace App\Services\Nexo;
 
+use App\Mail\NexoTicketAtribuido;
+use App\Models\Cliente;
+use App\Models\Crm\CrmAccount;
+use App\Models\NotificationIntranet;
 use App\Models\NexoTicket;
 use App\Models\NexoTicketNota;
 use App\Services\SendPulseWhatsAppService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class NexoTicketService
 {
@@ -265,17 +270,111 @@ class NexoTicketService
             3, '0', STR_PAD_LEFT
         );
 
-        return NexoTicket::create([
+        $responsavelId = $dados['responsavel_id'] ?? null;
+
+        // Se não veio responsável explícito, busca pelo CRM usando o telefone
+        if (!$responsavelId && !empty($dados['telefone'])) {
+            $responsavelId = $this->resolverResponsavelPorTelefone($dados['telefone']);
+        }
+
+        $ticket = NexoTicket::create([
             'nome_cliente' => $dados['nome_cliente'] ?? null,
             'telefone' => $dados['telefone'] ?? '',
             'tipo' => $dados['tipo'] ?? 'geral',
             'protocolo' => $protocolo,
             'assunto' => $dados['assunto'],
             'mensagem' => $dados['mensagem'] ?? null,
-            'status' => 'aberto',
+            'status' => $responsavelId ? 'em_andamento' : 'aberto',
             'prioridade' => $dados['prioridade'] ?? 'normal',
-            'responsavel_id' => $dados['responsavel_id'] ?? null,
+            'responsavel_id' => $responsavelId,
             'origem' => 'manual',
         ]);
+
+        if ($responsavelId) {
+            $this->notificarResponsavel($ticket);
+        }
+
+        return $ticket;
+    }
+
+    /**
+     * Resolve o user_id do advogado responsável a partir do telefone.
+     * Estratégia:
+     *   1. telefone → clientes.telefone → crm_accounts.datajuri_pessoa_id → owner_user_id
+     *   2. telefone → crm_accounts.phone_e164 → owner_user_id (fallback direto)
+     */
+    private function resolverResponsavelPorTelefone(string $telefone): ?int
+    {
+        $digits = preg_replace('/\D/', '', $telefone);
+        if (strlen($digits) < 8) return null;
+
+        // Monta variantes com e sem DDI 55
+        $variantes = [$digits];
+        if (str_starts_with($digits, '55') && strlen($digits) >= 12) {
+            $variantes[] = substr($digits, 2);
+        } elseif (strlen($digits) <= 11) {
+            $variantes[] = '55' . $digits;
+        }
+
+        // 1. Via tabela clientes → crm_accounts
+        $cliente = Cliente::whereIn('telefone', $variantes)->first();
+        if ($cliente?->datajuri_id) {
+            $account = CrmAccount::where('datajuri_pessoa_id', $cliente->datajuri_id)
+                ->whereNotNull('owner_user_id')
+                ->first();
+            if ($account?->owner_user_id) return $account->owner_user_id;
+        }
+
+        // 2. Direto em crm_accounts.phone_e164
+        $phone_e164 = '+' . (str_starts_with($digits, '55') ? $digits : '55' . $digits);
+        $account = CrmAccount::where('phone_e164', $phone_e164)
+            ->whereNotNull('owner_user_id')
+            ->first();
+
+        return $account?->owner_user_id;
+    }
+
+    /**
+     * Envia notificação bell + email para o responsável atribuído.
+     */
+    private function notificarResponsavel(NexoTicket $ticket): void
+    {
+        $responsavel = $ticket->responsavel;
+        if (!$responsavel) return;
+
+        $protocolo  = $ticket->protocolo ?? "#{$ticket->id}";
+        $cliente    = $ticket->nome_cliente ?? 'Cliente não identificado';
+        $linkTicket = route('nexo.tickets') . '?busca=' . urlencode($protocolo);
+
+        // Notificação no sininho
+        NotificationIntranet::enviar(
+            userId: $responsavel->id,
+            titulo: "🎫 Novo ticket: {$protocolo}",
+            mensagem: "{$cliente} — {$ticket->assunto}",
+            link: $linkTicket,
+            icone: 'ticket'
+        );
+
+        // Email para o responsável
+        try {
+            if ($responsavel->email) {
+                Mail::to($responsavel->email)->send(new NexoTicketAtribuido($responsavel, [
+                    'protocolo'    => $protocolo,
+                    'assunto'      => $ticket->assunto,
+                    'nome_cliente' => $ticket->nome_cliente,
+                    'telefone'     => $ticket->telefone,
+                    'tipo'         => $ticket->tipo_label,
+                    'prioridade'   => $ticket->prioridade,
+                    'mensagem'     => $ticket->mensagem,
+                    'link'         => $linkTicket,
+                ]));
+            }
+        } catch (\Exception $e) {
+            Log::warning('NEXO-TICKETS: Falha ao enviar email de atribuição', [
+                'ticket_id' => $ticket->id,
+                'responsavel_id' => $responsavel->id,
+                'erro' => $e->getMessage(),
+            ]);
+        }
     }
 }

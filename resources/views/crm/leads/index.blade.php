@@ -2,7 +2,7 @@
 @section('title', 'CRM - Leads')
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 py-6">
+<div class="px-4 py-6">
     <div class="flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold text-[#1B334A]">Leads</h1>
@@ -198,10 +198,18 @@
                 <div>
                     <label class="block text-xs font-medium text-gray-600 mb-1">Origem *</label>
                     <select id="ml_origem" class="w-full border rounded-lg px-3 py-2 text-sm">
-                        <option value="relacionamento">Relacionamento</option>
-                        <option value="indicacao">Indicação</option>
-                        <option value="telefone">Telefone</option>
-                        <option value="presencial">Presencial</option>
+                        <optgroup label="Presencial / Direto">
+                            <option value="relacionamento">Relacionamento</option>
+                            <option value="indicacao">Indicação</option>
+                            <option value="telefone">Telefone</option>
+                            <option value="presencial">Presencial</option>
+                        </optgroup>
+                        <optgroup label="Digital">
+                            <option value="google_ads">Google Ads</option>
+                            <option value="redes_sociais">Redes Sociais</option>
+                            <option value="organico">Orgânico (site/SEO)</option>
+                        </optgroup>
+                        <option value="nao_identificado">Não identificado</option>
                     </select>
                 </div>
                 <div>

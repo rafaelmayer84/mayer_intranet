@@ -2,7 +2,7 @@
 @section('title', 'CRM - Revisar Distribuição')
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 py-6">
+<div class="px-4 py-6">
     <div class="flex items-center gap-2 text-sm text-gray-500 mb-4">
         <a href="{{ route('crm.distribution') }}" class="hover:text-[#385776]">Distribuição</a>
         <span>›</span>

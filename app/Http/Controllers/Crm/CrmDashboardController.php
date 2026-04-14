@@ -32,8 +32,11 @@ class CrmDashboardController extends Controller
         // ── Oportunidades abertas ──
         $openOpps = $this->openOpportunities($ownerId);
 
+        // ── Dados para gráficos ──
+        $charts = $this->buildCharts($ownerId);
+
         return view('crm.dashboard.index', compact(
-            'user', 'isRestricted', 'kpis', 'agenda', 'alertas', 'recentClients', 'openOpps'
+            'user', 'isRestricted', 'kpis', 'agenda', 'alertas', 'recentClients', 'openOpps', 'charts'
         ));
     }
 
@@ -168,5 +171,61 @@ class CrmDashboardController extends Controller
         if ($ownerId) $query->where('owner_user_id', $ownerId);
 
         return $query->limit(10)->get();
+    }
+
+    private function buildCharts(?int $ownerId): array
+    {
+        // 1. Pipeline por estágio (valor e quantidade)
+        $pipelineByStage = CrmOpportunity::with('stage')
+            ->where('status', 'open')
+            ->when($ownerId, fn($q) => $q->where('owner_user_id', $ownerId))
+            ->get()
+            ->groupBy('stage_id')
+            ->map(fn($opps) => [
+                'name'  => $opps->first()->stage?->name ?? 'Sem estágio',
+                'color' => $opps->first()->stage?->color ?? '#385776',
+                'count' => $opps->count(),
+                'value' => $opps->sum('value_estimated'),
+            ])
+            ->values();
+
+        // 2. Tendência mensal: opps ganhas e perdidas (últimos 6 meses)
+        $months = collect(range(5, 0))->map(fn($i) => now()->subMonths($i));
+        $won = CrmOpportunity::where('status', 'won')
+            ->when($ownerId, fn($q) => $q->where('owner_user_id', $ownerId))
+            ->where('won_at', '>=', now()->subMonths(6))
+            ->get()
+            ->groupBy(fn($o) => \Carbon\Carbon::parse($o->won_at)->format('Y-m'));
+        $lost = CrmOpportunity::where('status', 'lost')
+            ->when($ownerId, fn($q) => $q->where('owner_user_id', $ownerId))
+            ->where('updated_at', '>=', now()->subMonths(6))
+            ->get()
+            ->groupBy(fn($o) => $o->updated_at->format('Y-m'));
+
+        $trend = $months->map(fn($m) => [
+            'label' => $m->locale('pt_BR')->isoFormat('MMM/YY'),
+            'won'   => $won->get($m->format('Y-m'))?->count() ?? 0,
+            'lost'  => $lost->get($m->format('Y-m'))?->count() ?? 0,
+        ]);
+
+        // 3. Atividades por tipo (últimos 30 dias)
+        $actByType = CrmActivity::where('created_at', '>=', now()->subDays(30))
+            ->when($ownerId, fn($q) => $q->where('created_by_user_id', $ownerId))
+            ->select('type', DB::raw('count(*) as total'))
+            ->groupBy('type')
+            ->pluck('total', 'type');
+
+        // 4. Clientes por lifecycle
+        $byLifecycle = CrmAccount::when($ownerId, fn($q) => $q->where('owner_user_id', $ownerId))
+            ->select('lifecycle', DB::raw('count(*) as total'))
+            ->groupBy('lifecycle')
+            ->pluck('total', 'lifecycle');
+
+        return [
+            'pipeline_stages' => $pipelineByStage,
+            'trend'           => $trend,
+            'activities'      => $actByType,
+            'lifecycle'       => $byLifecycle,
+        ];
     }
 }

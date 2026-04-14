@@ -210,8 +210,8 @@
         <div class="home-card p-4 anim-card">
             <p class="text-xs text-gray-400 font-medium mb-3">Pipeline CRM — oportunidades em aberto</p>
             <div class="flex items-end gap-2 overflow-x-auto pb-1">
-                @foreach($painelComercial['pipeline'] as $stage)
-                @php $maxVal = max(array_column($painelComercial['pipeline'], 'total'), 1); @endphp
+                @php $maxVal = max(array_map(fn($s) => $s['total'], $painelComercial['pipeline']) ?: [1]); @endphp
+            @foreach($painelComercial['pipeline'] as $stage)
                 <div class="flex flex-col items-center min-w-[80px] flex-1">
                     <span class="text-xs font-black text-[#1B334A] mb-1">{{ $stage['total'] }}</span>
                     <div class="w-full rounded-t-md transition-all" style="height: {{ max(4, intval(($stage['total'] / $maxVal) * 60)) }}px; background: linear-gradient(180deg,#385776,#1B334A)"></div>

@@ -1,113 +1,142 @@
 @extends('layouts.app')
 @section('title', 'CRM - Pipeline')
 
+@push('styles')
+<link rel="stylesheet" href="{{ asset('css/crm-modern.css') }}">
+@endpush
+
 @section('content')
 <div class="max-w-full mx-auto px-4 py-6">
+
     {{-- Header --}}
-    <div class="flex items-center justify-between mb-6">
-        <div>
-            <h1 class="text-2xl font-bold text-[#1B334A]">Pipeline</h1>
-            <p class="text-sm text-gray-500 mt-1">Gestão de oportunidades</p>
-        </div>
-        <div class="flex gap-2">
-            <a href="{{ route('crm.carteira') }}" class="px-4 py-2 border border-[#385776] text-[#385776] rounded-lg text-sm hover:bg-gray-50">← Carteira</a>
-            <a href="{{ route('crm.reports') }}" class="px-4 py-2 bg-[#385776] text-white rounded-lg text-sm hover:bg-[#1B334A]">Relatórios</a>
+    <div class="crm-page-header mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1>Pipeline</h1>
+                <p>Gestão de oportunidades em andamento</p>
+            </div>
+            <div class="flex gap-2">
+                <a href="{{ route('crm.carteira') }}"
+                   class="px-4 py-2 rounded-lg text-sm font-medium transition"
+                   style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.2)">
+                    ← Carteira
+                </a>
+                <a href="{{ route('crm.reports') }}"
+                   class="px-4 py-2 rounded-lg text-sm font-medium transition"
+                   style="background:#fff;color:var(--brand-navy)">
+                    Relatórios
+                </a>
+            </div>
         </div>
     </div>
 
-    {{-- KPI Cards --}}
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white rounded-lg shadow-sm border p-4">
-            <p class="text-xs text-gray-500 uppercase">Em aberto</p>
-            <p class="text-2xl font-bold text-[#1B334A]">{{ $kpis['open_count'] }}</p>
-            <p class="text-xs text-gray-400">R$ {{ number_format($kpis['open_value'], 2, ',', '.') }}</p>
+    {{-- KPIs + Filtro --}}
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div class="pipeline-kpi" style="--kpi-accent:var(--brand-navy)">
+            <p style="font-size:0.68rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--brand-text-muted);margin-bottom:0.3rem">Em aberto</p>
+            <p style="font-size:1.65rem;font-weight:700;color:var(--brand-navy);line-height:1.1">{{ $kpis['open_count'] }}</p>
+            <p style="font-size:0.72rem;color:var(--brand-text-muted);margin-top:0.15rem">R$ {{ number_format($kpis['open_value'], 0, ',', '.') }}</p>
         </div>
-        <div class="bg-white rounded-lg shadow-sm border p-4">
-            <p class="text-xs text-gray-500 uppercase">Vencidos</p>
-            <p class="text-2xl font-bold {{ $kpis['overdue_count'] > 0 ? 'text-red-600' : 'text-gray-400' }}">{{ $kpis['overdue_count'] }}</p>
+        <div class="pipeline-kpi" style="--kpi-accent:{{ $kpis['overdue_count'] > 0 ? '#dc2626' : '#e2e8f0' }}">
+            <p style="font-size:0.68rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--brand-text-muted);margin-bottom:0.3rem">Vencidos</p>
+            <p style="font-size:1.65rem;font-weight:700;line-height:1.1;color:{{ $kpis['overdue_count'] > 0 ? '#dc2626' : '#94a3b8' }}">{{ $kpis['overdue_count'] }}</p>
         </div>
-        <div class="bg-white rounded-lg shadow-sm border p-4">
-            <p class="text-xs text-gray-500 uppercase">Ganhos (mês)</p>
-            <p class="text-2xl font-bold text-green-600">{{ $kpis['won_month'] }}</p>
-            <p class="text-xs text-gray-400">R$ {{ number_format($kpis['won_value'], 2, ',', '.') }}</p>
+        <div class="pipeline-kpi" style="--kpi-accent:#059669">
+            <p style="font-size:0.68rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--brand-text-muted);margin-bottom:0.3rem">Ganhos (mês)</p>
+            <p style="font-size:1.65rem;font-weight:700;color:#059669;line-height:1.1">{{ $kpis['won_month'] }}</p>
+            <p style="font-size:0.72rem;color:var(--brand-text-muted);margin-top:0.15rem">R$ {{ number_format($kpis['won_value'], 0, ',', '.') }}</p>
         </div>
-        <div class="bg-white rounded-lg shadow-sm border p-4">
-            <p class="text-xs text-gray-500 uppercase">Filtros</p>
-            <form method="GET" class="flex gap-2 mt-1">
-                <select name="type" onchange="this.form.submit()" class="border rounded px-2 py-1 text-xs flex-1">
-                    <option value="">Todos</option>
+        <div class="pipeline-filter-card">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color:var(--brand-text-muted);flex-shrink:0"><path d="M3 4h18M7 12h10M11 20h2"/></svg>
+            <form method="GET" class="flex-1">
+                <select name="type" onchange="this.form.submit()"
+                    style="border:1px solid var(--brand-border);border-radius:8px;padding:0.35rem 0.6rem;font-size:0.78rem;width:100%;background:#fff;color:var(--brand-text)">
+                    <option value="">Todos os tipos</option>
                     <option value="aquisicao" {{ request('type') === 'aquisicao' ? 'selected' : '' }}>Aquisição</option>
-                    <option value="carteira" {{ request('type') === 'carteira' ? 'selected' : '' }}>Carteira</option>
+                    <option value="carteira"  {{ request('type') === 'carteira'  ? 'selected' : '' }}>Carteira</option>
                 </select>
             </form>
         </div>
     </div>
 
     {{-- Kanban Board --}}
-    <div class="flex gap-4 overflow-x-auto pb-4" style="min-height: 500px;">
+    <div class="kanban-board">
         @foreach($kanban as $col)
             @php $stage = $col['stage']; @endphp
-            <div class="flex-shrink-0 w-72 bg-gray-50 rounded-lg border">
-                {{-- Stage Header --}}
-                <div class="px-3 py-2 border-b flex items-center justify-between" style="border-top: 3px solid {{ $stage->color }};">
-                    <span class="font-medium text-sm text-gray-700">{{ $stage->name }}</span>
-                    <span class="bg-gray-200 text-gray-600 rounded-full px-2 py-0.5 text-xs">{{ count($col['opportunities']) }}</span>
+            <div class="kanban-col">
+                {{-- Column Header --}}
+                <div class="kanban-col-header" style="border-top:3px solid {{ $stage->color }}">
+                    <span class="kanban-col-title">{{ $stage->name }}</span>
+                    <span class="kanban-col-count">{{ count($col['opportunities']) }}</span>
                 </div>
 
                 {{-- Cards --}}
-                <div class="p-2 space-y-2 max-h-[60vh] overflow-y-auto">
+                <div class="kanban-col-body">
                     @forelse($col['opportunities'] as $opp)
-                        <div class="bg-white rounded-lg shadow-sm border p-3 hover:shadow-md transition cursor-pointer"
+                        <div class="pipeline-card {{ $opp->isOverdue() ? 'is-overdue' : '' }}"
                              onclick="window.location='{{ route('crm.opportunities.show', $opp->id) }}'">
-                            <div class="flex items-start justify-between mb-1">
-                                <span class="text-xs px-1.5 py-0.5 rounded {{ $opp->type === 'aquisicao' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600' }}">
+
+                            {{-- Delete button (hidden until hover) --}}
+                            @if(auth()->user()->role === 'admin')
+                            <button class="pipeline-card-delete"
+                                    onclick="event.stopPropagation(); excluirOportunidade({{ $opp->id }}, '{{ addslashes($opp->title) }}')"
+                                    title="Excluir oportunidade">
+                                🗑
+                            </button>
+                            @endif
+
+                            {{-- Top badges --}}
+                            <div class="pipeline-card-top">
+                                <span class="pipeline-card-type {{ $opp->type === 'aquisicao' ? 'type-aquisicao' : 'type-carteira' }}">
                                     {{ $opp->type === 'aquisicao' ? 'Aquisição' : 'Carteira' }}
                                 </span>
                                 @if($opp->isOverdue())
-                                    <span class="text-xs text-red-500 font-medium">{{ $opp->overdueDays() }}d atraso</span>
+                                <span class="pipeline-overdue-badge">{{ $opp->overdueDays() }}d atraso</span>
                                 @endif
                             </div>
-                            <p class="font-medium text-sm text-gray-800 mb-1 line-clamp-2">{{ $opp->title }}</p>
-                            <p class="text-xs text-gray-500 mb-2">{{ $opp->account?->name ?? '—' }}</p>
-                            <div class="flex items-center justify-between text-xs text-gray-400">
-                                @if($opp->value_estimated)
-                                    <span class="font-medium text-gray-600">R$ {{ number_format($opp->value_estimated, 0, ',', '.') }}</span>
-                                @else
-                                    <span>—</span>
-                                @endif
-                                @if($opp->source)
-                                    <span>{{ $opp->source }}</span>
-                                @endif
-                                @if($opp->owner)
-                                    <span>{{ explode(' ', $opp->owner->name)[0] }}</span>
-                                @endif
+
+                            {{-- Title + Client --}}
+                            <p class="pipeline-card-title">{{ $opp->title }}</p>
+                            <p class="pipeline-card-client">{{ $opp->account?->name ?? '—' }}</p>
+
+                            {{-- Footer --}}
+                            <div class="pipeline-card-footer">
+                                <span class="pipeline-card-value">
+                                    @if($opp->value_estimated)
+                                        R$ {{ number_format($opp->value_estimated, 0, ',', '.') }}
+                                    @else
+                                        <span style="color:#cbd5e1">—</span>
+                                    @endif
+                                </span>
+                                <div class="pipeline-card-meta">
+                                    @if($opp->next_action_at)
+                                    <span class="pipeline-card-date {{ $opp->isOverdue() ? 'overdue' : '' }}">
+                                        📅 {{ $opp->next_action_at->format('d/m') }}
+                                    </span>
+                                    @endif
+                                    @if($opp->owner)
+                                    <span class="pipeline-card-owner"
+                                          title="{{ $opp->owner->name }}">{{ mb_substr($opp->owner->name, 0, 2) }}</span>
+                                    @endif
+                                </div>
                             </div>
-                            @if($opp->next_action_at)
-                                <p class="text-xs mt-1 {{ $opp->isOverdue() ? 'text-red-500' : 'text-gray-400' }}">
-                                    Ação: {{ $opp->next_action_at->format('d/m') }}
-                                </p>
-                            @endif
-                        @if(auth()->user()->role === 'admin')
-                        <div class="flex justify-end mt-2 pt-1 border-t border-gray-100">
-                            <button type="button"
-                                onclick="event.stopPropagation(); excluirOportunidade({{ $opp->id }}, '{{ addslashes($opp->title) }}')"
-                                class="text-xs text-gray-400 hover:text-red-600 transition-colors">
-                                🗑 Excluir
-                            </button>
-                        </div>
-                        @endif
                         </div>
                     @empty
-                        <p class="text-xs text-gray-400 text-center py-4">Nenhuma oportunidade</p>
+                        <div class="crm-empty" style="padding:2rem 0.5rem">
+                            <div class="crm-empty-icon">📭</div>
+                            <p class="crm-empty-text">Nenhuma oportunidade</p>
+                        </div>
                     @endforelse
                 </div>
             </div>
         @endforeach
     </div>
 </div>
+
 @push('scripts')
 <script>
 function excluirOportunidade(id, titulo) {
+    if (!confirm('Excluir "' + titulo + '"?\n\nEsta ação não pode ser desfeita.')) return;
     fetch('/crm/pipeline/' + id, {
         method: 'DELETE',
         headers: {

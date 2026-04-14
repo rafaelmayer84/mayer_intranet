@@ -130,7 +130,7 @@ class NexoQaResponseProcessor
 
         if (isset($parts[1]) && is_numeric($parts[1])) {
             $val = (int) $parts[1];
-            if ($val >= 0 && $val <= 5) {
+            if ($val >= 1 && $val <= 5) {
                 $nps = $val;
             }
         }

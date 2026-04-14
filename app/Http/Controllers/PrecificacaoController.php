@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PricingCalibration;
 use App\Models\PricingProposal;
+use App\Models\SipexSetting;
 use App\Models\Crm\CrmOpportunity;
 use App\Models\Crm\CrmAccount;
 use App\Services\PricingDataCollectorService;
@@ -156,69 +157,16 @@ class PrecificacaoController extends Controller
             'proposta_premium' => $resultado['proposta_premium'],
             'recomendacao_ia' => $resultado['recomendacao'],
             'justificativa_ia' => $resultado['justificativa_recomendacao'] ?? null,
+            'modelo_ia_utilizado' => $resultado['model_used'] ?? null,
+            'analise_yield' => $resultado['analise_yield'] ?? null,
             'status' => 'gerada',
         ]);
 
         Log::info('Precificação: Proposta gerada', ['id' => $proposal->id, 'user' => Auth::id()]);
 
-        // === INTEGRAÇÃO SIPEX → CRM: criar oportunidade automaticamente ===
-        try {
-            $valorEquilibrada = $resultado['proposta_equilibrada']['valor_honorarios'] ?? null;
-            $nomeProponente = $dadosProponente['proponente']['nome'] ?? 'Proposta SIPEX';
-            $documento = $dadosProponente['proponente']['documento'] ?? null;
-            $telefone = $dadosProponente['proponente']['telefone'] ?? null;
-
-            // Tentar localizar account no CRM por documento ou telefone
-            $accountId = null;
-            if ($documento) {
-                $digits = preg_replace('/\D/', '', $documento);
-                $account = CrmAccount::where('doc_digits', $digits)->first();
-                if ($account) $accountId = $account->id;
-            }
-            if (!$accountId && $telefone) {
-                $phoneClean = preg_replace('/\D/', '', $telefone);
-                if (strlen($phoneClean) >= 10) {
-                    $account = CrmAccount::where('phone_e164', 'like', "%{$phoneClean}%")->first();
-                    if ($account) $accountId = $account->id;
-                }
-            }
-            // Se não encontrou, criar prospect
-            if (!$accountId) {
-                $newAccount = CrmAccount::create([
-                    'name' => $nomeProponente,
-                    'kind' => 'prospect',
-                    'doc_digits' => $documento ? preg_replace('/\D/', '', $documento) : null,
-                    'phone_e164' => $telefone ? preg_replace('/\D/', '', $telefone) : null,
-                    'owner_user_id' => Auth::id(),
-                ]);
-                $accountId = $newAccount->id;
-            }
-
-            $opp = CrmOpportunity::create([
-                'account_id' => $accountId,
-                'stage_id' => 3, // Proposta
-                'type' => 'aquisicao',
-                'title' => ($areaDireito ?? 'Demanda') . ' - ' . $nomeProponente,
-                'area' => $areaDireito,
-                'tipo_demanda' => $areaDireito,
-                'source' => 'sipex',
-                'value_estimated' => $valorEquilibrada,
-                'owner_user_id' => Auth::id(),
-                'status' => 'open',
-                'sipex_proposal_id' => $proposal->id,
-            ]);
-
-            $proposal->update(['crm_opportunity_id' => $opp->id]);
-            Log::info('SIPEX->CRM: Oportunidade criada', ['opp_id' => $opp->id, 'proposal_id' => $proposal->id]);
-        } catch (\Exception $e) {
-            Log::warning('SIPEX->CRM: Falha ao criar oportunidade', ['erro' => $e->getMessage()]);
-            // Não bloqueia o retorno da proposta
-        }
-
         return response()->json([
             'success' => true,
             'proposal_id' => $proposal->id,
-            'crm_opportunity_id' => $opp->id ?? null,
             'resultado' => $resultado,
         ]);
     }
@@ -243,7 +191,73 @@ class PrecificacaoController extends Controller
             'status' => 'enviada',
         ]);
 
-        return response()->json(['success' => true]);
+        // === INTEGRAÇÃO SIPEX → CRM: criar oportunidade no momento da aprovação ===
+        $crmOppId = null;
+        if ($request->proposta_escolhida !== 'nenhuma' && !$proposal->crm_opportunity_id) {
+            try {
+                $nomeProponente = $proposal->nome_proponente ?? 'Proposta SIPEX';
+                $documento = $proposal->documento_proponente;
+                $areaDireito = $proposal->area_direito;
+                $valorAprovado = $request->valor_final ?? $proposal->{'proposta_' . $request->proposta_escolhida}['valor_honorarios'] ?? null;
+
+                // Buscar telefone do lead/cliente
+                $telefone = null;
+                if ($proposal->lead_id) {
+                    $telefone = \App\Models\Lead::where('id', $proposal->lead_id)->value('telefone');
+                }
+
+                // Tentar localizar account no CRM por documento ou telefone
+                $accountId = null;
+                if ($documento) {
+                    $digits = preg_replace('/\D/', '', $documento);
+                    $account = CrmAccount::where('doc_digits', $digits)->first();
+                    if ($account) $accountId = $account->id;
+                }
+                if (!$accountId && $telefone) {
+                    $phoneClean = preg_replace('/\D/', '', $telefone);
+                    if (strlen($phoneClean) >= 10) {
+                        $account = CrmAccount::where('phone_e164', 'like', "%{$phoneClean}%")->first();
+                        if ($account) $accountId = $account->id;
+                    }
+                }
+                // Se não encontrou, criar prospect
+                if (!$accountId) {
+                    $newAccount = CrmAccount::create([
+                        'name' => $nomeProponente,
+                        'kind' => 'prospect',
+                        'doc_digits' => $documento ? preg_replace('/\D/', '', $documento) : null,
+                        'phone_e164' => $telefone ? preg_replace('/\D/', '', $telefone) : null,
+                        'owner_user_id' => Auth::id(),
+                    ]);
+                    $accountId = $newAccount->id;
+                }
+
+                $opp = CrmOpportunity::create([
+                    'account_id' => $accountId,
+                    'stage_id' => 3, // Proposta
+                    'type' => 'aquisicao',
+                    'title' => ($areaDireito ?? 'Demanda') . ' - ' . $nomeProponente,
+                    'area' => $areaDireito,
+                    'tipo_demanda' => $areaDireito,
+                    'source' => 'sipex',
+                    'value_estimated' => $valorAprovado,
+                    'owner_user_id' => Auth::id(),
+                    'status' => 'open',
+                    'sipex_proposal_id' => $proposal->id,
+                ]);
+
+                $proposal->update(['crm_opportunity_id' => $opp->id]);
+                $crmOppId = $opp->id;
+                Log::info('SIPEX->CRM: Oportunidade criada na aprovação', ['opp_id' => $opp->id, 'proposal_id' => $proposal->id, 'valor' => $valorAprovado]);
+            } catch (\Exception $e) {
+                Log::warning('SIPEX->CRM: Falha ao criar oportunidade', ['erro' => $e->getMessage()]);
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'crm_opportunity_id' => $crmOppId,
+        ]);
     }
 
     /**
@@ -406,7 +420,9 @@ class PrecificacaoController extends Controller
         }
 
         $eixos = PricingCalibration::orderBy('id')->get();
-        return view('precificacao.calibracao', compact('eixos'));
+        $modeloAtual = SipexSetting::get('modelo_ia', 'gpt-5.4');
+        $modelosDisponiveis = SipexSetting::modelosDisponiveis();
+        return view('precificacao.calibracao', compact('eixos', 'modeloAtual', 'modelosDisponiveis'));
     }
 
     /**
@@ -422,6 +438,7 @@ class PrecificacaoController extends Controller
         $request->validate([
             'eixos' => 'required|array',
             'eixos.*' => 'required|integer|min:0|max:100',
+            'modelo_ia' => 'nullable|string|in:' . implode(',', array_keys(SipexSetting::modelosDisponiveis())),
         ]);
 
         foreach ($request->eixos as $eixo => $valor) {
@@ -429,6 +446,10 @@ class PrecificacaoController extends Controller
                 'valor' => $valor,
                 'updated_by' => Auth::id(),
             ]);
+        }
+
+        if ($request->filled('modelo_ia')) {
+            SipexSetting::set('modelo_ia', $request->modelo_ia, Auth::id());
         }
 
         return response()->json(['success' => true, 'message' => 'Calibração salva com sucesso']);
