@@ -24,7 +24,7 @@ class NexoInactivityController extends Controller
     {
         // === AUTH ===
         $tokenRecebido = $request->header('X-Sendpulse-Token');
-        $tokenEsperado = env('NEXO_CONSULTA_TOKEN');
+        $tokenEsperado = config('services.nexo_consulta.token');
 
         if (!$tokenRecebido || $tokenRecebido !== $tokenEsperado) {
             if (!$this->isIpSendPulse($request->ip())) {

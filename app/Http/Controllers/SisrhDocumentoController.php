@@ -48,7 +48,7 @@ class SisrhDocumentoController extends Controller
         $this->checkAdmin();
 
         $request->validate([
-            'arquivo' => 'required|file|mimes:pdf|max:10240',
+            'arquivo' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx', 'max:20480'],
             'categoria' => 'required|string|max:50',
             'description' => 'nullable|string|max:500',
         ]);

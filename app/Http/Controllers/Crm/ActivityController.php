@@ -29,7 +29,16 @@ class ActivityController extends Controller
             'due_at' => 'nullable|date',
         ]);
 
-        $opportunity = Opportunity::findOrFail($request->input('opportunity_id'));
+        $opportunity = Opportunity::where('id', $request->input('opportunity_id'))
+            ->when(!auth()->user()->isAdmin() && !auth()->user()->isCoordenador(), function ($q) {
+                $q->where(function ($q2) {
+                    $q2->where('owner_user_id', auth()->id())
+                       ->orWhereHas('account', function ($q3) {
+                           $q3->where('owner_user_id', auth()->id());
+                       });
+                });
+            })
+            ->firstOrFail();
 
         $activity = $this->activityService->create($opportunity, [
             'title' => $request->input('title'),

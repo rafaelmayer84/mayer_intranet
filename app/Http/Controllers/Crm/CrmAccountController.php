@@ -669,7 +669,7 @@ class CrmAccountController extends Controller
 
         try {
             $request->validate([
-                'file'     => ['required', 'file', 'max:20480', function ($attribute, $value, $fail) { $ext = strtolower($value->getClientOriginalExtension()); if (!in_array($ext, ['pdf','jpg','jpeg','png','doc','docx'])) { $fail('O arquivo deve ser PDF, JPG, PNG, DOC ou DOCX.'); } }],
+                'file'     => ['required', 'file', 'max:20480', 'mimes:pdf,jpg,jpeg,png,doc,docx'],
                 'category' => 'required|string|max:50',
                 'notes'    => 'nullable|string|max:500',
             ]);

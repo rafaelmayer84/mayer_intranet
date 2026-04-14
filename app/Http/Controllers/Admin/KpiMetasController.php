@@ -89,7 +89,7 @@ class KpiMetasController extends Controller
     public function upload(Request $request)
     {
         $request->validate([
-            'arquivo' => 'required|file|mimes:xlsx,xls|max:5120',
+            'arquivo' => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:10240'],
         ]);
 
         $file = $request->file('arquivo');

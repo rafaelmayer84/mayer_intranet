@@ -240,6 +240,11 @@ class IntegracoesController extends Controller
     {
         $tipo = $request->input('tipo', 'full');
 
+        $allowed = ['full', 'atividades', 'clientes', 'processos', 'fases', 'andamentos', 'financeiro', 'compromissos', 'contas', 'datajuri', 'lancamentos', 'leads', 'movimentos'];
+        if (!in_array($tipo, $allowed, true)) {
+            return response()->json(['error' => 'Tipo de sincronização inválido'], 422);
+        }
+
         try {
             Artisan::call('sync:' . $tipo);
             $output = Artisan::output();

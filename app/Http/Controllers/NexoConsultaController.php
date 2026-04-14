@@ -23,7 +23,7 @@ class NexoConsultaController extends Controller
     private function validarToken(Request $request): bool
     {
         $token = $request->header('X-Sendpulse-Token');
-        $esperado = config('services.nexo_consulta.token', env('NEXO_CONSULTA_TOKEN', 'token_secreto'));
+        $esperado = config('services.nexo_consulta.token', env('NEXO_CONSULTA_TOKEN'));
 
         return is_string($token) && is_string($esperado) && hash_equals($esperado, $token);
     }

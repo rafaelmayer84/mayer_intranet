@@ -51,7 +51,7 @@ Route::post('nexo/api/pre-track-whatsapp-lead', [
 ])->middleware('throttle:60,1')->name('nexo.pre-track-whatsapp');
 
 // NEXO Autoatendimento — Endpoints chamados pelo SendPulse
-Route::prefix('nexo/autoatendimento')->group(function () {
+Route::prefix('nexo/autoatendimento')->middleware(['throttle:60,1'])->group(function () {
     Route::post('/financeiro/titulos-abertos', [NexoAutoatendimentoController::class, 'titulosAbertos']);
     Route::post('/financeiro/segunda-via', [NexoAutoatendimentoController::class, 'segundaVia']);
     Route::post('/compromissos/proximos', [NexoAutoatendimentoController::class, 'proximosCompromissos']);

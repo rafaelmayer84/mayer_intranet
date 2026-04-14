@@ -199,6 +199,12 @@ class AvisoController extends Controller
         // Permite um conjunto pequeno e útil de tags.
         $html = strip_tags($html, '<p><br><strong><em><ul><ol><li><a><blockquote><code><pre><h1><h2><h3><h4><h5><h6>');
 
+        // Remover event handlers (onclick, onerror, onload, etc.)
+        $html = preg_replace('/\s*on\w+\s*=\s*["\'][^"\']*["\']/i', '', $html) ?? $html;
+
+        // Bloquear javascript: em hrefs
+        $html = preg_replace('/href\s*=\s*["\']javascript:[^"\']*["\']/i', 'href="#"', $html) ?? $html;
+
         // Hardening simples para links.
         $html = preg_replace('/<a\s+([^>]*href=)/i', '<a rel="noopener noreferrer" target="_blank" $1', $html) ?? $html;
 

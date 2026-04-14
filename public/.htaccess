@@ -40,6 +40,9 @@
 
     RewriteEngine On
 
+    # Bloquear acesso direto a documentos sensíveis no storage
+    RewriteRule ^storage/(chamados|crm|justus|sisrh-docs)/ - [F,L]
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
