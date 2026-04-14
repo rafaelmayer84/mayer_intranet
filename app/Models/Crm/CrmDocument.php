@@ -2,8 +2,6 @@
 namespace App\Models\Crm;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Storage;
-
 class CrmDocument extends Model
 {
     protected $table = 'crm_documents';
@@ -26,7 +24,7 @@ class CrmDocument extends Model
 
     public function getUrlAttribute(): string
     {
-        return Storage::disk('public')->url($this->disk_path);
+        return route('secure-storage', ['path' => $this->disk_path]);
     }
 
     /**
