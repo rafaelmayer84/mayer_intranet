@@ -56,9 +56,9 @@ Schedule::command('crm:recalcular-carteira')
     ->timezone('America/Sao_Paulo')
     ->appendOutputTo(storage_path('logs/cron-crm-carteira.log'));
 
-// ===== NEXO: Fechamento automático de chats abandonados =====
-// A cada hora, fecha chats com >6h de inatividade e notifica cliente
-Schedule::command('nexo:close-abandoned-chats --notify')
+// ===== NEXO: Gerenciamento de chats inativos =====
+// A cada hora: lembrete após 6h de inatividade, encerramento após 23h
+Schedule::command('nexo:close-abandoned-chats --reminder-hours=6 --close-hours=23')
     ->hourly()
     ->timezone('America/Sao_Paulo')
     ->appendOutputTo(storage_path('logs/cron-nexo-close-chats.log'));

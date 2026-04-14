@@ -4,17 +4,18 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Services\SendPulseWhatsAppService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class NexoCloseAbandonedChats extends Command
 {
     protected $signature = 'nexo:close-abandoned-chats
-                            {--hours=6 : Horas de inatividade para considerar abandonado}
-                            {--dry-run : Simula sem fechar chats}
-                            {--notify : Envia mensagem ao cliente antes de fechar (se última msg foi dele)}';
+                            {--reminder-hours=6  : Horas de inatividade para enviar lembrete}
+                            {--close-hours=23    : Horas de inatividade para encerrar a conversa}
+                            {--dry-run           : Simula sem enviar mensagens nem fechar chats}';
 
-    protected $description = 'Fecha chats SendPulse abandonados (sem atividade por X horas) e reativa o bot';
+    protected $description = 'Gerencia chats inativos: lembrete após X horas, encerramento após Y horas';
 
     private SendPulseWhatsAppService $sp;
 
@@ -26,26 +27,26 @@ class NexoCloseAbandonedChats extends Command
 
     public function handle(): int
     {
-        $hoursThreshold = (int) $this->option('hours');
-        $dryRun = $this->option('dry-run');
-        $notify = $this->option('notify');
-        $now = Carbon::now('UTC');
-        $cutoff = $now->copy()->subHours($hoursThreshold);
+        $reminderHours = (int) $this->option('reminder-hours');
+        $closeHours    = (int) $this->option('close-hours');
+        $dryRun        = $this->option('dry-run');
+        $now           = Carbon::now('UTC');
+        $reminderCutoff = $now->copy()->subHours($reminderHours);
+        $closeCutoff    = $now->copy()->subHours($closeHours);
 
         $this->info("=== NEXO Close Abandoned Chats ===");
-        $this->info("Threshold: {$hoursThreshold}h | Cutoff: {$cutoff->toIso8601String()} | Dry-run: " . ($dryRun ? 'SIM' : 'NÃO'));
+        $this->info("Lembrete: >{$reminderHours}h | Encerramento: >{$closeHours}h | Dry-run: " . ($dryRun ? 'SIM' : 'NÃO'));
 
-        $closed = 0;
-        $notified = 0;
-        $errors = 0;
+        $reminders = 0;
+        $closed    = 0;
+        $errors    = 0;
         $processed = [];
 
-        // Busca apenas chats com live chat aberto (filtro server-side)
         $response = $this->sp->getOpenChats();
 
         if (!$response || !isset($response['data'])) {
             $this->error("Falha ao buscar chats");
-            Log::error('nexo:close-abandoned-chats — falha getChatsPage');
+            Log::error('nexo:close-abandoned-chats — falha getOpenChats');
             return self::FAILURE;
         }
 
@@ -53,82 +54,119 @@ class NexoCloseAbandonedChats extends Command
         $this->line("Chats recebidos: " . count($chats));
 
         foreach ($chats as $chat) {
-            $contact = $chat['contact'] ?? [];
-            $contactId = $contact['id'] ?? null;
-            $contactName = $contact['channel_data']['name'] ?? 'Desconhecido';
-            $isOpen = $contact['is_chat_opened'] ?? false;
+            $contact      = $chat['contact'] ?? [];
+            $contactId    = $contact['id'] ?? null;
+            $contactName  = $contact['channel_data']['name'] ?? 'Desconhecido';
+            $isOpen       = $contact['is_chat_opened'] ?? false;
             $lastActivity = $contact['last_activity_at'] ?? null;
+            $phone        = (string) ($contact['channel_data']['phone'] ?? '');
 
-            // Dedup safety (API pode retornar duplicatas)
+            // Dedup
             if (!$contactId || isset($processed[$contactId])) {
                 continue;
             }
             $processed[$contactId] = true;
 
-            // Só processa chats abertos (operador assumiu)
-            if (!$isOpen || !$lastActivity) {
+            // Só processa chats com operador (live chat aberto)
+            if (!$isOpen || !$lastActivity || !$phone) {
                 continue;
             }
 
             $lastActivityAt = Carbon::parse($lastActivity);
 
-            // Verifica se está inativo há mais de X horas
-            if ($lastActivityAt->greaterThan($cutoff)) {
+            // Nada a fazer se ainda está dentro do threshold de lembrete
+            if ($lastActivityAt->greaterThan($reminderCutoff)) {
+                continue;
+            }
+
+            // ── ESTÁGIO 2: encerrar após closeHours ──────────────────────────
+            if ($lastActivityAt->lessThanOrEqualTo($closeCutoff)) {
+                $inactiveHours = round($lastActivityAt->diffInMinutes($now) / 60, 1);
+
+                if ($dryRun) {
+                    $this->warn("[DRY-RUN] Encerraria: {$contactName} (inativo {$inactiveHours}h)");
+                    $closed++;
+                    continue;
+                }
+
+                // Mensagem de encerramento
+                $msg = "Encerramos sua conversa por falta de resposta. 😊\n\n"
+                     . "Quando precisar, é só mandar uma mensagem — estaremos aqui!";
+
+                $this->sp->sendMessageByPhone($phone, $msg);
+                sleep(1);
+
+                $result = $this->sp->closeChat($contactId);
+
+                // Limpa o lembrete no banco (conversa encerrada)
+                DB::table('wa_conversations')
+                    ->where('contact_id', $contactId)
+                    ->update(['lembrete_inatividade_at' => null]);
+
+                if ($result['success'] ?? false) {
+                    $closed++;
+                    $this->line("  ✅ Encerrado: {$contactName} (inativo {$inactiveHours}h)");
+                    Log::info('nexo:close-abandoned — encerrado', [
+                        'contact_id'   => $contactId,
+                        'name'         => $contactName,
+                        'inactive_hrs' => $inactiveHours,
+                    ]);
+                } else {
+                    $errors++;
+                    $this->error("  ❌ Erro ao fechar {$contactName}: " . ($result['error'] ?? 'unknown'));
+                    Log::error('nexo:close-abandoned — erro closeChat', [
+                        'contact_id' => $contactId,
+                        'error'      => $result['error'] ?? 'unknown',
+                    ]);
+                }
+
+                usleep(200000);
+                continue;
+            }
+
+            // ── ESTÁGIO 1: lembrete após reminderHours ───────────────────────
+            // Verifica se já enviamos o lembrete neste ciclo de inatividade
+            $conv = DB::table('wa_conversations')
+                ->where('contact_id', $contactId)
+                ->select('id', 'lembrete_inatividade_at')
+                ->first();
+
+            if ($conv && $conv->lembrete_inatividade_at) {
+                // Lembrete já enviado neste ciclo — aguardar estágio 2
                 continue;
             }
 
             $inactiveHours = round($lastActivityAt->diffInMinutes($now) / 60, 1);
 
-            // Determinar quem enviou última mensagem
-            $inboxMsg = $chat['inbox_last_message'] ?? [];
-            $inboxDirection = $inboxMsg['direction'] ?? null;
-            // direction 1 = incoming (cliente enviou), 2 = outgoing (bot/operador)
-            $clienteSemResposta = ($inboxDirection === 1);
-
             if ($dryRun) {
-                $this->warn("[DRY-RUN] Fecharia: {$contactName} (inativo {$inactiveHours}h)" .
-                    ($clienteSemResposta ? ' [cliente sem resposta]' : ''));
-                $closed++;
+                $this->warn("[DRY-RUN] Enviaria lembrete: {$contactName} (inativo {$inactiveHours}h)");
+                $reminders++;
                 continue;
             }
 
-            // Enviar mensagem se cliente foi o último a escrever e --notify ativo
-            if ($notify && $clienteSemResposta) {
-                $phone = (string) ($contact['channel_data']['phone'] ?? '');
-                if ($phone) {
-                    $msg = "Olá! Seu atendimento foi encerrado por inatividade. "
-                         . "Se precisar de algo, envie uma nova mensagem a qualquer momento. "
-                         . "Estamos à disposição! 😊";
-                    $sendResult = $this->sp->sendMessageByPhone($phone, $msg);
-                    if ($sendResult['success'] ?? false) {
-                        $notified++;
-                        $this->line("  📩 Notificado: {$contactName} ({$phone})");
-                    } else {
-                        $this->warn("  ⚠ Falha ao notificar {$contactName}: " . ($sendResult['error'] ?? 'unknown'));
-                    }
-                    sleep(1);
+            $msg = "Oi! 👋 Vimos que nossa conversa ficou em aberto.\n\n"
+                 . "Ainda podemos te ajudar? Se quiser continuar, é só responder aqui. 😊";
+
+            $sendResult = $this->sp->sendMessageByPhone($phone, $msg);
+
+            if ($sendResult['success'] ?? false) {
+                $reminders++;
+                $this->line("  💬 Lembrete enviado: {$contactName} (inativo {$inactiveHours}h)");
+
+                // Marca o lembrete no banco
+                if ($conv) {
+                    DB::table('wa_conversations')
+                        ->where('id', $conv->id)
+                        ->update(['lembrete_inatividade_at' => $now->toDateTimeString()]);
                 }
-            }
 
-            // Fechar o chat
-            $result = $this->sp->closeChat($contactId);
-
-            if ($result['success'] ?? false) {
-                $closed++;
-                $this->line("  ✅ Fechado: {$contactName} (inativo {$inactiveHours}h)");
-                Log::info('nexo:close-abandoned — chat fechado', [
+                Log::info('nexo:close-abandoned — lembrete enviado', [
                     'contact_id'   => $contactId,
                     'name'         => $contactName,
                     'inactive_hrs' => $inactiveHours,
-                    'notified'     => ($notify && $clienteSemResposta),
                 ]);
             } else {
-                $errors++;
-                $this->error("  ❌ Erro ao fechar {$contactName}: " . ($result['error'] ?? 'unknown'));
-                Log::error('nexo:close-abandoned — erro closeChat', [
-                    'contact_id' => $contactId,
-                    'error'      => $result['error'] ?? 'unknown',
-                ]);
+                $this->warn("  ⚠ Falha ao enviar lembrete para {$contactName}: " . ($sendResult['error'] ?? 'unknown'));
             }
 
             usleep(200000);
@@ -136,22 +174,21 @@ class NexoCloseAbandonedChats extends Command
 
         $this->newLine();
         $this->info("=== RESULTADO ===");
-        $this->info("Chats únicos analisados: " . count($processed));
-        $this->info("Chats fechados: {$closed}");
-        if ($notify) {
-            $this->info("Clientes notificados: {$notified}");
-        }
+        $this->info("Chats analisados: " . count($processed));
+        $this->info("Lembretes enviados: {$reminders}");
+        $this->info("Conversas encerradas: {$closed}");
         if ($errors > 0) {
             $this->error("Erros: {$errors}");
         }
 
         Log::info('nexo:close-abandoned — execução concluída', [
-            'unique_scanned' => count($processed),
-            'closed'  => $closed,
-            'notified' => $notified,
-            'errors'  => $errors,
-            'threshold_hours' => $hoursThreshold,
-            'dry_run' => $dryRun,
+            'unique_scanned'  => count($processed),
+            'reminders'       => $reminders,
+            'closed'          => $closed,
+            'errors'          => $errors,
+            'reminder_hours'  => $reminderHours,
+            'close_hours'     => $closeHours,
+            'dry_run'         => $dryRun,
         ]);
 
         return self::SUCCESS;
