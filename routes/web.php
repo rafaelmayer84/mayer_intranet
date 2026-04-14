@@ -17,6 +17,20 @@ Route::post("/logout", [LoginController::class, "logout"])->name("logout");
 Route::get("/", function () {    return redirect("/home");
 })->name("home");
 
+// Rota autenticada para servir arquivos de storage protegidos (M3 pentest — substitui acesso direto bloqueado pelo .htaccess)
+Route::middleware(['auth'])->get('/secure-storage/{path}', function (string $path) {
+    $allowed = ['chamados', 'crm', 'justus', 'sisrh-docs'];
+    $first = explode('/', $path)[0];
+    if (!in_array($first, $allowed, true)) {
+        abort(403);
+    }
+    $fullPath = storage_path('app/public/' . $path);
+    if (!file_exists($fullPath)) {
+        abort(404);
+    }
+    return response()->file($fullPath);
+})->where('path', '.+')->name('secure-storage');
+
 Route::middleware(["auth"])->group(function () {
     // Dashboard
     Route::get("/dashboard", function(){ return redirect("/avisos"); })->name("dashboard");

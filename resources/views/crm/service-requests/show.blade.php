@@ -84,7 +84,7 @@
                 <p class="text-[10px] uppercase tracking-wider text-gray-400 mb-2">Anexos</p>
                 <div class="flex flex-wrap gap-2">
                     @foreach($sr->attachments as $att)
-                        <a href="{{ asset('storage/' . $att) }}" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 border text-xs text-gray-600 hover:bg-gray-100 transition">
+                        <a href="{{ route('secure-storage', ['path' => $att]) }}" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 border text-xs text-gray-600 hover:bg-gray-100 transition">
                             <i class="fa-solid fa-paperclip text-gray-400"></i> {{ basename($att) }}
                         </a>
                     @endforeach
@@ -219,7 +219,7 @@
                         @if($comment->attachments && count($comment->attachments) > 0)
                             <div class="flex flex-wrap gap-1.5 mt-1.5">
                                 @foreach($comment->attachments as $att)
-                                    <a href="{{ asset('storage/' . $att) }}" target="_blank" class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-50 border text-[10px] text-gray-500 hover:bg-gray-100 transition">
+                                    <a href="{{ route('secure-storage', ['path' => $att]) }}" target="_blank" class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-50 border text-[10px] text-gray-500 hover:bg-gray-100 transition">
                                         <i class="fa-solid fa-paperclip text-gray-400"></i> {{ basename($att) }}
                                     </a>
                                 @endforeach
