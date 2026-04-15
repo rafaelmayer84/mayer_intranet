@@ -285,7 +285,7 @@
     .btn-generate-digest:disabled { opacity: 0.5; cursor: not-allowed; }
 
 </style>
-<div style="max-width: 1280px; margin: 0 auto; padding: 24px;">
+<div style="width: 100%; margin: 0 auto; padding: 24px;">
 
     {{-- ══════ HEADER ══════ --}}
     <div class="painel-header">

@@ -453,4 +453,79 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+/* ============================================================
+   CRM RESPONSIVE
+   ============================================================ */
+@media (max-width: 1024px) {
+    .crm-page-header {
+        padding: 1rem 1.25rem;
+        border-radius: 10px;
+    }
+    .crm-page-header h1 {
+        font-size: 1.15rem;
+    }
+    .kanban-col {
+        width: 240px;
+    }
+    .crm-kpi-value {
+        font-size: 1.35rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .crm-page-header {
+        padding: 0.85rem 1rem;
+    }
+    .crm-page-header h1 {
+        font-size: 1rem;
+    }
+    .crm-page-header .flex {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .kanban-board {
+        min-height: 400px;
+    }
+    .kanban-col {
+        width: 220px;
+        max-height: calc(100vh - 200px);
+    }
+    .crm-kpi-card {
+        padding: 0.75rem 1rem;
+    }
+    .crm-kpi-value {
+        font-size: 1.2rem;
+    }
+    .crm-card-header {
+        padding: 0.75rem 1rem;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+    .pipeline-filter-card {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+
+@media (max-width: 640px) {
+    .kanban-col {
+        width: 85vw;
+    }
+    .crm-kpi-value {
+        font-size: 1.1rem;
+    }
+    .crm-kpi-label {
+        font-size: 0.6rem;
+    }
+    .opp-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+    .agenda-item-title {
+        white-space: normal;
+    }
 }

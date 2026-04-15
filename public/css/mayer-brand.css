@@ -368,4 +368,62 @@ textarea {
     min-height: 40px;
 }
 
+/* ==================== 15. RESPONSIVE FULL-WIDTH ==================== */
+
+/* All max-w containers inside main content → full width */
+#main-content [class*="max-w-4xl"],
+#main-content [class*="max-w-5xl"],
+#main-content [class*="max-w-6xl"],
+#main-content [class*="max-w-7xl"] {
+    max-width: 100% !important;
+}
+
+/* Notification bar responsive */
+@media (max-width: 768px) {
+    #notification-bar {
+        display: none !important;
+    }
+
+    /* Page headers: compact */
+    .page-header-brand {
+        padding: 1rem 1.25rem;
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    .page-header-brand h1 {
+        font-size: 1.125rem;
+    }
+
+    /* Flex containers: allow wrapping */
+    #main-content .flex.gap-4,
+    #main-content .flex.gap-6 {
+        flex-wrap: wrap;
+    }
+
+    /* Tables: horizontal scroll */
+    #main-content .overflow-x-auto {
+        margin-left: -8px;
+        margin-right: -8px;
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+}
+
+@media (max-width: 640px) {
+    /* Stack flex rows on small mobile */
+    #main-content .flex.items-center.gap-2,
+    #main-content .flex.items-center.gap-3,
+    #main-content .flex.items-center.gap-4 {
+        flex-wrap: wrap;
+    }
+
+    /* Smaller text on mobile */
+    #main-content h1 {
+        font-size: 1.25rem !important;
+    }
+    #main-content h2 {
+        font-size: 1.1rem !important;
+    }
+}
+
 /* Botoes export: estilizados inline nos blade templates (15/02) */

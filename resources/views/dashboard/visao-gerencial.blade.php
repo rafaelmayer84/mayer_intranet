@@ -267,7 +267,7 @@
                     @endforeach
                 </div>
             </div>
-            <div class="mt-4 grid grid-cols-3 gap-3">
+            <div class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div class="rounded-xl bg-rose-50 p-3 text-center dark:bg-rose-950/20">
                     <p class="text-[10px] font-medium uppercase text-rose-600 dark:text-rose-400">Total em Atraso</p>
                     <p class="mt-1 text-xl font-bold text-rose-700 dark:text-rose-300">{{ $qtdAtraso > 0 ? $qtdAtraso : '—' }}</p>

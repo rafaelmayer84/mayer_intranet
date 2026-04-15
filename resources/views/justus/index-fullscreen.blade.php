@@ -49,6 +49,12 @@
         .collapse-content.open { max-height: 2000px; }
 
         [x-cloak] { display: none !important; }
+
+        /* Responsividade: paineis laterais em mobile */
+        @media (max-width: 768px) {
+            .justus-sidebar-left { display: none !important; }
+            .justus-sidebar-right { display: none !important; }
+        }
     </style>
 </head>
 <body>
@@ -104,7 +110,7 @@
     <div class="flex flex-1 overflow-hidden min-h-0">
 
         {{-- === COL ESQUERDA: Conversas === --}}
-        <div class="flex flex-col flex-shrink-0 bg-white/80" style="width:280px;backdrop-filter:blur(20px);border-right:1px solid rgba(0,0,0,0.06);">
+        <div class="justus-sidebar-left flex flex-col flex-shrink-0 bg-white/80" style="width:280px;backdrop-filter:blur(20px);border-right:1px solid rgba(0,0,0,0.06);">
             <div class="p-3">
                 @if(auth()->user()->is_admin)
                 <a href="{{ route('justus.admin.config') }}" class="text-xs text-gray-400 hover:text-gray-600 mb-2 block" title="Administração">⚙ Admin</a>
@@ -388,7 +394,7 @@
 
         {{-- === COL DIREITA: Insights do Processo === --}}
         @if($activeConversation)
-        <div class="flex-shrink-0 overflow-y-auto" style="width:320px;background:rgba(255,255,255,0.9);backdrop-filter:blur(20px);border-left:1px solid rgba(0,0,0,0.06);" x-data="insightsPanel()" x-init="initInsights()">
+        <div class="justus-sidebar-right flex-shrink-0 overflow-y-auto" style="width:320px;background:rgba(255,255,255,0.9);backdrop-filter:blur(20px);border-left:1px solid rgba(0,0,0,0.06);" x-data="insightsPanel()" x-init="initInsights()">
 
             {{-- SEÇÃO A: Dados Extraídos do Processo --}}
             <div class="border-b border-gray-100">

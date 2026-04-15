@@ -14,6 +14,12 @@
     #main-content > .p-4.md\:p-8 { padding: 0 !important; flex: 1 !important; min-height: 0 !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; }
     #main-content > #notification-bar + .p-4.md\:p-8,
     #main-content .p-4.md\:p-8 { padding: 0 !important; flex: 1 !important; min-height: 0 !important; overflow: hidden !important; display: flex !important; flex-direction: column !important; }
+
+    /* Responsividade: paineis laterais em mobile */
+    @media (max-width: 768px) {
+        .justus-sidebar-left { display: none !important; }
+        .justus-sidebar-right { display: none !important; }
+    }
 </style>
 <div x-data="justusApp()" x-init="init()" class="flex flex-col" style="height:100%;overflow:hidden;">
 
@@ -52,7 +58,7 @@
     <div class="flex flex-1 overflow-hidden min-h-0" style="background:#f0f2f5;">
 
         {{-- === COL ESQUERDA === --}}
-        <div class="flex flex-col flex-shrink-0 bg-white/80" style="width:280px;backdrop-filter:blur(20px);border-right:1px solid rgba(0,0,0,0.06);">
+        <div class="justus-sidebar-left flex flex-col flex-shrink-0 bg-white/80" style="width:280px;backdrop-filter:blur(20px);border-right:1px solid rgba(0,0,0,0.06);">
             <div class="p-3">
                 <button @click="showNewModal = true"
                     class="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-white font-semibold text-sm transition-all duration-300 hover:shadow-lg hover:scale-[1.02]"
@@ -257,7 +263,7 @@
 
         {{-- === COL DIREITA === --}}
         @if($activeConversation)
-        <div class="flex-shrink-0 overflow-y-auto" style="width:300px;background:rgba(255,255,255,0.8);backdrop-filter:blur(20px);border-left:1px solid rgba(0,0,0,0.06);">
+        <div class="justus-sidebar-right flex-shrink-0 overflow-y-auto" style="width:300px;background:rgba(255,255,255,0.8);backdrop-filter:blur(20px);border-left:1px solid rgba(0,0,0,0.06);">
 
             <div class="p-4 border-b border-gray-100">
                 <div class="flex items-center gap-2 mb-3">

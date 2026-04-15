@@ -168,17 +168,12 @@
                 display: flex;
                 align-items: center;
                 justify-content: space-between;
-                background-color: #1f2937;
-                border-bottom: 1px solid #374151;
-                padding: 1rem;
+                background-color: var(--navy, #1B334A);
+                border-bottom: 1px solid rgba(255,255,255,0.1);
+                padding: 0.75rem 1rem;
                 position: sticky;
                 top: 0;
                 z-index: 20;
-            }
-
-            .mobile-header.dark {
-                background-color: #111827;
-                border-bottom-color: #1f2937;
             }
 
             .main-content {
@@ -878,6 +873,22 @@ setInterval(fetchNotifications, 30000);
 document.addEventListener("DOMContentLoaded", fetchNotifications);
 </script>
 
+{{-- Auto-responsiveness: wrap bare tables, enforce full-width --}}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Wrap tables that aren't already inside overflow-x-auto
+    document.querySelectorAll('#main-content table').forEach(function(table) {
+        var parent = table.parentElement;
+        if (parent && !parent.classList.contains('overflow-x-auto') && !parent.closest('.overflow-x-auto')) {
+            var wrapper = document.createElement('div');
+            wrapper.className = 'overflow-x-auto';
+            wrapper.style.cssText = '-webkit-overflow-scrolling:touch;';
+            parent.insertBefore(wrapper, table);
+            wrapper.appendChild(table);
+        }
+    });
+});
+</script>
 
 <!-- Modal SIPEX - Cotar Honorários -->
 <div id="sipex-modal" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/50 backdrop-blur-sm" style="display:none;">

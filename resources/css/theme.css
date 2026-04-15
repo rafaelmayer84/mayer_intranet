@@ -767,6 +767,7 @@ aside.bg-gray-900,
 .bg-indigo-600,
 .bg-indigo-700 {
     background-color: var(--primary) !important;
+    color: #FFFFFF !important;
 }
 .hover\:bg-blue-600:hover,
 .hover\:bg-blue-700:hover,
@@ -775,6 +776,7 @@ aside.bg-gray-900,
 .hover\:bg-indigo-700:hover,
 .hover\:bg-indigo-800:hover {
     background-color: var(--primary-dark) !important;
+    color: #FFFFFF !important;
     box-shadow: 0 2px 8px rgba(56, 87, 118, 0.25);
 }
 /* Button text */
@@ -1019,8 +1021,38 @@ nav[role="navigation"] .text-indigo-600 {
 }
 
 /* ============================================================
-   RESPONSIVE REFINEMENTS
+   RESPONSIVE REFINEMENTS — FULL-WIDTH & ALL SCREENS
    ============================================================ */
+
+/* ── Force all content containers to full width ── */
+#main-content > .p-4 > [class*="max-w-"],
+#main-content > div > [class*="max-w-"],
+#main-content [class*="max-w-4xl"],
+#main-content [class*="max-w-5xl"],
+#main-content [class*="max-w-6xl"],
+#main-content [class*="max-w-7xl"] {
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
+/* ── Tables: always scrollable on overflow ── */
+table {
+    display: table;
+    width: 100%;
+}
+.overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+}
+
+/* ── Desktop (> 1024px) ── */
+@media (min-width: 1025px) {
+    .ma-kpi-value {
+        font-size: 1.75rem;
+    }
+}
+
+/* ── Tablet (max 1024px) ── */
 @media (max-width: 1024px) {
     :root {
         --space-lg: 16px;
@@ -1032,19 +1064,207 @@ nav[role="navigation"] .text-indigo-600 {
     .ma-page-title {
         font-size: 1.25rem;
     }
+
+    /* Grids: 4+ cols → 2 cols on tablet (only bare grid-cols, not responsive-prefixed) */
+    .grid.grid-cols-4:not([class*="md:grid-cols"]):not([class*="lg:grid-cols"]),
+    .grid.grid-cols-5:not([class*="md:grid-cols"]):not([class*="lg:grid-cols"]),
+    .grid.grid-cols-6:not([class*="md:grid-cols"]):not([class*="lg:grid-cols"]),
+    .grid.grid-cols-7:not([class*="md:grid-cols"]):not([class*="lg:grid-cols"]),
+    .grid.grid-cols-8:not([class*="md:grid-cols"]):not([class*="lg:grid-cols"]) {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
 }
 
-@media (max-width: 640px) {
-    :root {
-        --radius-lg: 12px;
-        --radius-xl: 16px;
+/* ── Mobile (max 768px) ── */
+@media (max-width: 768px) {
+    /* Reduce content padding */
+    #main-content > .p-4 {
+        padding: 12px !important;
+    }
+
+    /* Stack grids: 3+ cols → 2 cols */
+    .grid.grid-cols-3:not([class*="sm:grid-cols"]):not([class*="md:grid-cols"]) {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+    .grid.grid-cols-4:not([class*="sm:grid-cols"]):not([class*="md:grid-cols"]),
+    .grid.grid-cols-5:not([class*="sm:grid-cols"]):not([class*="md:grid-cols"]),
+    .grid.grid-cols-6:not([class*="sm:grid-cols"]):not([class*="md:grid-cols"]),
+    .grid.grid-cols-7:not([class*="sm:grid-cols"]):not([class*="md:grid-cols"]),
+    .grid.grid-cols-8:not([class*="sm:grid-cols"]):not([class*="md:grid-cols"]) {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+
+    /* Flex rows → column on mobile */
+    .ma-page-header {
+        flex-direction: column;
+        align-items: flex-start;
     }
     .ma-filter-bar {
         flex-direction: column;
         align-items: stretch;
     }
-    .ma-page-header {
-        flex-direction: column;
-        align-items: flex-start;
+
+    /* KPI cards smaller */
+    .ma-kpi-value {
+        font-size: 1.25rem;
+    }
+    .ma-kpi {
+        padding: var(--space-md);
+    }
+
+    /* Flex containers: allow wrapping */
+    .flex.items-center.justify-between {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    /* Cards: reduce padding */
+    .ma-card-body {
+        padding: var(--space-md);
+    }
+    .ma-card-header {
+        padding: var(--space-md);
+    }
+
+    /* Buttons: full-width on small screens */
+    .ma-btn {
+        font-size: 0.75rem;
+        padding: 8px 16px;
     }
 }
+
+/* ── Small mobile (max 640px) ── */
+@media (max-width: 640px) {
+    :root {
+        --radius-lg: 12px;
+        --radius-xl: 16px;
+    }
+
+    /* All grids → single column on very small screens */
+    .grid.grid-cols-2:not([class*="sm:grid-cols"]),
+    .grid.grid-cols-3:not([class*="sm:grid-cols"]),
+    .grid.grid-cols-4:not([class*="sm:grid-cols"]),
+    .grid.grid-cols-5:not([class*="sm:grid-cols"]),
+    .grid.grid-cols-6:not([class*="sm:grid-cols"]) {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Reduce gap on small screens */
+    .grid[class*="gap-4"],
+    .grid[class*="gap-5"],
+    .grid[class*="gap-6"] {
+        gap: 8px !important;
+    }
+
+    /* Content padding minimal */
+    #main-content > .p-4 {
+        padding: 8px !important;
+    }
+
+    /* Page title smaller */
+    .ma-page-title {
+        font-size: 1.125rem;
+    }
+
+    /* Tabs: scrollable horizontally */
+    .ma-tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        flex-wrap: nowrap;
+    }
+    .ma-tab {
+        white-space: nowrap;
+        flex-shrink: 0;
+        padding: 10px 16px;
+        font-size: 0.75rem;
+    }
+
+    /* Modal: full-width on mobile */
+    .ma-modal,
+    .fixed .bg-white.rounded-lg,
+    .fixed .bg-white.rounded-xl {
+        width: 95% !important;
+        max-width: 95% !important;
+        margin: 1rem auto !important;
+    }
+
+    /* Charts responsive */
+    .ma-chart-container {
+        padding: var(--space-md);
+    }
+
+    /* Alert compact */
+    .ma-alert {
+        padding: var(--space-sm) var(--space-md);
+        font-size: 0.75rem;
+    }
+
+    /* Inline style fixed-width elements: force responsive */
+    [style*="width:280px"],
+    [style*="width:300px"],
+    [style*="width:320px"],
+    [style*="width: 280px"],
+    [style*="width: 300px"],
+    [style*="width: 320px"] {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    /* Fixed-width modals/panels */
+    [style*="max-width:900px"],
+    [style*="max-width: 900px"],
+    [style*="max-width:1280px"],
+    [style*="max-width: 1280px"] {
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+}
+
+
+/* ===== PROFUNDIDADE DE FUNDO (v2) ===== */
+body, .min-h-screen {
+    background: linear-gradient(135deg, #E8ECF1 0%, #D5DCE5 50%, #E0E5EC 100%) !important;
+}
+
+#main-content, main.flex-1 {
+    background: transparent !important;
+}
+
+/* Sidebar glass depth */
+#sidebar, aside.sidebar {
+    background: linear-gradient(180deg, #1B334A 0%, #152A3D 60%, #0F2030 100%) !important;
+    box-shadow: 4px 0 24px rgba(27, 51, 74, 0.3) !important;
+}
+
+/* Logo area subtle glow */
+.sidebar-logo {
+    background: rgba(255,255,255,0.03) !important;
+}
+
+/* Cards com subtle shadow para profundidade */
+.ma-card, [class*="bg-white"], .bg-white {
+    box-shadow: 0 1px 3px rgba(27, 51, 74, 0.08), 0 4px 12px rgba(27, 51, 74, 0.04) !important;
+    border: 1px solid rgba(27, 51, 74, 0.06) !important;
+}
+
+/* Toggle discreto na sidebar */
+#sidebar-toggle-btn {
+    border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Divisor da sidebar mais sutil */
+#sidebar hr, aside.sidebar hr {
+    border-color: rgba(255,255,255,0.08) !important;
+}
+
+/* Seccao admin label */
+#sidebar .text-gray-500 {
+    color: rgba(255,255,255,0.35) !important;
+}
+
+/* User avatar com brand color */
+.w-10.h-10.rounded-full.bg-blue-600 {
+    background: #385776 !important;
+}
+
+/* ===== FIM PROFUNDIDADE ===== */

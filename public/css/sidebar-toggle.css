@@ -14,14 +14,12 @@
     width: 5rem; /* w-20 = 80px */
 }
 
-/* Content principal ajusta quando sidebar retrai */
+/* Content principal: flex-based layout, no margin needed */
 #main-content {
-    margin-left: 16rem; /* ml-64 */
+    flex: 1;
+    min-width: 0; /* prevent flex overflow */
+    width: 0; /* force flex-basis calculation */
     transition: margin-left 0.3s ease-in-out;
-}
-
-#main-content.main-expanded {
-    margin-left: 5rem; /* ml-20 */
 }
 
 /* Botão de toggle da sidebar */

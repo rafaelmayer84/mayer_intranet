@@ -74,7 +74,7 @@
 
     {{-- ====== TAB: AUDITORIA ====== --}}
     <div x-show="tab==='auditoria'" class="space-y-4">
-        <div class="grid grid-cols-3 gap-3 mb-4">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
             <div class="bg-white border rounded-lg p-3 text-center"><p class="text-2xl font-bold text-gray-900">{{ $feedbackStats['total'] }}</p><p class="text-xs text-gray-500">Feedbacks</p></div>
             <div class="bg-white border rounded-lg p-3 text-center"><p class="text-2xl font-bold text-green-600">{{ $feedbackStats['positive'] }}</p><p class="text-xs text-gray-500">Positivos</p></div>
             <div class="bg-white border rounded-lg p-3 text-center"><p class="text-2xl font-bold text-red-600">{{ $feedbackStats['negative'] }}</p><p class="text-xs text-gray-500">Negativos</p></div>
@@ -124,7 +124,7 @@
 
     {{-- Modal Auditoria --}}
     <div id="audit-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);overflow-y:auto;" onclick="if(event.target===this)this.style.display='none'">
-        <div style="background:white;max-width:900px;margin:2rem auto;border-radius:1rem;overflow:hidden;" onclick="event.stopPropagation()">
+        <div style="background:white;max-width:min(900px, 95vw);margin:2rem auto;border-radius:1rem;overflow:hidden;" onclick="event.stopPropagation()">
             <div style="padding:1rem 1.5rem;background:linear-gradient(135deg,#1B334A,#385776);display:flex;justify-content:space-between;align-items:center;">
                 <h3 style="color:white;font-size:1rem;font-weight:700;margin:0;" id="audit-title">Auditoria</h3>
                 <button onclick="document.getElementById('audit-modal').style.display='none'" style="color:rgba(255,255,255,0.6);background:none;border:none;font-size:1.5rem;cursor:pointer;">&times;</button>

@@ -268,7 +268,7 @@
                         @endif
                     </div>
                 </div>
-                <div class="grid grid-cols-4 gap-3">
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     @php $eixos = [
                         ['l'=>'JUR','s'=>$gdpScore['score_juridico']],
                         ['l'=>'FIN','s'=>$gdpScore['score_financeiro']],
