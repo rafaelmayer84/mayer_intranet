@@ -626,8 +626,19 @@ class NexoAutoatendimentoService
                     'nome_cliente'         => $cliente->nome,
                     'processo_status'      => $processo->status ?? '',
                     'tipo_acao'            => $processo->tipo_acao ?? '',
+                    'tipo_processo'        => $processo->tipo_processo ?? '',
                     'area_atuacao'         => $processo->area_atuacao ?? '',
+                    'natureza'             => $processo->natureza ?? '',
+                    'assunto'              => $processo->assunto ?? '',
                     'advogado_responsavel' => $processo->advogado_responsavel ?? '',
+                    'posicao_cliente'      => $processo->posicao_cliente ?? '',
+                    'posicao_adverso'      => $processo->posicao_adverso ?? '',
+                    'fase_vara'            => $processo->fase_atual_vara ?? '',
+                    'fase_instancia'       => $processo->fase_atual_instancia ?? '',
+                    'fase_orgao'           => $processo->fase_atual_orgao ?? '',
+                    'data_abertura'        => $processo->data_abertura
+                                                ? \Carbon\Carbon::parse($processo->data_abertura)->format('d/m/Y')
+                                                : '',
                     'andamentos'           => $resultado['_andamentos'] ?? [],
                 ]);
                 // Remover campo interno do retorno V1

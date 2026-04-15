@@ -1,216 +1,316 @@
 @extends('layouts.public')
 
-@section('title', 'Acompanhamento Processual — Mayer Advogados')
+@section('title', 'Processo ' . ($processo_pasta ?? '') . ' — Mayer Advogados')
+
+@push('styles')
+<style>
+    /* Timeline */
+    .tl-line { position: absolute; left: 7px; top: 24px; bottom: 0; width: 1px; background: linear-gradient(to bottom, #d4ad55, #e5e7eb); }
+    .tl-dot  { width: 15px; height: 15px; border-radius: 50%; background: #fff; border: 2px solid var(--gold); flex-shrink: 0; margin-top: 3px; position: relative; z-index: 1; box-shadow: 0 0 0 3px rgba(184,150,46,.12); }
+    .tl-dot-faded { border-color: #d1d5db; box-shadow: none; }
+
+    /* Chip de meta */
+    .meta-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: #f0f4f9; border-radius: 8px; font-size: 12px; color: #3b6fa0; font-weight: 500; }
+    .meta-chip svg { width: 13px; height: 13px; flex-shrink: 0; }
+
+    /* Número do processo */
+    .processo-number { font-family: 'Lato', monospace; letter-spacing: .06em; }
+
+    /* Secao */
+    .section-label { font-size: 10px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: #9ca3af; margin-bottom: 14px; }
+</style>
+@endpush
 
 @section('content')
 
-{{-- ── HERO: identificação do processo ── --}}
-<div class="bg-navy-700 rounded-2xl overflow-hidden mb-6 shadow-md">
-    {{-- Faixa dourada topo --}}
-    <div class="h-1 bg-gradient-to-r from-gold-700 via-gold-300 to-gold-700"></div>
+@php
+    // Limpar URL embutida no resumo
+    $resumoLimpo = preg_replace('/\n\n?🔗\s*https?:\/\/\S+/', '', $resumo ?? '');
+    $resumoLimpo = trim($resumoLimpo);
 
-    <div class="px-6 py-6">
-        {{-- Rótulo --}}
-        <div class="flex items-center gap-2 mb-3">
-            <svg class="w-4 h-4 text-gold-300 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/>
-            </svg>
-            <span class="text-gold-300 text-xs font-semibold tracking-widest uppercase">Processo Judicial</span>
-        </div>
+    // Badge de status
+    $statusLower = strtolower($processo_status ?? '');
+    $statusClass = str_contains($statusLower, 'ativo') || str_contains($statusLower, 'andamento')
+        ? 'status-ativo'
+        : (str_contains($statusLower, 'encerr') || str_contains($statusLower, 'arquiv')
+            ? 'status-encerrado'
+            : 'status-default');
 
-        {{-- Número do processo --}}
-        <h1 class="font-serif text-white text-xl sm:text-2xl font-bold leading-tight mb-1">
-            {{ $processo_pasta ?? '—' }}
-        </h1>
+    // Posição do cliente formatada
+    $posicaoLabel = match(strtolower($posicao_cliente ?? '')) {
+        'autor', 'requerente', 'reclamante' => 'Autor',
+        'réu', 'reu', 'requerido', 'reclamado' => 'Réu',
+        default => $posicao_cliente ?? '',
+    };
+@endphp
 
-        @if(!empty($processo_adverso))
-        <p class="text-white/60 text-sm">
-            {{ $nome_cliente ?? 'Você' }} <span class="text-gold-400 mx-1">×</span> {{ $processo_adverso }}
-        </p>
-        @endif
+{{-- ══════════════════════════════════════════
+     HERO — fundo navy, número do processo
+     ══════════════════════════════════════════ --}}
+<section class="bg-navy-700 w-full anim-1">
+    <div class="w-full px-4 sm:px-8 py-8 sm:py-12">
 
-        {{-- Status + metadados --}}
-        <div class="flex flex-wrap items-center gap-3 mt-4 pt-4 border-t border-white/10">
-            @if(!empty($processo_status))
-            <span class="badge
-                @if(str_contains(strtolower($processo_status ?? ''), 'ativo') || str_contains(strtolower($processo_status ?? ''), 'andamento'))
-                    bg-emerald-400/20 text-emerald-300 ring-1 ring-emerald-400/30
-                @elseif(str_contains(strtolower($processo_status ?? ''), 'encerr') || str_contains(strtolower($processo_status ?? ''), 'arquiv'))
-                    bg-white/10 text-white/50
-                @else
-                    bg-gold-500/20 text-gold-300 ring-1 ring-gold-500/30
-                @endif">
-                <span class="w-1.5 h-1.5 rounded-full bg-current"></span>
+        {{-- Topo: tipo + status --}}
+        <div class="flex flex-wrap items-center gap-3 mb-5">
+            <div class="flex items-center gap-1.5 text-gold-300">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/>
+                </svg>
+                <span class="text-[11px] font-bold tracking-[.18em] uppercase">{{ $tipo_processo ?: 'Processo Judicial' }}</span>
+            </div>
+            @if($processo_status)
+            <span class="status-badge {{ $statusClass }}">
+                <span class="w-1.5 h-1.5 rounded-full bg-current inline-block"></span>
                 {{ $processo_status }}
             </span>
             @endif
-
-            @if(!empty($area_atuacao))
-            <span class="text-white/40 text-xs">{{ $area_atuacao }}</span>
-            @endif
-
-            @if(!empty($tipo_acao))
-            <span class="text-white/40 text-xs hidden sm:inline">{{ $tipo_acao }}</span>
-            @endif
         </div>
-    </div>
-</div>
 
-{{-- ── GRID: info + resumo ── --}}
-<div class="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-6">
+        {{-- Número do processo --}}
+        <h1 class="processo-number text-white text-xl sm:text-3xl font-bold leading-tight mb-2">
+            {{ $processo_pasta ?? '—' }}
+        </h1>
 
-    {{-- Advogado responsável --}}
-    @if(!empty($advogado_responsavel))
-    <div class="card flex flex-col gap-1">
-        <p class="text-xs text-gray-400 font-medium uppercase tracking-wide">Advogado responsável</p>
-        <div class="flex items-center gap-2 mt-1">
-            <div class="w-8 h-8 rounded-full bg-navy-700 flex items-center justify-center shrink-0">
-                <svg class="w-4 h-4 text-gold-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-                </svg>
-            </div>
-            <p class="text-sm font-semibold text-navy-700 leading-tight">{{ $advogado_responsavel }}</p>
+        {{-- Partes --}}
+        @if(!empty($processo_adverso))
+        <div class="flex items-center gap-2 mt-3">
+            <span class="text-white/60 text-sm font-light">{{ $nome_cliente ?? 'Você' }}</span>
+            <span class="text-gold-400 text-sm font-bold">×</span>
+            <span class="text-white/60 text-sm font-light">{{ $processo_adverso }}</span>
         </div>
-    </div>
-    @endif
+        @endif
 
-    {{-- Área de atuação --}}
-    @if(!empty($area_atuacao))
-    <div class="card flex flex-col gap-1">
-        <p class="text-xs text-gray-400 font-medium uppercase tracking-wide">Área</p>
-        <div class="flex items-center gap-2 mt-1">
-            <div class="w-8 h-8 rounded-full bg-navy-50 flex items-center justify-center shrink-0">
-                <svg class="w-4 h-4 text-navy-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-                </svg>
-            </div>
-            <p class="text-sm font-semibold text-navy-700 leading-tight">{{ $area_atuacao }}</p>
+        {{-- Assunto --}}
+        @if(!empty($assunto))
+        <div class="mt-4 pt-4 border-t border-white/10">
+            <p class="text-white/40 text-[10px] uppercase tracking-widest font-semibold mb-1">Assunto</p>
+            <p class="text-white/70 text-sm leading-relaxed">{{ $assunto }}</p>
         </div>
-    </div>
-    @endif
+        @endif
 
-    {{-- Consultado em --}}
-    <div class="card flex flex-col gap-1">
-        <p class="text-xs text-gray-400 font-medium uppercase tracking-wide">Última consulta</p>
-        <div class="flex items-center gap-2 mt-1">
-            <div class="w-8 h-8 rounded-full bg-navy-50 flex items-center justify-center shrink-0">
-                <svg class="w-4 h-4 text-navy-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-            </div>
-            <p class="text-sm font-semibold text-navy-700 leading-tight">{{ $consultadoEm }}</p>
-        </div>
     </div>
-</div>
+    <div class="gold-rule opacity-30"></div>
+</section>
 
-{{-- ── RESUMO DA IA ── --}}
-@php
-    // Remover a URL do resumo se vier embutida (exibimos separada)
-    $resumoLimpo = preg_replace('/\n\n?🔗\s*https?:\/\/\S+/', '', $resumo ?? '');
-    $resumoLimpo = trim($resumoLimpo);
-@endphp
-@if(!empty($resumoLimpo))
-<div class="card mb-6 border-l-4 border-gold-500 rounded-l-none">
-    <div class="flex items-center gap-2 mb-4">
-        <div class="w-8 h-8 rounded-full bg-gold-50 border border-gold-200 flex items-center justify-center shrink-0">
-            <svg class="w-4 h-4 text-gold-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+{{-- ══════════════════════════════════════════
+     METADADOS — chips de informação
+     ══════════════════════════════════════════ --}}
+<section class="w-full px-4 sm:px-8 py-6 bg-white border-b border-gray-100 anim-2">
+    <div class="flex flex-wrap gap-2">
+
+        @if(!empty($posicaoLabel))
+        <span class="meta-chip">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
             </svg>
-        </div>
-        <div>
-            <p class="text-sm font-semibold text-gray-800">Atualização do escritório</p>
-            <p class="text-xs text-gray-400">Resumo em linguagem acessível</p>
-        </div>
-    </div>
-    <p class="text-sm text-gray-700 leading-relaxed">{{ $resumoLimpo }}</p>
-</div>
-@endif
+            Posição: <strong>{{ $posicaoLabel }}</strong>
+        </span>
+        @endif
 
-{{-- ── TIMELINE DE ANDAMENTOS ── --}}
-@if(!empty($andamentos) && count($andamentos) > 0)
-<div class="card p-0 overflow-hidden mb-6">
+        @if(!empty($fase_vara))
+        <span class="meta-chip">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5"/>
+            </svg>
+            {{ $fase_vara }}
+        </span>
+        @endif
 
-    {{-- Cabeçalho --}}
-    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-        <div class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-navy-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        @if(!empty($fase_instancia))
+        <span class="meta-chip">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
             </svg>
-            <h2 class="text-sm font-semibold text-gray-800">Movimentações processuais</h2>
-        </div>
-        <span class="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">
-            {{ count($andamentos) }} registro{{ count($andamentos) > 1 ? 's' : '' }}
+            {{ $fase_instancia }}
         </span>
-    </div>
+        @endif
 
-    {{-- Itens --}}
-    <div class="divide-y divide-gray-50">
-        @foreach($andamentos as $i => $and)
-        <div class="flex gap-5 px-6 py-5" x-data="{ open: {{ $i === 0 ? 'true' : 'false' }} }">
-            {{-- Coluna data --}}
-            <div class="shrink-0 w-20 text-right hidden sm:block">
-                <p class="text-xs font-semibold text-navy-700">{{ $and['data'] ?? '' }}</p>
-                @if(!empty($and['hora']))
-                <p class="text-xs text-gray-400">{{ $and['hora'] }}</p>
-                @endif
-            </div>
-
-            {{-- Separador vertical --}}
-            <div class="hidden sm:flex flex-col items-center shrink-0">
-                <div class="tl-dot mt-0.5"></div>
-                @if(!$loop->last)
-                <div class="w-px flex-1 bg-gray-100 mt-2"></div>
-                @endif
-            </div>
-
-            {{-- Conteúdo --}}
-            <div class="flex-1 min-w-0">
-                {{-- Data mobile --}}
-                <p class="text-xs text-gray-400 sm:hidden mb-1">{{ $and['data'] ?? '' }}</p>
-
-                <button @click="open = !open"
-                        class="w-full text-left flex items-start justify-between gap-2 group">
-                    <p class="text-sm text-gray-800 leading-snug font-medium group-hover:text-navy-700 transition-colors">
-                        {{ $and['descricao'] ?? '' }}
-                    </p>
-                    <svg class="w-4 h-4 text-gray-300 shrink-0 mt-0.5 transition-transform"
-                         :class="open && 'rotate-180'"
-                         fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </button>
-
-                @if(!empty($and['observacao']))
-                <div x-show="open" x-transition class="mt-2">
-                    <p class="text-xs text-gray-500 italic leading-relaxed border-l-2 border-gold-200 pl-3">
-                        {{ $and['observacao'] }}
-                    </p>
-                </div>
-                @endif
-            </div>
-        </div>
-        @endforeach
-    </div>
-</div>
-@endif
-
-{{-- ── RODAPÉ INFORMATIVO ── --}}
-<div class="card bg-navy-50 border-navy-100">
-    <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-        <div class="w-10 h-10 rounded-full bg-navy-700 flex items-center justify-center shrink-0">
-            <svg class="w-5 h-5 text-gold-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+        @if(!empty($natureza))
+        <span class="meta-chip">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
             </svg>
+            {{ $natureza }}
+        </span>
+        @endif
+
+        @if(!empty($area_atuacao))
+        <span class="meta-chip">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+            </svg>
+            {{ $area_atuacao }}
+        </span>
+        @endif
+
+        @if(!empty($data_abertura))
+        <span class="meta-chip">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+            Distribuído em {{ $data_abertura }}
+        </span>
+        @endif
+
+    </div>
+</section>
+
+{{-- ══════════════════════════════════════════
+     CORPO — resumo + tribunal + advogado + timeline
+     ══════════════════════════════════════════ --}}
+<div class="w-full px-4 sm:px-8 py-8 space-y-8">
+
+    {{-- Grid superior: resumo + cards laterais --}}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 anim-3">
+
+        {{-- RESUMO DA IA (col-span-2) --}}
+        @if(!empty($resumoLimpo))
+        <div class="lg:col-span-2">
+            <p class="section-label">Atualização do escritório</p>
+            <div class="card border-l-4 border-gold-500 rounded-l-none bg-gold-50 border-l-gold-500" style="border-left-color: var(--gold);">
+                <div class="flex items-start gap-3 mb-4">
+                    <div style="width:36px;height:36px;border-radius:50%;background:var(--navy);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <svg style="width:16px;height:16px;color:#d4ad55;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="font-semibold text-navy-700 text-sm">Resumo em linguagem acessível</p>
+                        <p class="text-xs text-gray-400 mt-px">Consultado em {{ $consultadoEm }}</p>
+                    </div>
+                </div>
+                <p class="text-sm text-gray-700 leading-relaxed">{{ $resumoLimpo }}</p>
+            </div>
         </div>
-        <div class="flex-1">
-            <p class="text-sm font-semibold text-navy-700">Tem dúvidas sobre seu processo?</p>
-            <p class="text-xs text-gray-500 mt-0.5">
-                Entre em contato com o escritório:
-                <span class="font-medium text-navy-700">(47) 3842-1050</span> ou
-                <span class="font-medium text-navy-700">contato@mayeradvogados.adv.br</span>
-            </p>
+        @endif
+
+        {{-- Cards laterais: advogado + tribunal --}}
+        <div class="space-y-4">
+            @if(!empty($advogado_responsavel))
+            <div class="card">
+                <p class="section-label">Advogado responsável</p>
+                <div class="flex items-center gap-3">
+                    <div style="width:40px;height:40px;border-radius:50%;background:#f0f4f9;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <svg style="width:18px;height:18px;color:#3b6fa0;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="font-semibold text-navy-700 text-sm leading-snug">{{ $advogado_responsavel }}</p>
+                        <p class="text-xs text-gray-400">Mayer Advogados</p>
+                    </div>
+                </div>
+            </div>
+            @endif
+
+            @if(!empty($fase_orgao))
+            <div class="card">
+                <p class="section-label">Tribunal</p>
+                <p class="text-sm font-medium text-navy-700 leading-snug">{{ $fase_orgao }}</p>
+                @if(!empty($fase_vara))
+                <p class="text-xs text-gray-400 mt-1">{{ $fase_vara }}@if(!empty($fase_instancia)) — {{ $fase_instancia }}@endif</p>
+                @endif
+            </div>
+            @endif
         </div>
     </div>
+
+    {{-- TIMELINE DE ANDAMENTOS --}}
+    @if(!empty($andamentos) && count($andamentos) > 0)
+    <div class="anim-4">
+        <p class="section-label">Movimentações processuais</p>
+        <div class="card p-0 overflow-hidden">
+            {{-- Cabeçalho da tabela --}}
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                <div class="flex items-center gap-2">
+                    <svg class="w-4 h-4 text-navy-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                    <span class="text-sm font-semibold text-gray-800">Histórico de andamentos</span>
+                </div>
+                <span class="text-xs text-gray-400 bg-gray-50 px-2.5 py-1 rounded-full">
+                    {{ count($andamentos) }} registro{{ count($andamentos) !== 1 ? 's' : '' }}
+                </span>
+            </div>
+
+            {{-- Itens --}}
+            <div class="divide-y divide-gray-50">
+                @foreach($andamentos as $i => $and)
+                <div class="flex gap-0" x-data="{ open: {{ $i === 0 ? 'true' : 'false' }} }">
+
+                    {{-- Coluna de data (desktop) --}}
+                    <div class="hidden sm:flex flex-col items-end justify-start pt-5 px-5 w-36 shrink-0 border-r border-gray-50">
+                        <p class="text-xs font-bold text-navy-700 text-right leading-tight">{{ $and['data'] ?? '' }}</p>
+                        @if(!empty($and['hora']))
+                        <p class="text-[11px] text-gray-400 mt-0.5">{{ $and['hora'] }}</p>
+                        @endif
+                    </div>
+
+                    {{-- Linha de separação + dot (desktop) --}}
+                    <div class="hidden sm:flex flex-col items-center pt-5 px-4 shrink-0">
+                        <div class="tl-dot {{ $i > 0 ? 'tl-dot-faded' : '' }}"></div>
+                        @if(!$loop->last)
+                        <div class="w-px flex-1 mt-2" style="background: {{ $i === 0 ? 'linear-gradient(to bottom, var(--gold), #e5e7eb)' : '#e5e7eb' }}"></div>
+                        @endif
+                    </div>
+
+                    {{-- Conteúdo --}}
+                    <div class="flex-1 py-5 pr-5">
+                        {{-- Data mobile --}}
+                        <p class="text-[11px] text-gray-400 sm:hidden mb-1.5">{{ $and['data'] ?? '' }}{{ !empty($and['hora']) ? ' • '.$and['hora'] : '' }}</p>
+
+                        <button @click="open = !open" class="w-full text-left">
+                            <div class="flex items-start justify-between gap-3">
+                                <p class="text-sm text-gray-800 leading-snug {{ $i === 0 ? 'font-semibold' : 'font-normal' }}">
+                                    {{ $and['descricao'] ?? '' }}
+                                </p>
+                                @if(!empty($and['observacao']))
+                                <svg class="w-4 h-4 text-gray-300 shrink-0 mt-0.5 transition-transform duration-200"
+                                     :class="open ? 'rotate-180' : ''"
+                                     fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                                @endif
+                            </div>
+                        </button>
+
+                        @if(!empty($and['observacao']))
+                        <div x-show="open" x-transition:enter="transition ease-out duration-150"
+                             x-transition:enter-start="opacity-0 transform -translate-y-1"
+                             x-transition:enter-end="opacity-100 transform translate-y-0"
+                             class="mt-2 pl-3 border-l-2 text-xs text-gray-500 italic leading-relaxed"
+                             style="border-left-color: var(--gold-light);">
+                            {{ $and['observacao'] }}
+                        </div>
+                        @endif
+                    </div>
+                </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- CONTATO DO ESCRITÓRIO --}}
+    <div class="card anim-5" style="background: #f0f4f9; border-color: #d6e2ef;">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div style="width:44px;height:44px;border-radius:50%;background:var(--navy);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <svg style="width:20px;height:20px;" fill="none" stroke="#d4ad55" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                </svg>
+            </div>
+            <div class="flex-1">
+                <p class="font-semibold text-navy-700 text-sm">Dúvidas sobre seu processo?</p>
+                <p class="text-xs text-gray-500 mt-1">
+                    Fale com o escritório:
+                    <a href="tel:+554738421050" class="font-semibold text-navy-700 hover:text-gold-500 transition-colors">(47) 3842-1050</a>
+                    &nbsp;·&nbsp;
+                    <a href="mailto:contato@mayeradvogados.adv.br" class="font-semibold text-navy-700 hover:text-gold-500 transition-colors">contato@mayeradvogados.adv.br</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 @endsection
