@@ -7,6 +7,15 @@ use App\Services\SendPulseWhatsAppService;
 use App\Models\WaConversation;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Comando de limpeza: reseta variáveis atendimento_humano/sessao_ativa
+ * no SendPulse para conversas sem operador ativo.
+ *
+ * Criado em 15/04/2026 para corrigir 458 conversas com variável presa
+ * após bug no changeStatus() do NexoAtendimentoController.
+ *
+ * Uso: php artisan nexo:reset-bot-variables [--dry-run] [--limit=N]
+ */
 class NexoResetBotVariables extends Command
 {
     protected $signature = 'nexo:reset-bot-variables

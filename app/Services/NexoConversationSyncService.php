@@ -11,6 +11,15 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Cache;
 
+/**
+ * Serviço de sincronização de conversas WhatsApp via SendPulse.
+ *
+ * HOTFIX 15/04/2026 — syncConversationFromWebhook()
+ * BUG: Ao reabrir conversa fechada, não chamava reativarAutomacao(),
+ * deixando atendimento_humano="sim" no SendPulse. Fluxo "Resposta padrão"
+ * enviava "Aguarde a resposta do advogado" ao invés do menu de boas-vindas.
+ * Corrigido: agora chama reativarAutomacao() ao reabrir conversa fechada.
+ */
 class NexoConversationSyncService
 {
     private SendPulseWhatsAppService $sendpulse;

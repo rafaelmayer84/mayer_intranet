@@ -19,14 +19,23 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * ╔══════════════════════════════════════════════════════════════╗
- * ║  NEXO ATENDIMENTO CONTROLLER — VERSÃO ESTÁVEL v2.1         ║
- * ║  Data: 27/02/2026                                          ║
+ * ║  NEXO ATENDIMENTO CONTROLLER — VERSÃO ESTÁVEL v2.2         ║
+ * ║  Data: 27/02/2026 | Hotfix: 15/04/2026                     ║
  * ║  Status: CONGELADO — NÃO EDITAR SEM AUTORIZAÇÃO            ║
  * ║                                                             ║
  * ║  Qualquer extensão deve ser feita em:                       ║
  * ║  - Novo Controller (ex: NexoAtendimentoExtController)       ║
  * ║  - Novo Service (ex: NexoXxxService)                        ║
  * ║  - NUNCA editar este arquivo diretamente                    ║
+ * ╠══════════════════════════════════════════════════════════════╣
+ * ║  HOTFIX 15/04/2026 — changeStatus()                        ║
+ * ║  BUG: Fechar conversa manualmente não chamava               ║
+ * ║  reativarAutomacao() no SendPulse. Variável                 ║
+ * ║  atendimento_humano ficava "sim" indefinidamente,           ║
+ * ║  causando envio repetido de "Aguarde a resposta do          ║
+ * ║  advogado" (~20x/dia). Corrigido: agora ao fechar,         ║
+ * ║  reseta bot_ativo, assigned_user_id e chama                 ║
+ * ║  reativarAutomacao() no SendPulse.                          ║
  * ╚══════════════════════════════════════════════════════════════╝
  */
 class NexoAtendimentoController extends Controller
