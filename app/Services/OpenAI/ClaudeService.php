@@ -78,14 +78,30 @@ class ClaudeService
     {
         $andamentosTexto = '';
         foreach ($andamentos as $i => $a) {
-            $andamentosTexto .= sprintf("%d. %s — %s\n", $i + 1, $a['data'] ?? 'Sem data', $a['descricao'] ?? 'Sem descrição');
+            $andamentosTexto .= sprintf("- %s: %s\n", $a['data'] ?? 'Sem data', $a['descricao'] ?? 'Sem descrição');
         }
 
-        $system = 'Você é secretária do escritório Mayer Advogados. Explique andamentos processuais em linguagem simples e acolhedora para clientes leigos. Sem markdown. Sem listas numeradas. No máximo 3 frases curtas (mensagem WhatsApp). NUNCA faça promessas ou exponha dados pessoais de terceiros.';
+        $system = <<<SYSTEM
+Você é secretária do escritório Mayer Advogados respondendo via WhatsApp.
 
-        $user = "O cliente {$nomeCliente} quer saber sobre o processo {$numeroProcesso}.\n\nÚltimos andamentos:\n{$andamentosTexto}\n\nInstruções:\n- Cumprimente pelo primeiro nome\n- Explique o que aconteceu em linguagem leiga\n- Máximo 3 frases\n- Não use asteriscos, números ou listas\n- Finalize com: 'Posso ajudar com mais alguma dúvida?'";
+FORMATO OBRIGATÓRIO:
+- Texto corrido, sem listas, sem numeração, sem asteriscos, sem markdown de qualquer tipo
+- Máximo 2 frases curtas
+- Tom tranquilizador: o escritório está acompanhando, tudo sob controle
 
-        $texto = $this->chamar($system, $user, 200, 0.5);
+PROIBIÇÕES ABSOLUTAS — se violar qualquer uma, a resposta será descartada:
+- NUNCA mencione prazos vencidos, encerrados ou que já passaram
+- NUNCA diga que o processo "pode levar tempo", "depende de" ou "é importante aguardar"
+- NUNCA crie expectativa de demora ou incerteza
+- NUNCA use "SITUAÇÃO ATUAL", "SIGNIFICADO PRÁTICO", "PRÓXIMOS PASSOS" ou qualquer subtítulo
+- NUNCA exponha dados pessoais de terceiros (CPF, endereço, dados bancários)
+- NUNCA faça promessas de resultado
+SYSTEM;
+
+        $primeiro = explode(' ', trim($nomeCliente))[0];
+        $user = "Resuma a última movimentação do processo {$numeroProcesso} para o cliente {$primeiro}.\n\nMovimentações recentes:\n{$andamentosTexto}\nEscreva no máximo 2 frases. Não use listas nem marcadores. Tom tranquilizador. Finalize com: 'Qualquer dúvida, nossa equipe está à disposição.'";
+
+        $texto = $this->chamar($system, $user, 150, 0.4);
 
         return $texto ?? $this->fallbackStatus($andamentos, $numeroProcesso, $nomeCliente);
     }
@@ -97,14 +113,31 @@ class ClaudeService
     {
         $andamentosTexto = '';
         foreach ($andamentos as $i => $a) {
-            $andamentosTexto .= sprintf("%d. %s — %s\n", $i + 1, $a['data'] ?? 'Sem data', $a['descricao'] ?? 'Sem descrição');
+            $andamentosTexto .= sprintf("- %s: %s\n", $a['data'] ?? 'Sem data', $a['descricao'] ?? 'Sem descrição');
         }
 
-        $system = 'Você é secretária do escritório Mayer Advogados. Resuma andamentos para clientes leigos em mensagens curtas de WhatsApp. Sem markdown. Sem listas. No máximo 3 frases. NUNCA faça promessas ou exponha dados pessoais de terceiros.';
+        $system = <<<SYSTEM
+Você é secretária do escritório Mayer Advogados respondendo via WhatsApp.
 
-        $user = "O cliente {$nomeCliente} quer um resumo do processo {$numeroProcesso}.\n\nÚltimos andamentos:\n{$andamentosTexto}\n\nRegras OBRIGATÓRIAS:\n- Máximo 3 frases curtas\n- Cumprimente pelo primeiro nome\n- Linguagem totalmente leiga, sem juridiquês\n- NUNCA use listas, asteriscos ou markdown\n- NUNCA prometa resultado, sugira estratégia ou mencione valores\n- NUNCA exponha dados pessoais de terceiros\n- Termine com: 'Toque no link abaixo para ver todos os detalhes.'";
+FORMATO OBRIGATÓRIO:
+- Texto corrido, sem listas, sem numeração, sem asteriscos, sem markdown de qualquer tipo
+- Máximo 2 frases curtas
+- Tom tranquilizador: o escritório está acompanhando, tudo caminhando
 
-        $texto = $this->chamar($system, $user, 180, 0.5);
+PROIBIÇÕES ABSOLUTAS — se violar qualquer uma, a resposta será descartada:
+- NUNCA mencione prazos vencidos, encerrados ou que já passaram
+- NUNCA diga que o processo "pode levar tempo", "depende de" ou "é importante aguardar"
+- NUNCA crie expectativa de demora, incerteza ou preocupação
+- NUNCA use "SITUAÇÃO ATUAL", "SIGNIFICADO PRÁTICO", "PRÓXIMOS PASSOS" ou qualquer subtítulo
+- NUNCA use asteriscos, hífens como marcadores, numeração ou qualquer formatação
+- NUNCA exponha dados pessoais de terceiros
+- NUNCA faça promessas de resultado ou sugira estratégia
+SYSTEM;
+
+        $primeiro = explode(' ', trim($nomeCliente))[0];
+        $user = "Resuma a última movimentação do processo {$numeroProcesso} para o cliente {$primeiro}.\n\nMovimentações recentes:\n{$andamentosTexto}\nEscreva no máximo 2 frases em texto corrido. Tom tranquilizador. Termine com: 'Toque no link abaixo para ver todos os detalhes.'";
+
+        $texto = $this->chamar($system, $user, 150, 0.4);
 
         return $texto ?? $this->fallbackResumo($andamentos, $nomeCliente);
     }
