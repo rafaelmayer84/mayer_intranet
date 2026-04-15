@@ -31,6 +31,12 @@
             <p class="text-sm text-gray-500 mt-1">Visão gerencial de toda a base CRM</p>
         </div>
         <div class="flex gap-2">
+            @if($isAdmin)
+            <a href="{{ route('crm.accounts.create') }}" class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition flex items-center gap-1.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                Nova Conta
+            </a>
+            @endif
             <a href="{{ route('crm.distribution') }}" class="px-4 py-2 border border-[#385776] text-[#385776] rounded-lg text-sm hover:bg-[#385776] hover:text-white transition">
                 Distribuição IA
             </a>

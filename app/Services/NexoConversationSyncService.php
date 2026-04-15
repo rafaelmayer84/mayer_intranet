@@ -89,6 +89,7 @@ class NexoConversationSyncService
                     'phone'            => $phone,
                     'name'             => $parsed['contact_name'] ?: null,
                     'status'           => 'open',
+                    'bot_ativo'        => true,
                     'last_message_at'  => $sentAt,
                     'last_incoming_at' => $sentAt,
                     'unread_count'     => 1,
@@ -100,7 +101,16 @@ class NexoConversationSyncService
                     'last_incoming_at' => $sentAt,
                     'unread_count'     => $conversation->unread_count + 1,
                 ];
-                if ($conversation->status === 'closed') $updateData['status'] = 'open';
+
+                // Conversa que estava fechada reabre — resetar estado do bot
+                $eraFechada = $conversation->status === 'closed';
+                if ($eraFechada) {
+                    $updateData['status']           = 'open';
+                    $updateData['bot_ativo']        = true;
+                    $updateData['assigned_user_id'] = null;
+                    $updateData['lembrete_inatividade_at'] = null;
+                }
+
                 // SEMPRE atualizar contact_id se webhook trouxer diferente (SendPulse recria contacts)
                 if (!empty($parsed['contact_id']) && $conversation->contact_id !== $parsed['contact_id']) {
                     $updateData['contact_id'] = $parsed['contact_id'];
@@ -145,22 +155,55 @@ class NexoConversationSyncService
                 'msg_type'   => $parsed['message_type'],
             ]);
 
-            // ── SAFEGUARD: Re-pausar bot no SendPulse se conversa está em atendimento humano ──
-            // Isso impede que o bot responda mesmo quando a automacao deveria estar pausada
+            // ── SAFEGUARD: Gerenciar estado do bot com base no tempo de inatividade ──
+            // Regra:
+            //   • bot_ativo = false + assigned_user_id + último incoming < 6h → re-pausar (humano ainda atendendo)
+            //   • bot_ativo = false + último incoming ≥ 6h → resetar para fluxo inicial (inatividade encerrou sessão)
+            $minutosDesdeUltimoIncoming = $conversation->last_incoming_at
+                ? (int) $conversation->last_incoming_at->diffInMinutes(now())
+                : 9999;
+
             if ($conversation->bot_ativo === false && $conversation->assigned_user_id) {
-                $contactIdPausa = $parsed['contact_id'] ?: $conversation->contact_id;
-                if ($contactIdPausa) {
-                    try {
-                        $this->sendpulse->pausarAutomacao($contactIdPausa);
-                        \Log::info('NEXO-AUDIT: bot re-pausado via webhook safeguard', [
-                            'conv_id' => $conversation->id,
-                            'contact_id' => $contactIdPausa,
-                        ]);
-                    } catch (\Throwable $e) {
-                        \Log::warning('NEXO-AUDIT: falha ao re-pausar bot no webhook', [
-                            'conv_id' => $conversation->id,
-                            'error' => $e->getMessage(),
-                        ]);
+                $contactIdAction = $parsed['contact_id'] ?: $conversation->contact_id;
+
+                if ($minutosDesdeUltimoIncoming >= 360) {
+                    // ≥ 6h sem mensagem: resetar conversa para o fluxo inicial
+                    $conversation->update([
+                        'bot_ativo'               => true,
+                        'assigned_user_id'        => null,
+                        'lembrete_inatividade_at' => null,
+                    ]);
+                    if ($contactIdAction) {
+                        try {
+                            $this->sendpulse->reativarAutomacao($contactIdAction);
+                            \Log::info('NEXO-AUDIT: bot reativado por inatividade ≥6h (fluxo inicial)', [
+                                'conv_id'    => $conversation->id,
+                                'contact_id' => $contactIdAction,
+                                'minutos'    => $minutosDesdeUltimoIncoming,
+                            ]);
+                        } catch (\Throwable $e) {
+                            \Log::warning('NEXO-AUDIT: falha ao reativar bot após 6h', [
+                                'conv_id' => $conversation->id,
+                                'error'   => $e->getMessage(),
+                            ]);
+                        }
+                    }
+                } else {
+                    // < 6h: humano ainda pode estar atendendo — re-pausar
+                    if ($contactIdAction) {
+                        try {
+                            $this->sendpulse->pausarAutomacao($contactIdAction);
+                            \Log::info('NEXO-AUDIT: bot re-pausado via webhook safeguard', [
+                                'conv_id'    => $conversation->id,
+                                'contact_id' => $contactIdAction,
+                                'minutos'    => $minutosDesdeUltimoIncoming,
+                            ]);
+                        } catch (\Throwable $e) {
+                            \Log::warning('NEXO-AUDIT: falha ao re-pausar bot no webhook', [
+                                'conv_id' => $conversation->id,
+                                'error'   => $e->getMessage(),
+                            ]);
+                        }
                     }
                 }
             }
@@ -463,10 +506,10 @@ class NexoConversationSyncService
             }
         }
 
-        // ── LEAD: normalizar dígitos do telefone do lead antes de comparar ──
+        // ── LEAD: só vincular se NÃO há cliente e o lead está ativo ──
         if (!$conversation->linked_lead_id && !$conversation->linked_cliente_id) {
-            // Só vincular lead se NÃO vinculou como cliente (cliente tem prioridade)
-            $lead = Lead::whereNotNull('telefone')
+            $lead = Lead::ativo()
+                ->whereNotNull('telefone')
                 ->where('telefone', '!=', '')
                 ->get()
                 ->first(function ($l) use ($phone) {
@@ -481,6 +524,35 @@ class NexoConversationSyncService
                 $conversation->update(['linked_lead_id' => $lead->id]);
             }
         }
+
+        // ── CONSISTÊNCIA: se há cliente vinculado, arquivar lead com mesmo telefone ──
+        if ($conversation->linked_cliente_id) {
+            $this->arquivarLeadSeDuplicaCliente($phone, $conversation->linked_cliente_id);
+        }
+    }
+
+    /**
+     * Quando uma conversa é vinculada a um cliente, arquiva qualquer lead ativo
+     * com o mesmo telefone, evitando duplicidade lead+cliente para a mesma pessoa.
+     */
+    private function arquivarLeadSeDuplicaCliente(string $phone, int $clienteId): void
+    {
+        Lead::ativo()
+            ->whereNotNull('telefone')
+            ->where('telefone', '!=', '')
+            ->get()
+            ->each(function ($lead) use ($phone, $clienteId) {
+                $norm = preg_replace('/\D/', '', $lead->telefone);
+                if (!str_starts_with($norm, '55') && strlen($norm) >= 10 && strlen($norm) <= 11) {
+                    $norm = '55' . $norm;
+                }
+                if ($norm === $phone) {
+                    $lead->update([
+                        'status'     => 'convertido',
+                        'cliente_id' => $clienteId,
+                    ]);
+                }
+            });
     }
 
     // ═══════════════════════════════════════════════════════

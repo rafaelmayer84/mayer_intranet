@@ -33,6 +33,8 @@ class Lead extends Model
         'origem_canal',
         'gclid', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'fbclid', 'landing_page', 'referrer_url',
         'status',
+        'crm_account_id',
+        'cliente_id',
         'espocrm_id',
         'erro_processamento',
         'metadata',
@@ -76,6 +78,16 @@ class Lead extends Model
     }
 
     // ========== SCOPES PARA FILTROS ==========
+
+    /**
+     * Leads ativos: excluí arquivados e convertidos (já viraram clientes).
+     * Usar em todas as buscas e listagens da UI.
+     */
+    public function scopeAtivo($query)
+    {
+        return $query->whereNotIn('status', ['arquivado', 'convertido'])
+                     ->whereNull('cliente_id');
+    }
 
     public function scopeArea($query, $area)
     {

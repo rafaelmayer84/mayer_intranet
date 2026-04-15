@@ -26,21 +26,41 @@
 
     {{-- Stats --}}
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div class="bg-white rounded-xl border shadow-sm px-4 py-4">
-            <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Ativos</p>
-            <p class="text-2xl font-bold text-[#1B334A] mt-1">{{ $stats['total'] }}</p>
+        <div class="bg-white rounded-xl border-l-4 border-l-[#1B334A] border border-gray-200 shadow-sm px-4 py-4 flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-[#1B334A]/10 flex items-center justify-center text-[#1B334A] shrink-0">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            </div>
+            <div>
+                <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Ativos</p>
+                <p class="text-2xl font-bold text-[#1B334A]">{{ $stats['total'] }}</p>
+            </div>
         </div>
-        <div class="bg-white rounded-xl border shadow-sm px-4 py-4">
-            <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Na minha mesa</p>
-            <p class="text-2xl font-bold text-indigo-600 mt-1">{{ $stats['na_minha_mesa'] }}</p>
+        <div class="bg-white rounded-xl border-l-4 border-l-indigo-500 border border-gray-200 shadow-sm px-4 py-4 flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-500 shrink-0">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+            </div>
+            <div>
+                <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Na minha mesa</p>
+                <p class="text-2xl font-bold text-indigo-600">{{ $stats['na_minha_mesa'] }}</p>
+            </div>
         </div>
-        <div class="bg-white rounded-xl border shadow-sm px-4 py-4">
-            <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Em andamento</p>
-            <p class="text-2xl font-bold text-blue-600 mt-1">{{ $stats['em_andamento'] }}</p>
+        <div class="bg-white rounded-xl border-l-4 border-l-blue-500 border border-gray-200 shadow-sm px-4 py-4 flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center text-blue-500 shrink-0">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            </div>
+            <div>
+                <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Em andamento</p>
+                <p class="text-2xl font-bold text-blue-600">{{ $stats['em_andamento'] }}</p>
+            </div>
         </div>
-        <div class="bg-white rounded-xl border shadow-sm px-4 py-4">
-            <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Atrasados</p>
-            <p class="text-2xl font-bold text-red-600 mt-1">{{ $stats['atrasados'] }}</p>
+        <div class="bg-white rounded-xl border-l-4 border-l-red-500 border border-gray-200 shadow-sm px-4 py-4 flex items-center gap-3">
+            <div class="w-9 h-9 rounded-lg bg-red-50 flex items-center justify-center text-red-500 shrink-0">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div>
+                <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">Atrasados</p>
+                <p class="text-2xl font-bold text-red-600">{{ $stats['atrasados'] }}</p>
+            </div>
         </div>
     </div>
 
@@ -107,19 +127,26 @@
                     $atrasado = $proc->prazo_final && $proc->prazo_final->isPast() && !in_array($proc->status,['concluido','cancelado']);
                     $ultimoAto = $proc->atos->last();
                     $comigo = $proc->com_user_id === auth()->id();
+                    $rowBg = $atrasado ? 'bg-red-50/60' : ($comigo ? 'bg-indigo-50/40' : '');
+                    $leftBorder = $atrasado ? 'border-l-4 border-l-red-400' : ($comigo ? 'border-l-4 border-l-indigo-400' : '');
                 @endphp
-                <tr class="hover:bg-gray-50 transition-colors {{ $comigo ? 'border-l-4 border-l-[#385776]' : '' }}">
+                <tr class="hover:bg-gray-50/80 transition-colors {{ $rowBg }} {{ $leftBorder }}">
                     <td class="px-4 py-3">
                         <span class="font-mono text-xs font-semibold text-[#385776]">{{ $proc->protocolo }}</span>
                         @if($atrasado)
-                            <span class="ml-1 inline-block w-2 h-2 rounded-full bg-red-500" title="Atrasado"></span>
+                            <span class="ml-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-600">
+                                ⚠ Atrasado
+                            </span>
                         @endif
                     </td>
                     <td class="px-4 py-3">
                         <p class="font-medium text-gray-800 leading-tight">{{ Str::limit($proc->titulo, 50) }}</p>
-                        <p class="text-xs text-gray-400 mt-0.5">
-                            {{ $proc->tipoLabel() }} · {{ $proc->account->name ?? '-' }}
-                        </p>
+                        <div class="flex items-center gap-1.5 mt-1 flex-wrap">
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border {{ $proc->tipoColor() }}">
+                                {{ $proc->tipoIcon() }} {{ $proc->tipoLabel() }}
+                            </span>
+                            <span class="text-xs text-gray-400">· {{ $proc->account->name ?? '-' }}</span>
+                        </div>
                     </td>
                     <td class="px-4 py-3">
                         <span class="px-2 py-0.5 rounded-full text-xs font-medium {{ $proc->statusColor() }}">
@@ -127,28 +154,36 @@
                         </span>
                     </td>
                     <td class="px-4 py-3">
-                        <span class="text-sm {{ $comigo ? 'text-[#385776] font-semibold' : 'text-gray-600' }}">
-                            {{ $proc->comUsuario->name ?? $proc->owner->name ?? '-' }}
-                        </span>
                         @if($comigo)
-                            <span class="text-[10px] text-[#385776] block">Você</span>
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-700">
+                                <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span> Você
+                            </span>
+                        @else
+                            <span class="text-sm text-gray-600">{{ $proc->comUsuario->name ?? $proc->owner->name ?? '-' }}</span>
                         @endif
                     </td>
                     <td class="px-4 py-3">
-                        <span class="text-sm text-gray-500">{{ $proc->atos->count() }}</span>
+                        @if($proc->atos->count() > 0)
+                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 text-xs font-semibold text-gray-600">
+                                {{ $proc->atos->count() }}
+                            </span>
+                        @else
+                            <span class="text-gray-300 text-sm">—</span>
+                        @endif
                     </td>
                     <td class="px-4 py-3">
                         @if($ultimoAto)
                             <p class="text-xs text-gray-600 leading-tight">{{ Str::limit($ultimoAto->titulo, 30) }}</p>
-                            <p class="text-[10px] text-gray-400">{{ $ultimoAto->created_at->format('d/m/Y') }}</p>
+                            <p class="text-[10px] text-gray-400 mt-0.5">{{ $ultimoAto->created_at->format('d/m/Y') }}</p>
                         @else
-                            <span class="text-gray-300">-</span>
+                            <span class="text-gray-300">—</span>
                         @endif
                     </td>
                     <td class="px-4 py-3">
                         <a href="{{ route('crm.admin-processes.show', $proc->id) }}"
-                           class="text-[#385776] hover:underline text-sm font-medium">
+                           class="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-lg bg-[#1B334A] text-white hover:bg-[#385776] transition-colors">
                             Abrir
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                         </a>
                     </td>
                 </tr>

@@ -325,8 +325,8 @@ class NexoTicketService
             if ($account?->owner_user_id) return $account->owner_user_id;
         }
 
-        // 2. Direto em crm_accounts.phone_e164
-        $phone_e164 = '+' . (str_starts_with($digits, '55') ? $digits : '55' . $digits);
+        // 2. Direto em crm_accounts.phone_e164 (formato canônico: 55XXXXXXXXXXX sem +)
+        $phone_e164 = str_starts_with($digits, '55') ? $digits : '55' . $digits;
         $account = CrmAccount::where('phone_e164', $phone_e164)
             ->whereNotNull('owner_user_id')
             ->first();

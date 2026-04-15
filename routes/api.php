@@ -65,6 +65,7 @@ Route::prefix('nexo/autoatendimento')->middleware(['throttle:60,1'])->group(func
     Route::post('/agendamento/solicitar', [NexoAutoatendimentoController::class, 'solicitarAgendamento']);
     Route::post('/verificar-inatividade', [NexoInactivityController::class, 'verificarInatividade']);
     Route::post('/desativar-bot', [NexoAutoatendimentoController::class, 'desativarBot']);
+    Route::post('/admin-processos/listar', [NexoAutoatendimentoController::class, 'processosAdministrativos']);
 });
 // --- NEXO QA: Webhook de Respostas de Pesquisa ---
 Route::post('/webhooks/sendpulse/nexo-qa', [\App\Http\Controllers\Api\NexoQaWebhookController::class, 'handle'])->name('webhooks.sendpulse.nexo-qa');

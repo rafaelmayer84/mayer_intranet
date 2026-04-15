@@ -135,7 +135,7 @@
     {{-- ═══════════════════════════════════════════════════════ --}}
     {{-- COLUNA 2 — CHAT (flex grow) --}}
     {{-- ═══════════════════════════════════════════════════════ --}}
-    <div id="chat-panel" class="hidden lg:flex flex-1 flex-col bg-[#f0f2f5]">
+    <div id="chat-panel" class="hidden lg:flex flex-1 flex-col bg-[#f0f2f5] min-w-0 overflow-hidden">
         {{-- Estado vazio --}}
         <div id="chat-empty" class="flex-1 flex flex-col items-center justify-center text-gray-400">
             <div class="w-20 h-20 mb-4 rounded-full bg-gray-100 flex items-center justify-center">
@@ -187,7 +187,7 @@
         </div>
 
         {{-- Mensagens --}}
-        <div id="chat-messages" class="hidden flex-1 overflow-y-auto px-5 py-4 space-y-1 nexo-chat-bg"></div>
+        <div id="chat-messages" class="hidden flex-1 overflow-y-auto overflow-x-hidden px-5 py-4 space-y-1 nexo-chat-bg"></div>
 
         {{-- Reply Bar (citação) --}}
         <div id="reply-bar" class="hidden px-4 pt-3 pb-0 bg-white border-t border-gray-200/80">

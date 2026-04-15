@@ -40,6 +40,53 @@ class CrmAdminProcessAto extends Model
         return $this->hasMany(CrmAdminProcessAtoAnexo::class, 'ato_id');
     }
 
+    // ── Movimentações padrão ──
+
+    public const MOVIMENTACOES = [
+        // Atos internos do escritório
+        'despacho'             => 'Despacho',
+        'parecer'              => 'Parecer / Análise',
+        'nota_interna'         => 'Nota Interna',
+
+        // Documentos juntados / produzidos
+        'juntada'              => 'Juntada de Documento',
+        'elaboracao_minuta'    => 'Elaboração de Minuta',
+        'elaboracao_peticao'   => 'Elaboração de Petição',
+        'elaboracao_contrato'  => 'Elaboração de Contrato',
+        'elaboracao_procuracao'=> 'Elaboração de Procuração',
+        'elaboracao_escritura' => 'Elaboração de Escritura',
+        'elaboracao_oficio'    => 'Elaboração de Ofício',
+        'elaboracao_requerimento' => 'Elaboração de Requerimento',
+
+        // Atos externos / cartório / órgão
+        'protocolo_orgao'      => 'Protocolo em Órgão / Cartório',
+        'diligencia_externa'   => 'Diligência Externa',
+        'certidao_obtida'      => 'Certidão Obtida',
+        'recebimento_documento'=> 'Recebimento de Documento',
+        'assinatura'           => 'Assinatura de Documento',
+        'registro_cartorio'    => 'Registro em Cartório',
+        'averbacao'            => 'Averbação',
+
+        // Financeiro
+        'pagamento_taxa'       => 'Pagamento de Taxa / Emolumento',
+        'comprovante_pagamento'=> 'Comprovante de Pagamento',
+
+        // Comunicação
+        'comunicacao_cliente'  => 'Comunicação ao Cliente',
+        'comunicacao_terceiro' => 'Comunicação a Terceiro',
+        'envio_documento'      => 'Envio de Documento',
+
+        // Aguardando
+        'aguardando_cliente'   => 'Aguardando Providência do Cliente',
+        'aguardando_orgao'     => 'Aguardando Órgão / Cartório',
+        'aguardando_terceiro'  => 'Aguardando Terceiro',
+
+        // Automáticos (gerados pelo sistema)
+        'tramitacao'           => 'Tramitação',
+        'conclusao'            => 'Conclusão',
+        'abertura'             => 'Abertura',
+    ];
+
     // ── Helpers ──
 
     public static function proximoNumero(int $processId): int
@@ -47,79 +94,60 @@ class CrmAdminProcessAto extends Model
         return (int) self::where('admin_process_id', $processId)->max('numero') + 1;
     }
 
-    public function tipoLabel(): string
+    public static function movimentacoesManuais(): array
     {
-        return match($this->tipo) {
-            'despacho'       => 'Despacho',
-            'parecer'        => 'Parecer',
-            'oficio'         => 'Ofício',
-            'requerimento'   => 'Requerimento',
-            'certidao'       => 'Certidão',
-            'protocolo'      => 'Protocolo',
-            'procuracao'     => 'Procuração',
-            'minuta'         => 'Minuta',
-            'contrato'       => 'Contrato',
-            'nota_interna'   => 'Nota Interna',
-            'comunicacao'    => 'Comunicação',
-            'recebimento'    => 'Recebimento',
-            'guia_pagamento' => 'Guia de Pagamento',
-            'comprovante'    => 'Comprovante',
-            'peticao'        => 'Petição',
-            'escritura'      => 'Escritura',
-            'relatorio'      => 'Relatório',
-            'tramitacao'     => 'Tramitação',
-            'conclusao'      => 'Conclusão',
-            'abertura'       => 'Abertura',
-            'outro'          => 'Documento',
-            default          => ucfirst(str_replace('_', ' ', $this->tipo)),
-        };
+        // Retorna só as que o advogado pode selecionar (exclui as automáticas)
+        return collect(self::MOVIMENTACOES)
+            ->except(['tramitacao', 'conclusao', 'abertura'])
+            ->all();
     }
 
-    public function tipoIcon(): string
+    public function tipoLabel(): string
     {
-        return match($this->tipo) {
-            'despacho'       => 'file-text',
-            'parecer'        => 'file-check',
-            'oficio'         => 'mail',
-            'requerimento'   => 'file-plus',
-            'certidao'       => 'award',
-            'protocolo'      => 'clipboard',
-            'procuracao'     => 'shield',
-            'minuta'         => 'edit-3',
-            'contrato'       => 'file-signature',
-            'nota_interna'   => 'lock',
-            'comunicacao'    => 'message-circle',
-            'recebimento'    => 'download',
-            'guia_pagamento' => 'dollar-sign',
-            'comprovante'    => 'check-circle',
-            'peticao'        => 'file-plus',
-            'escritura'      => 'book-open',
-            'relatorio'      => 'bar-chart-2',
-            'tramitacao'     => 'send',
-            'conclusao'      => 'flag',
-            'abertura'       => 'folder-plus',
-            default          => 'file',
-        };
+        return self::MOVIMENTACOES[$this->tipo]
+            ?? ucfirst(str_replace('_', ' ', $this->tipo));
     }
 
     public function tipoColor(): string
     {
         return match($this->tipo) {
-            'despacho'       => 'text-blue-600 bg-blue-50 border-blue-200',
-            'parecer'        => 'text-indigo-600 bg-indigo-50 border-indigo-200',
-            'oficio'         => 'text-gray-600 bg-gray-50 border-gray-200',
-            'requerimento'   => 'text-purple-600 bg-purple-50 border-purple-200',
-            'certidao'       => 'text-green-600 bg-green-50 border-green-200',
-            'protocolo'      => 'text-orange-600 bg-orange-50 border-orange-200',
-            'nota_interna'   => 'text-gray-500 bg-gray-100 border-gray-300',
-            'comunicacao'    => 'text-sky-600 bg-sky-50 border-sky-200',
-            'recebimento'    => 'text-teal-600 bg-teal-50 border-teal-200',
-            'guia_pagamento' => 'text-yellow-700 bg-yellow-50 border-yellow-200',
-            'comprovante'    => 'text-emerald-600 bg-emerald-50 border-emerald-200',
-            'tramitacao'     => 'text-rose-600 bg-rose-50 border-rose-200',
-            'conclusao'      => 'text-green-700 bg-green-100 border-green-300',
-            'abertura'       => 'text-blue-700 bg-blue-100 border-blue-300',
-            default          => 'text-gray-600 bg-gray-50 border-gray-200',
+            'despacho'              => 'text-blue-600 bg-blue-50 border-blue-200',
+            'parecer'               => 'text-indigo-600 bg-indigo-50 border-indigo-200',
+            'nota_interna'          => 'text-gray-500 bg-gray-100 border-gray-300',
+
+            'juntada',
+            'elaboracao_minuta',
+            'elaboracao_peticao',
+            'elaboracao_contrato',
+            'elaboracao_procuracao',
+            'elaboracao_escritura',
+            'elaboracao_oficio',
+            'elaboracao_requerimento' => 'text-purple-600 bg-purple-50 border-purple-200',
+
+            'protocolo_orgao'       => 'text-orange-600 bg-orange-50 border-orange-200',
+            'diligencia_externa'    => 'text-amber-600 bg-amber-50 border-amber-200',
+            'certidao_obtida'       => 'text-green-600 bg-green-50 border-green-200',
+            'recebimento_documento' => 'text-teal-600 bg-teal-50 border-teal-200',
+            'assinatura'            => 'text-emerald-700 bg-emerald-50 border-emerald-200',
+            'registro_cartorio'     => 'text-lime-700 bg-lime-50 border-lime-200',
+            'averbacao'             => 'text-green-700 bg-green-50 border-green-200',
+
+            'pagamento_taxa'        => 'text-yellow-700 bg-yellow-50 border-yellow-200',
+            'comprovante_pagamento' => 'text-emerald-600 bg-emerald-50 border-emerald-200',
+
+            'comunicacao_cliente'   => 'text-sky-600 bg-sky-50 border-sky-200',
+            'comunicacao_terceiro'  => 'text-cyan-600 bg-cyan-50 border-cyan-200',
+            'envio_documento'       => 'text-blue-500 bg-blue-50 border-blue-200',
+
+            'aguardando_cliente'    => 'text-yellow-600 bg-yellow-50 border-yellow-200',
+            'aguardando_orgao'      => 'text-orange-500 bg-orange-50 border-orange-200',
+            'aguardando_terceiro'   => 'text-amber-500 bg-amber-50 border-amber-200',
+
+            'tramitacao'            => 'text-rose-600 bg-rose-50 border-rose-200',
+            'conclusao'             => 'text-green-700 bg-green-100 border-green-300',
+            'abertura'              => 'text-blue-700 bg-blue-100 border-blue-300',
+
+            default                 => 'text-gray-600 bg-gray-50 border-gray-200',
         };
     }
 }

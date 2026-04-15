@@ -314,6 +314,27 @@ class NexoAutoatendimentoController extends Controller
         return false;
     }
 
+    // =====================================================
+    // PROCESSOS ADMINISTRATIVOS (V2)
+    // =====================================================
+
+    public function processosAdministrativos(Request $request)
+    {
+        if (!$this->validarWebhook($request)) {
+            return response()->json(['erro' => 'Não autorizado'], 401);
+        }
+
+        $request->validate(['telefone' => 'required|string']);
+
+        try {
+            $resultado = $this->service->processosAdministrativos($request->telefone);
+            return response()->json($resultado);
+        } catch (\Exception $e) {
+            Log::error('Erro processosAdministrativos', ['erro' => $e->getMessage()]);
+            return response()->json(['erro' => 'Erro interno'], 500);
+        }
+    }
+
     /**
      * Desativar bot para conversa (chamado pelo flow SendPulse ao "Falar com equipe")
      * POST /api/nexo/autoatendimento/desativar-bot

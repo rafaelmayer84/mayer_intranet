@@ -27,10 +27,16 @@ class PhoneHelper
             return null;
         }
 
-        // 2. Remover prefixo internacional duplicado ou +
-        // Se começa com 5555 (duplo), remover um 55
-        if (str_starts_with($digits, '5555') && strlen($digits) > 15) {
-            $digits = substr($digits, 2);
+        // 2. Remover prefixo internacional duplicado
+        // Números BR válidos: 12-13 dígitos (55 + DDD + 8-9 dígitos)
+        // 14+ dígitos com 5555 = DDI duplicado → remover um "55"
+        while (str_starts_with($digits, '5555') && strlen($digits) >= 14) {
+            $candidate = substr($digits, 2);
+            if (str_starts_with($candidate, '55')) {
+                $digits = $candidate;
+            } else {
+                break;
+            }
         }
 
         // 3. Se começa com 0 (discagem interurbana), remover

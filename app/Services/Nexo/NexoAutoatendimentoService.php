@@ -5,25 +5,29 @@ namespace App\Services\Nexo;
 use App\Mail\NexoTicketAtribuido;
 use App\Models\NexoAutomationLog;
 use App\Models\NexoClienteValidacao;
+use App\Models\NexoPublicToken;
 use App\Models\NexoTicket;
+use App\Models\Crm\CrmAccount;
+use App\Models\Crm\CrmAdminProcess;
 use App\Models\Crm\CrmServiceRequest;
 use App\Models\Cliente;
 use App\Models\NotificationIntranet;
 use App\Models\Processo;
 use App\Models\User;
-use App\Services\OpenAI\OpenAIService;
+use App\Services\OpenAI\ClaudeService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 class NexoAutoatendimentoService
 {
-    private OpenAIService $openAIService;
+    private ClaudeService $openAIService;
     private string $dataJuriBaseUrl;
     private ?string $dataJuriToken = null;
 
-    public function __construct(OpenAIService $openAIService)
+    public function __construct(ClaudeService $openAIService)
     {
         $this->openAIService = $openAIService;
         $this->dataJuriBaseUrl = config('services.datajuri.base_url', 'https://api.datajuri.com.br');
@@ -56,6 +60,18 @@ class NexoAutoatendimentoService
             'total_titulos' => $resultado['total'] ?? 0,
             'fonte' => $resultado['fonte'] ?? 'desconhecida',
         ], null, $tempoMs);
+
+        // V2: gerar token público + teaser
+        if ($resultado['encontrado'] ?? false) {
+            try {
+                $payload = array_merge($resultado, ['nome_cliente' => $cliente->nome]);
+                $token = $this->gerarTokenPublico('financeiro', $cliente->id, $telefoneNormalizado, $payload);
+                $resultado['link_visual'] = $token->getUrl();
+                $resultado['teaser'] = $this->gerarTeaser('financeiro', $resultado);
+            } catch (\Throwable $e) {
+                Log::warning('NexoAutoatendimento: falha ao gerar token público financeiro', ['erro' => $e->getMessage()]);
+            }
+        }
 
         return $resultado;
     }
@@ -258,6 +274,18 @@ class NexoAutoatendimentoService
             'cliente_id' => $cliente->id,
             'total_compromissos' => $resultado['total'] ?? 0,
         ], null, $tempoMs);
+
+        // V2: gerar token público + teaser
+        if (($resultado['encontrado'] ?? '') === 'sim') {
+            try {
+                $payload = array_merge($resultado, ['nome_cliente' => $cliente->nome]);
+                $token = $this->gerarTokenPublico('compromissos', $cliente->id, $telefoneNormalizado, $payload);
+                $resultado['link_visual'] = $token->getUrl();
+                $resultado['teaser'] = $this->gerarTeaser('compromissos', $resultado);
+            } catch (\Throwable $e) {
+                Log::warning('NexoAutoatendimento: falha ao gerar token público compromissos', ['erro' => $e->getMessage()]);
+            }
+        }
 
         return $resultado;
     }
@@ -511,22 +539,41 @@ class NexoAutoatendimentoService
 
         $tickets = $query->limit($limit)->get();
 
-        return [
-            'total' => $tickets->count(),
-            'tickets' => $tickets->map(function ($t) {
-                $nomeCliente = $t->ai_triage['nome_cliente'] ?? '(Sem identificação)';
-                return [
-                    'id' => $t->id,
-                    'protocolo' => $t->protocolo,
-                    'nome_cliente' => $nomeCliente,
-                    'telefone' => $t->phone_contato,
-                    'assunto' => $t->subject,
-                    'mensagem' => $t->description,
-                    'status' => $t->status,
-                    'data' => $t->created_at->format('d/m/Y H:i'),
-                ];
-            })->toArray(),
+        $listaTickets = $tickets->map(function ($t) {
+            $nomeCliente = $t->ai_triage['nome_cliente'] ?? '(Sem identificação)';
+            return [
+                'id'           => $t->id,
+                'protocolo'    => $t->protocolo,
+                'nome_cliente' => $nomeCliente,
+                'telefone'     => $t->phone_contato,
+                'assunto'      => $t->subject,
+                'mensagem'     => $t->description,
+                'status'       => $t->status,
+                'data'         => $t->created_at->format('d/m/Y H:i'),
+            ];
+        })->toArray();
+
+        $resultado = [
+            'total'   => $tickets->count(),
+            'tickets' => $listaTickets,
         ];
+
+        // V2: gerar token público + teaser (apenas se chamado com telefone específico)
+        if ($telefone && $tickets->isNotEmpty()) {
+            try {
+                $telefoneNormalizado = $this->normalizarTelefone($telefone);
+                $clienteAuth = $this->obterClienteAutenticado($telefoneNormalizado);
+                $clienteId = isset($clienteAuth['erro']) ? null : $clienteAuth->id;
+                $payload = array_merge($resultado, ['nome_cliente' => (!isset($clienteAuth['erro']) ? $clienteAuth->nome : null)]);
+                $token = $this->gerarTokenPublico('tickets', $clienteId, $telefoneNormalizado, $payload);
+                $resultado['link_visual'] = $token->getUrl();
+                $resultado['teaser'] = $this->gerarTeaser('tickets', $resultado);
+            } catch (\Throwable $e) {
+                Log::warning('NexoAutoatendimento: falha ao gerar token público tickets', ['erro' => $e->getMessage()]);
+            }
+        }
+
+        return $resultado;
     }
 
     // =====================================================
@@ -572,6 +619,30 @@ class NexoAutoatendimentoService
             'pasta' => $processo->pasta,
         ], $resultado['resumo'] ?? null, $tempoMs);
 
+        // V2: gerar token público com snapshot enriquecido para a página visual
+        if (!isset($resultado['erro'])) {
+            try {
+                $payload = array_merge($resultado, [
+                    'nome_cliente'         => $cliente->nome,
+                    'processo_status'      => $processo->status ?? '',
+                    'tipo_acao'            => $processo->tipo_acao ?? '',
+                    'area_atuacao'         => $processo->area_atuacao ?? '',
+                    'advogado_responsavel' => $processo->advogado_responsavel ?? '',
+                    'andamentos'           => $resultado['_andamentos'] ?? [],
+                ]);
+                // Remover campo interno do retorno V1
+                unset($payload['_andamentos'], $resultado['_andamentos']);
+
+                $token = $this->gerarTokenPublico('processo-judicial', $cliente->id, $telefoneNormalizado, $payload);
+                $resultado['link_visual'] = $token->getUrl();
+                $resultado['teaser'] = $this->gerarTeaser('processo-judicial', $resultado);
+                // Embutir URL direto no resumo — o flow SendPulse exibe só o campo `resumo`
+                $resultado['resumo'] = ($resultado['resumo'] ?? '') . "\n\n🔗 " . $resultado['link_visual'];
+            } catch (\Throwable $e) {
+                Log::warning('NexoAutoatendimento: falha ao gerar token público processo-judicial', ['erro' => $e->getMessage()]);
+            }
+        }
+
         return $resultado;
     }
 
@@ -600,12 +671,13 @@ class NexoAutoatendimentoService
 
         if (empty($andamentos)) {
             return [
-                'resumo' => "Olá {$cliente->nome}! Seu processo {$processo->pasta} está ativo, mas não há movimentações recentes registradas.",
-                'processo_pasta' => $processo->pasta,
+                'resumo'          => "Olá {$cliente->nome}! Seu processo {$processo->pasta} está ativo, mas não há movimentações recentes registradas.",
+                'processo_pasta'  => $processo->pasta,
+                '_andamentos'     => [],
             ];
         }
 
-        // Chamar OpenAI com guarda LGPD
+        // Chamar Claude com guarda LGPD
         $resumo = $this->openAIService->gerarResumoLeigo(
             $andamentos,
             $processo->pasta . ' x ' . ($processo->adverso_nome ?? ''),
@@ -613,9 +685,10 @@ class NexoAutoatendimentoService
         );
 
         return [
-            'resumo' => $resumo,
-            'processo_pasta' => $processo->pasta,
+            'resumo'           => $resumo,
+            'processo_pasta'   => $processo->pasta,
             'processo_adverso' => $processo->adverso_nome ?? '',
+            '_andamentos'      => $andamentos, // campo interno — usado pelo token V2, removido do retorno V1
         ];
     }
 
@@ -765,20 +838,20 @@ class NexoAutoatendimentoService
 
         try {
             $response = \Illuminate\Support\Facades\Http::withHeaders([
-                'Authorization' => 'Bearer ' . config('services.openai.api_key'),
-                'Content-Type' => 'application/json',
-            ])->timeout(30)->post('https://api.openai.com/v1/chat/completions', [
-                'model' => config('services.openai.model', 'gpt-4o-mini'),
-                'messages' => [
-                    ['role' => 'system', 'content' => $systemPrompt],
+                'x-api-key'         => config('services.anthropic.api_key'),
+                'anthropic-version' => '2023-06-01',
+                'content-type'      => 'application/json',
+            ])->timeout(30)->post('https://api.anthropic.com/v1/messages', [
+                'model'      => config('services.anthropic.model', 'claude-sonnet-4-6'),
+                'max_tokens' => 600,
+                'system'     => $systemPrompt,
+                'messages'   => [
                     ['role' => 'user', 'content' => $pergunta],
                 ],
-                'max_tokens' => 800,
-                'temperature' => 0.4,
             ]);
 
             if ($response->successful()) {
-                $resposta = $response->json('choices.0.message.content', '');
+                $resposta = $response->json('content.0.text', '');
                 if (!empty($resposta)) {
                     return [
                         'encontrado' => true,
@@ -789,9 +862,9 @@ class NexoAutoatendimentoService
                     ];
                 }
             }
-            Log::error('ChatIA: OpenAI resposta inválida', ['status' => $response->status()]);
+            Log::error('ChatIA: Claude resposta inválida', ['status' => $response->status(), 'body' => $response->body()]);
         } catch (\Throwable $e) {
-            Log::error('ChatIA: erro OpenAI', ['erro' => $e->getMessage()]);
+            Log::error('ChatIA: erro Claude', ['erro' => $e->getMessage()]);
         }
 
         return [
@@ -943,6 +1016,133 @@ class NexoAutoatendimentoService
             'mensagem' => "Solicitação de agendamento registrada!\n\n📋 Protocolo: {$sr->protocolo}\n📌 Motivo: {$motivoLabel}\n⏰ Urgência: {$urgenciaLabel}\n🕐 Preferência: {$preferenciaLabel}\n\nNossa equipe entrará em contato para confirmar a melhor data e horário.",
             'nome_cliente' => $cliente->nome,
         ];
+    }
+
+    // =====================================================
+    // V2 — TOKEN PÚBLICO + TEASER
+    // =====================================================
+
+    public function gerarTokenPublico(string $tipo, ?int $clienteId, string $telefone, array $payload): NexoPublicToken
+    {
+        return NexoPublicToken::create([
+            'token'      => (string) Str::uuid(),
+            'tipo'       => $tipo,
+            'cliente_id' => $clienteId,
+            'telefone'   => $telefone,
+            'payload'    => $payload,
+            'expires_at' => now()->addHours(6),
+        ]);
+    }
+
+    private function gerarTeaser(string $tipo, array $resultado): string
+    {
+        return match($tipo) {
+            'financeiro' => sprintf(
+                'Você tem %d título(s) em aberto totalizando %s. Toque no link para ver o detalhamento completo.',
+                $resultado['total'] ?? 0,
+                $resultado['valor_total'] ?? 'R$ 0,00'
+            ),
+            'compromissos' => sprintf(
+                'Encontrei %d compromisso(s) nos seus processos. Toque para ver datas, horários e detalhes.',
+                $resultado['total'] ?? 0
+            ),
+            'processo-judicial' => 'Confira o status atualizado do seu processo e a linha do tempo de andamentos. Toque no link para ver.',
+            'tickets' => sprintf(
+                'Você tem %d solicitação(ões) registrada(s). Toque para acompanhar o status de cada uma.',
+                $resultado['total'] ?? 0
+            ),
+            'processo-admin' => 'Acompanhe o andamento do seu processo administrativo com todas as etapas e documentos. Toque no link.',
+            default => 'Toque no link para ver os detalhes completos.',
+        };
+    }
+
+    // =====================================================
+    // V2 — PROCESSOS ADMINISTRATIVOS
+    // =====================================================
+
+    public function processosAdministrativos(string $telefone): array
+    {
+        $inicio = microtime(true);
+        $telefoneNormalizado = $this->normalizarTelefone($telefone);
+
+        $cliente = $this->obterClienteAutenticado($telefoneNormalizado);
+        if (isset($cliente['erro'])) {
+            return $cliente;
+        }
+
+        // Localizar conta CRM
+        $crmAccount = CrmAccount::where('datajuri_pessoa_id', $cliente->datajuri_id)
+            ->orWhere('phone_e164', $telefoneNormalizado)
+            ->first();
+
+        if (!$crmAccount && $cliente->datajuri_id) {
+            // Tentativa com últimos 8 dígitos
+            $parcial = substr($telefoneNormalizado, -8);
+            $crmAccount = CrmAccount::where('phone_e164', 'LIKE', '%' . $parcial)
+                ->where('lifecycle', '!=', 'arquivado')
+                ->first();
+        }
+
+        if (!$crmAccount) {
+            return [
+                'encontrado' => false,
+                'total' => 0,
+                'mensagem' => "Olá {$cliente->nome}! Não encontrei processos administrativos vinculados ao seu cadastro.",
+            ];
+        }
+
+        $processos = CrmAdminProcess::where('account_id', $crmAccount->id)
+            ->whereNotIn('status', ['rascunho', 'cancelado'])
+            ->orderByDesc('created_at')
+            ->get();
+
+        if ($processos->isEmpty()) {
+            return [
+                'encontrado' => false,
+                'total' => 0,
+                'mensagem' => "Olá {$cliente->nome}! Não há processos administrativos ativos para o seu cadastro.",
+            ];
+        }
+
+        $lista = $processos->map(function ($p) use ($telefoneNormalizado, $cliente) {
+            $token = $this->gerarTokenPublico('processo-admin', $cliente->id, $telefoneNormalizado, [
+                'processo_id' => $p->id,
+                'protocolo'   => $p->protocolo,
+            ]);
+            return [
+                'protocolo'   => $p->protocolo,
+                'titulo'      => $p->titulo,
+                'tipo'        => $p->tipoLabel(),
+                'status'      => $p->statusLabel(),
+                'link_visual' => $token->getUrl(),
+                'teaser'      => $this->gerarTeaser('processo-admin', []),
+            ];
+        })->toArray();
+
+        $total = count($lista);
+        $resultado = [
+            'encontrado' => true,
+            'total'      => $total,
+            'mensagem'   => "Olá {$cliente->nome}! Encontrei {$total} processo(s) administrativo(s):",
+            'processos'  => $lista,
+        ];
+
+        // Flat para variáveis SendPulse (máximo 3)
+        foreach (array_slice($lista, 0, 3) as $i => $p) {
+            $n = $i + 1;
+            $resultado["proc{$n}_protocolo"] = $p['protocolo'];
+            $resultado["proc{$n}_titulo"]    = $p['titulo'];
+            $resultado["proc{$n}_status"]    = $p['status'];
+            $resultado["proc{$n}_link"]      = $p['link_visual'];
+        }
+
+        $tempoMs = (int)((microtime(true) - $inicio) * 1000);
+        $this->logarAcao($telefoneNormalizado, 'consulta_admin_processos', [
+            'cliente_id' => $cliente->id,
+            'total'      => $total,
+        ], null, $tempoMs);
+
+        return $resultado;
     }
 
     // =====================================================
@@ -1142,23 +1342,58 @@ class NexoAutoatendimentoService
         }
 
         // Buscar cliente por telefone na tabela clientes
+        $viaFallback = false;
+
         $cliente = Cliente::where('telefone_normalizado', $telefoneNormalizado)->first();
+
         if (!$cliente) {
+            // Últimos 10 dígitos — busca parcial para cobrir variações de DDI
             $ultimos10 = substr($telefoneNormalizado, -10);
             $cliente = Cliente::where('telefone_normalizado', 'LIKE', '%' . $ultimos10)->first();
+            if ($cliente) $viaFallback = true;
         }
 
-        // Fallback: buscar por celular
+        // Fallback: celular (campo raw, com máscara)
+        // Testa os últimos 8 dígitos para cobrir a transição 8→9 dígitos
         if (!$cliente) {
-            $cliente = Cliente::where('celular', 'LIKE', '%' . $ultimos10)->first();
+            $ultimos8 = substr($telefoneNormalizado, -8);
+            $cliente = Cliente::whereRaw(
+                "REPLACE(REPLACE(REPLACE(REPLACE(celular,'(',''),')',''),'-',''),' ','') LIKE ?",
+                ['%' . $ultimos8]
+            )->first();
+            if ($cliente) $viaFallback = true;
         }
 
-        // Fallback: buscar por telefone fixo
+        // Fallback: telefone principal (campo raw)
         if (!$cliente) {
-            $cliente = Cliente::where('telefone', 'LIKE', '%' . $ultimos10)->first();
+            $cliente = Cliente::whereRaw(
+                "REPLACE(REPLACE(REPLACE(REPLACE(telefone,'(',''),')',''),'-',''),' ','') LIKE ?",
+                ['%' . $ultimos8]
+            )->first();
+            if ($cliente) $viaFallback = true;
         }
 
-        // Fallback: buscar por CPF/CNPJ via variavel do SendPulse
+        // Fallback: wa_conversations vinculada (mesma lógica do NexoConsultaService)
+        if (!$cliente) {
+            $conv = \DB::table('wa_conversations')
+                ->where('phone', $telefoneNormalizado)
+                ->whereNotNull('linked_cliente_id')
+                ->orderByDesc('updated_at')
+                ->first();
+            if ($conv) {
+                $cliente = Cliente::find($conv->linked_cliente_id);
+                if ($cliente) {
+                    $viaFallback = true;
+                    \Log::info('Nexo: cliente encontrado via wa_conversations', [
+                        'telefone' => $telefoneNormalizado,
+                        'conv_id'  => $conv->id,
+                        'cliente_id' => $cliente->id,
+                    ]);
+                }
+            }
+        }
+
+        // Fallback: CPF/CNPJ via variável do SendPulse
         if (!$cliente) {
             try {
                 $sp = app(\App\Services\SendPulseWhatsAppService::class);
@@ -1168,7 +1403,6 @@ class NexoAutoatendimentoService
                     $info = $sp->getContactInfo($contactId);
                     $vars = $info['data']['variables'] ?? $info['variables'] ?? [];
 
-                    // Tentar por CPF/CNPJ
                     $cpfInformado = $vars['cpf'] ?? $vars['CPF'] ?? $vars['cpf_cnpj'] ?? $vars['documento'] ?? '';
                     if (!empty($cpfInformado)) {
                         $cpfLimpo = preg_replace('/\D/', '', $cpfInformado);
@@ -1179,16 +1413,17 @@ class NexoAutoatendimentoService
                               ->orWhere('cpf_cnpj', 'LIKE', '%' . $cpfLimpo . '%');
                         })->first();
                         if ($cliente) {
+                            $viaFallback = true;
                             \Log::info('Nexo fallback: cliente encontrado por CPF/CNPJ', ['cpf' => $cpfLimpo, 'cliente_id' => $cliente->id]);
                         }
                     }
 
-                    // Tentar por nome completo
                     if (!$cliente) {
                         $nomeInformado = $vars['nomecompleto'] ?? $vars['Nomecompleto'] ?? $vars['nome'] ?? '';
                         if (!empty($nomeInformado) && strlen($nomeInformado) >= 5) {
                             $cliente = Cliente::where('nome', 'LIKE', '%' . trim($nomeInformado) . '%')->first();
                             if ($cliente) {
+                                $viaFallback = true;
                                 \Log::info('Nexo fallback: cliente encontrado por nome', ['nome' => $nomeInformado, 'cliente_id' => $cliente->id]);
                             }
                         }
@@ -1204,11 +1439,24 @@ class NexoAutoatendimentoService
             return ['erro' => 'Nao conseguimos localizar seu cadastro. Por favor, entre em contato com nosso escritorio pelo telefone (47) 3349-7979 para atualizar seus dados.'];
         }
 
-        // Atualizar telefone do cliente se encontrado por fallback
-        if ($cliente->telefone_normalizado !== $telefoneNormalizado) {
-            \Log::info('Nexo: atualizando telefone do cliente via fallback', [
-                'cliente_id' => $cliente->id, 'antigo' => $cliente->telefone_normalizado, 'novo' => $telefoneNormalizado
+        // Quando encontrado via fallback com número diferente do cadastrado:
+        // atualiza o celular para garantir que próximas buscas funcionem direto.
+        if ($viaFallback && $cliente->telefone_normalizado !== $telefoneNormalizado) {
+            $ddd    = substr($telefoneNormalizado, 2, 2);
+            $numero = substr($telefoneNormalizado, 4);
+            $celFormatado = strlen($numero) === 9
+                ? "({$ddd}) " . substr($numero, 0, 5) . '-' . substr($numero, 5)
+                : "({$ddd}) " . substr($numero, 0, 4) . '-' . substr($numero, 4);
+
+            \DB::table('clientes')->where('id', $cliente->id)
+                ->update(['celular' => $celFormatado, 'updated_at' => now()]);
+
+            \Log::info('Nexo: celular do cliente atualizado via fallback WA', [
+                'cliente_id' => $cliente->id,
+                'celular_novo' => $celFormatado,
             ]);
+
+            $cliente->celular = $celFormatado;
         }
 
         return $cliente;
@@ -1216,7 +1464,7 @@ class NexoAutoatendimentoService
 
     private function normalizarTelefone(string $telefone): string
     {
-        return preg_replace('/\D/', '', $telefone);
+        return \App\Helpers\PhoneHelper::normalize($telefone) ?? preg_replace('/\D/', '', $telefone);
     }
 
     /**
@@ -1370,62 +1618,19 @@ class NexoAutoatendimentoService
         }
 
         try {
-            $apiKey = config('services.openai.api_key');
-            $model = config('services.openai.model', 'gpt-5-mini');
+            $resumo = $this->openAIService->resumirContexto($contextoTexto);
 
-            $ch = curl_init('https://api.openai.com/v1/chat/completions');
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_POST => true,
-                CURLOPT_TIMEOUT => 10,
-                CURLOPT_HTTPHEADER => [
-                    'Content-Type: application/json',
-                    'Authorization: Bearer ' . $apiKey,
-                ],
-                CURLOPT_POSTFIELDS => json_encode([
-                    'model' => $model,
-                    'max_tokens' => 150,
-                    'temperature' => 0.3,
-                    'messages' => [
-                        [
-                            'role' => 'system',
-                            'content' => 'Voce e assistente de um escritorio de advocacia. Resuma em NO MAXIMO 1 frase curta (ate 150 caracteres) qual e o assunto/problema do cliente baseado nas mensagens abaixo. Seja direto e objetivo. Use terceira pessoa. Exemplo: "Duvida sobre andamento do processo trabalhista contra empresa X"'
-                        ],
-                        [
-                            'role' => 'user',
-                            'content' => "Mensagens recentes do cliente:\n" . $contextoTexto
-                        ],
-                    ],
-                ]),
+            \Illuminate\Support\Facades\Log::info('NEXO-TICKET: contexto resumido', [
+                'telefone' => $telefoneNormalizado,
+                'msgs'     => isset($mensagens) ? $mensagens->count() : 0,
+                'resumo'   => $resumo,
             ]);
 
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-
-            if ($httpCode === 200) {
-                $data = json_decode($response, true);
-                $resumo = trim($data['choices'][0]['message']['content'] ?? '');
-                $resumo = trim($resumo, '"\'');
-                $resumo = mb_substr($resumo, 0, 200);
-
-                \Illuminate\Support\Facades\Log::info('NEXO-TICKET: contexto resumido', [
-                    'telefone' => $telefoneNormalizado,
-                    'msgs' => isset($mensagens) ? $mensagens->count() : 0,
-                    'resumo' => $resumo,
-                ]);
-
-                return [
-                    'sucesso' => true,
-                    'ticket_resumo' => $resumo,
-                    'fonte' => 'ia',
-                ];
-            }
-
-            \Illuminate\Support\Facades\Log::warning('NEXO-TICKET: OpenAI falhou', [
-                'http_code' => $httpCode,
-            ]);
-
+            return [
+                'sucesso'      => true,
+                'ticket_resumo' => $resumo,
+                'fonte'        => 'ia',
+            ];
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('NEXO-TICKET: erro ao resumir', [
                 'msg' => $e->getMessage(),

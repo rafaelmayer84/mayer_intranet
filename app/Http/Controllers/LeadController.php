@@ -19,7 +19,7 @@ class LeadController extends Controller
     }
 
     /**
-     * Dashboard principal da Central de Leads — Marketing Jurídico
+     * Dashboard principal da Central de Leads ï¿½ Marketing Jurï¿½dico
      */
     public function index(Request $request): View
     {
@@ -32,13 +32,12 @@ class LeadController extends Controller
         $filtroPotencial = $request->get('potencial', 'todos');
         $busca = trim($request->get('busca', ''));
 
-        // Query base com filtros
-        $query = Lead::query()
+        // Query base com filtros (exclui arquivados e convertidos via scopeAtivo)
+        $query = Lead::ativo()
             ->area($filtroArea)
             ->cidade($filtroCidade)
             ->periodo($filtroPeriodo)
-            ->intencao($filtroIntencao)
-            ->where("status", "!=", "arquivado");
+            ->intencao($filtroIntencao);
 
         // Busca textual
         if ($busca !== '') {
@@ -60,7 +59,7 @@ class LeadController extends Controller
             $query->where('potencial_honorarios', $filtroPotencial);
         }
 
-        // ========== ESTATÍSTICAS GERAIS ==========
+        // ========== ESTATï¿½STICAS GERAIS ==========
         $totalLeads = $query->count();
         $leadsHoje = Lead::whereDate('data_entrada', today())->count();
         $leadsSemana = Lead::where('data_entrada', '>=', now()->subDays(7))->count();
@@ -69,16 +68,16 @@ class LeadController extends Controller
         // Taxas
         $leadsSim = (clone $query)->where('intencao_contratar', 'sim')->count();
         $leadsTalvez = (clone $query)->where('intencao_contratar', 'talvez')->count();
-        $leadsNao = (clone $query)->where('intencao_contratar', 'não')->count();
+        $leadsNao = (clone $query)->where('intencao_contratar', 'nï¿½o')->count();
         $taxaConversao = $totalLeads > 0 ? round(($leadsSim / $totalLeads) * 100, 1) : 0;
         $taxaInteresse = $totalLeads > 0 ? round((($leadsSim + $leadsTalvez) / $totalLeads) * 100, 1) : 0;
 
         // Leads com erro
         $leadsComErro = Lead::whereNotNull('erro_processamento')->count();
 
-        // ========== DADOS PARA GRÁFICOS ==========
+        // ========== DADOS PARA GRï¿½FICOS ==========
 
-        // Por Área Jurídica
+        // Por ï¿½rea Jurï¿½dica
         $dadosArea = DB::table('leads')
             ->select('area_interesse', DB::raw('COUNT(*) as total'))
             ->whereNotNull('area_interesse')
@@ -92,13 +91,13 @@ class LeadController extends Controller
             ->select('cidade', DB::raw('COUNT(*) as total'))
             ->whereNotNull('cidade')
             ->where('cidade', '!=', '')
-            ->where('cidade', '!=', 'não informado')
+            ->where('cidade', '!=', 'nï¿½o informado')
             ->groupBy('cidade')
             ->orderByDesc('total')
             ->limit(10)
             ->get();
 
-        // Funil de Intenção
+        // Funil de Intenï¿½ï¿½o
         $dadosIntencao = DB::table('leads')
             ->select('intencao_contratar', DB::raw('COUNT(*) as total'))
             ->whereNotNull('intencao_contratar')
@@ -115,7 +114,7 @@ class LeadController extends Controller
             ->orderByDesc('total')
             ->get();
 
-        // Potencial de Honorários
+        // Potencial de Honorï¿½rios
         $dadosPotencial = DB::table('leads')
             ->select('potencial_honorarios', DB::raw('COUNT(*) as total'))
             ->whereNotNull('potencial_honorarios')
@@ -123,7 +122,7 @@ class LeadController extends Controller
             ->groupBy('potencial_honorarios')
             ->get();
 
-        // Urgência
+        // Urgï¿½ncia
         $dadosUrgencia = DB::table('leads')
             ->select('urgencia', DB::raw('COUNT(*) as total'))
             ->whereNotNull('urgencia')
@@ -131,7 +130,7 @@ class LeadController extends Controller
             ->groupBy('urgencia')
             ->get();
 
-        // Por Sub-área (top 10)
+        // Por Sub-ï¿½rea (top 10)
         $dadosSubArea = DB::table('leads')
             ->select('sub_area', DB::raw('COUNT(*) as total'))
             ->whereNotNull('sub_area')
@@ -170,7 +169,7 @@ class LeadController extends Controller
         arsort($contagemPalavras);
         $topPalavras = array_slice($contagemPalavras, 0, 25, true);
 
-        // Timeline (últimos 30 dias)
+        // Timeline (ï¿½ltimos 30 dias)
         $dadosTimeline = DB::table('leads')
             ->select(DB::raw('DATE(data_entrada) as data'), DB::raw('COUNT(*) as total'))
             ->where('data_entrada', '>=', now()->subDays(30))
@@ -178,7 +177,7 @@ class LeadController extends Controller
             ->orderBy('data')
             ->get();
 
-        // Perfil Socioeconômico
+        // Perfil Socioeconï¿½mico
         $dadosPerfil = DB::table('leads')
             ->select('perfil_socioeconomico', DB::raw('COUNT(*) as total'))
             ->whereNotNull('perfil_socioeconomico')
@@ -186,14 +185,14 @@ class LeadController extends Controller
             ->groupBy('perfil_socioeconomico')
             ->get();
 
-        // Leads recentes (últimos 20)
+        // Leads recentes (ï¿½ltimos 20)
         // Ordenacao dinamica
         $sortField = $request->get('sort', 'data_entrada');
         $sortOrder = $request->get('order', 'desc');
         $allowedSorts = ['id','nome','area_interesse','cidade','intencao_contratar','potencial_honorarios','urgencia','origem_canal','data_entrada'];
         $leads = (clone $query)->orderBy($sortField, $sortOrder)->paginate(25)->appends($request->query());
 
-        // Opções para filtros
+        // Opï¿½ï¿½es para filtros
         $areas = Lead::whereNotNull('area_interesse')
             ->where('area_interesse', '!=', '')
             ->distinct()
@@ -202,7 +201,7 @@ class LeadController extends Controller
 
         $cidades = Lead::whereNotNull('cidade')
             ->where('cidade', '!=', '')
-            ->where('cidade', '!=', 'não informado')
+            ->where('cidade', '!=', 'nï¿½o informado')
             ->distinct()
             ->orderBy('cidade')
             ->pluck('cidade');
@@ -227,7 +226,7 @@ class LeadController extends Controller
     }
 
     /**
-     * Detalhes de um lead específico
+     * Detalhes de um lead especï¿½fico
      */
     public function show(Lead $lead): View
     {
@@ -240,8 +239,8 @@ class LeadController extends Controller
      */
     public function webhook(Request $request): JsonResponse
     {
-        // ---- INÍCIO BLOCO NEXO v1.2 ----
-        // Detectar se é incoming_message do SendPulse para o Nexo
+        // ---- INï¿½CIO BLOCO NEXO v1.2 ----
+        // Detectar se ï¿½ incoming_message do SendPulse para o Nexo
         $rawPayload = $request->all();
         $event = is_array($rawPayload) && isset($rawPayload[0]) ? $rawPayload[0] : $rawPayload;
 
@@ -285,7 +284,7 @@ class LeadController extends Controller
                     'line'  => $e->getLine(),
                 ]);
             }
-            // NÃO retornar aqui — deixar o fluxo de leads continuar
+            // Nï¿½O retornar aqui ï¿½ deixar o fluxo de leads continuar
         }
         // ---- FIM BLOCO NEXO v1.2 ----
 
@@ -381,7 +380,7 @@ class LeadController extends Controller
     }
 
     /**
-     * Estatísticas para API
+     * Estatï¿½sticas para API
      */
     public function stats(): JsonResponse
     {
@@ -437,7 +436,7 @@ class LeadController extends Controller
 
             switch ($tipo) {
                 case 'palavras_chave':
-                    fputcsv($file, ['Palavra-chave', 'Frequência', 'Área Predominante'], ';');
+                    fputcsv($file, ['Palavra-chave', 'Frequï¿½ncia', 'ï¿½rea Predominante'], ';');
                     $keywords = [];
                     $blacklist = ['lead', 'leads', 'migrado', 'legacy', 'sistema', 'anterior', 'ads', 'teste'];
                     foreach ($leads as $lead) {
@@ -465,7 +464,7 @@ class LeadController extends Controller
                     break;
 
                 case 'gclid':
-                    fputcsv($file, ['Nome', 'Telefone', 'GCLID', 'Área', 'Cidade', 'Intenção', 'Data'], ';');
+                    fputcsv($file, ['Nome', 'Telefone', 'GCLID', 'ï¿½rea', 'Cidade', 'Intenï¿½ï¿½o', 'Data'], ';');
                     foreach ($leads->where('gclid', '!=', null)->where('gclid', '!=', '') as $lead) {
                         fputcsv($file, [
                             $lead->nome, $lead->telefone, $lead->gclid,
@@ -477,11 +476,11 @@ class LeadController extends Controller
 
                 default: // completo
                     fputcsv($file, [
-                        'ID', 'Nome', 'Telefone', 'Cidade', 'Área Jurídica', 'Sub-área',
-                        'Resumo da Demanda', 'Palavras-chave', 'Intenção de Contratar',
-                        'Justificativa', 'Urgência', 'Complexidade', 'Potencial Honorários',
-                        'Perfil Socioeconômico', 'Gatilho Emocional', 'Objeções',
-                        'Origem Canal', 'GCLID', 'Status', 'Data Entrada', 'Data Criação'
+                        'ID', 'Nome', 'Telefone', 'Cidade', 'ï¿½rea Jurï¿½dica', 'Sub-ï¿½rea',
+                        'Resumo da Demanda', 'Palavras-chave', 'Intenï¿½ï¿½o de Contratar',
+                        'Justificativa', 'Urgï¿½ncia', 'Complexidade', 'Potencial Honorï¿½rios',
+                        'Perfil Socioeconï¿½mico', 'Gatilho Emocional', 'Objeï¿½ï¿½es',
+                        'Origem Canal', 'GCLID', 'Status', 'Data Entrada', 'Data Criaï¿½ï¿½o'
                     ], ';');
                     foreach ($leads as $lead) {
                         fputcsv($file, [

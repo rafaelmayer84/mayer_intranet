@@ -180,20 +180,64 @@ class CrmAdminProcess extends Model
     public function tipoLabel(): string
     {
         return match($this->tipo) {
-            'transferencia_imovel'   => 'Transferência de Imóvel',
-            'inventario_extrajudicial'=> 'Inventário Extrajudicial',
-            'divorcio_extrajudicial' => 'Divórcio Extrajudicial',
-            'abertura_empresa'       => 'Abertura de Empresa',
-            'usucapiao_extrajudicial'=> 'Usucapião Extrajudicial',
-            'retificacao_registro'   => 'Retificação de Registro',
-            'dissolucao_sociedade'   => 'Dissolução de Sociedade',
-            'regularizacao_fundiaria'=> 'Regularização Fundiária',
-            'testamento'             => 'Testamento',
-            'emancipacao'            => 'Emancipação',
+            'transferencia_imovel'      => 'Transferência de Imóvel',
+            'inventario_extrajudicial'  => 'Inventário Extrajudicial',
+            'divorcio_extrajudicial'    => 'Divórcio Extrajudicial',
+            'abertura_empresa'          => 'Abertura de Empresa',
+            'usucapiao_extrajudicial'   => 'Usucapião Extrajudicial',
+            'retificacao_registro'      => 'Retificação de Registro',
+            'dissolucao_sociedade'      => 'Dissolução de Sociedade',
+            'regularizacao_fundiaria'   => 'Regularização Fundiária',
+            'testamento'                => 'Testamento',
+            'emancipacao'               => 'Emancipação',
             'reconhecimento_paternidade'=> 'Reconhecimento de Paternidade',
-            'alteracao_contratual'   => 'Alteração Contratual',
-            'outro'                  => 'Outro',
-            default                  => ucfirst(str_replace('_', ' ', $this->tipo)),
+            'alteracao_contratual'      => 'Alteração Contratual',
+            'acompanhamento_extrajudicial' => 'Acompanhamento Extrajudicial',
+            'consultoria_assessoria'    => 'Consultoria / Assessoria',
+            'outro'                     => 'Outro',
+            default                     => ucfirst(str_replace('_', ' ', $this->tipo)),
+        };
+    }
+
+    public function tipoColor(): string
+    {
+        return match($this->tipo) {
+            'transferencia_imovel'      => 'bg-purple-100 text-purple-700 border-purple-200',
+            'inventario_extrajudicial'  => 'bg-amber-100 text-amber-700 border-amber-200',
+            'divorcio_extrajudicial'    => 'bg-rose-100 text-rose-700 border-rose-200',
+            'abertura_empresa'          => 'bg-emerald-100 text-emerald-700 border-emerald-200',
+            'usucapiao_extrajudicial'   => 'bg-teal-100 text-teal-700 border-teal-200',
+            'retificacao_registro'      => 'bg-blue-100 text-blue-700 border-blue-200',
+            'dissolucao_sociedade'      => 'bg-orange-100 text-orange-700 border-orange-200',
+            'regularizacao_fundiaria'   => 'bg-lime-100 text-lime-700 border-lime-200',
+            'testamento'                => 'bg-violet-100 text-violet-700 border-violet-200',
+            'emancipacao'               => 'bg-cyan-100 text-cyan-700 border-cyan-200',
+            'reconhecimento_paternidade'=> 'bg-sky-100 text-sky-700 border-sky-200',
+            'alteracao_contratual'         => 'bg-indigo-100 text-indigo-700 border-indigo-200',
+            'acompanhamento_extrajudicial' => 'bg-red-100 text-red-700 border-red-200',
+            'consultoria_assessoria'       => 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200',
+            default                        => 'bg-gray-100 text-gray-600 border-gray-200',
+        };
+    }
+
+    public function tipoIcon(): string
+    {
+        return match($this->tipo) {
+            'transferencia_imovel'      => '🏠',
+            'inventario_extrajudicial'  => '📋',
+            'divorcio_extrajudicial'    => '⚖️',
+            'abertura_empresa'          => '🏢',
+            'usucapiao_extrajudicial'   => '🌍',
+            'retificacao_registro'      => '📝',
+            'dissolucao_sociedade'      => '🤝',
+            'regularizacao_fundiaria'   => '🌱',
+            'testamento'                => '📜',
+            'emancipacao'               => '🎓',
+            'reconhecimento_paternidade'=> '👨‍👧',
+            'alteracao_contratual'         => '📃',
+            'acompanhamento_extrajudicial' => '🏛️',
+            'consultoria_assessoria'       => '💼',
+            default                        => '📂',
         };
     }
 }

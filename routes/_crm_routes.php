@@ -55,6 +55,7 @@ Route::middleware(['auth','modulo:operacional.crm,visualizar'])->prefix('crm')->
     // Account — criação manual (admin)
     Route::get('/accounts/create', [CrmAccountController::class, 'create'])->name('accounts.create');
     Route::post('/accounts', [CrmAccountController::class, 'store'])->name('accounts.store');
+    Route::get('/accounts/search', [CrmAccountController::class, 'search'])->name('accounts.search');
 
     // Account 360
     Route::get('/accounts/{id}', [CrmAccountController::class, 'show'])->name('accounts.show');
@@ -98,6 +99,7 @@ Route::middleware(['auth','modulo:operacional.crm,visualizar'])->prefix('crm')->
         Route::get('/criar',                 [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'create'])->name('create');
         Route::post('/',                     [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'store'])->name('store');
         Route::get('/api/template/{tipo}',   [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'getTemplate'])->name('template');
+        Route::post('/api/checklist-ia',     [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'checklistIa'])->name('checklist-ia');
         Route::get('/{id}',                  [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'show'])->name('show');
         Route::get('/{id}/editar',           [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'edit'])->name('edit');
         Route::put('/{id}',                  [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'update'])->name('update');
@@ -105,7 +107,9 @@ Route::middleware(['auth','modulo:operacional.crm,visualizar'])->prefix('crm')->
         Route::post('/{id}/ato',             [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'storeAto'])->name('store-ato');
         Route::post('/{id}/tramitar',        [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'tramitar'])->name('tramitar');
         Route::post('/{id}/etapas/{stepId}', [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'updateStep'])->name('update-step');
-        Route::post('/{id}/checklist/{itemId}', [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'updateChecklist'])->name('update-checklist');
+        Route::post('/{id}/checklist/import-docx', [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'importChecklistDocx'])->name('import-checklist-docx');
+        Route::post('/{id}/checklist',             [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'storeChecklistItem'])->name('store-checklist-item');
+        Route::post('/{id}/checklist/{itemId}',    [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'updateChecklist'])->name('update-checklist');
     });
 
     // ── Pulso do Cliente ──

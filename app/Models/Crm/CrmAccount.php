@@ -16,13 +16,15 @@ class CrmAccount extends Model
         'phone_e164', 'owner_user_id', 'lifecycle', 'health_score',
         'last_touch_at', 'next_touch_at', 'tags', 'notes',
         'segment', 'segment_summary', 'segment_cached_at',
+        'profissao', 'data_nascimento', 'endereco_cidade', 'endereco_estado',
     ];
 
     protected $casts = [
-        'health_score'   => 'integer',
-        'last_touch_at'  => 'datetime',
-        'next_touch_at'       => 'datetime',
-        'segment_cached_at'   => 'datetime',
+        'health_score'      => 'integer',
+        'last_touch_at'     => 'datetime',
+        'next_touch_at'     => 'datetime',
+        'segment_cached_at' => 'datetime',
+        'data_nascimento'   => 'date',
     ];
 
     // --- Relationships ---

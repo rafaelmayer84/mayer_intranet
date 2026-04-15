@@ -630,7 +630,9 @@ class SendPulseWhatsAppService
      */
     public function reativarAutomacao(string $contactId): bool
     {
+        // Resetar AMBAS as variáveis que pausarAutomacao seta
         $this->setContactVariable($contactId, 'atendimento_humano', 'nao');
+        $this->setContactVariable($contactId, 'sessao_ativa', 'nao');
         $result = $this->closeChat($contactId);
         return $result['success'] ?? false;
     }

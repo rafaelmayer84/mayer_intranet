@@ -255,13 +255,6 @@ class NexoAtendimentoController extends Controller
         $cid = $conversation->id;
         $sinceId = (int) $request->input('since_id', 0);
 
-        // Se a conversa está fechada mas o usuário está ativamente visualizando,
-        // reabrir para permitir sync (o usuário quer interagir)
-        if ($conversation->status === 'closed') {
-            $conversation->update(['status' => 'open']);
-            \Log::info('NEXO: conversa reaberta por poll ativo', ['conv_id' => $cid]);
-        }
-
         // Sync leve: a cada 30s, captura mensagens outgoing do bot
         // Não bloqueia se falhar — serve dados locais de qualquer forma
         $syncKey = "nexo_light_sync_{$cid}";
@@ -812,7 +805,7 @@ class NexoAtendimentoController extends Controller
             'tipo' => $c->tipo ?? 'PF', 'telefone' => $c->telefone ?? '-',
         ]);
 
-        $leadQuery = Lead::select('id', 'nome', 'telefone', 'email', 'area_interesse', 'status');
+        $leadQuery = Lead::ativo()->select('id', 'nome', 'telefone', 'email', 'area_interesse', 'status');
         if ($isNumeric && strlen($q) <= 6) {
             $leadQuery->where('id', $q);
         } else {

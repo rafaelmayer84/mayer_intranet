@@ -312,7 +312,7 @@ class HomeDashboardService
         try {
             return [
                 'clientes'      => DB::table('clientes')->count(),
-                'processos'     => DB::table('processos')->where('status', 'Em andamento')->count(),
+                'processos'     => DB::table('processos')->where('status', 'Ativo')->count(),
                 'oportunidades' => DB::table('crm_opportunities')->count(),
                 'leads'         => DB::table('leads')->count(),
             ];

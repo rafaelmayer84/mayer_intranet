@@ -44,3 +44,21 @@ storage/logs/*
 !storage/logs/.gitkeep
 *.bak_*
 patches/
+
+# Uploads e arquivos gerados em runtime
+storage/app/public/nexo/
+storage/app/public/chamados/
+storage/app/public/justus/
+storage/app/public/crm/
+storage/app/private/
+storage/imports/
+storage/app/docs/
+storage/app/*.json
+storage/app/siric_*.json
+storage/app/sipex_*.json
+
+# Logs de erros do servidor
+error_log
+
+# Claude Code (memória local)
+.claude/

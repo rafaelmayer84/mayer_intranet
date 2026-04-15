@@ -56,6 +56,12 @@ Schedule::command('crm:recalcular-carteira')
     ->timezone('America/Sao_Paulo')
     ->appendOutputTo(storage_path('logs/cron-crm-carteira.log'));
 
+// ===== NEXO: Purge tokens públicos expirados =====
+Schedule::command('nexo:purge-expired-tokens')
+    ->hourly()
+    ->timezone('America/Sao_Paulo')
+    ->appendOutputTo(storage_path('logs/cron-nexo-purge-tokens.log'));
+
 // ===== NEXO: Gerenciamento de chats inativos =====
 // A cada hora: lembrete após 6h de inatividade, encerramento após 23h
 Schedule::command('nexo:close-abandoned-chats --reminder-hours=6 --close-hours=23')
@@ -273,6 +279,13 @@ Schedule::command('crm:check-deadlines')
     ->timezone('America/Sao_Paulo')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/crm-deadlines.log'));
+
+// Alertas proativos de processos administrativos (prazos, etapas atrasadas, inatividade)
+Schedule::command('admin-processes:alerts')
+    ->dailyAt('08:30')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/admin-processes-alerts.log'));
 
 // ===== PULSO DO CLIENTE =====
 // Consolidação diária — 23:00 BRT (após expediente)

@@ -135,7 +135,7 @@ PROMPT;
             );
         }
 
-        $prompt = "O cliente {$nomeCliente} solicitou um resumo simples do processo {$numeroProcesso}.\n\nUltimos andamentos:\n{$andamentosTexto}\n\nINSTRUCOES:\n1. Cumprimente pelo primeiro nome\n2. Linguagem leiga\n3. Maximo 5 linhas\n4. NUNCA prometa resultado\n5. NUNCA sugira estrategia\n6. NUNCA mencione valores\n7. NUNCA exponha CPF/RG de terceiros\n8. Finalize com Se tiver duvidas estamos a disposicao";
+        $prompt = "O cliente {$nomeCliente} solicitou um resumo do processo {$numeroProcesso}.\n\nUltimos andamentos:\n{$andamentosTexto}\n\nINSTRUCOES CRITICAS:\n- Responda em NO MAXIMO 3 frases curtas (WhatsApp tem limite)\n- Cumprimente pelo primeiro nome\n- Linguagem totalmente leiga, sem juridiques\n- NUNCA use listas numeradas, asteriscos ou markdown\n- NUNCA prometa resultado, sugira estrategia ou mencione valores\n- NUNCA exponha dados pessoais de terceiros\n- Termine com: 'Toque no link abaixo para ver todos os detalhes.'";
 
         try {
             $response = \Illuminate\Support\Facades\Http::withHeaders([
@@ -144,11 +144,11 @@ PROMPT;
             ])->timeout(30)->post($this->baseUrl . '/chat/completions', [
                 'model' => $this->model,
                 'messages' => [
-                    ['role' => 'system', 'content' => 'Voce e uma secretaria experiente do escritorio Mayer Advogados. Explique andamentos para clientes leigos. NUNCA exponha dados pessoais. NUNCA faca promessas.'],
+                    ['role' => 'system', 'content' => 'Voce e uma secretaria do escritorio Mayer Advogados. Resuma andamentos para clientes leigos em mensagens curtas de WhatsApp. Sem formatacao markdown. Sem listas. No maximo 3 frases. NUNCA faca promessas ou exponha dados pessoais.'],
                     ['role' => 'user', 'content' => $prompt]
                 ],
-                'temperature' => 0.6,
-                'max_tokens' => 400
+                'temperature' => 0.5,
+                'max_tokens' => 180
             ]);
 
             if ($response->successful()) {
@@ -160,9 +160,9 @@ PROMPT;
 
         $ultimo = $andamentos[0] ?? null;
         if (!$ultimo) {
-            return "Ola {$nomeCliente}! Seu processo {$numeroProcesso} esta ativo, mas nao encontrei movimentacoes recentes.";
+            return "Ola {$nomeCliente}! Seu processo esta ativo mas sem movimentacoes recentes. Toque no link abaixo para ver os detalhes.";
         }
-        return sprintf("Ola %s! Resumo do processo %s:\n\nUltima movimentacao em %s:\n%s\n\nSe tiver duvidas, estamos a disposicao.", $nomeCliente, $numeroProcesso, $ultimo['data'] ?? 'data nao informada', $ultimo['descricao'] ?? 'Movimentacao processual');
+        return sprintf("Ola %s! A ultima movimentacao do seu processo foi em %s. Toque no link abaixo para ver os detalhes completos.", $nomeCliente, $ultimo['data'] ?? 'data nao informada');
     }
 
 }

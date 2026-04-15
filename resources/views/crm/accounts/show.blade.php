@@ -67,6 +67,13 @@
                     </div>
                 </div>
                 <div class="flex gap-2">
+                    @if(auth()->user()->isAdmin())
+                        <button onclick="openEditModal()"
+                                class="px-3 py-2 bg-white/20 text-white rounded-lg text-sm hover:bg-white/30 backdrop-blur flex items-center gap-1.5" title="Editar dados da conta">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                            Editar
+                        </button>
+                    @endif
                     @if($commContext['has_wa'])
                         <a href="{{ route('nexo.atendimento') }}?conversation={{ $commContext['whatsapp']->id }}"
                            class="px-3 py-2 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600 flex items-center gap-1.5">
@@ -93,9 +100,14 @@
             <div><span class="text-gray-400 text-xs block">CPF/CNPJ</span><span class="text-gray-700 font-medium">{{ $cli->cpf_cnpj ?? $account->doc_digits ?? '—' }}</span></div>
             <div><span class="text-gray-400 text-xs block">Email</span><span class="text-gray-700">{{ $cli->email ?? $account->email ?? '—' }}</span></div>
             <div><span class="text-gray-400 text-xs block">Celular</span><span class="text-gray-700">{{ $cli->celular ?? '—' }}</span></div>
-            <div><span class="text-gray-400 text-xs block">Cidade/UF</span><span class="text-gray-700">{{ $cli ? trim(($cli->endereco_cidade ?? '') . '/' . ($cli->endereco_estado ?? ''), '/') : '—' }}</span></div>
-            <div><span class="text-gray-400 text-xs block">Profissão</span><span class="text-gray-700">{{ $cli->profissao ?? '—' }}</span></div>
-            <div><span class="text-gray-400 text-xs block">Nascimento</span><span class="text-gray-700">{{ $cli && $cli->data_nascimento ? \Carbon\Carbon::parse($cli->data_nascimento)->format('d/m/Y') : '—' }}</span></div>
+            @php
+                $cidadeUF = $account->endereco_cidade
+                    ? trim($account->endereco_cidade . ($account->endereco_estado ? '/' . $account->endereco_estado : ''))
+                    : ($cli ? trim(($cli->endereco_cidade ?? '') . ($cli->endereco_estado ? '/' . $cli->endereco_estado : ''), '/') : null);
+            @endphp
+            <div><span class="text-gray-400 text-xs block">Cidade/UF</span><span class="text-gray-700">{{ $cidadeUF ?: '—' }}</span></div>
+            <div><span class="text-gray-400 text-xs block">Profissão{{ $account->profissao ? ' ✎' : '' }}</span><span class="text-gray-700">{{ $account->profissao ?? $cli->profissao ?? '—' }}</span></div>
+            <div><span class="text-gray-400 text-xs block">Nascimento</span><span class="text-gray-700">{{ $account->data_nascimento ? $account->data_nascimento->format('d/m/Y') : ($cli && $cli->data_nascimento ? \Carbon\Carbon::parse($cli->data_nascimento)->format('d/m/Y') : '—') }}</span></div>
             <div><span class="text-gray-400 text-xs block">Responsável</span><span class="text-gray-700 font-medium">{{ $account->owner?->name ?? $cli->proprietario_nome ?? '—' }}</span></div>
             <div><span class="text-gray-400 text-xs block">Último Contato</span><span class="text-gray-700">{{ $account->last_touch_at ? \Carbon\Carbon::parse($account->last_touch_at)->format('d/m/Y') : '—' }}</span></div>
         </div>
@@ -244,6 +256,12 @@
                 </button>
                 <button onclick="switchTab('processos')" data-tab="processos" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
                     ⚖️ Processos <span class="ml-1 px-1.5 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600">{{ count($djContext['processos']) }}</span>
+                </button>
+                <button onclick="switchTab('proc-adm')" data-tab="proc-adm" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                    🏛️ Proc. Adm.
+                    @if($adminProcesses->count() > 0)
+                        <span class="ml-1 px-1.5 py-0.5 rounded-full text-xs {{ $adminProcesses->whereNotIn('status',['concluido','cancelado'])->count() > 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600' }}">{{ $adminProcesses->count() }}</span>
+                    @endif
                 </button>
                 <button onclick="switchTab('comunicacao')" data-tab="comunicacao" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
                     💬 Comunicação
@@ -844,6 +862,103 @@
                     @endforeach
                 </div>
             </div>
+            @endif
+        </div>
+    </div>
+
+    {{-- ================================================================== --}}
+    {{-- TAB: PROCESSOS ADMINISTRATIVOS                                   --}}
+    {{-- ================================================================== --}}
+    <div id="tab-proc-adm" class="tab-content hidden">
+        <div class="space-y-4">
+            <div class="flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-[#1B334A]">Processos Administrativos</h2>
+                <a href="{{ route('crm.admin-processes.create') }}?account_id={{ $account->id }}"
+                   class="px-3 py-1.5 bg-[#385776] text-white rounded-lg text-sm hover:bg-[#1B334A] flex items-center gap-1.5">
+                    + Novo processo
+                </a>
+            </div>
+
+            @if($adminProcesses->isEmpty())
+                <div class="bg-white rounded-lg shadow-sm border p-8 text-center">
+                    <p class="text-gray-400 text-sm">Nenhum processo administrativo cadastrado para este cliente.</p>
+                    <a href="{{ route('crm.admin-processes.create') }}?account_id={{ $account->id }}"
+                       class="mt-3 inline-block text-sm text-[#385776] hover:underline">Criar o primeiro</a>
+                </div>
+            @else
+                {{-- Cards ativos --}}
+                @php
+                    $adm_ativos    = $adminProcesses->whereNotIn('status', ['concluido','cancelado']);
+                    $adm_encerrados = $adminProcesses->whereIn('status', ['concluido','cancelado']);
+                @endphp
+
+                @foreach($adm_ativos as $ap)
+                @php
+                    $statusColors = [
+                        'rascunho'            => 'bg-gray-100 text-gray-600',
+                        'aberto'              => 'bg-blue-100 text-blue-700',
+                        'em_andamento'        => 'bg-indigo-100 text-indigo-700',
+                        'aguardando_cliente'  => 'bg-yellow-100 text-yellow-700',
+                        'aguardando_terceiro' => 'bg-orange-100 text-orange-700',
+                        'suspenso'            => 'bg-red-100 text-red-600',
+                    ];
+                    $sc = $statusColors[$ap->status] ?? 'bg-gray-100 text-gray-600';
+                @endphp
+                <div class="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow">
+                    <a href="{{ route('crm.admin-processes.show', $ap->id) }}" class="block p-5">
+                        <div class="flex items-start justify-between gap-4">
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="text-base">{{ $ap->tipoIcon() }}</span>
+                                    <span class="text-xs font-mono text-gray-400">{{ $ap->protocolo }}</span>
+                                    <span class="px-2 py-0.5 rounded-full text-xs border {{ $ap->tipoColor() }}">{{ $ap->tipoLabel() }}</span>
+                                </div>
+                                <p class="font-medium text-gray-800 truncate">{{ $ap->titulo }}</p>
+                                @if($ap->orgao_destino)
+                                    <p class="text-xs text-gray-400 mt-0.5">{{ $ap->orgao_destino }}</p>
+                                @endif
+                            </div>
+                            <div class="flex flex-col items-end gap-1.5 shrink-0">
+                                <span class="px-2.5 py-0.5 rounded-full text-xs font-medium {{ $sc }}">{{ $ap->statusLabel() }}</span>
+                                @if($ap->prazo_final)
+                                    @php $atrasado = $ap->prazo_final->isPast(); @endphp
+                                    <span class="text-xs {{ $atrasado ? 'text-red-600 font-medium' : 'text-gray-400' }}">
+                                        {{ $atrasado ? '⚠ ' : '' }}Prazo: {{ $ap->prazo_final->format('d/m/Y') }}
+                                    </span>
+                                @endif
+                                @if($ap->owner)
+                                    <span class="text-xs text-gray-400">{{ $ap->owner->name }}</span>
+                                @endif
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                @endforeach
+
+                @if($adm_encerrados->isNotEmpty())
+                <details class="group">
+                    <summary class="cursor-pointer text-sm text-gray-500 hover:text-gray-700 py-2 flex items-center gap-1">
+                        <svg class="w-4 h-4 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                        {{ $adm_encerrados->count() }} processo(s) encerrado(s)
+                    </summary>
+                    <div class="mt-2 space-y-2">
+                        @foreach($adm_encerrados as $ap)
+                        <div class="bg-gray-50 rounded-lg border border-gray-200 opacity-70 hover:opacity-100 transition-opacity">
+                            <a href="{{ route('crm.admin-processes.show', $ap->id) }}" class="block px-5 py-3">
+                                <div class="flex items-center justify-between gap-4">
+                                    <div class="flex items-center gap-2 min-w-0">
+                                        <span>{{ $ap->tipoIcon() }}</span>
+                                        <span class="text-xs font-mono text-gray-400">{{ $ap->protocolo }}</span>
+                                        <span class="font-medium text-sm text-gray-700 truncate">{{ $ap->titulo }}</span>
+                                    </div>
+                                    <span class="text-xs px-2 py-0.5 rounded-full shrink-0 {{ $ap->status === 'concluido' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500' }}">{{ $ap->statusLabel() }}</span>
+                                </div>
+                            </a>
+                        </div>
+                        @endforeach
+                    </div>
+                </details>
+                @endif
             @endif
         </div>
     </div>
@@ -1677,6 +1792,32 @@ function saveVisit(generatePdf) {
 }
 document.addEventListener('keydown', function(e) { var mv = document.getElementById('modal-visit'); if (mv && e.key === 'Escape' && !mv.classList.contains('hidden')) closeVisitModal(); });
 document.addEventListener('DOMContentLoaded', function() { var mv = document.getElementById('modal-visit'); if (mv) mv.addEventListener('click', function(e) { if (e.target === this) closeVisitModal(); }); });
+
+@if(auth()->user()->isAdmin())
+function openEditModal() { document.getElementById('modal-edit-account').classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
+function closeEditModal() { document.getElementById('modal-edit-account').classList.add('hidden'); document.body.style.overflow = ''; }
+function saveEditAccount() {
+    var form = document.getElementById('form-edit-account');
+    var data = {};
+    new FormData(form).forEach(function(v, k) { data[k] = v; });
+    var btn = document.getElementById('btn-edit-save');
+    btn.disabled = true; btn.textContent = 'Salvando...';
+    fetch('{{ route("crm.accounts.update", $account->id) }}', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
+        body: JSON.stringify(data)
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.ok) { location.reload(); }
+        else {
+            btn.disabled = false; btn.textContent = 'Salvar';
+            var msg = d.message || (d.errors ? Object.values(d.errors).flat().join('\n') : 'Erro ao salvar');
+            alert(msg);
+        }
+    }).catch(function() { btn.disabled = false; btn.textContent = 'Salvar'; alert('Erro de conexão'); });
+}
+document.addEventListener('keydown', function(e) { var m = document.getElementById('modal-edit-account'); if (m && e.key === 'Escape' && !m.classList.contains('hidden')) closeEditModal(); });
+document.addEventListener('DOMContentLoaded', function() { var m = document.getElementById('modal-edit-account'); if (m) m.addEventListener('click', function(e) { if (e.target === this) closeEditModal(); }); });
+@endif
 </script>
 
 <!-- ======= MODAL VISITA PRESENCIAL ======= -->
@@ -1739,4 +1880,135 @@ document.addEventListener('DOMContentLoaded', function() { var mv = document.get
     </div>
 </div>
 <style>@keyframes slideUp{from{opacity:0;transform:translateY(20px)scale(.97)}to{opacity:1;transform:translateY(0)scale(1)}}</style>
+
+@if(auth()->user()->isAdmin())
+<!-- ======= MODAL EDITAR CONTA (ADMIN) ======= -->
+<div id="modal-edit-account" class="hidden fixed inset-0 z-50 flex items-center justify-center" style="background:rgba(27,51,74,0.55);backdrop-filter:blur(4px)">
+    <div class="bg-white rounded-2xl w-full max-w-xl max-h-[90vh] flex flex-col shadow-2xl" style="animation:slideUp .3s ease">
+        <div class="px-6 py-4 rounded-t-2xl flex items-center justify-between" style="background:linear-gradient(135deg,#1B334A,#385776)">
+            <div>
+                <h2 class="text-white font-bold text-lg">Editar Conta</h2>
+                <p class="text-white/60 text-xs">{{ $account->name }} · Admin</p>
+            </div>
+            <button onclick="closeEditModal()" class="text-white/70 hover:text-white p-1 rounded-lg hover:bg-white/10">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div class="px-6 py-5 overflow-y-auto flex-1">
+            <form id="form-edit-account" class="space-y-4" onsubmit="return false">
+                {{-- Identidade --}}
+                <div class="text-xs font-bold uppercase tracking-wider text-[#385776] border-b-2 border-gray-100 pb-1 mb-3">Dados de identidade</div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Tipo</label>
+                        <select name="kind" class="w-full border rounded-lg px-3 py-2 text-sm">
+                            <option value="client"   {{ $account->kind === 'client'   ? 'selected' : '' }}>Cliente</option>
+                            <option value="prospect" {{ $account->kind === 'prospect' ? 'selected' : '' }}>Prospect</option>
+                        </select>
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Nome <span class="text-red-500">*</span></label>
+                        <input type="text" name="name" value="{{ $account->name }}" maxlength="255" required
+                               class="w-full border rounded-lg px-3 py-2 text-sm">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">E-mail</label>
+                        <input type="email" name="email" value="{{ $account->email }}" maxlength="255"
+                               class="w-full border rounded-lg px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Telefone (E.164)</label>
+                        <input type="text" name="phone_e164" value="{{ $account->phone_e164 }}" maxlength="30"
+                               class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="5549999999999">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">CPF / CNPJ</label>
+                        <input type="text" name="doc_digits" value="{{ $account->doc_digits }}" maxlength="20"
+                               class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="Somente dígitos">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">ID DataJuri</label>
+                        <input type="number" name="datajuri_pessoa_id" value="{{ $account->datajuri_pessoa_id }}" min="1"
+                               class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="pessoa_id no DataJuri">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Profissão</label>
+                        <input type="text" name="profissao" value="{{ $account->profissao ?? $cli->profissao ?? '' }}" maxlength="255"
+                               class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="{{ $cli->profissao ?? 'Ex: Engenheiro' }}">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Nascimento</label>
+                        <input type="date" name="data_nascimento"
+                               value="{{ $account->data_nascimento ? $account->data_nascimento->format('Y-m-d') : ($cli->data_nascimento ?? '') }}"
+                               class="w-full border rounded-lg px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Cidade</label>
+                        <input type="text" name="endereco_cidade" value="{{ $account->endereco_cidade ?? $cli->endereco_cidade ?? '' }}" maxlength="100"
+                               class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="{{ $cli->endereco_cidade ?? '' }}">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">UF</label>
+                        <input type="text" name="endereco_estado" value="{{ $account->endereco_estado ?? $cli->endereco_estado ?? '' }}" maxlength="2"
+                               class="w-full border rounded-lg px-3 py-2 text-sm" placeholder="SC">
+                    </div>
+                </div>
+
+                {{-- Gestão --}}
+                <div class="text-xs font-bold uppercase tracking-wider text-[#385776] border-b-2 border-gray-100 pb-1 mt-5 mb-3">Gestão</div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Responsável</label>
+                        <select name="owner_user_id" class="w-full border rounded-lg px-3 py-2 text-sm">
+                            <option value="">— Sem responsável —</option>
+                            @foreach($users as $u)
+                                <option value="{{ $u->id }}" {{ $account->owner_user_id == $u->id ? 'selected' : '' }}>{{ $u->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Lifecycle</label>
+                        <select name="lifecycle" class="w-full border rounded-lg px-3 py-2 text-sm">
+                            <option value="onboarding" {{ $account->lifecycle === 'onboarding' ? 'selected' : '' }}>Onboarding</option>
+                            <option value="ativo"      {{ $account->lifecycle === 'ativo'      ? 'selected' : '' }}>Ativo</option>
+                            <option value="adormecido" {{ $account->lifecycle === 'adormecido' ? 'selected' : '' }}>Adormecido</option>
+                            <option value="arquivado"  {{ $account->lifecycle === 'arquivado'  ? 'selected' : '' }}>Arquivado</option>
+                            <option value="risco"      {{ $account->lifecycle === 'risco'      ? 'selected' : '' }}>Risco</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Saúde (0–100)</label>
+                        <input type="number" name="health_score" value="{{ $account->health_score }}" min="0" max="100"
+                               class="w-full border rounded-lg px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1">Próximo contato</label>
+                        <input type="date" name="next_touch_at"
+                               value="{{ $account->next_touch_at ? $account->next_touch_at->format('Y-m-d') : '' }}"
+                               class="w-full border rounded-lg px-3 py-2 text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Tags (JSON ou texto livre)</label>
+                    <input type="text" name="tags" value="{{ $account->tags }}" maxlength="1000"
+                           class="w-full border rounded-lg px-3 py-2 text-sm" placeholder='["vip","cobrança"]'>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 mb-1">Notas internas</label>
+                    <textarea name="notes" rows="3" maxlength="5000"
+                              class="w-full border rounded-lg px-3 py-2 text-sm">{{ $account->notes }}</textarea>
+                </div>
+            </form>
+        </div>
+        <div class="px-6 py-3 border-t bg-gray-50 rounded-b-2xl flex justify-between items-center">
+            <button onclick="closeEditModal()" class="px-4 py-2 text-sm text-gray-500 border rounded-lg hover:bg-gray-100 font-medium">Cancelar</button>
+            <button onclick="saveEditAccount()" id="btn-edit-save"
+                    class="px-5 py-2 text-sm text-white font-semibold rounded-lg"
+                    style="background:linear-gradient(135deg,#1B334A,#385776)">Salvar</button>
+        </div>
+    </div>
+</div>
+@endif
 @endpush

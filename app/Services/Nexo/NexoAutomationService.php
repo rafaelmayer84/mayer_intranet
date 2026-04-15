@@ -6,17 +6,17 @@ use App\Models\NexoClienteValidacao;
 use App\Models\NexoAutomationLog;
 use App\Models\Cliente;
 use App\Models\Processo;
-use App\Services\OpenAI\OpenAIService;
+use App\Services\OpenAI\ClaudeService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class NexoAutomationService
 {
-    private OpenAIService $openAIService;
+    private ClaudeService $openAIService;
     private string $dataJuriBaseUrl;
     private ?string $dataJuriToken = null;
 
-    public function __construct(OpenAIService $openAIService)
+    public function __construct(ClaudeService $openAIService)
     {
         $this->openAIService = $openAIService;
         $this->dataJuriBaseUrl = config('services.datajuri.base_url', 'https://api.datajuri.com.br');

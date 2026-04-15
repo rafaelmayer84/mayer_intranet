@@ -1,6 +1,7 @@
 <?php
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\NexoPublicPageController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SyncController;
 use App\Http\Controllers\ConfiguracaoController;
@@ -9,6 +10,14 @@ use App\Http\Controllers\ConfiguracaoController;
 Route::get("/", function () {
     return auth()->check() ? redirect()->route("avisos.index") : redirect()->route("login");
 });
+// ============================================================================
+// PÁGINAS PÚBLICAS — token efêmero (sem auth, com throttle)
+// ============================================================================
+Route::get('/a/{token}', [NexoPublicPageController::class, 'show'])
+    ->where('token', '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
+    ->middleware('throttle:30,1')
+    ->name('nexo.public.show');
+
 // Autenticação
 Route::get("/login", [LoginController::class, "showLoginForm"])->name("login");
 Route::post("/login", [LoginController::class, "login"]);

@@ -38,6 +38,12 @@ return [
         'model' => env('OPENAI_MODEL', 'gpt-4o-mini'),
     ],
 
+    // ── Anthropic / Claude ──
+    'anthropic' => [
+        'api_key' => env('ANTHROPIC_API_KEY', env('JUSTUS_ANTHROPIC_API_KEY')),
+        'model'   => env('ANTHROPIC_MODEL', 'claude-sonnet-4-6'),
+    ],
+
     // ── SIRIC v2 - Análise de Crédito ──
     'siric' => [
         'openai_model' => env('SIRIC_OPENAI_MODEL', 'o3'),               // v2: reasoning model
@@ -55,6 +61,11 @@ return [
 
     'internal_api' => [
         'token' => env('API_INTERNAL_TOKEN'),
+    ],
+
+    // ── NEXO — Portal público do cliente ──
+    'nexo' => [
+        'whatsapp' => env('NEXO_WHATSAPP', '554738421050'),  // número do escritório (wa.me)
     ],
 
 ];

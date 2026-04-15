@@ -96,16 +96,23 @@ class NexoCloseAbandonedChats extends Command
                 $this->sp->sendMessageByPhone($phone, $msg);
                 sleep(1);
 
-                $result = $this->sp->closeChat($contactId);
+                // reativarAutomacao = setVariable(atendimento_humano=nao) + closeChat
+                // Isso garante que o fluxo do bot seja retomado na próxima mensagem
+                $ok = $this->sp->reativarAutomacao($contactId);
 
-                // Limpa o lembrete no banco (conversa encerrada)
+                // Reseta o estado local: bot assume controle novamente
                 DB::table('wa_conversations')
                     ->where('contact_id', $contactId)
-                    ->update(['lembrete_inatividade_at' => null]);
+                    ->update([
+                        'bot_ativo'               => true,
+                        'status'                  => 'closed',
+                        'assigned_user_id'        => null,
+                        'lembrete_inatividade_at' => null,
+                    ]);
 
-                if ($result['success'] ?? false) {
+                if ($ok) {
                     $closed++;
-                    $this->line("  ✅ Encerrado: {$contactName} (inativo {$inactiveHours}h)");
+                    $this->line("  ✅ Encerrado + automação reativada: {$contactName} (inativo {$inactiveHours}h)");
                     Log::info('nexo:close-abandoned — encerrado', [
                         'contact_id'   => $contactId,
                         'name'         => $contactName,
@@ -113,10 +120,9 @@ class NexoCloseAbandonedChats extends Command
                     ]);
                 } else {
                     $errors++;
-                    $this->error("  ❌ Erro ao fechar {$contactName}: " . ($result['error'] ?? 'unknown'));
-                    Log::error('nexo:close-abandoned — erro closeChat', [
+                    $this->error("  ❌ Erro ao reativar automação de {$contactName}");
+                    Log::error('nexo:close-abandoned — erro reativarAutomacao', [
                         'contact_id' => $contactId,
-                        'error'      => $result['error'] ?? 'unknown',
                     ]);
                 }
 

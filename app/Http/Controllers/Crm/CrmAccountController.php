@@ -87,6 +87,12 @@ class CrmAccountController extends Controller
             ->get();
         $srCategorias = \App\Models\Crm\CrmServiceRequest::categorias();
 
+        // Processos administrativos
+        $adminProcesses = \App\Models\Crm\CrmAdminProcess::where('account_id', $id)
+            ->with('owner')
+            ->orderByDesc('created_at')
+            ->get();
+
         // Notificações WhatsApp pendentes (Nexo) vinculadas a este cliente
         $nexoPendentes = collect();
         $clienteLocal = $djContext['cliente'] ?? null;
@@ -99,25 +105,95 @@ class CrmAccountController extends Controller
         }
 
         return view('crm.accounts.show', compact(
-            'account', 'timeline', 'djContext', 'commContext', 'users', 'segmentation', 'finSummary', 'documents', 'docCategorias', 'serviceRequests', 'srCategorias', 'nexoPendentes'
+            'account', 'timeline', 'djContext', 'commContext', 'users', 'segmentation', 'finSummary', 'documents', 'docCategorias', 'serviceRequests', 'srCategorias', 'nexoPendentes', 'adminProcesses'
         ));
     }
 
     /**
-     * Atualizar campos gerenciais do account (AJAX).
+     * Formulário de criação manual de account (admin).
+     */
+    public function create()
+    {
+        if (!auth()->user()->isAdmin()) abort(403);
+        $users = User::orderBy('name')->get(['id', 'name']);
+        return view('crm.accounts.create', compact('users'));
+    }
+
+    /**
+     * Salvar novo account criado manualmente (admin).
+     */
+    public function store(Request $request)
+    {
+        if (!auth()->user()->isAdmin()) abort(403);
+
+        $validated = $request->validate([
+            'name'               => 'required|string|max:255',
+            'kind'               => 'required|in:client,prospect',
+            'email'              => 'nullable|email|max:255',
+            'phone_e164'         => 'nullable|string|max:30',
+            'doc_digits'         => 'nullable|string|max:20',
+            'owner_user_id'      => 'nullable|exists:users,id',
+            'lifecycle'          => 'nullable|in:onboarding,ativo,adormecido,risco',
+            'datajuri_pessoa_id' => 'nullable|integer|min:1',
+            'profissao'          => 'nullable|string|max:255',
+            'data_nascimento'    => 'nullable|date',
+            'endereco_cidade'    => 'nullable|string|max:100',
+            'endereco_estado'    => 'nullable|string|max:2',
+            'notes'              => 'nullable|string|max:5000',
+        ]);
+
+        $validated['lifecycle'] = $validated['lifecycle'] ?? 'onboarding';
+
+        $account = CrmAccount::create($validated);
+
+        CrmEvent::create([
+            'account_id'         => $account->id,
+            'type'               => 'account_created_manual',
+            'payload'            => ['created_by' => auth()->user()->name],
+            'happened_at'        => now(),
+            'created_by_user_id' => auth()->id(),
+        ]);
+
+        Log::info('[CRM] Account criado manualmente', ['id' => $account->id, 'name' => $account->name, 'by' => auth()->id()]);
+
+        return redirect()->route('crm.accounts.show', $account->id)
+            ->with('success', "Conta \"{$account->name}\" criada com sucesso.");
+    }
+
+    /**
+     * Atualizar campos do account (AJAX).
+     * Admin pode editar também campos de identidade (name, email, phone, doc, kind, datajuri_pessoa_id).
      */
     public function update(Request $request, int $id)
     {
         $account = CrmAccount::findOrFail($id);
+        $user    = auth()->user();
 
-        $validated = $request->validate([
+        $rules = [
             'owner_user_id' => 'nullable|exists:users,id',
             'lifecycle'     => 'nullable|in:onboarding,ativo,adormecido,arquivado,risco',
             'health_score'  => 'nullable|integer|min:0|max:100',
             'next_touch_at' => 'nullable|date',
             'notes'         => 'nullable|string|max:5000',
             'tags'          => 'nullable|string|max:1000',
-        ]);
+        ];
+
+        if ($user->isAdmin()) {
+            $rules = array_merge($rules, [
+                'name'               => 'nullable|string|max:255',
+                'kind'               => 'nullable|in:client,prospect',
+                'email'              => 'nullable|email|max:255',
+                'phone_e164'         => 'nullable|string|max:30',
+                'doc_digits'         => 'nullable|string|max:20',
+                'datajuri_pessoa_id' => 'nullable|integer|min:1',
+                'profissao'          => 'nullable|string|max:255',
+                'data_nascimento'    => 'nullable|date',
+                'endereco_cidade'    => 'nullable|string|max:100',
+                'endereco_estado'    => 'nullable|string|max:2',
+            ]);
+        }
+
+        $validated = $request->validate($rules);
 
         $before = $account->only(array_keys($validated));
         $account->update($validated);
@@ -772,6 +848,31 @@ class CrmAccountController extends Controller
         \Illuminate\Support\Facades\Log::info('[CRM] Account excluido', ['id' => $id, 'name' => $name, 'by' => auth()->id()]);
 
         return redirect()->route('crm.carteira')->with('success', "Conta \"{$name}\" excluida com sucesso.");
+    }
+
+    // ── Autocomplete ───────────────────────────────────────────
+
+    public function search(Request $request)
+    {
+        $term = trim($request->input('q', ''));
+        if (strlen($term) < 2) {
+            return response()->json([]);
+        }
+
+        $accounts = CrmAccount::where(function ($q) use ($term) {
+                $q->where('name', 'like', "%{$term}%")
+                  ->orWhere('doc', 'like', "%{$term}%");
+            })
+            ->orderBy('name')
+            ->limit(10)
+            ->get(['id', 'name', 'kind', 'doc']);
+
+        return response()->json($accounts->map(fn($a) => [
+            'id'   => $a->id,
+            'name' => $a->name,
+            'doc'  => $a->doc,
+            'kind' => $a->kind,
+        ]));
     }
 
 }

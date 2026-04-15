@@ -2,6 +2,7 @@
 
 namespace App\Services\Crm;
 
+use App\Helpers\PhoneHelper;
 use App\Models\Crm\CrmAccount;
 use App\Models\Crm\CrmEvent;
 use App\Models\Crm\CrmIdentity;
@@ -95,8 +96,8 @@ class CrmLeadSyncService
         }
 
         // 2. Buscar por telefone normalizado
-        $phone = preg_replace('/\D/', '', $lead->telefone ?? '');
-        if (strlen($phone) >= 10) {
+        $phone = PhoneHelper::normalize($lead->telefone ?? '');
+        if ($phone && strlen($phone) >= 10) {
             $phoneSuffix = substr($phone, -9);
             $identity = CrmIdentity::where('kind', 'phone')
                 ->where('value_norm', 'LIKE', '%' . $phoneSuffix)
@@ -121,7 +122,7 @@ class CrmLeadSyncService
             'kind'          => 'prospect',
             'name'          => $lead->nome ?? 'Lead #' . $lead->id,
             'email'         => $lead->email,
-            'phone_e164'    => $phone ? '+55' . $phone : null,
+            'phone_e164'    => $phone ?: null,
             'lifecycle'     => 'onboarding',
             'owner_user_id' => $this->assignOwnerRoundRobin(),
             'last_touch_at' => now(),
