@@ -52,6 +52,10 @@ Route::middleware(['auth','modulo:operacional.crm,visualizar'])->prefix('crm')->
     Route::post('/pipeline/{id}/lost', [CrmPipelineController::class, 'markLost'])->name('pipeline.lost');
     Route::delete('/pipeline/{id}', [CrmPipelineController::class, 'destroy'])->name('pipeline.destroy');
 
+    // Account — criação manual (admin)
+    Route::get('/accounts/create', [CrmAccountController::class, 'create'])->name('accounts.create');
+    Route::post('/accounts', [CrmAccountController::class, 'store'])->name('accounts.store');
+
     // Account 360
     Route::get('/accounts/{id}', [CrmAccountController::class, 'show'])->name('accounts.show');
     Route::delete('/accounts/{id}', [CrmAccountController::class, 'destroy'])->name('accounts.destroy');
@@ -87,6 +91,22 @@ Route::middleware(['auth','modulo:operacional.crm,visualizar'])->prefix('crm')->
 
     // Relatórios
     Route::get('/relatorios', [CrmReportsController::class, 'index'])->name('reports');
+
+    // ── Processos Administrativos ──
+    Route::prefix('processos-admin')->name('admin-processes.')->group(function () {
+        Route::get('/',                      [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'index'])->name('index');
+        Route::get('/criar',                 [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'create'])->name('create');
+        Route::post('/',                     [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'store'])->name('store');
+        Route::get('/api/template/{tipo}',   [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'getTemplate'])->name('template');
+        Route::get('/{id}',                  [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'show'])->name('show');
+        Route::get('/{id}/editar',           [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'edit'])->name('edit');
+        Route::put('/{id}',                  [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'update'])->name('update');
+        Route::post('/{id}/status',          [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'updateStatus'])->name('update-status');
+        Route::post('/{id}/ato',             [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'storeAto'])->name('store-ato');
+        Route::post('/{id}/tramitar',        [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'tramitar'])->name('tramitar');
+        Route::post('/{id}/etapas/{stepId}', [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'updateStep'])->name('update-step');
+        Route::post('/{id}/checklist/{itemId}', [\App\Http\Controllers\Crm\CrmAdminProcessController::class, 'updateChecklist'])->name('update-checklist');
+    });
 
     // ── Pulso do Cliente ──
     require __DIR__ . '/_crm_pulso_routes.php';
