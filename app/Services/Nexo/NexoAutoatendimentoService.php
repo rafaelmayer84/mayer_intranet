@@ -622,6 +622,11 @@ class NexoAutoatendimentoService
         // V2: gerar token público com snapshot enriquecido para a página visual
         if (!isset($resultado['erro'])) {
             try {
+                // Enriquecer andamentos com explicações leigas via Claude
+                $andamentosEnriquecidos = $this->openAIService->explicarAndamentos(
+                    $resultado['_andamentos'] ?? []
+                );
+
                 $payload = array_merge($resultado, [
                     'nome_cliente'         => $cliente->nome,
                     'processo_status'      => $processo->status ?? '',
@@ -639,7 +644,7 @@ class NexoAutoatendimentoService
                     'data_abertura'        => $processo->data_abertura
                                                 ? \Carbon\Carbon::parse($processo->data_abertura)->format('d/m/Y')
                                                 : '',
-                    'andamentos'           => $resultado['_andamentos'] ?? [],
+                    'andamentos'           => $andamentosEnriquecidos,
                 ]);
                 // Remover campo interno do retorno V1
                 unset($payload['_andamentos'], $resultado['_andamentos']);

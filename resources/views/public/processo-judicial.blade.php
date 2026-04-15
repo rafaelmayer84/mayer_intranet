@@ -259,27 +259,39 @@
                         {{-- Data mobile --}}
                         <p class="text-[11px] text-gray-400 sm:hidden mb-1.5">{{ $and['data'] ?? '' }}{{ !empty($and['hora']) ? ' • '.$and['hora'] : '' }}</p>
 
-                        <button @click="open = !open" class="w-full text-left">
-                            <div class="flex items-start justify-between gap-3">
-                                <p class="text-sm text-gray-800 leading-snug {{ $i === 0 ? 'font-semibold' : 'font-normal' }}">
-                                    {{ $and['descricao'] ?? '' }}
-                                </p>
-                                @if(!empty($and['observacao']))
-                                <svg class="w-4 h-4 text-gray-300 shrink-0 mt-0.5 transition-transform duration-200"
-                                     :class="open ? 'rotate-180' : ''"
-                                     fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
-                                </svg>
-                                @endif
-                            </div>
-                        </button>
+                        {{-- Descrição técnica --}}
+                        <p class="text-sm text-gray-800 leading-snug {{ $i === 0 ? 'font-semibold' : 'font-normal' }}">
+                            {{ $and['descricao'] ?? '' }}
+                        </p>
 
+                        {{-- Explicação leiga (sempre visível) --}}
+                        @if(!empty($and['explicacao']))
+                        <div class="mt-2 flex items-start gap-1.5">
+                            <svg class="w-3.5 h-3.5 shrink-0 mt-0.5" style="color:var(--gold);" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <p class="text-xs leading-relaxed" style="color:#6b7280; font-style:italic;">
+                                {{ $and['explicacao'] }}
+                            </p>
+                        </div>
+                        @endif
+
+                        {{-- Observação técnica (expansível) --}}
                         @if(!empty($and['observacao']))
+                        <button @click="open = !open"
+                                class="mt-2 flex items-center gap-1 text-[11px] font-medium transition-colors"
+                                style="color: var(--gold);">
+                            <svg class="w-3 h-3 transition-transform duration-200" :class="open ? 'rotate-180' : ''"
+                                 fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                            <span x-text="open ? 'Ocultar detalhe' : 'Ver detalhe técnico'"></span>
+                        </button>
                         <div x-show="open" x-transition:enter="transition ease-out duration-150"
-                             x-transition:enter-start="opacity-0 transform -translate-y-1"
-                             x-transition:enter-end="opacity-100 transform translate-y-0"
-                             class="mt-2 pl-3 border-l-2 text-xs text-gray-500 italic leading-relaxed"
-                             style="border-left-color: var(--gold-light);">
+                             x-transition:enter-start="opacity-0 -translate-y-1"
+                             x-transition:enter-end="opacity-100 translate-y-0"
+                             class="mt-2 pl-3 border-l-2 text-xs text-gray-500 leading-relaxed"
+                             style="border-left-color: #e5e7eb;">
                             {{ $and['observacao'] }}
                         </div>
                         @endif

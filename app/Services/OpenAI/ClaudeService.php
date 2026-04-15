@@ -143,6 +143,41 @@ SYSTEM;
     }
 
     /**
+     * Enriquece cada andamento com uma explicação leiga curta.
+     * Retorna o array original com campo `explicacao` adicionado em cada item.
+     */
+    public function explicarAndamentos(array $andamentos): array
+    {
+        if (empty($andamentos)) return $andamentos;
+
+        $lista = '';
+        foreach ($andamentos as $i => $a) {
+            $lista .= sprintf("%d. %s\n", $i + 1, $a['descricao'] ?? '');
+        }
+
+        $system = 'Você é secretária jurídica do escritório Mayer Advogados. Explique cada andamento processual em linguagem completamente leiga, como se estivesse falando com alguém que nunca entrou em um tribunal. Seja simples, direto e tranquilizador.';
+
+        $user = "Para cada andamento abaixo, escreva UMA frase curta (máximo 18 palavras) explicando o que aconteceu em linguagem leiga. Retorne SOMENTE um JSON válido no formato: [{\"explicacao\":\"...\"},...]\n\nAndamentos:\n{$lista}";
+
+        $texto = $this->chamar($system, $user, 400, 0.3);
+
+        if (!$texto) return $andamentos;
+
+        // Extrair JSON da resposta (Claude pode adicionar texto antes/depois)
+        if (preg_match('/\[.*\]/s', $texto, $m)) {
+            $decoded = json_decode($m[0], true);
+            if (is_array($decoded)) {
+                foreach ($andamentos as $i => &$and) {
+                    $and['explicacao'] = $decoded[$i]['explicacao'] ?? '';
+                }
+                unset($and);
+            }
+        }
+
+        return $andamentos;
+    }
+
+    /**
      * Resume o contexto de mensagens recentes para abertura de ticket (resumirContexto).
      */
     public function resumirContexto(string $contextoTexto): string
