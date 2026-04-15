@@ -109,6 +109,21 @@ class NexoConversationSyncService
                     $updateData['bot_ativo']        = true;
                     $updateData['assigned_user_id'] = null;
                     $updateData['lembrete_inatividade_at'] = null;
+
+                    // Resetar variáveis no SendPulse para que o fluxo de boas-vindas funcione
+                    $contactIdReset = $parsed['contact_id'] ?: $conversation->contact_id;
+                    if ($contactIdReset) {
+                        try {
+                            $this->sendpulse->reativarAutomacao($contactIdReset);
+                            \Log::info('NEXO-AUDIT: bot reativado ao reabrir conversa fechada', [
+                                'conv_id' => $conversation->id, 'contact_id' => $contactIdReset,
+                            ]);
+                        } catch (\Throwable $e) {
+                            \Log::warning('NEXO-AUDIT: falha ao reativar bot na reabertura', [
+                                'conv_id' => $conversation->id, 'error' => $e->getMessage(),
+                            ]);
+                        }
+                    }
                 }
 
                 // SEMPRE atualizar contact_id se webhook trouxer diferente (SendPulse recria contacts)

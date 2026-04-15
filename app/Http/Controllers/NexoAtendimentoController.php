@@ -389,6 +389,29 @@ class NexoAtendimentoController extends Controller
         $request->validate(['status' => 'required|in:open,closed']);
         $c = WaConversation::findOrFail($id);
         $c->status = $request->status;
+
+        // Ao fechar: reativar bot no SendPulse para resetar variáveis e permitir fluxo normal
+        if ($request->status === 'closed') {
+            $c->bot_ativo = true;
+            $c->assigned_user_id = null;
+            $c->assigned_at = null;
+            $c->lembrete_inatividade_at = null;
+
+            if ($c->contact_id) {
+                try {
+                    $sp = app(SendPulseWhatsAppService::class);
+                    $sp->reativarAutomacao($c->contact_id);
+                    Log::info('changeStatus: bot reativado ao fechar conversa', [
+                        'conv_id' => $id, 'contact_id' => $c->contact_id,
+                    ]);
+                } catch (\Throwable $e) {
+                    Log::warning('changeStatus: falha ao reativar bot no SendPulse', [
+                        'conv_id' => $id, 'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+
         $c->save();
         return response()->json(['success' => true, 'status' => $c->status]);
     }
