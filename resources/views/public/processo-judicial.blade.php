@@ -42,6 +42,16 @@
         'réu', 'reu', 'requerido', 'reclamado' => 'Réu',
         default => $posicao_cliente ?? '',
     };
+
+    // Atividades / portfólio
+    $atividadesConcluidas = $atividades_concluidas ?? [];
+    $atividadesPendentes  = $atividades_pendentes ?? [];
+    $totalMinutos         = $total_horas_minutos ?? 0;
+    $portfolioTotal       = $portfolio_total ?? 0;
+    $portfolioAtivos      = $portfolio_ativos ?? 0;
+    $totalHorasFmt        = $totalMinutos >= 60
+        ? round($totalMinutos / 60, 1) . 'h'
+        : ($totalMinutos > 0 ? $totalMinutos . 'min' : null);
 @endphp
 
 {{-- ══════════════════════════════════════════
@@ -154,6 +164,73 @@
 
     </div>
 </section>
+
+{{-- ══════════════════════════════════════════
+     PORTFÓLIO — estatísticas do relacionamento
+     ══════════════════════════════════════════ --}}
+@if($portfolioTotal > 0)
+<section class="w-full bg-navy-900 border-b border-white/5 anim-2" style="background: #0d1e32;">
+    <div class="w-full px-4 sm:px-8 py-5 flex flex-wrap gap-6 sm:gap-12 items-center">
+
+        @if($portfolioAtivos > 0)
+        <div class="flex items-center gap-3">
+            <div style="width:36px;height:36px;border-radius:10px;background:rgba(184,150,46,.15);display:flex;align-items:center;justify-content:center;">
+                <svg style="width:16px;height:16px;color:#d4ad55;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-white font-bold text-lg leading-none">{{ $portfolioAtivos }}</p>
+                <p class="text-white/40 text-[11px] mt-0.5 uppercase tracking-wider">processo{{ $portfolioAtivos > 1 ? 's' : '' }} ativo{{ $portfolioAtivos > 1 ? 's' : '' }}</p>
+            </div>
+        </div>
+        @endif
+
+        @if($portfolioTotal > 0)
+        <div class="flex items-center gap-3">
+            <div style="width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;">
+                <svg style="width:16px;height:16px;color:#9ca3af;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-white font-bold text-lg leading-none">{{ $portfolioTotal }}</p>
+                <p class="text-white/40 text-[11px] mt-0.5 uppercase tracking-wider">histórico total</p>
+            </div>
+        </div>
+        @endif
+
+        @if($totalHorasFmt)
+        <div class="flex items-center gap-3">
+            <div style="width:36px;height:36px;border-radius:10px;background:rgba(184,150,46,.15);display:flex;align-items:center;justify-content:center;">
+                <svg style="width:16px;height:16px;color:#d4ad55;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-white font-bold text-lg leading-none">{{ $totalHorasFmt }}</p>
+                <p class="text-white/40 text-[11px] mt-0.5 uppercase tracking-wider">dedicadas a este processo</p>
+            </div>
+        </div>
+        @endif
+
+        @if(count($atividadesConcluidas) > 0)
+        <div class="flex items-center gap-3">
+            <div style="width:36px;height:36px;border-radius:10px;background:rgba(16,185,129,.12);display:flex;align-items:center;justify-content:center;">
+                <svg style="width:16px;height:16px;color:#059669;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div>
+                <p class="text-white font-bold text-lg leading-none">{{ count($atividadesConcluidas) }}</p>
+                <p class="text-white/40 text-[11px] mt-0.5 uppercase tracking-wider">atividade{{ count($atividadesConcluidas) > 1 ? 's' : '' }} concluída{{ count($atividadesConcluidas) > 1 ? 's' : '' }}</p>
+            </div>
+        </div>
+        @endif
+
+    </div>
+</section>
+@endif
 
 {{-- ══════════════════════════════════════════
      CORPO — resumo + tribunal + advogado + timeline
@@ -296,6 +373,91 @@
                         </div>
                         @endif
                     </div>
+                </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+    @endif
+
+    {{-- TRABALHO REALIZADO --}}
+    @if(count($atividadesConcluidas) > 0)
+    <div class="anim-5">
+        <p class="section-label">Trabalho realizado neste processo</p>
+        <div class="card p-0 overflow-hidden">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                <div class="flex items-center gap-2">
+                    <svg class="w-4 h-4" style="color:var(--gold);" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span class="text-sm font-semibold text-gray-800">Atividades da equipe</span>
+                </div>
+                @if($totalHorasFmt)
+                <span class="text-xs font-bold px-3 py-1 rounded-full" style="background:rgba(184,150,46,.1);color:var(--gold);">
+                    {{ $totalHorasFmt }} registradas
+                </span>
+                @endif
+            </div>
+
+            <div class="divide-y divide-gray-50">
+                @foreach($atividadesConcluidas as $atv)
+                <div class="flex items-center gap-4 px-6 py-4">
+                    {{-- Ícone check --}}
+                    <div style="width:32px;height:32px;border-radius:50%;background:rgba(16,185,129,.08);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <svg style="width:14px;height:14px;color:#059669;" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                        </svg>
+                    </div>
+
+                    {{-- Info --}}
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-gray-800">{{ $atv['responsavel'] ?: 'Equipe Mayer' }}</p>
+                        <p class="text-[11px] text-gray-400 mt-0.5">{{ $atv['data'] }}</p>
+                    </div>
+
+                    {{-- Duração --}}
+                    @if($atv['duracao_min'] > 0)
+                    <span class="text-xs font-semibold text-navy-700 bg-navy-50 px-2.5 py-1 rounded-full shrink-0" style="background:#f0f4f9;color:#1a2e4a;">
+                        {{ $atv['duracao_fmt'] }}
+                    </span>
+                    @endif
+                </div>
+                @endforeach
+            </div>
+
+            {{-- Rodapé com total --}}
+            @if($totalHorasFmt && count($atividadesConcluidas) > 1)
+            <div class="px-6 py-3 border-t border-gray-100 flex items-center justify-between" style="background:#fafafa;">
+                <p class="text-xs text-gray-400">Total acumulado neste processo</p>
+                <p class="text-xs font-bold" style="color:var(--navy);">{{ $totalHorasFmt }}</p>
+            </div>
+            @endif
+        </div>
+    </div>
+    @endif
+
+    {{-- ATIVIDADES EM ANDAMENTO --}}
+    @if(count($atividadesPendentes) > 0)
+    <div class="anim-5">
+        <p class="section-label">Em andamento pela equipe</p>
+        <div class="card p-0 overflow-hidden">
+            <div class="divide-y divide-gray-50">
+                @foreach($atividadesPendentes as $atv)
+                <div class="flex items-center gap-4 px-6 py-4">
+                    <div style="width:32px;height:32px;border-radius:50%;background:rgba(184,150,46,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <svg style="width:14px;height:14px;color:var(--gold);" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-gray-800">{{ $atv['responsavel'] ?: 'Equipe Mayer' }}</p>
+                        @if(!empty($atv['data']))
+                        <p class="text-[11px] text-gray-400 mt-0.5">Previsto: {{ $atv['data'] }}</p>
+                        @endif
+                    </div>
+                    <span class="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded" style="background:rgba(184,150,46,.1);color:var(--gold);">
+                        {{ $atv['status'] }}
+                    </span>
                 </div>
                 @endforeach
             </div>

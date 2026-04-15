@@ -627,6 +627,9 @@ class NexoAutoatendimentoService
                     $resultado['_andamentos'] ?? []
                 );
 
+                // Buscar atividades do processo e estatísticas do portfólio
+                $dadosAtividades = $this->buscarAtividadesProcesso($processo->id, $processo->cliente_datajuri_id);
+
                 $payload = array_merge($resultado, [
                     'nome_cliente'         => $cliente->nome,
                     'processo_status'      => $processo->status ?? '',
@@ -644,7 +647,12 @@ class NexoAutoatendimentoService
                     'data_abertura'        => $processo->data_abertura
                                                 ? \Carbon\Carbon::parse($processo->data_abertura)->format('d/m/Y')
                                                 : '',
-                    'andamentos'           => $andamentosEnriquecidos,
+                    'andamentos'              => $andamentosEnriquecidos,
+                    'atividades_concluidas'   => $dadosAtividades['concluidas'],
+                    'atividades_pendentes'    => $dadosAtividades['pendentes'],
+                    'total_horas_minutos'     => $dadosAtividades['total_minutos'],
+                    'portfolio_total'         => $dadosAtividades['portfolio_total'],
+                    'portfolio_ativos'        => $dadosAtividades['portfolio_ativos'],
                 ]);
                 // Remover campo interno do retorno V1
                 unset($payload['_andamentos'], $resultado['_andamentos']);
@@ -1159,6 +1167,73 @@ class NexoAutoatendimentoService
         ], null, $tempoMs);
 
         return $resultado;
+    }
+
+    // =====================================================
+    // ATIVIDADES DataJuri — trabalho realizado no processo
+    // =====================================================
+
+    private function buscarAtividadesProcesso(int $processoId, ?int $clienteDatajuriId): array
+    {
+        // Atividades concluídas neste processo
+        $rowsConcluidas = DB::table('atividades')
+            ->where('processo_id', $processoId)
+            ->where('status', 'Concluído')
+            ->orderByDesc('data_conclusao')
+            ->get(['status', 'responsavel_nome', 'data_conclusao', 'payload_raw']);
+
+        $concluidas = [];
+        $totalMinutos = 0;
+
+        foreach ($rowsConcluidas as $a) {
+            $p = json_decode($a->payload_raw ?? '', true) ?? [];
+            $duracao = (int)($p['duracao'] ?? 0);
+            $totalMinutos += $duracao;
+
+            $concluidas[] = [
+                'data'         => $p['data'] ?? '',
+                'duracao_min'  => $duracao,
+                'duracao_fmt'  => $duracao >= 60
+                    ? round($duracao / 60, 1) . 'h'
+                    : ($duracao > 0 ? $duracao . 'min' : '—'),
+                'responsavel'  => $p['proprietario.nome'] ?? $a->responsavel_nome ?? '',
+            ];
+        }
+
+        // Atividades pendentes neste processo
+        $rowsPendentes = DB::table('atividades')
+            ->where('processo_id', $processoId)
+            ->whereIn('status', ['Em andamento', 'Não iniciado'])
+            ->orderByDesc('data_vencimento')
+            ->limit(5)
+            ->get(['status', 'responsavel_nome', 'data_vencimento', 'payload_raw']);
+
+        $pendentes = [];
+        foreach ($rowsPendentes as $a) {
+            $p = json_decode($a->payload_raw ?? '', true) ?? [];
+            $pendentes[] = [
+                'status'      => $a->status,
+                'data'        => $p['data'] ?? '',
+                'responsavel' => $p['proprietario.nome'] ?? $a->responsavel_nome ?? '',
+            ];
+        }
+
+        // Portfólio: total e ativos do mesmo cliente (via datajuri_id)
+        $portfolioTotal  = 0;
+        $portfolioAtivos = 0;
+        if ($clienteDatajuriId) {
+            $portfolioTotal  = DB::table('processos')->where('cliente_datajuri_id', $clienteDatajuriId)->count();
+            $portfolioAtivos = DB::table('processos')->where('cliente_datajuri_id', $clienteDatajuriId)
+                ->where('status', '!=', 'Encerrado')->count();
+        }
+
+        return [
+            'concluidas'       => $concluidas,
+            'pendentes'        => $pendentes,
+            'total_minutos'    => $totalMinutos,
+            'portfolio_total'  => $portfolioTotal,
+            'portfolio_ativos' => $portfolioAtivos,
+        ];
     }
 
     // =====================================================
