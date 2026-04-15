@@ -41,6 +41,9 @@ Route::middleware(['auth'])->get('/secure-storage/{path}', function (string $pat
 })->where('path', '.+')->name('secure-storage');
 
 Route::middleware(["auth"])->group(function () {
+    // Design System Preview (temporário)
+    Route::get("/design-preview", function(){ return view('test.design-preview'); })->name("design-preview");
+
     // Dashboard
     Route::get("/dashboard", function(){ return redirect("/avisos"); })->name("dashboard");
     Route::get("/api/kpis/financeiros", [DashboardController::class, "getKpisFinanceiros"]);
