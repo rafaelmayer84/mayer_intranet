@@ -13,7 +13,7 @@ class JustusClaudeService
     public function __construct()
     {
         $this->apiKey = config('justus.anthropic_api_key', '');
-        $this->model = config('justus.claude_model', 'claude-sonnet-4-5-20250929');
+        $this->model = config('justus.claude_model', 'claude-sonnet-4-6');
     }
 
     public function isAvailable(): bool

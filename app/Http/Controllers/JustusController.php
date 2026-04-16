@@ -11,7 +11,7 @@ use App\Models\JustusProcessProfile;
 use App\Models\JustusApproval;
 use App\Models\SystemEvent;
 use App\Services\Justus\JustusBudgetService;
-use App\Services\Justus\JustusOpenAiService;
+use App\Services\Justus\JustusClaudeMainService;
 use App\Jobs\JustusProcessPdfJob;
 use App\Models\JustusStyleGuide;
 use Illuminate\Http\Request;
@@ -135,6 +135,8 @@ class JustusController extends Controller
 
     public function sendMessage(Request $request, int $conversationId)
     {
+        set_time_limit(0);
+
         $request->validate([
             'message' => 'required|string|max:10000',
         ]);
@@ -150,9 +152,9 @@ class JustusController extends Controller
             return response()->json(['success' => false, 'error' => 'Limite de 10 mensagens atingido nesta conversa. Crie uma nova análise.'], 429);
         }
 
-        $openAiService = app(JustusOpenAiService::class);
+        $claudeService = app(JustusClaudeMainService::class);
         $fullContext = (bool) $request->input('full_context', false);
-        $result = $openAiService->sendMessage($conversation, $request->input('message'), $fullContext);
+        $result = $claudeService->sendMessage($conversation, $request->input('message'), $fullContext);
 
         if ($request->ajax() || $request->wantsJson()) {
             return response()->json($result);

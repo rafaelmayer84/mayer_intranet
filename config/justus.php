@@ -33,7 +33,9 @@ return [
     |--------------------------------------------------------------------------
     */
     'anthropic_api_key' => env('JUSTUS_ANTHROPIC_API_KEY'),
-    'claude_model' => env('JUSTUS_CLAUDE_MODEL', 'claude-sonnet-4-5-20250929'),
+    'claude_main_model' => env('JUSTUS_CLAUDE_MAIN_MODEL', 'claude-sonnet-4-6'),
+    'claude_opus_model' => env('JUSTUS_CLAUDE_OPUS_MODEL', 'claude-opus-4-7'),
+    'claude_model' => env('JUSTUS_CLAUDE_MODEL', 'claude-sonnet-4-6'),
     'claude_pricing' => [
         'input_per_million_usd' => (float) env('JUSTUS_CLAUDE_PRICING_INPUT', 3.00),
         'output_per_million_usd' => (float) env('JUSTUS_CLAUDE_PRICING_OUTPUT', 15.00),
@@ -41,10 +43,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Pricing per 1M tokens (BRL) — atualizar conforme tabela OpenAI
+    | Pricing per 1M tokens (USD) — usado por JustusBudgetService::calculateCost()
     |--------------------------------------------------------------------------
     */
     'pricing' => [
+        'claude-sonnet-4-6' => [
+            'input_per_1m' => (float) env('JUSTUS_PRICING_SONNET46_INPUT', 3.00),
+            'output_per_1m' => (float) env('JUSTUS_PRICING_SONNET46_OUTPUT', 15.00),
+        ],
+        'claude-opus-4-7' => [
+            'input_per_1m' => (float) env('JUSTUS_PRICING_OPUS47_INPUT', 15.00),
+            'output_per_1m' => (float) env('JUSTUS_PRICING_OPUS47_OUTPUT', 75.00),
+        ],
         'gpt-5.2' => [
             'input_per_1m' => (float) env('JUSTUS_PRICING_GPT52_INPUT', 1.75),
             'output_per_1m' => (float) env('JUSTUS_PRICING_GPT52_OUTPUT', 14.00),
