@@ -186,6 +186,13 @@
             </div>
         </div>
 
+        {{-- Banner de notas (aparece quando o contato tem notas) --}}
+        <div id="notes-alert-banner" style="display:none" onclick="switchTab('notes')" class="flex items-center gap-2.5 px-4 py-2.5 bg-amber-50 border-b border-amber-200 cursor-pointer hover:bg-amber-100 transition-colors">
+            <svg class="w-4 h-4 text-amber-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            <span id="notes-alert-text" class="text-[12px] font-semibold text-amber-800 flex-1"></span>
+            <span class="text-[11px] text-amber-600 font-medium underline">Ver notas →</span>
+        </div>
+
         {{-- Mensagens --}}
         <div id="chat-messages" class="hidden flex-1 overflow-y-auto overflow-x-hidden px-5 py-4 space-y-1 nexo-chat-bg"></div>
 
@@ -264,7 +271,7 @@
             <div class="flex bg-white px-2">
                 <button id="tab-contexto" onclick="switchTab('contexto')" class="nexo-tab active flex-1 px-2 py-3 text-[12px] font-medium text-[#1e3a5f] border-b-2 border-[#1e3a5f] transition">Contexto</button>
                 <button id="tab-datajuri" onclick="switchTab('datajuri')" class="nexo-tab flex-1 px-2 py-3 text-[12px] font-medium text-gray-400 border-b-2 border-transparent hover:text-gray-600 transition">DataJuri</button>
-                <button id="tab-notes" onclick="switchTab('notes')" class="nexo-tab flex-1 px-2 py-3 text-[12px] font-medium text-gray-400 border-b-2 border-transparent hover:text-gray-600 transition">Notas</button>
+                <button id="tab-notes" onclick="switchTab('notes')" class="nexo-tab flex-1 px-2 py-3 text-[12px] font-medium text-gray-400 border-b-2 border-transparent hover:text-gray-600 transition">Notas<span id="notes-tab-badge" style="display:none"></span></button>
                 <button id="tab-flows" onclick="switchTab('flows')" class="nexo-tab flex-1 px-2 py-3 text-[12px] font-medium text-gray-400 border-b-2 border-transparent hover:text-gray-600 transition">Flows</button>
             </div>
         </div>

@@ -131,6 +131,7 @@ const NexoApp = {
         const signal=this._abortCtrl.signal;
         if(this.pollTimer)clearInterval(this.pollTimer);
         this.lastMsgId=null;this.lastMsgCount=0;
+        this.updateNotesBadge(0);
         try{
             const j=await this.api(`/nexo/atendimento/conversas/${id}`,{signal});
             this.conversaAtual=j.conversation;
@@ -156,6 +157,7 @@ const NexoApp = {
             this.loadContexto(id);
             if(typeof NexoDataJuri!=='undefined')NexoDataJuri.setConversation(id);
             switchTab('contexto');
+            this.checkNotesBadge(id);
             this.pollTimer=setInterval(()=>this.poll(id),5000);
         }catch(e){if(e.name==='AbortError')return;console.error('Select error:',e)}
     },
@@ -177,7 +179,7 @@ const NexoApp = {
             const pid=m.provider_message_id||'';
             const quoteHtml=this.renderQuote(m);
             const actionsHtml=pid?`<div class="nexo-msg-actions opacity-0 group-hover/msg:opacity-100 absolute ${isIn?'-right-2':'-left-2'} -top-1 flex gap-0.5 z-10 transition-opacity"><button onclick="NexoApp.startReply(${m.id},'${pid}')" class="w-6 h-6 flex items-center justify-center rounded-full bg-white shadow-md hover:bg-gray-100 text-[#8696a0] hover:text-[#3b4a54] transition-colors" title="Responder"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a5 5 0 015 5v4M3 10l6 6M3 10l6-6"/></svg></button><button onclick="NexoApp.showEmojiPicker(event,${m.id},'${pid}')" class="w-6 h-6 flex items-center justify-center rounded-full bg-white shadow-md hover:bg-gray-100 text-[#8696a0] hover:text-[#3b4a54] transition-colors" title="Reagir"><svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke-width="2"/><path d="M8 14s1.5 2 4 2 4-2 4-2" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="9" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1" fill="currentColor" stroke="none"/></svg></button></div>`:'';
-            html+=`<div class="flex ${al} mb-1" data-pmid="${pid}"><div class="relative group/msg max-w-[75%] lg:max-w-[60%]">${actionsHtml}<div class="${bc} px-3 py-2">${quoteHtml}${content}<p class="text-[10px] text-[#8696a0] text-right mt-1 leading-none select-none">${time}${hb}</p></div></div></div>`;
+            html+=`<div class="flex ${al} mb-1" data-pmid="${pid}"><div class="nexo-msg-wrap group/msg">${actionsHtml}<div class="${bc} px-3 py-2">${quoteHtml}${content}<p class="text-[10px] text-[#8696a0] text-right mt-1 leading-none select-none">${time}${hb}</p></div></div></div>`;
         });
         c.innerHTML=html;
         this._lastMsgs=msgs;
@@ -214,7 +216,7 @@ const NexoApp = {
             const pid=m.provider_message_id||'';
             const quoteHtml=this.renderQuote(m);
             const actionsHtml=pid?`<div class="nexo-msg-actions opacity-0 group-hover/msg:opacity-100 absolute ${isIn?'-right-2':'-left-2'} -top-1 flex gap-0.5 z-10 transition-opacity"><button onclick="NexoApp.startReply(${m.id},'${pid}')" class="w-6 h-6 flex items-center justify-center rounded-full bg-white shadow-md hover:bg-gray-100 text-[#8696a0] hover:text-[#3b4a54] transition-colors" title="Responder"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a5 5 0 015 5v4M3 10l6 6M3 10l6-6"/></svg></button><button onclick="NexoApp.showEmojiPicker(event,${m.id},'${pid}')" class="w-6 h-6 flex items-center justify-center rounded-full bg-white shadow-md hover:bg-gray-100 text-[#8696a0] hover:text-[#3b4a54] transition-colors" title="Reagir"><svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke-width="2"/><path d="M8 14s1.5 2 4 2 4-2 4-2" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="9" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1" fill="currentColor" stroke="none"/></svg></button></div>`:'';
-            html+=`<div class="flex ${al} mb-1" data-pmid="${pid}"><div class="relative group/msg max-w-[75%] lg:max-w-[60%]">${actionsHtml}<div class="${bc} px-3 py-2">${quoteHtml}${content}<p class="text-[10px] text-[#8696a0] text-right mt-1 leading-none select-none">${time}${hb}</p></div></div></div>`;
+            html+=`<div class="flex ${al} mb-1" data-pmid="${pid}"><div class="nexo-msg-wrap group/msg">${actionsHtml}<div class="${bc} px-3 py-2">${quoteHtml}${content}<p class="text-[10px] text-[#8696a0] text-right mt-1 leading-none select-none">${time}${hb}</p></div></div></div>`;
         });
         c.insertAdjacentHTML('beforeend',html);
         if(!this._lastMsgs)this._lastMsgs=[];
@@ -334,7 +336,7 @@ const NexoApp = {
                 const file=new File([blob],'audio_'+Date.now()+'.webm',{type:'audio/webm'});
                 const c=document.getElementById('chat-messages');
                 const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-                c.insertAdjacentHTML('beforeend',`<div class="flex justify-end mb-1 nexo-ghost-msg"><div class="msg-bubble-out px-3 py-2 max-w-[75%] opacity-70"><p class="text-[13px]">\u{1F3A4} Enviando audio...</p><p class="text-[10px] text-[#667781] text-right mt-0.5">\u23F3 ${now}</p></div></div>`);
+                c.insertAdjacentHTML('beforeend',`<div class="flex justify-end mb-1 nexo-ghost-msg"><div class="nexo-msg-wrap"><div class="msg-bubble-out px-3 py-2 opacity-70"><p class="text-[13px]">\u{1F3A4} Enviando audio...</p><p class="text-[10px] text-[#667781] text-right mt-0.5">\u23F3 ${now}</p></div></div></div>`);
                 c.scrollTop=c.scrollHeight;
                 const fd=new FormData();fd.append('file',file);
                 try{
@@ -366,7 +368,7 @@ const NexoApp = {
         const caption=prompt('Legenda (opcional):','');
         const c=document.getElementById('chat-messages');
         const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-        c.insertAdjacentHTML('beforeend',`<div class="flex justify-end mb-1 nexo-ghost-msg"><div class="msg-bubble-out px-3 py-2 max-w-[75%] opacity-70"><p class="text-[13px]">\u{1F4CE} ${file.name}</p><p class="text-[10px] text-[#667781] text-right mt-0.5">\u23F3 ${now}</p></div></div>`);
+        c.insertAdjacentHTML('beforeend',`<div class="flex justify-end mb-1 nexo-ghost-msg"><div class="nexo-msg-wrap"><div class="msg-bubble-out px-3 py-2 opacity-70"><p class="text-[13px]">\u{1F4CE} ${file.name}</p><p class="text-[10px] text-[#667781] text-right mt-0.5">\u23F3 ${now}</p></div></div></div>`);
         c.scrollTop=c.scrollHeight;
         const fd=new FormData();fd.append('file',file);if(caption)fd.append('caption',caption);
         try{
@@ -386,7 +388,7 @@ const NexoApp = {
         inp.value='';inp.style.height='auto';
         const c=document.getElementById('chat-messages');
         const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-        c.insertAdjacentHTML('beforeend',`<div class="flex justify-end mb-1 nexo-ghost-msg"><div class="msg-bubble-out px-3 py-2 max-w-[75%] lg:max-w-[60%] opacity-70"><p class="text-[13px] text-[#111b21] whitespace-pre-wrap break-words">${this.esc(text)}</p><p class="text-[10px] text-[#667781] text-right mt-0.5">⏳ ${now}</p></div></div>`);
+        c.insertAdjacentHTML('beforeend',`<div class="flex justify-end mb-1 nexo-ghost-msg"><div class="nexo-msg-wrap"><div class="msg-bubble-out px-3 py-2 opacity-70"><p class="text-[13px] text-[#111b21] whitespace-pre-wrap break-words">${this.esc(text)}</p><p class="text-[10px] text-[#667781] text-right mt-0.5">⏳ ${now}</p></div></div></div>`);
         c.scrollTop=c.scrollHeight;
         const body={text};
         if(this.replyTo&&this.replyTo.provider_message_id){body.reply_to_message_id=this.replyTo.provider_message_id}
@@ -486,6 +488,21 @@ const NexoApp = {
     },
 
     // ═══ NOTAS ═══
+    updateNotesBadge(count){
+        // badge na aba
+        const b=document.getElementById('notes-tab-badge');
+        if(b){if(count>0){b.textContent=count>9?'9+':count;b.style.display='inline-flex'}else{b.style.display='none'}}
+        // banner no topo do chat
+        const banner=document.getElementById('notes-alert-banner');
+        const txt=document.getElementById('notes-alert-text');
+        if(banner&&txt){
+            if(count>0){txt.textContent=count===1?'Este contato tem 1 nota interna':`Este contato tem ${count} notas internas`;banner.style.display='flex'}
+            else{banner.style.display='none'}
+        }
+    },
+    async checkNotesBadge(id){
+        try{const j=await this.api(`/nexo/atendimento/conversas/${id}/notes`);this.updateNotesBadge((j.notes||[]).length)}catch(e){}
+    },
     async loadNotes(){
         if(!this.conversaAtual)return;
         const list=document.getElementById('notes-list');
@@ -493,6 +510,7 @@ const NexoApp = {
         try{
             const j=await this.api(`/nexo/atendimento/conversas/${this.conversaAtual.id}/notes`);
             const notes=j.notes||[];
+            this.updateNotesBadge(notes.length);
             if(!notes.length){list.innerHTML='<p class="text-xs text-gray-400 text-center py-4">Nenhuma nota ainda</p>';return}
             list.innerHTML=notes.map(n=>{
                 const d=new Date(n.created_at).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});

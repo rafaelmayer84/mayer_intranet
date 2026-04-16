@@ -55,6 +55,15 @@
     box-shadow: 0 1px 3px rgba(30,58,95,.25);
 }
 
+/* ── Message wrapper (WhatsApp style — max-width via CSS, não Tailwind JIT) ── */
+.nexo-msg-wrap {
+    position: relative;
+    max-width: 75%;
+}
+@media (min-width: 1024px) {
+    .nexo-msg-wrap { max-width: 60%; }
+}
+
 /* ── Chat Bubbles ── */
 .msg-bubble-in {
     background: #fff;
@@ -168,6 +177,30 @@
 .nexo-tab.active { color: #1e3a5f; font-weight: 600; }
 .nexo-tab.active::after { width: 70%; }
 .nexo-tab:not(.active):hover { color: #374151; }
+
+/* ── Notes tab badge (alerta vermelho quando há notas no contato) ── */
+#notes-tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #ef4444;
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    min-width: 15px;
+    height: 15px;
+    padding: 0 3px;
+    border-radius: 8px;
+    margin-left: 4px;
+    line-height: 1;
+    vertical-align: middle;
+    box-shadow: 0 1px 3px rgba(239,68,68,.4);
+    animation: notesBadgePulse 2.5s ease-in-out infinite;
+}
+@keyframes notesBadgePulse {
+    0%, 100% { box-shadow: 0 1px 3px rgba(239,68,68,.4); }
+    50% { box-shadow: 0 0 0 4px rgba(239,68,68,0); }
+}
 
 /* ── Unread badge pulse ── */
 .unread-badge {
