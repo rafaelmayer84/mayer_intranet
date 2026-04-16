@@ -54,78 +54,133 @@
 
         <div class="space-y-3" id="listaPendentes">
         @forelse($pendentes as $n)
-            <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-sm transition" id="card-{{ $n->id }}">
+            @php $vars = $n->tipo !== 'os' ? json_decode($n->template_vars, true) : null; @endphp
+            <div class="bg-white border border-gray-200 rounded-xl p-5 hover:shadow-md transition" id="card-{{ $n->id }}">
                 <div class="flex items-start gap-3">
-                    <input type="checkbox" class="notif-check rounded mt-1" value="{{ $n->id }}" onchange="updateMassBtn()">
+                    @if($n->tipo !== 'audiencia')
+                    <input type="checkbox" class="notif-check rounded mt-1 flex-shrink-0" value="{{ $n->id }}" onchange="updateMassBtn()">
+                    @else
+                    <div class="w-4 flex-shrink-0"></div>
+                    @endif
                     <div class="flex-1 min-w-0">
+
+                        {{-- Cabeçalho: tipo + cliente + data --}}
                         <div class="flex items-center justify-between mb-1">
-                            <div class="flex items-center gap-2">
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold
                                     {{ $n->tipo === 'audiencia' ? 'bg-purple-100 text-purple-700' : ($n->tipo === 'andamento' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700') }}">
                                     {{ $n->tipo === 'audiencia' ? 'Audiência' : ($n->tipo === 'andamento' ? 'Andamento' : 'OS') }}
                                 </span>
-                                <span class="text-sm font-semibold text-gray-800">{{ $n->cliente_nome }}</span>
+                                <span class="text-sm font-bold text-gray-900">{{ $n->cliente_nome }}</span>
                             </div>
-                            <span class="text-xs text-gray-400">{{ \Carbon\Carbon::parse($n->created_at)->format('d/m H:i') }}</span>
+                            <span class="text-xs text-gray-400 flex-shrink-0 ml-2">{{ \Carbon\Carbon::parse($n->created_at)->format('d/m H:i') }}</span>
                         </div>
-                        <div class="text-xs text-gray-500 mb-2">
-                            Processo: <span class="font-mono">{{ $n->processo_pasta }}</span>
-                            · Tel: {{ $n->telefone }}
-                        </div>
-                        <div class="bg-gray-50 rounded p-3 text-sm text-gray-700 mb-3">
-                            @if($n->tipo === 'os')
-                                {{ $n->error_message ?? 'Ordem de Serviço' }}
-                            @else
-                                @php $vars = json_decode($n->template_vars, true); @endphp
-                                {{ $vars[2]['text'] ?? 'Sem descrição' }}
+
+                        {{-- Processo + telefone --}}
+                        <div class="text-xs text-gray-500 mb-3">
+                            <span class="font-mono font-medium text-gray-700">{{ $n->processo_pasta }}</span>
+                            @if($n->telefone)
+                            · <span>{{ $n->telefone }}</span>
                             @endif
                         </div>
+
                         @if($n->tipo === 'os')
-                        {{-- OS: formulário com autocomplete cliente + mensagem --}}
-                        <div class="border-t border-gray-100 pt-3 mt-1 space-y-2" id="os-form-{{ $n->id }}">
+                        {{-- OS: OS info + formulário --}}
+                        <div class="bg-orange-50 border border-orange-100 rounded-lg px-3 py-2 text-sm text-orange-800 mb-3">
+                            {{ $n->error_message ?? 'Ordem de Serviço com movimentação recente' }}
+                        </div>
+                        <div class="border-t border-gray-100 pt-3 space-y-2" id="os-form-{{ $n->id }}">
                             <div class="relative">
                                 <input type="text" id="os-cliente-search-{{ $n->id }}" placeholder="Buscar cliente (nome, CPF ou telefone)..."
-                                    class="w-full text-sm border border-gray-300 rounded px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                                    class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                                     oninput="buscarClienteOS({{ $n->id }}, this.value)" autocomplete="off">
                                 <input type="hidden" id="os-cliente-id-{{ $n->id }}">
                                 <div id="os-dropdown-{{ $n->id }}" class="absolute z-50 w-full bg-white border border-gray-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto hidden"></div>
                             </div>
-                            <textarea id="os-msg-{{ $n->id }}" rows="2" placeholder="Mensagem de atualização para o cliente..."
-                                class="w-full text-sm border border-gray-300 rounded px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" maxlength="300"></textarea>
+                            <textarea id="os-msg-{{ $n->id }}" rows="3" placeholder="Escreva a mensagem de atualização para o cliente..."
+                                class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" maxlength="300"></textarea>
                             <div class="flex items-center gap-2">
-                                <button onclick="aprovarOS({{ $n->id }})" class="text-sm px-3 py-1.5 rounded text-white font-medium" style="background:#385776">
+                                <button onclick="aprovarOS({{ $n->id }})" class="text-sm px-4 py-2 rounded-lg text-white font-semibold" style="background:#385776">
                                     Enviar ao cliente
                                 </button>
-                                <button onclick="descartarNotificacao({{ $n->id }})" class="text-sm px-3 py-1.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-50">
+                                <button onclick="descartarNotificacao({{ $n->id }})" class="text-sm px-4 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50">
                                     Descartar
                                 </button>
                             </div>
                         </div>
+
                         @elseif($n->tipo === 'andamento')
-                        {{-- Andamento: textarea editável para complementar --}}
+                        {{-- Contexto do processo --}}
+                        @if($n->processo_natureza || $n->processo_adverso || $n->processo_tipo_acao)
+                        <div class="flex flex-wrap gap-2 mb-3">
+                            @if($n->processo_natureza)
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">{{ $n->processo_natureza }}</span>
+                            @endif
+                            @if($n->processo_tipo_acao)
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{{ $n->processo_tipo_acao }}</span>
+                            @endif
+                            @if($n->processo_posicao)
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">{{ $n->processo_posicao }}</span>
+                            @endif
+                            @if($n->processo_adverso)
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-red-50 text-red-600" title="{{ $n->processo_adverso }}">vs. {{ Str::limit($n->processo_adverso, 40) }}</span>
+                            @endif
+                        </div>
+                        @endif
+
+                        {{-- Movimentação original --}}
+                        @if($n->andamento_descricao_original)
+                        <div class="mb-3">
+                            <div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1 flex items-center gap-1">
+                                <span>Movimentação original</span>
+                                @if($n->andamento_data)
+                                <span class="font-normal text-gray-300">· {{ \Carbon\Carbon::parse($n->andamento_data)->format('d/m/Y') }}</span>
+                                @endif
+                            </div>
+                            <div class="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-sm text-amber-900 font-medium">
+                                {{ $n->andamento_descricao_original }}
+                            </div>
+                        </div>
+                        @endif
+
+                        {{-- Mensagem gerada pela IA --}}
+                        <div class="mb-3">
+                            <div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Mensagem gerada para o cliente</div>
+                            <div class="bg-green-50 border border-green-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 leading-relaxed">
+                                {{ $vars[2]['text'] ?? 'Sem descrição' }}
+                            </div>
+                        </div>
                         <div class="space-y-2">
-                            <textarea id="and-msg-{{ $n->id }}" rows="2" placeholder="Complementar ou reescrever a mensagem para o cliente..."
-                                class="w-full text-sm border border-gray-300 rounded px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" maxlength="300">{{ $vars[2]['text'] ?? '' }}</textarea>
+                            <div class="text-xs text-gray-400">Edite se necessário antes de enviar:</div>
+                            <textarea id="and-msg-{{ $n->id }}" rows="3"
+                                class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" maxlength="300">{{ $vars[2]['text'] ?? '' }}</textarea>
                             <div class="flex items-center gap-2">
-                                <button onclick="aprovarAndamento({{ $n->id }})" class="text-sm px-3 py-1.5 rounded text-white font-medium" style="background:#385776">
-                                    Enviar ao cliente
+                                <button onclick="aprovarAndamento({{ $n->id }})" class="text-sm px-4 py-2 rounded-lg text-white font-semibold" style="background:#385776">
+                                    Aprovar e enviar
                                 </button>
-                                <button onclick="descartarNotificacao({{ $n->id }})" class="text-sm px-3 py-1.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-50">
+                                <button onclick="descartarNotificacao({{ $n->id }})" class="text-sm px-4 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50">
                                     Descartar
                                 </button>
                             </div>
                         </div>
+
                         @else
                         {{-- Audiência: envio direto --}}
+                        @if($vars)
+                        <div class="bg-purple-50 border border-purple-100 rounded-lg px-3 py-2 text-sm text-purple-900 mb-3">
+                            {{ $vars[2]['text'] ?? 'Lembrete de audiência' }}
+                        </div>
+                        @endif
                         <div class="flex items-center gap-2">
-                            <button onclick="aprovarNotificacao({{ $n->id }})" class="text-sm px-3 py-1.5 rounded text-white font-medium" style="background:#385776">
+                            <button onclick="aprovarNotificacao({{ $n->id }})" class="text-sm px-4 py-2 rounded-lg text-white font-semibold" style="background:#385776">
                                 Enviar ao cliente
                             </button>
-                            <button onclick="descartarNotificacao({{ $n->id }})" class="text-sm px-3 py-1.5 rounded border border-gray-300 text-gray-600 hover:bg-gray-50">
+                            <button onclick="descartarNotificacao({{ $n->id }})" class="text-sm px-4 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50">
                                 Descartar
                             </button>
                         </div>
                         @endif
+
                     </div>
                 </div>
             </div>

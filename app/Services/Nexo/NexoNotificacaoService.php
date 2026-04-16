@@ -298,6 +298,22 @@ class NexoNotificacaoService
     }
 
     /**
+     * Evita duplicatas: verifica se o mesmo processo já tem notificação de andamento
+     * pendente ou enviada hoje. Resolve o caso em que dois andamentos do DataJuri
+     * descrevem o mesmo evento (ex: "conclusos" + "julgamento em pauta") e ambos
+     * disparariam cards separados para o mesmo cliente no mesmo dia.
+     */
+    protected function jaNotificadoProcessoHoje(string $processoPasta): bool
+    {
+        return DB::table('nexo_notificacoes')
+            ->where('tipo', 'andamento')
+            ->where('processo_pasta', $processoPasta)
+            ->whereIn('status', ['sent', 'pending', 'approved'])
+            ->whereDate('created_at', today('America/Sao_Paulo'))
+            ->exists();
+    }
+
+    /**
      * Registra notificação na tabela de controle.
      */
     protected function registrar(
@@ -380,6 +396,16 @@ class NexoNotificacaoService
                 continue;
             }
 
+            // Deduplicar por processo no mesmo dia: se já existe notificação pendente/enviada
+            // para este processo hoje, registrar o andamento como ja_existe e pular.
+            // Resolve o caso em que dois andamentos do DataJuri descrevem o mesmo evento.
+            if ($this->jaNotificadoProcessoHoje($pastaProceso)) {
+                // Marcar este andamento como "já existente" para não reprocessá-lo amanhã
+                $this->registrar('andamento', $and->id, 'andamentos_fase', null, null, null, 'skipped', null, 'Processo já notificado hoje', $pastaProceso);
+                $stats['ja_existe']++;
+                continue;
+            }
+
             $processo = DB::table('processos')->where('pasta', $pastaProceso)->first();
             if (!$processo || empty($processo->cliente_datajuri_id)) {
                 $stats['sem_cliente']++;
@@ -443,7 +469,14 @@ class NexoNotificacaoService
             $descricao = trim($descricao);
 
             // Reescrever com IA para tom de marketing jurídico (fallback silencioso se falhar)
-            $descricao = $this->reescreverComIA($descricao, $cliente->nome, $pastaProceso ?? '');
+            $contextoProcesso = [
+                'natureza'        => $processo->natureza        ?? null,
+                'tipo_acao'       => $processo->tipo_acao       ?? null,
+                'adverso_nome'    => $processo->adverso_nome    ?? null,
+                'posicao_cliente' => $processo->posicao_cliente ?? null,
+                'assunto'         => $processo->assunto         ?? null,
+            ];
+            $descricao = $this->reescreverComIA($descricao, $cliente->nome, $pastaProceso ?? '', $contextoProcesso);
 
             $templateVars = [
                 ['type' => 'text', 'text' => $this->primeiroNome($cliente->nome)],
@@ -472,10 +505,11 @@ class NexoNotificacaoService
                 ->update(['user_id' => $userId]);
 
             // Notificar o advogado no sininho da intranet
+            $descricaoOriginal = preg_replace('/\s+/', ' ', trim($and->descricao ?? 'Movimentação processual'));
             NotificationIntranet::enviar(
                 $userId,
-                'Andamento para notificar: ' . $cliente->nome,
-                mb_substr($descricao, 0, 120) . ($pastaProceso ? ' | ' . $pastaProceso : ''),
+                'WhatsApp pendente: ' . $cliente->nome . ' — ' . mb_substr($descricaoOriginal, 0, 60),
+                'Processo ' . $pastaProceso . ' — Mensagem gerada aguarda sua aprovação.',
                 url('/nexo/notificacoes'),
                 'warning',
                 'whatsapp'
@@ -605,15 +639,30 @@ class NexoNotificacaoService
      */
     public function listarPendentes(?int $userId = null, ?string $tipo = null): \Illuminate\Support\Collection
     {
-        $query = DB::table('nexo_notificacoes')
-            ->where('status', 'pending')
-            ->orderByDesc('created_at');
+        $query = DB::table('nexo_notificacoes as nn')
+            ->leftJoin('andamentos_fase as af', function ($join) {
+                $join->on('af.id', '=', 'nn.entidade_id')
+                     ->where('nn.entidade_type', 'andamentos_fase');  // join só faz sentido para andamentos
+            })
+            ->leftJoin('processos as pr', 'pr.pasta', '=', 'nn.processo_pasta')
+            ->where('nn.status', 'pending')
+            ->orderByDesc('nn.created_at')
+            ->select(
+                'nn.*',
+                'af.descricao as andamento_descricao_original',
+                'af.data_andamento as andamento_data',
+                'pr.natureza as processo_natureza',
+                'pr.tipo_acao as processo_tipo_acao',
+                'pr.adverso_nome as processo_adverso',
+                'pr.posicao_cliente as processo_posicao',
+                'pr.assunto as processo_assunto',
+            );
 
         if ($userId) {
-            $query->where('user_id', $userId);
+            $query->where('nn.user_id', $userId);
         }
         if ($tipo) {
-            $query->where('tipo', $tipo);
+            $query->where('nn.tipo', $tipo);
         }
 
         return $query->get();
@@ -641,29 +690,55 @@ class NexoNotificacaoService
      * Preserva os fatos mas transforma em linguagem próxima, clara e de reforço de marca.
      * Retorna o texto original em caso de falha (nunca bloqueia o fluxo).
      */
-    public function reescreverComIA(string $textoOriginal, string $clienteNome, string $processoPasta): string
+    public function reescreverComIA(string $textoOriginal, string $clienteNome, string $processoPasta, array $contexto = []): string
     {
         $apiKey = config('justus.anthropic_api_key', env('JUSTUS_ANTHROPIC_API_KEY', ''));
         if (empty($apiKey)) {
             return $textoOriginal;
         }
 
-        $system = <<<PROMPT
-Você é o assistente de comunicação do escritório Mayer Sociedade de Advogados.
-Sua função é transformar textos jurídicos técnicos em mensagens de WhatsApp que:
-- Sejam claras e acessíveis para o cliente leigo
-- Transmitam a notícia de forma positiva e próxima (quando favorável) ou cuidadosa e tranquilizadora (quando desfavorável)
-- Reforcem a presença e cuidado do escritório com o cliente
-- Usem linguagem humana, sem jargão excessivo
-- Sejam curtas: máximo 220 caracteres
-- NÃO incluam saudação (já está no template) nem assinatura (já está no template)
-- NÃO inventem fatos além do que foi informado
-- NÃO prometam resultados futuros incertos
-- Preservem a juridicidade: não distorçam o conteúdo da decisão
-Responda APENAS com o texto da mensagem, sem explicações, sem aspas, sem prefixos.
+        $system = <<<'PROMPT'
+Você é especialista em comunicação do escritório Mayer Sociedade de Advogados.
+Sua tarefa: transformar uma movimentação processual em mensagem de WhatsApp para o cliente.
+
+REGRAS OBRIGATÓRIAS:
+1. Explique O QUE ACONTECEU de forma clara e direta, em linguagem acessível
+2. Use sempre "você" — nunca "te", "tu" ou tratamento informal
+3. Máximo 240 caracteres no total
+4. Tom profissional e próximo: como um advogado que cuida pessoalmente do caso
+5. PROIBIDO: emojis, jargão sem explicação, promessas de resultado, frases genéricas como "estamos acompanhando"
+6. Se favorável: transmita claramente a boa notícia
+7. Se desfavorável ou em curso: seja transparente, sereno e demonstre controle da situação
+8. NÃO inclua saudação (ex: "Olá João") — já está no template
+9. NÃO inclua assinatura (ex: "Mayer Advogados") — já está no template
+10. NÃO invente fatos além do informado
+11. USE O CONTEXTO DAS PARTES quando ajudar o cliente a identificar o caso: mencione a parte adversa pelo primeiro nome ou nome fantasia (nunca o nome completo) se houver mais de um processo provável. Ex: "no processo contra a Empresa X" ou "na ação contra João". Se o cliente for réu, adapte: "na ação movida por João contra você".
+12. Não mencione as partes se a movimentação já é autoexplicativa ou se não há informação de parte adversa.
+
+EXEMPLOS DE OUTPUT CORRETO:
+• Sem parte adversa, conclusos → "Seu processo foi encaminhado ao juiz para decisão. Assim que ele se pronunciar, você será avisado imediatamente."
+• Com parte adversa, sentença favorável → "O juiz julgou a seu favor o processo contra a Empresa X. Em breve orientaremos os próximos passos."
+• Réu, despacho → "Na ação movida por Maria Silva contra você, o juiz determinou um prazo processual. Já estamos preparando a resposta."
+• Com parte adversa, tutela deferida → "Conseguimos uma decisão liminar favorável contra a Empresa Y: o juiz deferiu a tutela de urgência."
+• Sem parte adversa, agravo → "Recorremos da decisão junto ao Tribunal. Seu processo segue avançando com toda a atenção necessária."
+• Audiência realizada → "A audiência foi realizada. Agora aguardamos a sentença do juiz, que deve sair nos próximos dias."
+
+Responda APENAS com o texto da mensagem, sem aspas, sem prefixos, sem explicações.
 PROMPT;
 
-        $user = "Processo: {$processoPasta}\nCliente: {$clienteNome}\n\nMovimentação:\n{$textoOriginal}";
+        // Montar bloco de contexto do processo
+        $linhasContexto = ["Processo: {$processoPasta}"];
+        if (!empty($contexto['natureza']))        $linhasContexto[] = "Natureza: {$contexto['natureza']}";
+        if (!empty($contexto['tipo_acao']))       $linhasContexto[] = "Tipo de ação: {$contexto['tipo_acao']}";
+        if (!empty($contexto['adverso_nome']))    $linhasContexto[] = "Parte adversa: {$contexto['adverso_nome']}";
+        if (!empty($contexto['posicao_cliente'])) $linhasContexto[] = "Posição do cliente: {$contexto['posicao_cliente']}";
+        if (!empty($contexto['assunto'])) {
+            // assunto pode ser longo (lista separada por vírgula), pegar só as 2 primeiras partes
+            $assuntoCurto = implode(', ', array_slice(explode(',', $contexto['assunto']), 0, 2));
+            $linhasContexto[] = "Assunto: {$assuntoCurto}";
+        }
+
+        $user = implode("\n", $linhasContexto) . "\n\nMovimentação registrada:\n{$textoOriginal}";
 
         try {
             $response = Http::withHeaders([
@@ -703,14 +778,46 @@ PROMPT;
     }
 
     /**
-     * Retorna primeiro nome do cliente para uso no template.
+     * Retorna o nome de tratamento do cliente para uso no template WhatsApp.
+     * - Pessoa física: primeiro nome (ex: "Rafael Mayer" → "Rafael")
+     * - Pessoa jurídica: primeiras 2 palavras significativas (ex: "Office Show Moveis... ltda" → "Office Show")
      */
     protected function primeiroNome(?string $nomeCompleto): string
     {
         if (empty($nomeCompleto)) {
             return 'Cliente';
         }
-        $partes = explode(' ', trim($nomeCompleto));
+
+        $nome = trim($nomeCompleto);
+        $nomeLower = mb_strtolower($nome);
+
+        // Detectar pessoa jurídica pelos sufixos mais comuns
+        $sufixosPJ = ['ltda', 'eireli', 's.a.', ' sa ', ' s/a', ' me ', ' epp ', ' ss ', 'sociedade', 'ind. com.', 'industria', 'comércio', 'comercio', 'serviços', 'servicos'];
+        $isPJ = false;
+        foreach ($sufixosPJ as $suf) {
+            if (str_contains($nomeLower, $suf)) {
+                $isPJ = true;
+                break;
+            }
+        }
+
+        if ($isPJ) {
+            // Remover sufixos empresariais do final para ficar com o nome principal
+            $semSufixo = preg_replace('/\b(ltda\.?|eireli|s\.?a\.?|me|epp|ss|industria|comercio|comércio|serviços|servicos)\b\.?$/i', '', $nome);
+            $semSufixo = trim($semSufixo, ' ,-.');
+            // Pegar as primeiras 2 palavras com mais de 2 letras
+            $partes = array_values(array_filter(
+                explode(' ', $semSufixo),
+                fn($p) => mb_strlen($p) > 2 && !in_array(mb_strtolower($p), ['de', 'da', 'do', 'das', 'dos', 'e', 'em', 'para'])
+            ));
+            if (count($partes) >= 2) {
+                return ucfirst(mb_strtolower($partes[0])) . ' ' . ucfirst(mb_strtolower($partes[1]));
+            }
+            return ucfirst(mb_strtolower($partes[0] ?? $nome));
+        }
+
+        // Pessoa física: apenas o primeiro nome
+        $partes = explode(' ', $nome);
         return ucfirst(mb_strtolower($partes[0]));
     }
 
