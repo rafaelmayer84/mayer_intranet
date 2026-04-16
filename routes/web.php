@@ -160,6 +160,8 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
         ->name('relatorios-ceo.index')->middleware('admin');
     Route::get('relatorios-ceo/{relatorioCeo}/download', [\App\Http\Controllers\Admin\RelatorioCeoController::class, 'download'])
         ->name('relatorios-ceo.download')->middleware('admin');
+    Route::post('relatorios-ceo/gerar', [\App\Http\Controllers\Admin\RelatorioCeoController::class, 'gerar'])
+        ->name('relatorios-ceo.gerar')->middleware('admin');
 
     // Rotas de CRUD
     Route::resource('classificacao-regras', \App\Http\Controllers\Admin\ClassificacaoRegrasController::class)
