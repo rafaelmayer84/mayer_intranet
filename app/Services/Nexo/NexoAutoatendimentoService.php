@@ -488,6 +488,7 @@ class NexoAutoatendimentoService
             ->value('id') : null;
 
         $ticket = CrmServiceRequest::create([
+            'protocolo'            => $this->gerarProtocoloAutoatendimento('TK'),
             'account_id'           => $crmAccountId,
             'phone_contato'        => $telefoneNormalizado,
             'category'             => 'cliente_geral',
@@ -924,6 +925,7 @@ class NexoAutoatendimentoService
         $crmAccountId = $this->resolverCrmAccountId($cliente->datajuri_id, $telefoneNormalizado);
 
         $sr = CrmServiceRequest::create([
+            'protocolo'            => $this->gerarProtocoloAutoatendimento('DOC'),
             'account_id'           => $crmAccountId,
             'phone_contato'        => $telefoneNormalizado,
             'category'             => 'cliente_documento',
@@ -964,6 +966,7 @@ class NexoAutoatendimentoService
         $crmAccountId = $this->resolverCrmAccountId($cliente->datajuri_id, $telefoneNormalizado);
 
         $sr = CrmServiceRequest::create([
+            'protocolo'            => $this->gerarProtocoloAutoatendimento('ENV'),
             'account_id'           => $crmAccountId,
             'phone_contato'        => $telefoneNormalizado,
             'category'             => 'cliente_documento_envio',
@@ -1018,6 +1021,7 @@ class NexoAutoatendimentoService
         $crmAccountId = $this->resolverCrmAccountId($cliente->datajuri_id, $telefoneNormalizado);
 
         $sr = CrmServiceRequest::create([
+            'protocolo'            => $this->gerarProtocoloAutoatendimento('AGD'),
             'account_id'           => $crmAccountId,
             'phone_contato'        => $telefoneNormalizado,
             'category'             => 'cliente_agendamento',
@@ -1562,6 +1566,19 @@ class NexoAutoatendimentoService
      * Resolve o crm_accounts.id a partir do datajuri_id ou telefone.
      * Usado para vincular tickets de autoatendimento à conta CRM correta.
      */
+    /**
+     * Gera protocolo sequencial diário para tickets de autoatendimento (WhatsApp).
+     * Formato: PREFIX-YYYYMMDD-NNN (ex: TK-20260416-001)
+     * Separado do formato SIATE-XXXXXX que é exclusivo para tickets internos.
+     */
+    private function gerarProtocoloAutoatendimento(string $prefix): string
+    {
+        $hoje = date('Ymd');
+        $padrao = $prefix . '-' . $hoje . '-%';
+        $count = CrmServiceRequest::where('protocolo', 'LIKE', $padrao)->count();
+        return $prefix . '-' . $hoje . '-' . str_pad($count + 1, 3, '0', STR_PAD_LEFT);
+    }
+
     private function resolverCrmAccountId(?int $datajuriId, string $telefone): ?int
     {
         if ($datajuriId) {
