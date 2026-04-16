@@ -3,7 +3,7 @@
 @section('title', 'GDP — Acompanhamento Bimestral')
 
 @section('content')
-<div class="max-w-4xl mx-auto px-4 py-6">
+<div class="w-full px-4 py-6">
     <h1 class="text-2xl font-bold mb-2" style="color: #1B334A;">Acompanhamento do Plano de Trabalho</h1>
     <p class="text-sm text-gray-500 mb-6">Ciclo: {{ $ciclo->nome ?? 'Nenhum ciclo ativo' }}</p>
 

@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container mx-auto px-4 py-8">
+<div class="w-full px-4 py-8">
     {{-- Cabeçalho --}}
     <div class="mb-8">
         <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Classificação de Movimentos</h1>

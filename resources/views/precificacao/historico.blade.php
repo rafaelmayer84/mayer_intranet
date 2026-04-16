@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 py-6">
+<div class="w-full px-4 py-6">
     <div class="flex items-center justify-between mb-6">
         <div class="flex items-center gap-3">
             <a href="{{ route('precificacao.index') }}" class="text-indigo-600 hover:text-indigo-800 text-sm">← Voltar</a>

@@ -43,7 +43,7 @@
     @page { margin: 15mm; }
 </style>
 
-<div class="rel-container max-w-5xl mx-auto px-4 py-6">
+<div class="rel-container w-full px-4 py-6">
     <div class="no-print flex justify-end gap-2 mb-4">
         <button onclick="window.print()" class="px-3 py-1.5 rounded text-xs font-medium border border-[#385776] text-[#385776] hover:bg-gray-50">🖨 Imprimir</button>
         <a href="/vigilia" class="px-3 py-1.5 rounded text-xs font-medium border border-gray-300 text-gray-500 hover:bg-gray-50">← Voltar</a>

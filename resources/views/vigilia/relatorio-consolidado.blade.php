@@ -43,7 +43,7 @@
     @page { margin: 15mm; }
 </style>
 
-<div class="rel-container max-w-5xl mx-auto px-4 py-6">
+<div class="rel-container w-full px-4 py-6">
     <div class="no-print flex justify-end gap-2 mb-4">
         <a href="/vigilia/export/excel?periodo={{ request('periodo', 'mes-atual') }}" class="px-3 py-1.5 rounded text-xs font-medium border border-green-500 text-green-600">📊 Excel</a>
         <button onclick="window.print()" class="px-3 py-1.5 rounded text-xs font-medium border border-[#385776] text-[#385776]">🖨 Imprimir</button>

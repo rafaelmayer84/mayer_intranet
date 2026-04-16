@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title', 'Documentos — ' . $adv->name)
 @section('content')
-<div class="max-w-6xl mx-auto">
+<div class="w-full">
 
     <div class="flex items-center justify-between mb-6">
         <div>

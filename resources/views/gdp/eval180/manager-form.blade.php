@@ -3,7 +3,7 @@
 @section('title', 'Avaliar ' . $avaliado->name . ' — ' . $period)
 
 @section('content')
-<div class="max-w-5xl mx-auto px-4 py-6">
+<div class="w-full px-4 py-6">
 
     {{-- Header --}}
     <div class="flex items-center justify-between mb-6">

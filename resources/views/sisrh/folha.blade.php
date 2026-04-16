@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title', 'Folha de Pagamento')
 @section('content')
-<div class="max-w-7xl mx-auto">
+<div class="w-full">
     <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold text-gray-800">Folha de Pagamento</h1>
         <a href="{{ route('sisrh.index') }}" class="text-sm underline" style="color: #385776;">← Voltar</a>

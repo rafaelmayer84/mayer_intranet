@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title', 'JUSTUS — Administração')
 @section('content')
-<div class="max-w-7xl mx-auto px-4 py-6" x-data="{ tab: 'config' }">
+<div class="w-full px-4 py-6" x-data="{ tab: 'config' }">
 
     <div class="flex items-center justify-between mb-6">
         <div>

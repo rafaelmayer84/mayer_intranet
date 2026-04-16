@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title', 'Rubricas do Holerite')
 @section('content')
-<div class="max-w-5xl mx-auto">
+<div class="w-full">
     <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold text-gray-800">Rubricas do Holerite</h1>
         <a href="{{ route('sisrh.folha') }}" class="text-sm underline" style="color: #385776;">← Voltar à Folha</a>

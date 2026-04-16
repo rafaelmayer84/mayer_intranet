@@ -3,7 +3,7 @@
 @section('title', 'Detalhes do Usuário')
 
 @section('content')
-<div class="max-w-4xl mx-auto space-y-6">
+<div class="w-full space-y-6">
     {{-- Cabeçalho --}}
     <div class="flex items-center justify-between">
         <div class="flex items-center gap-4">

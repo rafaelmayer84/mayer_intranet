@@ -2,7 +2,7 @@
 @section('title', 'Pulso - Upload Ligações')
 
 @section('content')
-<div class="max-w-4xl mx-auto px-6 py-6">
+<div class="w-full px-6 py-6">
     <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold text-[#1B334A]">Upload de Relatório de Ligações</h1>
         <a href="{{ route('crm.pulso') }}" class="px-4 py-2 bg-white border rounded-lg text-sm hover:bg-gray-50">← Voltar ao Pulso</a>

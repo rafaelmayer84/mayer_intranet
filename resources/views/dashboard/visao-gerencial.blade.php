@@ -171,7 +171,7 @@
 {{-- ═══════════════════════════════════════════════════════════════════════
      LAYOUT — HERO (mockup) + SEÇÕES DETALHADAS (original)
      ═══════════════════════════════════════════════════════════════════════ --}}
-<div id="dashboard-root" class="max-w-[1400px] mx-auto space-y-6 pb-12"
+<div id="dashboard-root" class="w-full space-y-6 pb-12"
      data-api-url="{{ route('api.visao-gerencial') }}"
      data-export-url="{{ route('visao-gerencial.export') }}">
 

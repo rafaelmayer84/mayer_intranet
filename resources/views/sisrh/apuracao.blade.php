@@ -3,7 +3,7 @@
 @section('title', 'SISRH — Apuração de Competência')
 
 @section('content')
-<div class="max-w-6xl mx-auto px-4 py-6">
+<div class="w-full px-4 py-6">
     <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold" style="color: #1B334A;">Apuração de Competência</h1>
         <a href="{{ route('sisrh.index') }}" class="text-sm underline" style="color: #385776;">← Voltar</a>

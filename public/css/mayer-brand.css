@@ -261,16 +261,30 @@ a[class*="bg-blue-600"]:hover {
     border-color: var(--brand-blue) !important;
 }
 
-/* ==================== 8. PAGE HEADERS (uso futuro) ==================== */
+/* ==================== 8. PAGE HEADERS — design aprovado ==================== */
 .page-header-brand {
-    background: linear-gradient(135deg, var(--brand-navy) 0%, var(--brand-blue) 100%);
+    background: linear-gradient(160deg, #0F2030 0%, var(--brand-navy) 40%, var(--brand-blue) 100%);
     color: #FFFFFF;
-    padding: 1.5rem 2rem;
-    border-radius: 0.75rem;
-    margin-bottom: 1.5rem;
+    padding: 2rem;
+    border-radius: 14px;
+    margin-bottom: 1.25rem;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(27,51,74,.12), 0 2px 8px rgba(27,51,74,.06),
+                inset 0 1px 0 rgba(255,255,255,.04);
 }
-.page-header-brand h1 { color: #FFFFFF; font-weight: 700; font-size: 1.5rem; }
-.page-header-brand p { color: rgba(255,255,255,0.8); font-size: 0.875rem; }
+.page-header-brand::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse 50% 70% at 75% 15%, rgba(74,109,140,.3) 0%, transparent 60%),
+        radial-gradient(ellipse 35% 50% at 15% 85%, rgba(56,87,118,.2) 0%, transparent 50%);
+    pointer-events: none;
+}
+.page-header-brand > * { position: relative; z-index: 1; }
+.page-header-brand h1 { color: #FFFFFF; font-weight: 700; font-size: 1.5rem; letter-spacing: -0.02em; }
+.page-header-brand p { color: rgba(255,255,255,0.45); font-size: 0.78rem; font-weight: 400; }
 
 /* ==================== 9. FORM ELEMENTS ==================== */
 select, input[type="text"], input[type="email"], input[type="password"],

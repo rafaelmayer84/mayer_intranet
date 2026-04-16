@@ -2,7 +2,7 @@
 @section('title', 'CRM - ' . $opp->title)
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 py-6">
+<div class="w-full px-4 py-6">
     {{-- Breadcrumb --}}
     <div class="flex items-center gap-2 text-sm text-gray-500 mb-4">
         <a href="{{ route('crm.pipeline') }}" class="hover:text-[#385776]">Pipeline</a>

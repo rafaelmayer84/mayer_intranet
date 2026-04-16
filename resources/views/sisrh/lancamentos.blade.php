@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title', 'Lançamentos do Holerite')
 @section('content')
-<div class="max-w-6xl mx-auto">
+<div class="w-full">
     <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold text-gray-800">Lançamentos Manuais</h1>
         <a href="{{ route('sisrh.folha') }}?ano={{ $ano }}&mes={{ $mes }}" class="text-sm underline" style="color: #385776;">← Voltar à Folha</a>

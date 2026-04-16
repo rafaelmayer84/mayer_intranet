@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="max-w-5xl mx-auto px-4 py-6">
+<div class="w-full px-4 py-6">
     <div class="flex items-center gap-3 mb-6">
         <a href="{{ route('precificacao.index') }}" class="text-indigo-600 hover:text-indigo-800">← Voltar</a>
         <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Proposta #{{ $proposta->id }}</h1>

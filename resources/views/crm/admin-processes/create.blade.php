@@ -2,7 +2,7 @@
 @section('title', 'Novo Processo Administrativo')
 
 @section('content')
-<div class="max-w-4xl mx-auto px-6 py-6"
+<div class="w-full px-6 py-6"
      x-data="adminProcessCreate()">
 
     {{-- Breadcrumb --}}

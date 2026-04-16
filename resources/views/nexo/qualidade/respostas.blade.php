@@ -3,7 +3,7 @@
 @section('title', 'Respostas — ' . $campaign->name)
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+<div class="w-full px-4 sm:px-6 py-6">
 
     <div class="flex items-center gap-3 mb-6">
         <a href="{{ route('nexo.qualidade.index') }}" class="text-gray-400 hover:text-gray-600 transition">

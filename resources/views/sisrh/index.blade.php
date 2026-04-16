@@ -3,7 +3,7 @@
 @section('title', 'SISRH — Gestão de Remuneração')
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 py-6">
+<div class="w-full px-4 py-6">
     <div class="flex items-center justify-between mb-6">
         <div>
             <h1 class="text-2xl font-bold" style="color: #1B334A;">SISRH — Gestão de Remuneração</h1>

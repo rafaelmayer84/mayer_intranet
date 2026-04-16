@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title', 'Advogados SISRH')
 @section('content')
-<div class="max-w-7xl mx-auto" x-data="advogadosApp()">
+<div class="w-full" x-data="advogadosApp()">
 
     <div class="flex items-center justify-between mb-6">
         <h1 class="text-2xl font-bold text-gray-800">Cadastro de Advogados</h1>

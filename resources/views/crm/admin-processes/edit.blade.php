@@ -2,7 +2,7 @@
 @section('title', 'Editar — ' . $processo->protocolo)
 
 @section('content')
-<div class="max-w-4xl mx-auto px-6 py-6">
+<div class="w-full px-6 py-6">
 
     {{-- Breadcrumb --}}
     <div class="flex items-center gap-2 text-sm text-gray-500 mb-4">

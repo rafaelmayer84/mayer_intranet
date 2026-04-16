@@ -3,7 +3,7 @@
 @section('title', 'NEXO — Escala de Atendimento')
 
 @section('content')
-<div class="max-w-5xl mx-auto px-4 py-6">
+<div class="w-full px-4 py-6">
 
     <div class="flex items-center justify-between mb-6">
         <div>

@@ -3,7 +3,7 @@
 @section('title', 'CRM - ' . $opportunity->title)
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 py-6">
+<div class="w-full px-4 py-6">
 
     {{-- Header --}}
     <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">

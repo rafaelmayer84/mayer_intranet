@@ -3,7 +3,7 @@
 @section('title', 'EVIDENTIA - Busca Inteligente de Jurisprudência')
 
 @section('content')
-<div class="max-w-5xl mx-auto px-4 py-8">
+<div class="w-full px-4 py-8">
 
     {{-- Header --}}
     <div class="text-center mb-8">

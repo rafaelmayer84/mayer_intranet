@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container mx-auto px-4 py-8">
+<div class="w-full px-4 py-8">
     <!-- Header -->
     <div class="mb-8">
         <div class="flex items-center justify-between mb-6">

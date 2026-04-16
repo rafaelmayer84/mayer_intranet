@@ -3,7 +3,7 @@
 @section('title', 'NEXO Qualidade — Monitoramento')
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+<div class="w-full px-4 sm:px-6 py-6">
 
     {{-- Header --}}
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">

@@ -43,7 +43,7 @@
     @page { margin: 15mm; }
 </style>
 
-<div class="rel-container max-w-5xl mx-auto px-4 py-6">
+<div class="rel-container w-full px-4 py-6">
     <div class="no-print flex justify-between items-center mb-4">
         <form class="flex gap-2" method="GET" action="/vigilia/relatorio/individual">
             <select name="responsavel" class="rounded border border-gray-200 px-3 py-1.5 text-sm" style="font-family:monospace;">

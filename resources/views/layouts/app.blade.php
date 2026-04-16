@@ -12,13 +12,13 @@
     <!-- Inter removida - Montserrat e a font oficial da marca -->
     <!-- CSS auxiliar (transições, tema claro/escuro, pequenos fixes) -->
     <link rel="stylesheet" href="{{ asset('css/intranet-ui.css') }}?v=242">
-    <!-- Hotfix legado (mantido) -->
-    <link rel="stylesheet" href="{{ asset('css/theme.css') }}">
+    <!-- Design System Mayer -->
+    <link rel="stylesheet" href="{{ asset('css/theme.css') }}?v={{ filemtime(public_path('css/theme.css')) }}">
     <!-- Identidade Visual Unificada Mayer Advogados -->
-    <link rel="stylesheet" href="{{ asset('css/mayer-brand.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/mayer-brand.css') }}?v={{ filemtime(public_path('css/mayer-brand.css')) }}">
     @stack('styles')
     <style>
-        body { font-family: 'Montserrat', 'Inter', system-ui, sans-serif; }
+body { font-family: 'Montserrat', 'Inter', system-ui, sans-serif; }
         .submenu { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
         .submenu.open { max-height: 500px; }
         .menu-arrow { transition: transform 0.3s ease; }
@@ -211,7 +211,7 @@
 <body class="min-h-screen">
     <div class="flex min-h-screen">
         <!-- Sidebar -->
-        <aside id="sidebar" class="sidebar w-64 bg-gray-800 border-r border-gray-700 flex flex-col">
+        <aside id="sidebar" class="sidebar w-64 flex flex-col" style="background: linear-gradient(180deg, #0F2030 0%, #1B334A 100%); border-right: 1px solid rgba(255,255,255,.06);"
 
             <!-- Logo/Nome do Sistema -->
             <div class="sidebar-logo p-5 border-b border-white/10 flex items-center justify-center">
@@ -639,7 +639,7 @@
         <main id="main-content" class="flex-1 overflow-auto w-full">
             <!-- Notification Bar Desktop -->
             @auth
-            <div id="notification-bar" class="hidden md:flex items-center justify-between px-6 py-2 bg-white border-b border-gray-200">
+            <div id="notification-bar" class="hidden md:flex items-center justify-between px-6 py-2 bg-white border-b border-gray-200 relative z-[200]">
                 <!-- Busca Global -->
                 <div x-data="buscaGlobalHeader()" class="relative flex-1 max-w-xl">
                     <div class="relative group">

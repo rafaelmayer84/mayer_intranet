@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container mx-auto px-4 py-8 max-w-3xl">
+<div class="w-full px-4 py-8 max-w-3xl">
     {{-- Cabeçalho --}}
     <div class="mb-8">
         <a href="{{ route('admin.classificacao-regras.index') }}" 

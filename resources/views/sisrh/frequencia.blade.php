@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title', 'Folha de Frequência — SISRH')
 @section('content')
-<div class="max-w-7xl mx-auto px-4 py-6" x-data="frequenciaApp()">
+<div class="w-full px-4 py-6" x-data="frequenciaApp()">
 
     <div class="flex items-center justify-between mb-6">
         <div>

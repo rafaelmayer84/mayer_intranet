@@ -2,7 +2,7 @@
 @section('title', 'Chamado ' . $sr->protocolo)
 
 @section('content')
-<div class="max-w-5xl mx-auto px-4 py-6">
+<div class="w-full px-4 py-6">
 
     {{-- Voltar --}}
     <div class="flex items-center gap-3 mb-5">

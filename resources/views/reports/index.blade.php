@@ -3,7 +3,7 @@
 @section('title', 'Central de Relatórios')
 
 @section('content')
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+<div class="w-full px-4 sm:px-6 lg:px-8 py-6">
 
     {{-- Header com gradiente --}}
     <div class="bg-gradient-to-r from-[#385776] to-[#1B334A] rounded-2xl p-6 mb-8 shadow-lg">

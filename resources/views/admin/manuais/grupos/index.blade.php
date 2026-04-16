@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="max-w-5xl mx-auto px-4 py-6">
+<div class="w-full px-4 py-6">
     {{-- Navegação Admin --}}
     <div class="mb-6">
         <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4">Admin — Manuais Normativos</h1>
