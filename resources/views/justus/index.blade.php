@@ -135,29 +135,68 @@
             {{-- Mensagens --}}
             <div class="flex-1 overflow-y-auto px-4 py-4 space-y-5 min-h-0" id="chatMessages">
                 @if($messages->isEmpty())
-                <div class="flex items-center justify-center h-full">
-                    <div class="text-center max-w-md">
-                        <div class="w-20 h-20 mx-auto mb-5 rounded-2xl flex items-center justify-center" style="background:linear-gradient(135deg,#1B334A,#385776);box-shadow:0 20px 40px rgba(27,51,74,0.3);">
-                            <svg class="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                <div class="flex items-center justify-center h-full py-6">
+                    <div class="w-full max-w-lg px-2">
+                        {{-- Cabeçalho --}}
+                        <div class="text-center mb-8">
+                            <div class="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style="background:linear-gradient(135deg,#1B334A,#385776);box-shadow:0 16px 32px rgba(27,51,74,0.25);">
+                                <svg class="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
+                            </div>
+                            <h3 class="text-lg font-bold mb-1" style="color:#1B334A;">Como posso ajudar?</h3>
+                            <p class="text-xs text-gray-400">Selecione uma análise ou escreva diretamente no campo abaixo.</p>
                         </div>
-                        <h3 class="text-xl font-bold mb-2" style="color:#1B334A;">Como posso ajudar?</h3>
-                        <p class="text-sm text-gray-400 mb-6">Envie um documento PDF ou faca uma pergunta juridica.</p>
-                        <div class="grid grid-cols-2 gap-2">
-                            <button @click="messageText = 'Analise os pontos fortes e fracos deste processo'" class="p-3 rounded-xl text-left text-xs text-gray-600 transition-all hover:shadow-md hover:scale-[1.02]" style="background:white;border:1px solid #e5e7eb;">
-                                <span class="font-semibold block mb-1" style="color:#385776;">Analise estrategica</span>
-                                Pontos fortes e fracos
+
+                        {{-- Badge de documento (se há PDF anexado) --}}
+                        @if(isset($attachments) && $attachments->isNotEmpty())
+                        @php $att = $attachments->first(); @endphp
+                        <div class="mb-5 flex items-center gap-2 px-3 py-2 rounded-xl border text-xs" style="background:#f0fdf4;border-color:#bbf7d0;color:#15803d;">
+                            <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <span class="font-medium truncate">{{ $att->original_name }}</span>
+                            @if($att->total_pages)<span class="flex-shrink-0 text-green-500">· {{ $att->total_pages }} págs</span>@endif
+                        </div>
+                        @else
+                        <div class="mb-5 flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed text-xs text-gray-400 cursor-pointer hover:border-gray-400 hover:text-gray-500 transition-all" onclick="document.querySelector('[x-ref=pdfInput]').click()">
+                            <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                            <span>Clique para anexar um PDF do processo <span class="text-gray-300">(opcional)</span></span>
+                        </div>
+                        @endif
+
+                        {{-- Cards de atalho --}}
+                        <div class="grid grid-cols-2 gap-3">
+                            <button @click="messageText = 'Analise os pontos fortes, fracos e riscos deste processo, com recomendação de estratégia processual'; $nextTick(() => $refs.msgInput && $refs.msgInput.focus())"
+                                class="group p-4 rounded-2xl text-left border border-gray-200 bg-white hover:border-[#385776] hover:shadow-md transition-all duration-200">
+                                <div class="w-8 h-8 rounded-xl mb-3 flex items-center justify-center" style="background:linear-gradient(135deg,#e8f0f7,#d1e3f0);">
+                                    <svg class="w-4 h-4" style="color:#385776;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
+                                </div>
+                                <span class="block text-sm font-semibold mb-0.5" style="color:#1B334A;">Análise Estratégica</span>
+                                <span class="block text-xs text-gray-400 leading-relaxed">Pontos fortes, fracos e recomendação de estratégia</span>
                             </button>
-                            <button @click="messageText = 'Identifique os prazos processuais pendentes'" class="p-3 rounded-xl text-left text-xs text-gray-600 transition-all hover:shadow-md hover:scale-[1.02]" style="background:white;border:1px solid #e5e7eb;">
-                                <span class="font-semibold block mb-1" style="color:#385776;">Prazos</span>
-                                Prazos pendentes
+
+                            <button @click="messageText = 'Identifique todos os prazos processuais pendentes e urgentes, ordenados por urgência'; $nextTick(() => $refs.msgInput && $refs.msgInput.focus())"
+                                class="group p-4 rounded-2xl text-left border border-gray-200 bg-white hover:border-[#385776] hover:shadow-md transition-all duration-200">
+                                <div class="w-8 h-8 rounded-xl mb-3 flex items-center justify-center" style="background:linear-gradient(135deg,#fef3e2,#fde8c0);">
+                                    <svg class="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                </div>
+                                <span class="block text-sm font-semibold mb-0.5" style="color:#1B334A;">Prazos Processuais</span>
+                                <span class="block text-xs text-gray-400 leading-relaxed">Identifica prazos pendentes ordenados por urgência</span>
                             </button>
-                            <button @click="messageText = 'Elabore um projeto de contestacao'" class="p-3 rounded-xl text-left text-xs text-gray-600 transition-all hover:shadow-md hover:scale-[1.02]" style="background:white;border:1px solid #e5e7eb;">
-                                <span class="font-semibold block mb-1" style="color:#385776;">Peca processual</span>
-                                Projeto de contestacao
+
+                            <button @click="messageText = 'Elabore um projeto de contestação completo com fundamentos jurídicos e pedidos'; $nextTick(() => $refs.msgInput && $refs.msgInput.focus())"
+                                class="group p-4 rounded-2xl text-left border border-gray-200 bg-white hover:border-[#385776] hover:shadow-md transition-all duration-200">
+                                <div class="w-8 h-8 rounded-xl mb-3 flex items-center justify-center" style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);">
+                                    <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                </div>
+                                <span class="block text-sm font-semibold mb-0.5" style="color:#1B334A;">Peça Processual</span>
+                                <span class="block text-xs text-gray-400 leading-relaxed">Contestação, recurso ou petição com fundamentos</span>
                             </button>
-                            <button @click="messageText = 'Faca uma higiene dos autos e organize cronologicamente'" class="p-3 rounded-xl text-left text-xs text-gray-600 transition-all hover:shadow-md hover:scale-[1.02]" style="background:white;border:1px solid #e5e7eb;">
-                                <span class="font-semibold block mb-1" style="color:#385776;">Higiene de autos</span>
-                                Organizar cronologia
+
+                            <button @click="messageText = 'Faça uma higiene dos autos e organize os eventos em ordem cronológica, destacando os movimentos mais relevantes'; $nextTick(() => $refs.msgInput && $refs.msgInput.focus())"
+                                class="group p-4 rounded-2xl text-left border border-gray-200 bg-white hover:border-[#385776] hover:shadow-md transition-all duration-200">
+                                <div class="w-8 h-8 rounded-xl mb-3 flex items-center justify-center" style="background:linear-gradient(135deg,#fdf4ff,#fae8ff);">
+                                    <svg class="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+                                </div>
+                                <span class="block text-sm font-semibold mb-0.5" style="color:#1B334A;">Higiene de Autos</span>
+                                <span class="block text-xs text-gray-400 leading-relaxed">Cronologia organizada dos eventos do processo</span>
                             </button>
                         </div>
                     </div>
@@ -205,23 +244,42 @@
                 <span>R$ {{ number_format($activeConversation->total_cost_brl, 2, ',', '.') }}</span>
             </div>
 
+            {{-- Barra de contexto da conversa --}}
+            <div class="px-4 pt-2 pb-1 flex items-center gap-2 flex-shrink-0">
+                <span class="text-[10px] px-2 py-0.5 rounded-full font-medium" style="background:#e8f0f7;color:#385776;">
+                    {{ $activeConversation->type_label }}
+                </span>
+                <span class="text-[10px] px-2 py-0.5 rounded-full" style="background:#f3f4f6;color:#6b7280;">
+                    {{ $activeConversation->mode_label }}
+                </span>
+                <a href="{{ route('justus.app', ['c' => $activeConversation->id]) }}" target="_blank"
+                   class="ml-auto text-[10px] text-gray-300 hover:text-gray-500 flex items-center gap-1 transition-colors">
+                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                    Tela cheia
+                </a>
+            </div>
+
             {{-- Input Premium --}}
-            <div class="px-4 py-3 flex-shrink-0" style="background:linear-gradient(180deg,rgba(240,242,245,0),rgba(240,242,245,1));">
+            <div class="px-4 pb-3 flex-shrink-0" style="background:linear-gradient(180deg,rgba(240,242,245,0),rgba(240,242,245,1));">
                 <form action="{{ route('justus.upload', $activeConversation->id) }}" method="POST" enctype="multipart/form-data" x-ref="uploadForm" class="hidden">
                     @csrf
                     <input type="file" name="pdf_file" accept=".pdf" x-ref="pdfInput" @change="$refs.uploadForm.submit()">
                 </form>
-                <div class="flex items-end gap-2 bg-white rounded-2xl shadow-lg border border-gray-100 px-4 py-3 transition-all focus-within:shadow-xl focus-within:border-blue-200">
+                <div class="flex items-end gap-2 bg-white rounded-2xl shadow-lg border border-gray-100 px-3 py-3 transition-all focus-within:shadow-xl focus-within:border-blue-200">
                     <button type="button" @click="$refs.pdfInput.click()"
-                        class="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all flex-shrink-0 mb-0.5" title="Enviar PDF">
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                        class="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all flex-shrink-0 mb-0.5 text-xs font-medium"
+                        title="Anexar PDF do processo">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                        PDF
                     </button>
-                    <textarea x-model="messageText" @keydown.enter.prevent="if(!$event.shiftKey && messageText.trim()) sendMessage()" placeholder="Pergunte sobre o processo, solicite uma analise ou peca..."
-                        class="flex-1 px-2 py-2 text-sm border-0 outline-none bg-transparent resize-none"
-                        style="min-height:44px;max-height:120px;"
-                        :disabled="sending"
+                    <textarea x-model="messageText"
+                        @keydown.enter.prevent="if(!$event.shiftKey && messageText.trim()) sendMessage()"
                         @keydown.enter.exact.prevent="sendMessage"
                         @input="$el.style.height='auto';$el.style.height=Math.min($el.scrollHeight,120)+'px'"
+                        :placeholder="sending ? 'Claude está processando...' : (placeholderByType['{{ $activeConversation->type }}'] || 'Pergunte sobre o processo ou solicite uma análise...')"
+                        class="flex-1 px-2 py-2 text-sm border-0 outline-none bg-transparent resize-none"
+                        style="min-height:56px;max-height:120px;"
+                        :disabled="sending"
                         x-ref="msgInput"
                         rows="1"></textarea>
                     <button @click="sendMessage"
@@ -236,6 +294,13 @@
                             <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
                         </template>
                     </button>
+                </div>
+                {{-- Footer: hints + contador --}}
+                <div class="flex items-center justify-between px-1 pt-1.5 text-[10px] text-gray-300" x-show="messageText.length > 0" x-cloak>
+                    <span>Enter para enviar &middot; Shift+Enter para nova linha</span>
+                    <span :class="messageText.length > 9000 ? 'text-red-400 font-medium' : ''">
+                        <span x-text="messageText.length"></span>/10.000
+                    </span>
                 </div>
             </div>
 
@@ -381,6 +446,20 @@ function justusApp() {
         messageText: '',
         sending: false,
         creating: false,
+        placeholderByType: {
+            'analise_estrategica': 'Solicite uma análise estratégica, pontos fortes e fracos...',
+            'peca': 'Descreva a peça que precisa: contestação, recurso, petição...',
+            'higiene_autos': 'Solicite a higiene dos autos ou organize cronologicamente...',
+            'analise_completa': 'Faça perguntas sobre o documento — o contexto integral será usado...',
+            'calculo_prazo': 'Informe o evento e calcule os prazos processuais...',
+        },
+        typeOptions: [
+            { value: 'analise_estrategica', icon: '⚖️', label: 'Análise Estratégica', desc: 'Pontos fortes, fracos e estratégia' },
+            { value: 'analise_completa',    icon: '🔍', label: 'Análise Completa',     desc: 'Leitura integral do documento' },
+            { value: 'peca',               icon: '📝', label: 'Projeto de Peça',      desc: 'Contestação, recurso, petição' },
+            { value: 'higiene_autos',      icon: '🗂️', label: 'Higiene de Autos',     desc: 'Organização cronológica' },
+            { value: 'calculo_prazo',      icon: '⏱️', label: 'Cálculo de Prazo',     desc: 'Prazos processuais e fatais' },
+        ],
 
         init() {
             const flexRoot = document.querySelector('body > div.flex');
@@ -586,14 +665,20 @@ function renderMarkdown(el) {
                 </div>
             </div>
             <div>
-                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Tipo de Analise</label>
-                <select x-model="newType" class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none">
-                    <option value="analise_estrategica">Analise Estrategica</option>
-                    <option value="analise_completa">Analise Completa</option>
-                    <option value="peca">Projeto de Peca</option>
-                    <option value="higiene_autos">Higiene de Autos</option>
-                    <option value="calculo_prazo">Calculo de Prazo</option>
-                </select>
+                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Tipo de Análise</label>
+                <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    <template x-for="opt in typeOptions" :key="opt.value">
+                        <button type="button" @click="newType = opt.value"
+                            :class="newType === opt.value
+                                ? 'border-[#385776] bg-[#f0f5fa] shadow-sm'
+                                : 'border-gray-200 bg-gray-50 hover:bg-white hover:border-gray-300'"
+                            class="p-3 rounded-xl border text-left transition-all duration-150">
+                            <span class="block text-base mb-1" x-text="opt.icon"></span>
+                            <span class="block text-xs font-semibold leading-tight" style="color:#1B334A;" x-text="opt.label"></span>
+                            <span class="block text-[10px] text-gray-400 mt-0.5 leading-tight" x-text="opt.desc"></span>
+                        </button>
+                    </template>
+                </div>
             </div>
         </div>
         <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3 bg-gray-50/50">
