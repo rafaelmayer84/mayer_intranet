@@ -314,3 +314,10 @@ Schedule::call(function () {
     ]);
 })->weeklyOn(1, '09:00')->timezone('America/Sao_Paulo');
 
+// Relatório CEO — dias 1 e 15 de cada mês às 07:00 BRT
+Schedule::command('relatorio:gerar-ceo')
+    ->twiceMonthly(1, 15, '07:00')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/cron-relatorio-ceo.log'));
+

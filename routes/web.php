@@ -154,7 +154,13 @@ use App\Http\Controllers\ClientesMercadoController;
 // MÓDULO CLASSIFICAÇÃO DE REGRAS
 // ============================================================================
 Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
-    
+
+    // Relatórios CEO (quinzenal, apenas admin)
+    Route::get('relatorios-ceo', [\App\Http\Controllers\Admin\RelatorioCeoController::class, 'index'])
+        ->name('relatorios-ceo.index')->middleware('admin');
+    Route::get('relatorios-ceo/{relatorioCeo}/download', [\App\Http\Controllers\Admin\RelatorioCeoController::class, 'download'])
+        ->name('relatorios-ceo.download')->middleware('admin');
+
     // Rotas de CRUD
     Route::resource('classificacao-regras', \App\Http\Controllers\Admin\ClassificacaoRegrasController::class)
         ->parameters(['classificacao-regras' => 'regra']);

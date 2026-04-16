@@ -1,23 +1,26 @@
 <?php
 
-use App\Http\Controllers\BscInsightsController;
 use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| BSC Insights Routes
+| BSC Insights — encerrado em 16/04/2026
+| Substituído por Relatórios CEO (quinzenal, Claude Opus 4.7)
+| /bsc-insights agora redireciona para /admin/relatorios-ceo
 |--------------------------------------------------------------------------
-| Prefix: nenhum (mesma raiz que /visao-gerencial, /clientes-mercado, etc.)
-| Middleware: auth (herdado do grupo)
 */
 
-Route::middleware(['auth','modulo:resultados.bsc-insights,visualizar'])->group(function () {
-    Route::get('/bsc-insights', [BscInsightsController::class, 'index'])
-        ->name('bsc-insights.index');
+Route::middleware('auth')->group(function () {
+    Route::get('/bsc-insights', function () {
+        return redirect()->route('admin.relatorios-ceo.index');
+    })->name('bsc-insights.index');
 
-    Route::post('/bsc-insights/generate', [BscInsightsController::class, 'generate'])
-        ->name('bsc-insights.generate');
+    // Rotas antigas — redireciona para a listagem
+    Route::post('/bsc-insights/generate', function () {
+        return redirect()->route('admin.relatorios-ceo.index');
+    })->name('bsc-insights.generate');
 
-    Route::get('/bsc-insights/status/{runId}', [BscInsightsController::class, 'status'])
-        ->name('bsc-insights.status');
+    Route::get('/bsc-insights/status/{runId}', function () {
+        return redirect()->route('admin.relatorios-ceo.index');
+    })->name('bsc-insights.status');
 });
