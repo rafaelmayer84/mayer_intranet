@@ -30,6 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/nexo/*',
             'api/webhooks/*',
             'api/evidentia-mcp/*',
+            'api/mcp/evidentia',
             'webhook/leads',
         ]);
     })
