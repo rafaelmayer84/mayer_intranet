@@ -20,14 +20,16 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => \App\Http\Middleware\CheckAdmin::class,
             'modulo' => \App\Http\Middleware\CheckModulePermission::class,
             'user.active' => \App\Http\Middleware\CheckUserActive::class,
-            'internal.api' => \App\Http\Middleware\VerifyInternalApi::class,
+            'internal.api'  => \App\Http\Middleware\VerifyInternalApi::class,
+            'evidentia.mcp' => \App\Http\Middleware\VerifyEventiaMcpToken::class,
         ]);
-        
+
         // Excluir rotas de API do CSRF
         $middleware->validateCsrfTokens(except: [
             'api/sync/*',
             'api/nexo/*',
             'api/webhooks/*',
+            'api/evidentia-mcp/*',
             'webhook/leads',
         ]);
     })

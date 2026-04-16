@@ -1,5 +1,51 @@
 <?php
 
+// ESTÁVEL desde 16/04/2026
+//
+// ┌─────────────────────────────────────────────────────────────────────────┐
+// │  EVIDENTIA — Módulo de Busca Semântica de Jurisprudência  v2.1          │
+// ├─────────────────────────────────────────────────────────────────────────┤
+// │  Visão geral                                                            │
+// │  Busca híbrida sobre acórdãos de TJSC, STJ, TRF4 e TRT12 usando        │
+// │  fulltext (MATCH AGAINST) + similaridade coseno (embeddings float16)   │
+// │  + rerank por LLM (OpenAI). Gera blocos de citação para petições.       │
+// ├─────────────────────────────────────────────────────────────────────────┤
+// │  Pipeline de busca (6 etapas)                                           │
+// │  1. Query Understanding  — gpt-4.1-mini extrai termos/filtros/expansões │
+// │  2. Fulltext Search      — BOOLEAN → NATURAL → LIKE em 4 bancos         │
+// │  3. Semantic Search      — cosine similarity nos embeddings shardados   │
+// │  4. Score Mixing         — 55% semântico + 45% fulltext (min-max norm.) │
+// │  5. Rerank               — gpt-4.1-mini ordena top-30 c/ justificativa  │
+// │  6. Final Score          — 50% mixed + 50% rerank                       │
+// ├─────────────────────────────────────────────────────────────────────────┤
+// │  Bancos de dados                                                        │
+// │  Jurisprudência: justus_tjsc, justus_stj, mysql (TRF4), justus_falcao   │
+// │  Embeddings (shards): emb_tjsc, emb_stj; fallback: evidentia            │
+// │  evidentia.evidentia_embeddings: suporta vector_bin (float16) e         │
+// │    vector_json (legado); prefere vector_bin quando disponível           │
+// ├─────────────────────────────────────────────────────────────────────────┤
+// │  Escrita                                                                │
+// │  - evidentia_searches (1 row por busca)                                 │
+// │  - evidentia_search_results (N rows por busca, topk padrão 10)          │
+// │  - evidentia_citation_blocks (1 row por geração de bloco)               │
+// ├─────────────────────────────────────────────────────────────────────────┤
+// │  Dependências                                                           │
+// │  - EvidentiaOpenAIService  (API OpenAI — query, embedding, rerank)      │
+// │  - EvidentiaEmbedding      (conversão float16, cosine similarity)       │
+// │  - config/evidentia.php    (pesos, limites, conexões, modelos)          │
+// ├─────────────────────────────────────────────────────────────────────────┤
+// │  Budget guard                                                           │
+// │  Cache key: evidentia_budget_YYYY-MM-DD  — limite: EVIDENTIA_DAILY_BUDGET│
+// ├─────────────────────────────────────────────────────────────────────────┤
+// │  Modos de degradação                                                    │
+// │  - Sem embedding API: usa score misto fulltext-only (degraded_mode=true) │
+// │  - Sem rerank API: usa mixed_score como final_score                     │
+// ├─────────────────────────────────────────────────────────────────────────┤
+// │  ATENÇÃO: alterar pesos (weight_*) ou estratégias de fulltext afeta     │
+// │  diretamente a qualidade dos resultados em produção. Testar com         │
+// │  php artisan test:negocios --modulo=evidentia antes de qualquer mudança.│
+// └─────────────────────────────────────────────────────────────────────────┘
+
 namespace App\Services\Evidentia;
 
 use App\Models\EvidentiaChunk;
@@ -484,8 +530,11 @@ class EvidentiaSearchService
     }
 
     /**
-     * Busca embeddings no formato legado (JSON) do banco evidentia original.
-     * Usado durante o período de transição antes da migração completa.
+     * Busca embeddings no banco 'evidentia' (TRF4, TRT12 e chunks ainda não migrados).
+     *
+     * Prefere vector_bin (float16) quando disponível — registros gerados após a
+     * migration 2026_04_16_000001. Faz fallback para vector_json nos registros
+     * legados que ainda não foram re-embeddados.
      */
     private function searchEmbeddingsLegacy(array $chunkIds, array $queryVector, float $queryNorm, array &$scores, array &$bestChunks): void
     {
@@ -495,11 +544,17 @@ class EvidentiaSearchService
                 ->table('evidentia_embeddings as e')
                 ->join('evidentia_chunks as c', 'c.id', '=', 'e.chunk_id')
                 ->whereIn('e.chunk_id', $batch)
-                ->select('e.vector_json', 'e.norm', 'c.tribunal', 'c.jurisprudence_id', 'c.chunk_text')
+                ->select('e.vector_bin', 'e.vector_json', 'e.norm', 'c.tribunal', 'c.jurisprudence_id', 'c.chunk_text')
                 ->get();
 
             foreach ($rows as $row) {
-                $vector = json_decode($row->vector_json, true);
+                // Prefere vector_bin (novo, float16); fallback para vector_json (legado)
+                if ($row->vector_bin !== null) {
+                    $vector = EvidentiaEmbedding::binToVector($row->vector_bin);
+                } else {
+                    $vector = json_decode($row->vector_json, true);
+                }
+
                 if (!$vector || !is_array($vector)) {
                     continue;
                 }

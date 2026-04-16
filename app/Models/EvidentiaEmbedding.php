@@ -1,5 +1,28 @@
 <?php
 
+// ESTÁVEL desde 16/04/2026
+//
+// ┌─────────────────────────────────────────────────────────────────────────┐
+// │  EvidentiaEmbedding — Model de Vetores  v2.1                           │
+// ├─────────────────────────────────────────────────────────────────────────┤
+// │  Armazena embeddings de chunks de jurisprudência em formato float16    │
+// │  (BLOB binário) para busca semântica por cosine similarity.             │
+// ├─────────────────────────────────────────────────────────────────────────┤
+// │  Formato de armazenamento                                               │
+// │  - vector_bin (BLOB): float16 big-endian, 2 bytes/dim → 3072 bytes     │
+// │    para 1536 dimensões (text-embedding-3-small). ~50% menor que JSON.  │
+// │  - vector_json (JSON, legado): array de float32. Presente somente em   │
+// │    registros anteriores à migration 2026_04_16_000001 no banco evidentia│
+// ├─────────────────────────────────────────────────────────────────────────┤
+// │  Sharding por tribunal                                                  │
+// │  TJSC → emb_tjsc  |  STJ → emb_stj  |  TRF4/TRT12 → evidentia         │
+// │  Acesso via: EvidentiaEmbedding::onTribunal('STJ')                      │
+// │             EvidentiaEmbedding::connectionForTribunal('TJSC')           │
+// ├─────────────────────────────────────────────────────────────────────────┤
+// │  ATENÇÃO: floatToHalf/halfToFloat são implementações IEEE 754 manuais. │
+// │  Não alterar sem validar o round-trip em EvidentiaSearchTest.          │
+// └─────────────────────────────────────────────────────────────────────────┘
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
