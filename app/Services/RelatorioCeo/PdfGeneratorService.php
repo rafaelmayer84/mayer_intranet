@@ -9,8 +9,15 @@ use Illuminate\Support\Facades\Log;
 
 class PdfGeneratorService
 {
+    private string $logoB64 = '';
+
     public function gerar(array $dados, array $analise, string $periodoLabel): string
     {
+        $logoPath = public_path('logo-mayer.png');
+        if (file_exists($logoPath)) {
+            $this->logoB64 = 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath));
+        }
+
         $charts = $this->gerarCharts($dados);
         $html   = $this->renderHtml($dados, $analise, $periodoLabel, $charts);
 
@@ -32,7 +39,6 @@ class PdfGeneratorService
     {
         $charts = [];
 
-        // Receita 6 meses
         $historico = $dados['financeiro']['historico_6meses'] ?? [];
         if (!empty($historico)) {
             $charts['receita_historico'] = $this->fetchChart([
@@ -40,28 +46,32 @@ class PdfGeneratorService
                 'data' => [
                     'labels'   => array_column($historico, 'mes'),
                     'datasets' => [
-                        ['label' => 'Receita', 'data' => array_column($historico, 'receita_total'), 'backgroundColor' => '#1e3a5f'],
-                        ['label' => 'Despesas', 'data' => array_map(fn($v) => abs($v), array_column($historico, 'despesas')), 'backgroundColor' => '#c0392b'],
+                        ['label' => 'Receita', 'data' => array_column($historico, 'receita_total'), 'backgroundColor' => '#0a1628'],
+                        ['label' => 'Despesas', 'data' => array_map(fn($v) => abs($v), array_column($historico, 'despesas')), 'backgroundColor' => '#c9a84c'],
                     ],
                 ],
-                'options' => ['plugins' => ['legend' => ['labels' => ['font' => ['size' => 10]]]], 'scales' => ['y' => ['ticks' => ['font' => ['size' => 9]]]]],
-            ]);
+                'options' => [
+                    'plugins' => ['legend' => ['labels' => ['font' => ['size' => 10]]]],
+                    'scales'  => ['y' => ['ticks' => ['font' => ['size' => 9]]]],
+                ],
+            ], 560, 210);
         }
 
-        // Performance advogados
         $snapshots = $dados['gdp']['snapshots'] ?? [];
         if (!empty($snapshots)) {
             $charts['performance_adv'] = $this->fetchChart([
                 'type' => 'horizontalBar',
                 'data' => [
                     'labels'   => array_column($snapshots, 'name'),
-                    'datasets' => [['label' => 'Score', 'data' => array_column($snapshots, 'score_total'), 'backgroundColor' => '#1e3a5f']],
+                    'datasets' => [['label' => 'Score GDP', 'data' => array_column($snapshots, 'score_total'), 'backgroundColor' => '#385776']],
                 ],
-                'options' => ['scales' => ['x' => ['max' => 100, 'ticks' => ['font' => ['size' => 9]]]], 'plugins' => ['legend' => ['display' => false]]],
-            ]);
+                'options' => [
+                    'scales'  => ['x' => ['max' => 100, 'ticks' => ['font' => ['size' => 9]]]],
+                    'plugins' => ['legend' => ['display' => false]],
+                ],
+            ], 480, 200);
         }
 
-        // Leads por área
         $leadsArea = $dados['leads']['por_area'] ?? [];
         if (!empty($leadsArea)) {
             $areas  = array_keys($leadsArea);
@@ -70,26 +80,24 @@ class PdfGeneratorService
                 'type' => 'pie',
                 'data' => [
                     'labels'   => array_slice($areas, 0, 6),
-                    'datasets' => [['data' => array_slice($totais, 0, 6), 'backgroundColor' => ['#1e3a5f','#2e6da4','#3498db','#5dade2','#85c1e9','#aed6f1']]],
+                    'datasets' => [['data' => array_slice($totais, 0, 6), 'backgroundColor' => ['#0a1628','#385776','#5d8ab4','#c9a84c','#e8c97a','#8896a6']]],
                 ],
                 'options' => ['plugins' => ['legend' => ['position' => 'right', 'labels' => ['font' => ['size' => 9]]]]],
-            ]);
+            ], 400, 180);
         }
 
-        // Processos por tipo
         $porTipo = $dados['processos']['por_tipo_acao'] ?? [];
         if (!empty($porTipo)) {
             $charts['processos_tipo'] = $this->fetchChart([
                 'type' => 'doughnut',
                 'data' => [
                     'labels'   => array_slice(array_column($porTipo, 'tipo_acao'), 0, 6),
-                    'datasets' => [['data' => array_slice(array_column($porTipo, 'total'), 0, 6), 'backgroundColor' => ['#1e3a5f','#2e6da4','#3498db','#5dade2','#85c1e9','#aed6f1']]],
+                    'datasets' => [['data' => array_slice(array_column($porTipo, 'total'), 0, 6), 'backgroundColor' => ['#0a1628','#385776','#5d8ab4','#c9a84c','#e8c97a','#8896a6']]],
                 ],
                 'options' => ['plugins' => ['legend' => ['position' => 'right', 'labels' => ['font' => ['size' => 8]]]]],
-            ]);
+            ], 340, 160);
         }
 
-        // Leads por intenção de contratar
         $porIntencao = $dados['leads']['por_intencao_contratar'] ?? [];
         if (!empty($porIntencao)) {
             $charts['leads_intencao'] = $this->fetchChart([
@@ -99,17 +107,17 @@ class PdfGeneratorService
                     'datasets' => [['data' => array_values($porIntencao), 'backgroundColor' => ['#27ae60','#f39c12','#c0392b','#95a5a6']]],
                 ],
                 'options' => ['plugins' => ['legend' => ['position' => 'right', 'labels' => ['font' => ['size' => 9]]]]],
-            ]);
+            ], 340, 150);
         }
 
         return $charts;
     }
 
-    private function fetchChart(array $config): string
+    private function fetchChart(array $config, int $w = 520, int $h = 200): string
     {
         try {
             $json = urlencode(json_encode($config, JSON_UNESCAPED_UNICODE));
-            $url  = "https://quickchart.io/chart?w=520&h=200&bkg=white&c={$json}";
+            $url  = "https://quickchart.io/chart?w={$w}&h={$h}&bkg=white&c={$json}";
             $resp = Http::timeout(15)->get($url);
             if ($resp->successful()) {
                 return 'data:image/png;base64,' . base64_encode($resp->body());
@@ -120,32 +128,40 @@ class PdfGeneratorService
         return '';
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // HTML RENDER
+    // ─────────────────────────────────────────────────────────────────────────
+
     private function renderHtml(array $dados, array $analise, string $periodoLabel, array $charts): string
     {
-        $fin     = $dados['financeiro'] ?? [];
-        $nexo    = $dados['nexo'] ?? [];
-        $gdp     = $dados['gdp'] ?? [];
-        $proc    = $dados['processos'] ?? [];
-        $merc    = $dados['mercado'] ?? [];
-        $ga      = $dados['ga'] ?? [];
-        $leads   = $dados['leads'] ?? [];
-        $wa      = $dados['whatsapp'] ?? [];
-        $geradoEm = now()->format('d/m/Y H:i');
+        $fin        = $dados['financeiro'] ?? [];
+        $nexo       = $dados['nexo'] ?? [];
+        $gdp        = $dados['gdp'] ?? [];
+        $proc       = $dados['processos'] ?? [];
+        $leads      = $dados['leads'] ?? [];
+        $wa         = $dados['whatsapp'] ?? [];
+        $geradoEm   = now()->format('d/m/Y H:i');
 
-        // Campos do novo schema de análise
-        $scoreGeral     = $analise['score_geral'] ?? 0;
-        $tituloPeriodo  = $analise['titulo_periodo'] ?? '';
-        $resumoExec     = $analise['resumo_executivo'] ?? '';
-        $vozClientes    = $analise['voz_dos_clientes'] ?? [];
-        $intMercado     = $analise['inteligencia_de_mercado'] ?? [];
-        $aFin           = $analise['financeiro'] ?? [];
-        $aEquipe        = $analise['performance_equipe'] ?? [];
-        $aProc          = $analise['carteira_processos'] ?? [];
-        $cruzamentos    = $analise['cruzamentos_estrategicos'] ?? [];
-        $recomendacoes  = $analise['recomendacoes_priorizadas'] ?? [];
-        $monitorar      = $analise['o_que_monitorar_proximo_periodo'] ?? [];
+        $scoreGeral    = $analise['score_geral'] ?? 0;
+        $tituloPeriodo = $analise['titulo_periodo'] ?? '';
+        $resumoExec    = $analise['resumo_executivo'] ?? '';
+        $vozClientes   = $analise['voz_dos_clientes'] ?? [];
+        $intMercado    = $analise['inteligencia_de_mercado'] ?? [];
+        $aFin          = $analise['financeiro'] ?? [];
+        $aEquipe       = $analise['performance_equipe'] ?? [];
+        $aProc         = $analise['carteira_processos'] ?? [];
+        $cruzamentos   = $analise['cruzamentos_estrategicos'] ?? [];
+        $recomendacoes = $analise['recomendacoes_priorizadas'] ?? [];
+        $monitorar     = $analise['o_que_monitorar_proximo_periodo'] ?? [];
 
-        $scoreCor = $scoreGeral >= 7 ? '#27ae60' : ($scoreGeral >= 5 ? '#f39c12' : '#c0392b');
+        $dreAt     = $fin['dre_atual'] ?? [];
+        $inadim    = $fin['inadimplencia'] ?? [];
+        $varPct    = $fin['variacao_receita_pct'] ?? 0;
+        $receita   = $dreAt['receita_total'] ?? 0;
+        $despesas  = abs($dreAt['despesas'] ?? 0);
+        $resultado = $dreAt['resultado'] ?? 0;
+        $scoreCor  = $scoreGeral >= 7 ? '#27ae60' : ($scoreGeral >= 5 ? '#d97706' : '#c0392b');
+        $logo      = $this->logoB64;
 
         ob_start(); ?>
 <!DOCTYPE html>
@@ -153,103 +169,367 @@ class PdfGeneratorService
 <head>
 <meta charset="UTF-8">
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: DejaVu Sans, sans-serif; font-size: 9.5px; color: #1c2b3a; background: #fff; line-height: 1.55; }
-.page-break { page-break-before: always; }
+/* ── Reset ── */
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: "DejaVu Sans", sans-serif; font-size:9px; color:#1B334A; background:#fff; line-height:1.55; }
 
-.cover { background: #0a1628; color: #fff; padding: 55px 48px 45px; }
-.cover-firm { font-size: 11px; font-weight: bold; color: #c9a84c; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 3px; }
-.cover-oab  { font-size: 8.5px; color: #5a7080; margin-bottom: 48px; letter-spacing: 1px; }
-.cover-type { font-size: 10px; color: #8899aa; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; }
-.cover-title { font-size: 24px; font-weight: bold; color: #fff; line-height: 1.3; margin-bottom: 6px; max-width: 420px; }
-.cover-periodo { font-size: 11px; color: #c9a84c; margin-bottom: 28px; }
-.cover-score { display: inline-block; background: <?= $scoreCor ?>; color: #fff; padding: 7px 18px; border-radius: 3px; font-size: 12px; font-weight: bold; letter-spacing: 1px; }
-.cover-confidencial { font-size: 8px; color: #3a4f60; margin-top: 22px; border-top: 1px solid #1e3448; padding-top: 12px; }
+/* ── Page header (repeated on every page via a sticky-style div) ── */
+.page-header {
+  background:#0a1628;
+  padding:10px 24px;
+  display:table;
+  width:100%;
+}
+.page-header-left  { display:table-cell; vertical-align:middle; }
+.page-header-right { display:table-cell; vertical-align:middle; text-align:right; }
+.page-header-firm  { font-size:7px; color:#c9a84c; letter-spacing:2px; text-transform:uppercase; font-weight:bold; }
+.page-header-section { font-size:9px; color:#fff; font-weight:bold; letter-spacing:.5px; margin-top:1px; }
+.page-header-period { font-size:7.5px; color:#8896A6; margin-top:1px; }
 
-.section { padding: 22px 40px; }
-.section + .section { border-top: 1px solid #e8edf2; }
+/* ── Dashboard layout (Page 1) ── */
+.dashboard-wrap { display:table; width:100%; border-collapse:collapse; }
 
-.sh { background: #0a1628; padding: 7px 40px; margin: 0 -40px 16px; display: table; width: calc(100% + 80px); }
-.sh h2 { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: #c9a84c; display: table-cell; }
-.sh .sh-sub { font-size: 8px; color: #5a7080; display: table-cell; text-align: right; vertical-align: middle; }
+/* Sidebar */
+.sidebar {
+  display:table-cell;
+  width:29%;
+  background:#EFF3F8;
+  vertical-align:top;
+  padding:18px 14px;
+  border-right:2px solid #D8DEE6;
+}
+.sidebar-logo { text-align:center; margin-bottom:14px; }
+.sidebar-logo img { max-width:80px; max-height:56px; }
+.sidebar-prepared { background:#fff; border-radius:4px; padding:10px 10px; margin-bottom:14px; border:1px solid #D8DEE6; }
+.sidebar-prepared-name { font-size:9px; font-weight:bold; color:#0a1628; }
+.sidebar-prepared-role { font-size:7.5px; color:#8896A6; margin-top:1px; }
+.sidebar-prepared-label { font-size:6.5px; color:#c9a84c; text-transform:uppercase; letter-spacing:1px; font-weight:bold; margin-bottom:5px; }
 
-.analise { font-size: 9.5px; line-height: 1.65; color: #2c3e50; margin-bottom: 12px; text-align: justify; }
-.analise p { margin-bottom: 8px; }
+.sidebar-divider { border:none; border-top:1px solid #D8DEE6; margin:12px 0; }
 
-.metrics { display: table; width: 100%; border-collapse: separate; border-spacing: 6px; margin-bottom: 14px; }
-.mbox { display: table-cell; text-align: center; padding: 10px 6px; background: #f4f6f9; border: 1px solid #e0e5ec; border-radius: 3px; }
-.mval { font-size: 17px; font-weight: bold; color: #0a1628; }
-.mlbl { font-size: 7.5px; color: #7f8c8d; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
-.mvar { font-size: 8.5px; margin-top: 2px; }
-.pos { color: #27ae60; } .neg { color: #c0392b; }
+.sidebar-metric { margin-bottom:10px; }
+.sidebar-metric-label { font-size:7px; color:#8896A6; text-transform:uppercase; letter-spacing:.8px; font-weight:bold; display:block; }
+.sidebar-metric-value { font-size:16px; font-weight:bold; color:#0a1628; display:block; margin-top:1px; line-height:1.1; }
+.sidebar-metric-sub { font-size:7px; color:#8896A6; margin-top:1px; display:block; }
+.sidebar-metric-badge { display:inline-block; padding:1px 6px; border-radius:10px; font-size:7px; font-weight:bold; }
 
-.two { display: table; width: 100%; }
-.cl { display: table-cell; width: 58%; padding-right: 14px; vertical-align: top; }
-.cr { display: table-cell; width: 42%; vertical-align: top; }
+.sidebar-chart-label { font-size:7px; color:#385776; text-transform:uppercase; letter-spacing:.8px; font-weight:bold; margin-bottom:4px; display:block; }
 
-.ul { padding-left: 14px; margin: 6px 0 10px; }
-.ul li { font-size: 9px; margin-bottom: 4px; line-height: 1.5; }
-.ul li::marker { color: #c9a84c; }
+/* Score badge */
+.score-badge {
+  display:inline-block;
+  background:<?= $scoreCor ?>;
+  color:#fff;
+  padding:4px 10px;
+  border-radius:3px;
+  font-size:12px;
+  font-weight:bold;
+  letter-spacing:.5px;
+}
 
-table.dt { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 8.5px; }
-table.dt th { background: #0a1628; color: #c9a84c; padding: 5px 8px; text-align: left; font-size: 8px; font-weight: bold; }
-table.dt td { padding: 4px 8px; border-bottom: 1px solid #eee; vertical-align: top; }
-table.dt tr:nth-child(even) td { background: #f8f9fa; }
+/* Main content area */
+.main-content {
+  display:table-cell;
+  width:71%;
+  vertical-align:top;
+  padding:16px 20px;
+}
 
-.badge { display: inline-block; padding: 2px 7px; border-radius: 2px; font-size: 7.5px; font-weight: bold; letter-spacing: 0.5px; }
-.bg-green  { background: #d5f5e3; color: #1a7a3e; }
-.bg-yellow { background: #fef9e7; color: #7d6608; }
-.bg-red    { background: #fadbd8; color: #922b21; }
-.bg-blue   { background: #d6eaf8; color: #1a5276; }
-.bg-navy   { background: #0a1628; color: #c9a84c; }
+/* ── KPI Cards (3 side by side) ── */
+.kpi-row { display:table; width:100%; border-collapse:separate; border-spacing:8px; margin-bottom:14px; }
+.kpi-card {
+  display:table-cell;
+  background:#fff;
+  border:1px solid #D8DEE6;
+  border-radius:4px;
+  padding:10px 12px;
+  vertical-align:top;
+}
+.kpi-card-label  { font-size:7px; color:#8896A6; text-transform:uppercase; letter-spacing:.8px; font-weight:bold; }
+.kpi-card-value  { font-size:17px; font-weight:bold; color:#0a1628; margin-top:3px; line-height:1.1; }
+.kpi-card-var    { font-size:8px; margin-top:3px; }
+.kpi-card-var.up   { color:#16a34a; }
+.kpi-card-var.down { color:#dc2626; }
+.kpi-card-var.flat { color:#8896A6; }
 
-.callout { padding: 10px 14px; border-radius: 3px; margin-bottom: 10px; font-size: 9px; }
-.callout-info  { background: #eaf3fb; border-left: 3px solid #2980b9; }
-.callout-warn  { background: #fef9e7; border-left: 3px solid #f39c12; }
-.callout-alert { background: #fdedec; border-left: 3px solid #c0392b; }
-.callout-pos   { background: #eafaf1; border-left: 3px solid #27ae60; }
-.callout strong { color: #0a1628; }
+/* ── Section header strip ── */
+.sec-header {
+  background:#0a1628;
+  padding:5px 12px;
+  margin-bottom:10px;
+  display:table;
+  width:100%;
+}
+.sec-header-title { display:table-cell; font-size:8px; letter-spacing:1.5px; text-transform:uppercase; color:#c9a84c; font-weight:bold; }
+.sec-header-sub   { display:table-cell; text-align:right; font-size:7px; color:#5a7080; vertical-align:middle; }
 
-.rec-card { border-left: 3px solid #c9a84c; padding: 9px 13px; margin-bottom: 10px; background: #fffdf5; }
-.rec-pri { font-size: 8px; font-weight: bold; color: #c9a84c; letter-spacing: 1px; margin-bottom: 3px; }
-.rec-decisao { font-size: 10px; font-weight: bold; color: #0a1628; margin-bottom: 4px; }
-.rec-why { font-size: 8.5px; color: #4a5568; margin-bottom: 3px; line-height: 1.5; }
-.rec-impacto { font-size: 8px; color: #718096; }
+/* ── Full-page sections ── */
+.section { padding:18px 24px; }
+.section + .section { border-top:1px solid #E8ECF1; }
+.page-break { page-break-before:always; }
 
-.cruzamento { background: #f0f4ff; border: 1px solid #c5d5ef; border-radius: 3px; padding: 10px 13px; margin-bottom: 10px; }
-.cruzamento h4 { font-size: 9px; color: #1a5276; font-weight: bold; margin-bottom: 5px; }
-.cruzamento .analise { font-size: 9px; margin-bottom: 5px; }
-.cruzamento .impl { font-size: 8.5px; color: #2e86c1; font-style: italic; }
+/* ── Wide section header (for detail pages) ── */
+.sh { background:#0a1628; padding:7px 24px; margin:0 -24px 14px; display:table; width:calc(100% + 48px); }
+.sh h2 { font-size:9px; letter-spacing:1.5px; text-transform:uppercase; color:#c9a84c; display:table-cell; font-weight:bold; }
+.sh .sh-sub { font-size:7.5px; color:#5a7080; display:table-cell; text-align:right; vertical-align:middle; }
 
-.chart-img { max-width: 100%; margin: 8px 0; }
+/* ── Analise text ── */
+.analise { font-size:9px; line-height:1.65; color:#2c3e50; margin-bottom:10px; text-align:justify; }
+.analise p { margin-bottom:7px; }
 
-.footer { text-align: center; font-size: 7.5px; color: #aaa; margin-top: 28px; padding-top: 12px; border-top: 1px solid #e8edf2; }
+/* ── Metrics row ── */
+.metrics { display:table; width:100%; border-collapse:separate; border-spacing:5px; margin-bottom:12px; }
+.mbox { display:table-cell; text-align:center; padding:8px 5px; background:#F2F5F8; border:1px solid #D8DEE6; border-radius:3px; }
+.mval { font-size:14px; font-weight:bold; color:#0a1628; }
+.mlbl { font-size:7px; color:#8896A6; text-transform:uppercase; letter-spacing:.5px; margin-top:2px; }
+.mvar { font-size:8px; margin-top:2px; }
+.pos { color:#16a34a; } .neg { color:#dc2626; }
 
-.kv { display: table; width: 100%; margin-bottom: 8px; }
-.kv-row { display: table-row; }
-.kv-k { display: table-cell; width: 40%; font-size: 8.5px; color: #718096; padding: 2px 8px 2px 0; }
-.kv-v { display: table-cell; font-size: 8.5px; color: #1c2b3a; font-weight: bold; }
+/* ── Two-column layout ── */
+.two { display:table; width:100%; }
+.cl  { display:table-cell; width:58%; padding-right:12px; vertical-align:top; }
+.cr  { display:table-cell; width:42%; vertical-align:top; }
+
+/* ── Lists ── */
+.ul { padding-left:13px; margin:5px 0 8px; }
+.ul li { font-size:8.5px; margin-bottom:3px; line-height:1.5; }
+
+/* ── Tables ── */
+table.dt { width:100%; border-collapse:collapse; margin-bottom:10px; font-size:8px; }
+table.dt th { background:#0a1628; color:#c9a84c; padding:5px 8px; text-align:left; font-size:7.5px; font-weight:bold; }
+table.dt td { padding:4px 8px; border-bottom:1px solid #E8ECF1; vertical-align:top; }
+table.dt tr:nth-child(even) td { background:#F8F9FA; }
+
+/* ── Badges ── */
+.badge { display:inline-block; padding:2px 7px; border-radius:2px; font-size:7px; font-weight:bold; letter-spacing:.5px; }
+.bg-green  { background:#D1FAE5; color:#065F46; }
+.bg-yellow { background:#FEF3C7; color:#92400E; }
+.bg-red    { background:#FEE2E2; color:#991B1B; }
+.bg-blue   { background:#DBEAFE; color:#1E40AF; }
+.bg-navy   { background:#0a1628; color:#c9a84c; }
+
+/* ── Callouts ── */
+.callout { padding:8px 12px; border-radius:3px; margin-bottom:8px; font-size:8.5px; }
+.callout-info  { background:#EFF6FF; border-left:3px solid #3B82F6; }
+.callout-warn  { background:#FFFBEB; border-left:3px solid #F59E0B; }
+.callout-alert { background:#FEF2F2; border-left:3px solid #EF4444; }
+.callout-pos   { background:#ECFDF5; border-left:3px solid #10B981; }
+.callout strong { color:#0a1628; }
+
+/* ── Recommendation cards ── */
+.rec-card { border-left:3px solid #c9a84c; padding:8px 12px; margin-bottom:9px; background:#FFFDF5; }
+.rec-pri     { font-size:7.5px; font-weight:bold; color:#c9a84c; letter-spacing:1px; margin-bottom:2px; }
+.rec-decisao { font-size:9.5px; font-weight:bold; color:#0a1628; margin-bottom:3px; }
+.rec-why     { font-size:8px; color:#4A5568; margin-bottom:2px; line-height:1.5; }
+.rec-impacto { font-size:7.5px; color:#8896A6; }
+
+/* ── Strategic cross cards ── */
+.cruzamento { background:#F0F4FF; border:1px solid #C5D5EF; border-radius:3px; padding:9px 12px; margin-bottom:9px; }
+.cruzamento h4 { font-size:8.5px; color:#1E40AF; font-weight:bold; margin-bottom:4px; }
+.cruzamento .analise { font-size:8.5px; margin-bottom:4px; }
+.cruzamento .impl { font-size:8px; color:#2563EB; font-style:italic; }
+
+/* ── Chart images ── */
+.chart-img { max-width:100%; margin:6px 0; }
+
+/* ── Footer ── */
+.footer { text-align:center; font-size:7px; color:#aaa; margin-top:24px; padding-top:10px; border-top:1px solid #E8ECF1; }
+
+/* ── Key-value pairs ── */
+.kv { display:table; width:100%; margin-bottom:6px; }
+.kv-k { display:table-cell; width:40%; font-size:8px; color:#8896A6; padding:2px 6px 2px 0; }
+.kv-v { display:table-cell; font-size:8px; color:#1B334A; font-weight:bold; }
 </style>
 </head>
 <body>
 
-<!-- ══ CAPA ══ -->
-<div class="cover">
-  <div class="cover-firm">Mayer Advogados</div>
-  <div class="cover-oab">Sociedade de Advogados · OAB/SC 2097 · Itajaí, SC</div>
-  <div class="cover-type">Relatório de Inteligência Executiva</div>
-  <div class="cover-title"><?= htmlspecialchars($tituloPeriodo ?: 'Análise Executiva do Período') ?></div>
-  <div class="cover-periodo"><?= htmlspecialchars($periodoLabel) ?></div>
-  <div>
-    <span class="cover-score">Saúde Geral: <?= $scoreGeral ?>/10</span>
-  </div>
-  <div class="cover-confidencial">
-    Gerado em <?= $geradoEm ?> · Análise via Claude Opus 4.7 com Extended Thinking · CONFIDENCIAL — uso exclusivo da diretoria
-  </div>
-</div>
+<!-- ══════════════════════════════════════════════════════
+     PAGE 1 — DASHBOARD
+     ══════════════════════════════════════════════════════ -->
 
-<!-- ══ RESUMO EXECUTIVO ══ -->
-<div class="section">
+<!-- HEADER: full-width navy bar -->
+<table style="width:100%; background:#0a1628; padding:0; border-collapse:collapse;">
+  <tr>
+    <td style="padding:18px 24px; vertical-align:middle;">
+      <div style="font-size:9px; color:#c9a84c; letter-spacing:2px; text-transform:uppercase; font-weight:bold; margin-bottom:2px;">Mayer Sociedade de Advogados · OAB/SC 2097</div>
+      <div style="font-size:20px; font-weight:bold; color:#fff; letter-spacing:.3px; line-height:1.2;">Relatório de Inteligência Executiva</div>
+      <div style="font-size:10px; color:#8896A6; margin-top:3px;"><?= htmlspecialchars($periodoLabel) ?> · Análise via Claude Opus 4.7</div>
+    </td>
+    <td style="padding:14px 24px 14px 0; text-align:right; vertical-align:middle; width:120px;">
+      <?php if ($logo): ?>
+      <img src="<?= $logo ?>" style="max-width:80px; max-height:60px;" alt="Mayer">
+      <?php else: ?>
+      <div style="font-size:11px; font-weight:bold; color:#c9a84c; letter-spacing:1px;">MAYER</div>
+      <?php endif; ?>
+    </td>
+  </tr>
+</table>
+
+<!-- BODY: sidebar + main content -->
+<table style="width:100%; border-collapse:collapse;">
+<tr>
+
+<!-- ── SIDEBAR ── -->
+<td style="width:29%; background:#EFF3F8; vertical-align:top; padding:16px 14px; border-right:2px solid #D8DEE6;">
+
+  <!-- Prepared by -->
+  <div style="background:#fff; border-radius:4px; padding:10px; margin-bottom:14px; border:1px solid #D8DEE6;">
+    <div style="font-size:6.5px; color:#c9a84c; text-transform:uppercase; letter-spacing:1px; font-weight:bold; margin-bottom:5px;">Prepared by</div>
+    <div style="display:table; width:100%;">
+      <div style="display:table-cell; vertical-align:middle; padding-right:8px;">
+        <div style="width:32px; height:32px; background:#0a1628; border-radius:50%; text-align:center; line-height:32px;">
+          <span style="color:#c9a84c; font-size:12px; font-weight:bold;">R</span>
+        </div>
+      </div>
+      <div style="display:table-cell; vertical-align:middle;">
+        <div style="font-size:9px; font-weight:bold; color:#0a1628;">Rafael Mayer</div>
+        <div style="font-size:7.5px; color:#8896A6; margin-top:1px;">Sócio-Fundador &amp; CEO</div>
+        <div style="font-size:7px; color:#8896A6; margin-top:1px;">Gerado: <?= now()->format('d/m/Y') ?></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Score geral -->
+  <div style="text-align:center; margin-bottom:14px;">
+    <div style="font-size:6.5px; color:#8896A6; text-transform:uppercase; letter-spacing:.8px; font-weight:bold; margin-bottom:5px;">Saúde Geral do Escritório</div>
+    <div style="font-size:30px; font-weight:bold; color:<?= $scoreCor ?>; line-height:1;"><?= $scoreGeral ?><span style="font-size:14px; color:#8896A6;">/10</span></div>
+    <div style="font-size:7.5px; color:#8896A6; margin-top:2px; font-style:italic; max-width:120px; margin-left:auto; margin-right:auto; line-height:1.4;"><?= htmlspecialchars(mb_substr($tituloPeriodo, 0, 60)) ?></div>
+  </div>
+
+  <hr style="border:none; border-top:1px solid #D8DEE6; margin:0 0 12px;">
+
+  <!-- Key metrics stacked -->
+  <div style="margin-bottom:10px;">
+    <div style="font-size:6.5px; color:#8896A6; text-transform:uppercase; letter-spacing:.8px; font-weight:bold; display:block;">Receita Total</div>
+    <div style="font-size:15px; font-weight:bold; color:#0a1628; display:block; margin-top:1px;">R$ <?= number_format($receita, 0, ',', '.') ?></div>
+    <div style="font-size:7px; color:<?= $varPct >= 0 ? '#16a34a' : '#dc2626' ?>; margin-top:1px;"><?= $varPct >= 0 ? '▲' : '▼' ?> <?= abs($varPct) ?>% vs período anterior</div>
+  </div>
+
+  <div style="margin-bottom:10px;">
+    <div style="font-size:6.5px; color:#8896A6; text-transform:uppercase; letter-spacing:.8px; font-weight:bold; display:block;">Resultado</div>
+    <div style="font-size:15px; font-weight:bold; color:<?= $resultado >= 0 ? '#16a34a' : '#dc2626' ?>; display:block; margin-top:1px;">R$ <?= number_format($resultado, 0, ',', '.') ?></div>
+  </div>
+
+  <div style="margin-bottom:10px;">
+    <div style="font-size:6.5px; color:#8896A6; text-transform:uppercase; letter-spacing:.8px; font-weight:bold; display:block;">Inadimplência</div>
+    <div style="font-size:15px; font-weight:bold; color:#dc2626; display:block; margin-top:1px;">R$ <?= number_format($inadim['valor'] ?? 0, 0, ',', '.') ?></div>
+    <div style="font-size:7px; color:#8896A6; margin-top:1px;"><?= $inadim['qtd'] ?? 0 ?> títulos</div>
+  </div>
+
+  <div style="margin-bottom:10px;">
+    <div style="font-size:6.5px; color:#8896A6; text-transform:uppercase; letter-spacing:.8px; font-weight:bold; display:block;">Novos Leads</div>
+    <div style="font-size:15px; font-weight:bold; color:#0a1628; display:block; margin-top:1px;"><?= $leads['total'] ?? 0 ?></div>
+    <div style="font-size:7px; color:#16a34a; margin-top:1px;"><?= $leads['convertidos_para_cliente'] ?? 0 ?> convertidos</div>
+  </div>
+
+  <div style="margin-bottom:12px;">
+    <div style="font-size:6.5px; color:#8896A6; text-transform:uppercase; letter-spacing:.8px; font-weight:bold; display:block;">Processos Ativos</div>
+    <div style="font-size:15px; font-weight:bold; color:#0a1628; display:block; margin-top:1px;"><?= number_format($proc['total_ativos'] ?? 0) ?></div>
+    <div style="font-size:7px; color:<?= ($proc['prazos_vencidos'] ?? 0) > 0 ? '#dc2626' : '#8896A6' ?>; margin-top:1px;"><?= $proc['prazos_vencidos'] ?? 0 ?> prazo(s) vencido(s)</div>
+  </div>
+
+  <div style="margin-bottom:10px;">
+    <div style="font-size:6.5px; color:#8896A6; text-transform:uppercase; letter-spacing:.8px; font-weight:bold; display:block;">Conversas WhatsApp</div>
+    <div style="font-size:15px; font-weight:bold; color:#0a1628; display:block; margin-top:1px;"><?= $wa['total_conversas_analisadas'] ?? 0 ?></div>
+  </div>
+
+  <hr style="border:none; border-top:1px solid #D8DEE6; margin:4px 0 10px;">
+
+  <!-- Donut chart: processos por tipo -->
+  <?php if (!empty($charts['processos_tipo'])): ?>
+  <div style="font-size:6.5px; color:#385776; text-transform:uppercase; letter-spacing:.8px; font-weight:bold; margin-bottom:4px; display:block;">Carteira por tipo de ação</div>
+  <img src="<?= $charts['processos_tipo'] ?>" style="max-width:100%; margin:0;" alt="Processos tipo">
+  <?php elseif (!empty($charts['leads_intencao'])): ?>
+  <div style="font-size:6.5px; color:#385776; text-transform:uppercase; letter-spacing:.8px; font-weight:bold; margin-bottom:4px; display:block;">Intenção de contratar</div>
+  <img src="<?= $charts['leads_intencao'] ?>" style="max-width:100%; margin:0;" alt="Leads intenção">
+  <?php endif; ?>
+
+  <div style="margin-top:12px; font-size:6.5px; color:#8896A6; text-align:center; border-top:1px solid #D8DEE6; padding-top:8px;">
+    CONFIDENCIAL · Uso exclusivo da diretoria
+  </div>
+</td>
+
+<!-- ── MAIN CONTENT ── -->
+<td style="width:71%; vertical-align:top; padding:16px 20px;">
+
+  <!-- KPI Cards: 3 side by side -->
+  <table style="width:100%; border-collapse:separate; border-spacing:6px; margin-bottom:14px;">
+    <tr>
+      <td style="background:#fff; border:1px solid #D8DEE6; border-radius:4px; padding:10px 12px; border-top:3px solid #0a1628; vertical-align:top;">
+        <div style="font-size:7px; color:#8896A6; text-transform:uppercase; letter-spacing:.8px; font-weight:bold;">Receita Total</div>
+        <div style="font-size:16px; font-weight:bold; color:#0a1628; margin-top:3px; line-height:1.1;">R$ <?= number_format($receita / 1000, 1, ',', '.') ?>k</div>
+        <div style="font-size:8px; margin-top:3px; color:<?= $varPct >= 0 ? '#16a34a' : '#dc2626' ?>;"><?= $varPct >= 0 ? '↑' : '↓' ?> <?= abs($varPct) ?>% vs ant.</div>
+      </td>
+      <td style="background:#fff; border:1px solid #D8DEE6; border-radius:4px; padding:10px 12px; border-top:3px solid #c9a84c; vertical-align:top;">
+        <div style="font-size:7px; color:#8896A6; text-transform:uppercase; letter-spacing:.8px; font-weight:bold;">Resultado</div>
+        <div style="font-size:16px; font-weight:bold; color:<?= $resultado >= 0 ? '#16a34a' : '#dc2626' ?>; margin-top:3px; line-height:1.1;">R$ <?= number_format($resultado / 1000, 1, ',', '.') ?>k</div>
+        <div style="font-size:8px; margin-top:3px; color:#8896A6;">Margem: <?= $receita > 0 ? round(($resultado / $receita) * 100) : 0 ?>%</div>
+      </td>
+      <td style="background:#fff; border:1px solid #D8DEE6; border-radius:4px; padding:10px 12px; border-top:3px solid #385776; vertical-align:top;">
+        <div style="font-size:7px; color:#8896A6; text-transform:uppercase; letter-spacing:.8px; font-weight:bold;">Score GDP Médio</div>
+        <?php $gdpMedia = !empty($gdp['snapshots']) ? round(array_sum(array_column($gdp['snapshots'], 'score_total')) / count($gdp['snapshots']), 1) : 0; ?>
+        <div style="font-size:16px; font-weight:bold; color:#0a1628; margin-top:3px; line-height:1.1;"><?= $gdpMedia ?><span style="font-size:10px; color:#8896A6;">/100</span></div>
+        <div style="font-size:8px; margin-top:3px; color:#8896A6;"><?= count($gdp['snapshots'] ?? []) ?> advogados avaliados</div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- Bar chart: receita histórico -->
+  <?php if (!empty($charts['receita_historico'])): ?>
+  <div style="margin-bottom:10px;">
+    <div style="background:#0a1628; padding:4px 10px; margin-bottom:6px;">
+      <span style="font-size:7.5px; letter-spacing:1.5px; text-transform:uppercase; color:#c9a84c; font-weight:bold;">Performance Financeira · Últimos 6 Meses</span>
+    </div>
+    <img src="<?= $charts['receita_historico'] ?>" style="max-width:100%;" alt="Histórico receita">
+  </div>
+  <?php endif; ?>
+
+  <!-- Table: Top 5 recomendações -->
+  <?php if (!empty($recomendacoes)): ?>
+  <div style="margin-top:10px;">
+    <div style="background:#0a1628; padding:4px 10px; margin-bottom:6px; display:table; width:100%;">
+      <span style="font-size:7.5px; letter-spacing:1.5px; text-transform:uppercase; color:#c9a84c; font-weight:bold; display:table-cell;">Ações Prioritárias</span>
+      <span style="font-size:7px; color:#5a7080; display:table-cell; text-align:right; vertical-align:middle;">Decisões acionáveis</span>
+    </div>
+    <table style="width:100%; border-collapse:collapse; font-size:8px;">
+      <thead>
+        <tr style="background:#0a1628;">
+          <th style="color:#c9a84c; padding:5px 8px; text-align:left; font-size:7px; font-weight:bold; width:30px;">#</th>
+          <th style="color:#c9a84c; padding:5px 8px; text-align:left; font-size:7px; font-weight:bold;">Decisão</th>
+          <th style="color:#c9a84c; padding:5px 8px; text-align:left; font-size:7px; font-weight:bold; width:55px;">Área</th>
+          <th style="color:#c9a84c; padding:5px 8px; text-align:left; font-size:7px; font-weight:bold; width:60px;">Prazo</th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php foreach (array_slice($recomendacoes, 0, 6) as $i => $rec):
+          $prazo = $rec['prazo'] ?? '';
+          $prazoBg = $prazo === 'imediato' ? '#FEE2E2' : ($prazo === '7 dias' ? '#FEF3C7' : '#DBEAFE');
+          $prazoCl = $prazo === 'imediato' ? '#991B1B' : ($prazo === '7 dias' ? '#92400E' : '#1E40AF');
+        ?>
+        <tr style="background:<?= $i % 2 === 0 ? '#fff' : '#F8F9FA' ?>;">
+          <td style="padding:4px 8px; border-bottom:1px solid #E8ECF1; color:#c9a84c; font-weight:bold;"><?= $rec['prioridade'] ?? ($i+1) ?></td>
+          <td style="padding:4px 8px; border-bottom:1px solid #E8ECF1; color:#1B334A;"><?= htmlspecialchars(mb_substr($rec['decisao'] ?? '', 0, 70)) ?></td>
+          <td style="padding:4px 8px; border-bottom:1px solid #E8ECF1;">
+            <span style="display:inline-block; padding:1px 5px; border-radius:2px; font-size:6.5px; font-weight:bold; background:#0a1628; color:#c9a84c;"><?= htmlspecialchars(strtoupper($rec['area'] ?? '')) ?></span>
+          </td>
+          <td style="padding:4px 8px; border-bottom:1px solid #E8ECF1;">
+            <span style="display:inline-block; padding:1px 5px; border-radius:2px; font-size:6.5px; font-weight:bold; background:<?= $prazoBg ?>; color:<?= $prazoCl ?>;"><?= htmlspecialchars($prazo) ?></span>
+          </td>
+        </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
+  <?php endif; ?>
+
+</td>
+</tr>
+</table>
+
+<!-- ══════════════════════════════════════════════════════
+     PAGE 2 — RESUMO EXECUTIVO
+     ══════════════════════════════════════════════════════ -->
+<div class="section page-break">
   <div class="sh"><h2>Resumo Executivo</h2><div class="sh-sub">Visão consolidada · <?= htmlspecialchars($periodoLabel) ?></div></div>
   <div class="analise">
     <?php foreach (explode("\n", $resumoExec) as $p): if(trim($p)): ?>
@@ -258,10 +538,12 @@ table.dt tr:nth-child(even) td { background: #f8f9fa; }
   </div>
 </div>
 
-<!-- ══ VOZ DOS CLIENTES ══ -->
+<!-- ══════════════════════════════════════════════════════
+     VOZ DOS CLIENTES
+     ══════════════════════════════════════════════════════ -->
 <?php if (!empty($vozClientes['analise'])): ?>
-<div class="section page-break">
-  <div class="sh"><h2>Voz dos Clientes</h2><div class="sh-sub">Análise semântica de <?= $wa['total_conversas_analisadas'] ?? 0 ?> conversas · <?= array_sum($wa['volume_diario_msgs'] ?? []) ?> mensagens</div></div>
+<div class="section">
+  <div class="sh"><h2>Voz dos Clientes</h2><div class="sh-sub">Análise semântica de <?= $wa['total_conversas_analisadas'] ?? 0 ?> conversas</div></div>
 
   <div class="analise">
     <?php foreach (explode("\n", $vozClientes['analise']) as $p): if(trim($p)): ?>
@@ -270,19 +552,17 @@ table.dt tr:nth-child(even) td { background: #f8f9fa; }
   </div>
 
   <?php if (!empty($vozClientes['temas_criticos'])): ?>
-  <div style="margin-bottom:12px;">
-    <strong style="font-size:9px; color:#0a1628;">Temas críticos identificados:</strong>
-    <ul class="ul" style="margin-top:5px;">
-      <?php foreach ($vozClientes['temas_criticos'] as $t): ?>
-      <li><?= htmlspecialchars($t) ?></li>
-      <?php endforeach; ?>
-    </ul>
-  </div>
+  <strong style="font-size:8.5px; color:#0a1628;">Temas críticos:</strong>
+  <ul class="ul" style="margin-top:4px;">
+    <?php foreach ($vozClientes['temas_criticos'] as $t): ?>
+    <li><?= htmlspecialchars($t) ?></li>
+    <?php endforeach; ?>
+  </ul>
   <?php endif; ?>
 
   <?php if (!empty($vozClientes['alertas'])): ?>
   <?php foreach ($vozClientes['alertas'] as $alerta): ?>
-  <div class="callout callout-alert"><strong>⚠ ALERTA:</strong> <?= htmlspecialchars($alerta) ?></div>
+  <div class="callout callout-alert"><strong>Alerta:</strong> <?= htmlspecialchars($alerta) ?></div>
   <?php endforeach; ?>
   <?php endif; ?>
 
@@ -291,52 +571,33 @@ table.dt tr:nth-child(even) td { background: #f8f9fa; }
   <?php endif; ?>
 
   <?php if (!empty($wa['temas_recorrentes'])): ?>
-  <div style="margin-top:10px;">
-    <strong style="font-size:8.5px; color:#718096;">Palavras mais frequentes nas mensagens dos clientes:</strong>
-    <div style="margin-top:5px; font-size:8px; color:#4a5568; line-height:1.8;">
-      <?php $i = 0; foreach (array_slice($wa['temas_recorrentes'], 0, 25, true) as $palavra => $freq): $i++; ?>
-      <span style="background:#edf2f7; padding:2px 6px; border-radius:2px; margin:2px; display:inline-block;">
+  <div style="margin-top:8px;">
+    <strong style="font-size:8px; color:#8896A6;">Palavras mais frequentes:</strong>
+    <div style="margin-top:4px; font-size:7.5px; color:#4A5568; line-height:2;">
+      <?php foreach (array_slice($wa['temas_recorrentes'], 0, 20, true) as $palavra => $freq): ?>
+      <span style="background:#EDF2F7; padding:2px 6px; border-radius:2px; margin:2px; display:inline-block;">
         <?= htmlspecialchars($palavra) ?> <span style="color:#c9a84c;">(<?= $freq ?>)</span>
       </span>
       <?php endforeach; ?>
     </div>
   </div>
   <?php endif; ?>
-
-  <?php if (!empty($wa['conversas_criticas_urgentes'])): ?>
-  <div style="margin-top:8px; font-size:8.5px; color:#c0392b;">
-    ⚠ <?= $wa['conversas_criticas_urgentes'] ?> conversa(s) com prioridade crítica/urgente no período.
-  </div>
-  <?php endif; ?>
 </div>
 <?php endif; ?>
 
-<!-- ══ INTELIGÊNCIA DE MERCADO / LEADS ══ -->
+<!-- ══════════════════════════════════════════════════════
+     INTELIGÊNCIA DE MERCADO / LEADS
+     ══════════════════════════════════════════════════════ -->
 <?php if (!empty($intMercado['perfil_leads_periodo']) && ($leads['total'] ?? 0) > 0): ?>
 <div class="section page-break">
-  <div class="sh"><h2>Inteligência de Mercado</h2><div class="sh-sub"><?= $leads['total'] ?? 0 ?> leads no período · Captação · Conversão</div></div>
+  <div class="sh"><h2>Inteligência de Mercado</h2><div class="sh-sub"><?= $leads['total'] ?? 0 ?> leads · Captação · Conversão</div></div>
 
   <div class="metrics">
-    <div class="mbox">
-      <div class="mval"><?= $leads['total'] ?? 0 ?></div>
-      <div class="mlbl">Total de Leads</div>
-    </div>
-    <div class="mbox">
-      <div class="mval" style="color:#27ae60;"><?= $leads['por_intencao_contratar']['sim'] ?? 0 ?></div>
-      <div class="mlbl">Intenção Alta</div>
-    </div>
-    <div class="mbox">
-      <div class="mval"><?= $leads['por_intencao_contratar']['talvez'] ?? 0 ?></div>
-      <div class="mlbl">Intenção Média</div>
-    </div>
-    <div class="mbox">
-      <div class="mval"><?= $leads['taxa_conversao_estimada'] ?? 0 ?>%</div>
-      <div class="mlbl">Taxa Conv. Estimada</div>
-    </div>
-    <div class="mbox">
-      <div class="mval"><?= $leads['convertidos_para_cliente'] ?? 0 ?></div>
-      <div class="mlbl">Convertidos</div>
-    </div>
+    <div class="mbox"><div class="mval"><?= $leads['total'] ?? 0 ?></div><div class="mlbl">Total Leads</div></div>
+    <div class="mbox"><div class="mval" style="color:#16a34a;"><?= $leads['por_intencao_contratar']['sim'] ?? 0 ?></div><div class="mlbl">Intenção Alta</div></div>
+    <div class="mbox"><div class="mval"><?= $leads['por_intencao_contratar']['talvez'] ?? 0 ?></div><div class="mlbl">Intenção Média</div></div>
+    <div class="mbox"><div class="mval"><?= $leads['taxa_conversao_estimada'] ?? 0 ?>%</div><div class="mlbl">Taxa Conv.</div></div>
+    <div class="mbox"><div class="mval"><?= $leads['convertidos_para_cliente'] ?? 0 ?></div><div class="mlbl">Convertidos</div></div>
   </div>
 
   <div class="two">
@@ -346,22 +607,15 @@ table.dt tr:nth-child(even) td { background: #f8f9fa; }
         <p><?= htmlspecialchars(trim($p)) ?></p>
         <?php endif; endforeach; ?>
       </div>
-
       <?php if (!empty($intMercado['qualidade_captacao'])): ?>
-      <div class="callout callout-info" style="margin-bottom:8px;">
-        <strong>Qualidade da captação:</strong> <?= htmlspecialchars($intMercado['qualidade_captacao']) ?>
-      </div>
+      <div class="callout callout-info"><strong>Qualidade da captação:</strong> <?= htmlspecialchars($intMercado['qualidade_captacao']) ?></div>
       <?php endif; ?>
-
       <?php if (!empty($intMercado['campanhas_eficazes'])): ?>
-      <div class="callout callout-info">
-        <strong>Campanhas eficazes:</strong> <?= htmlspecialchars($intMercado['campanhas_eficazes']) ?>
-      </div>
+      <div class="callout callout-info"><strong>Campanhas eficazes:</strong> <?= htmlspecialchars($intMercado['campanhas_eficazes']) ?></div>
       <?php endif; ?>
-
       <?php if (!empty($leads['por_area'])): ?>
-      <strong style="font-size:8.5px;">Leads por área jurídica:</strong>
-      <table class="dt" style="margin-top:5px;">
+      <strong style="font-size:8px;">Leads por área jurídica:</strong>
+      <table class="dt" style="margin-top:4px;">
         <tr><th>Área</th><th>Leads</th></tr>
         <?php foreach (array_slice($leads['por_area'], 0, 8, true) as $area => $tot): ?>
         <tr><td><?= htmlspecialchars($area) ?></td><td><?= $tot ?></td></tr>
@@ -371,20 +625,20 @@ table.dt tr:nth-child(even) td { background: #f8f9fa; }
     </div>
     <div class="cr">
       <?php if (!empty($charts['leads_area'])): ?>
-      <strong style="font-size:8.5px;">Distribuição por área:</strong>
-      <img src="<?= $charts['leads_area'] ?>" class="chart-img" alt="Leads por área">
+      <strong style="font-size:8px;">Distribuição por área:</strong>
+      <img src="<?= $charts['leads_area'] ?>" class="chart-img" alt="Leads área">
       <?php endif; ?>
       <?php if (!empty($charts['leads_intencao'])): ?>
-      <strong style="font-size:8.5px; display:block; margin-top:4px;">Intenção de contratar:</strong>
-      <img src="<?= $charts['leads_intencao'] ?>" class="chart-img" alt="Intenção de contratar">
+      <strong style="font-size:8px; display:block; margin-top:6px;">Intenção de contratar:</strong>
+      <img src="<?= $charts['leads_intencao'] ?>" class="chart-img" alt="Leads intenção">
       <?php endif; ?>
     </div>
   </div>
 
   <?php if (!empty($leads['por_gatilho_emocional'])): ?>
   <div style="margin-top:8px;">
-    <strong style="font-size:8.5px;">Gatilhos emocionais predominantes:</strong>
-    <div style="margin-top:5px;">
+    <strong style="font-size:8px;">Gatilhos emocionais:</strong>
+    <div style="margin-top:4px;">
       <?php arsort($leads['por_gatilho_emocional']); foreach (array_slice($leads['por_gatilho_emocional'], 0, 8, true) as $g => $n): ?>
       <span class="badge bg-yellow" style="margin:2px;"><?= htmlspecialchars($g) ?> (<?= $n ?>)</span>
       <?php endforeach; ?>
@@ -393,49 +647,35 @@ table.dt tr:nth-child(even) td { background: #f8f9fa; }
   <?php endif; ?>
 
   <?php if (!empty($intMercado['alertas'])): ?>
-  <div style="margin-top:10px;">
-    <?php foreach ($intMercado['alertas'] as $alerta): ?>
-    <div class="callout callout-warn"><strong>Atenção:</strong> <?= htmlspecialchars($alerta) ?></div>
-    <?php endforeach; ?>
-  </div>
-  <?php endif; ?>
-
-  <?php if (!empty($intMercado['oportunidades'])): ?>
-  <strong style="font-size:8.5px; color:#27ae60;">Oportunidades identificadas:</strong>
-  <ul class="ul">
-    <?php foreach ($intMercado['oportunidades'] as $o): ?><li><?= htmlspecialchars($o) ?></li><?php endforeach; ?>
-  </ul>
+  <?php foreach ($intMercado['alertas'] as $al): ?>
+  <div class="callout callout-warn"><strong>Atenção:</strong> <?= htmlspecialchars($al) ?></div>
+  <?php endforeach; ?>
   <?php endif; ?>
 </div>
 <?php endif; ?>
 
-<!-- ══ FINANCEIRO ══ -->
+<!-- ══════════════════════════════════════════════════════
+     FINANCEIRO
+     ══════════════════════════════════════════════════════ -->
 <div class="section page-break">
   <div class="sh"><h2>Análise Financeira</h2><div class="sh-sub">DRE · Inadimplência · Histórico 6 meses</div></div>
 
-  <?php
-  $dreAt  = $fin['dre_atual'] ?? [];
-  $varPct = $fin['variacao_receita_pct'] ?? 0;
-  $inadim = $fin['inadimplencia'] ?? [];
-  ?>
   <div class="metrics">
     <div class="mbox">
-      <div class="mval">R$ <?= number_format($dreAt['receita_total'] ?? 0, 0, ',', '.') ?></div>
+      <div class="mval">R$ <?= number_format($receita, 0, ',', '.') ?></div>
       <div class="mlbl">Receita Total</div>
-      <div class="mvar <?= $varPct >= 0 ? 'pos' : 'neg' ?>"><?= $varPct >= 0 ? '▲' : '▼' ?> <?= abs($varPct) ?>% vs mês ant.</div>
+      <div class="mvar <?= $varPct >= 0 ? 'pos' : 'neg' ?>"><?= $varPct >= 0 ? '▲' : '▼' ?> <?= abs($varPct) ?>%</div>
     </div>
     <div class="mbox">
-      <div class="mval">R$ <?= number_format(abs($dreAt['despesas'] ?? 0), 0, ',', '.') ?></div>
+      <div class="mval">R$ <?= number_format($despesas, 0, ',', '.') ?></div>
       <div class="mlbl">Despesas</div>
     </div>
     <div class="mbox">
-      <div class="mval" style="color:<?= ($dreAt['resultado'] ?? 0) >= 0 ? '#27ae60' : '#c0392b' ?>">
-        R$ <?= number_format($dreAt['resultado'] ?? 0, 0, ',', '.') ?>
-      </div>
+      <div class="mval" style="color:<?= $resultado >= 0 ? '#16a34a' : '#dc2626' ?>">R$ <?= number_format($resultado, 0, ',', '.') ?></div>
       <div class="mlbl">Resultado</div>
     </div>
     <div class="mbox">
-      <div class="mval" style="color:#c0392b;">R$ <?= number_format($inadim['valor'] ?? 0, 0, ',', '.') ?></div>
+      <div class="mval" style="color:#dc2626;">R$ <?= number_format($inadim['valor'] ?? 0, 0, ',', '.') ?></div>
       <div class="mlbl">Inadimplência</div>
       <div class="mvar"><?= $inadim['qtd'] ?? 0 ?> títulos</div>
     </div>
@@ -456,9 +696,19 @@ table.dt tr:nth-child(even) td { background: #f8f9fa; }
   <div class="callout callout-alert"><?= htmlspecialchars($r) ?></div>
   <?php endforeach; ?>
   <?php endif; ?>
+
+  <?php if (!empty($aFin['recomendacoes'])): ?>
+  <ul class="ul">
+    <?php foreach ($aFin['recomendacoes'] as $r): ?>
+    <li><?= htmlspecialchars($r) ?></li>
+    <?php endforeach; ?>
+  </ul>
+  <?php endif; ?>
 </div>
 
-<!-- ══ PERFORMANCE DA EQUIPE ══ -->
+<!-- ══════════════════════════════════════════════════════
+     PERFORMANCE DA EQUIPE
+     ══════════════════════════════════════════════════════ -->
 <div class="section page-break">
   <div class="sh"><h2>Performance da Equipe</h2><div class="sh-sub">GDP · Scores · Rankings · QA de Atendimento</div></div>
 
@@ -505,13 +755,13 @@ table.dt tr:nth-child(even) td { background: #f8f9fa; }
   <?php endif; ?>
 
   <?php if (!empty($aEquipe['cruzamento_gdp_nexo'])): ?>
-  <div class="callout callout-info" style="margin-top:10px;">
-    <strong>GDP × NEXO — Cruzamento de performance:</strong> <?= htmlspecialchars($aEquipe['cruzamento_gdp_nexo']) ?>
+  <div class="callout callout-info" style="margin-top:8px;">
+    <strong>GDP × NEXO:</strong> <?= htmlspecialchars($aEquipe['cruzamento_gdp_nexo']) ?>
   </div>
   <?php endif; ?>
 
   <?php if (!empty($nexo['qa_scores'])): ?>
-  <strong style="font-size:8.5px; display:block; margin-top:12px;">QA — Satisfação dos clientes:</strong>
+  <strong style="font-size:8px; display:block; margin-top:10px;">QA — Satisfação dos clientes:</strong>
   <table class="dt" style="margin-top:4px;">
     <tr><th>Advogado</th><th>Score Médio</th><th>NPS</th><th>Respostas</th></tr>
     <?php foreach ($nexo['qa_scores'] as $qa): ?>
@@ -526,33 +776,21 @@ table.dt tr:nth-child(even) td { background: #f8f9fa; }
   <?php endif; ?>
 </div>
 
-<!-- ══ CARTEIRA DE PROCESSOS ══ -->
+<!-- ══════════════════════════════════════════════════════
+     CARTEIRA DE PROCESSOS
+     ══════════════════════════════════════════════════════ -->
 <div class="section page-break">
   <div class="sh"><h2>Carteira de Processos</h2><div class="sh-sub">Portfolio ativo · Prazos · Andamentos</div></div>
 
   <div class="metrics">
+    <div class="mbox"><div class="mval"><?= number_format($proc['total_ativos'] ?? 0) ?></div><div class="mlbl">Processos Ativos</div></div>
+    <div class="mbox"><div class="mval">R$ <?= number_format(($proc['valor_carteira'] ?? 0) / 1000000, 1, ',', '.') ?>M</div><div class="mlbl">Valor Carteira</div></div>
     <div class="mbox">
-      <div class="mval"><?= number_format($proc['total_ativos'] ?? 0) ?></div>
-      <div class="mlbl">Processos Ativos</div>
-    </div>
-    <div class="mbox">
-      <div class="mval">R$ <?= number_format(($proc['valor_carteira'] ?? 0) / 1000000, 1, ',', '.') ?>M</div>
-      <div class="mlbl">Valor da Carteira</div>
-    </div>
-    <div class="mbox">
-      <div class="mval" style="color:<?= ($proc['prazos_vencidos'] ?? 0) > 0 ? '#c0392b' : '#27ae60' ?>">
-        <?= $proc['prazos_vencidos'] ?? 0 ?>
-      </div>
+      <div class="mval" style="color:<?= ($proc['prazos_vencidos'] ?? 0) > 0 ? '#dc2626' : '#16a34a' ?>"><?= $proc['prazos_vencidos'] ?? 0 ?></div>
       <div class="mlbl">Prazos Vencidos</div>
     </div>
-    <div class="mbox">
-      <div class="mval"><?= number_format($proc['novos_no_periodo'] ?? 0) ?></div>
-      <div class="mlbl">Novos no Período</div>
-    </div>
-    <div class="mbox">
-      <div class="mval"><?= number_format($proc['andamentos_periodo'] ?? 0) ?></div>
-      <div class="mlbl">Andamentos</div>
-    </div>
+    <div class="mbox"><div class="mval"><?= number_format($proc['novos_no_periodo'] ?? 0) ?></div><div class="mlbl">Novos no Período</div></div>
+    <div class="mbox"><div class="mval"><?= number_format($proc['andamentos_periodo'] ?? 0) ?></div><div class="mlbl">Andamentos</div></div>
   </div>
 
   <div class="two">
@@ -562,15 +800,11 @@ table.dt tr:nth-child(even) td { background: #f8f9fa; }
         <p><?= htmlspecialchars(trim($p)) ?></p>
         <?php endif; endforeach; ?>
       </div>
-
       <?php if (!empty($aProc['riscos_prazos'])): ?>
-      <div class="callout callout-alert">
-        <strong>Prazos — exposição jurídica:</strong> <?= htmlspecialchars($aProc['riscos_prazos']) ?>
-      </div>
+      <div class="callout callout-alert"><strong>Exposição jurídica:</strong> <?= htmlspecialchars($aProc['riscos_prazos']) ?></div>
       <?php endif; ?>
-
       <?php if (!empty($proc['prazos_proximos'])): ?>
-      <strong style="font-size:8.5px; display:block; margin-top:10px;">Prazos fatais próximos (30 dias):</strong>
+      <strong style="font-size:8px; display:block; margin-top:8px;">Prazos fatais próximos (30 dias):</strong>
       <table class="dt" style="margin-top:4px;">
         <tr><th>Processo</th><th>Prazo Fatal</th><th>Responsável</th></tr>
         <?php foreach (array_slice($proc['prazos_proximos'], 0, 8) as $p): ?>
@@ -585,14 +819,16 @@ table.dt tr:nth-child(even) td { background: #f8f9fa; }
     </div>
     <div class="cr">
       <?php if (!empty($charts['processos_tipo'])): ?>
-      <strong style="font-size:8.5px;">Por tipo de ação:</strong>
-      <img src="<?= $charts['processos_tipo'] ?>" class="chart-img" alt="Processos por tipo">
+      <strong style="font-size:8px;">Por tipo de ação:</strong>
+      <img src="<?= $charts['processos_tipo'] ?>" class="chart-img" alt="Processos tipo">
       <?php endif; ?>
     </div>
   </div>
 </div>
 
-<!-- ══ CRUZAMENTOS ESTRATÉGICOS ══ -->
+<!-- ══════════════════════════════════════════════════════
+     CRUZAMENTOS ESTRATÉGICOS
+     ══════════════════════════════════════════════════════ -->
 <?php if (!empty($cruzamentos)): ?>
 <div class="section page-break">
   <div class="sh"><h2>Cruzamentos Estratégicos</h2><div class="sh-sub">Insights gerados por correlação de múltiplas fontes</div></div>
@@ -608,18 +844,20 @@ table.dt tr:nth-child(even) td { background: #f8f9fa; }
 </div>
 <?php endif; ?>
 
-<!-- ══ RECOMENDAÇÕES ══ -->
+<!-- ══════════════════════════════════════════════════════
+     RECOMENDAÇÕES PRIORIZADAS
+     ══════════════════════════════════════════════════════ -->
 <div class="section page-break">
   <div class="sh"><h2>Recomendações Priorizadas</h2><div class="sh-sub">Decisões acionáveis · Ordenadas por impacto e urgência</div></div>
 
-  <?php foreach ($recomendacoes as $rec): ?>
-  <?php $prazo = $rec['prazo'] ?? ''; ?>
+  <?php foreach ($recomendacoes as $rec):
+    $prazo = $rec['prazo'] ?? '';
+    $pBg   = $prazo === 'imediato' ? 'bg-red' : ($prazo === '7 dias' ? 'bg-yellow' : 'bg-blue');
+  ?>
   <div class="rec-card">
     <div class="rec-pri">
       PRIORIDADE <?= $rec['prioridade'] ?? '?' ?>
-      <span class="badge <?= $prazo === 'imediato' ? 'bg-red' : ($prazo === '7 dias' ? 'bg-yellow' : 'bg-blue') ?>" style="margin-left:8px;">
-        <?= htmlspecialchars(strtoupper($prazo)) ?>
-      </span>
+      <span class="badge <?= $pBg ?>" style="margin-left:7px;"><?= htmlspecialchars(strtoupper($prazo)) ?></span>
       <span class="badge bg-navy" style="margin-left:4px;"><?= htmlspecialchars(strtoupper($rec['area'] ?? '')) ?></span>
     </div>
     <div class="rec-decisao"><?= htmlspecialchars($rec['decisao'] ?? '') ?></div>
@@ -629,17 +867,18 @@ table.dt tr:nth-child(even) td { background: #f8f9fa; }
   <?php endforeach; ?>
 
   <?php if (!empty($monitorar)): ?>
-  <div style="margin-top:20px; background:#f4f6f9; border-radius:3px; padding:12px 15px;">
-    <strong style="font-size:9px; color:#0a1628;">O que monitorar no próximo período:</strong>
-    <ul class="ul" style="margin-top:6px;">
+  <div style="margin-top:16px; background:#F2F5F8; border-radius:3px; padding:10px 14px; border-left:3px solid #385776;">
+    <strong style="font-size:8.5px; color:#0a1628;">O que monitorar no próximo período:</strong>
+    <ul class="ul" style="margin-top:5px;">
       <?php foreach ($monitorar as $m): ?><li><?= htmlspecialchars($m) ?></li><?php endforeach; ?>
     </ul>
   </div>
   <?php endif; ?>
 
-  <div class="footer">
-    Mayer Sociedade de Advogados · Relatório de Inteligência Executiva · <?= htmlspecialchars($periodoLabel) ?>
-    <br>Gerado em <?= $geradoEm ?> via Claude Opus 4.7 · CONFIDENCIAL
+  <!-- FOOTER -->
+  <div style="text-align:center; font-size:7px; color:#aaa; margin-top:24px; padding-top:10px; border-top:1px solid #E8ECF1;">
+    Mayer Sociedade de Advogados · OAB/SC 2097 · Relatório de Inteligência Executiva · <?= htmlspecialchars($periodoLabel) ?><br>
+    Gerado em <?= $geradoEm ?> · Claude Opus 4.7 com Extended Thinking · CONFIDENCIAL — uso exclusivo da diretoria
   </div>
 </div>
 

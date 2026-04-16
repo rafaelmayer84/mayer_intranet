@@ -29,7 +29,7 @@ class ClaudeAnalysisService
             ->post('https://api.anthropic.com/v1/messages', [
                 'model'      => 'claude-opus-4-7',
                 'max_tokens' => 20000,
-                'thinking'   => ['type' => 'enabled', 'budget_tokens' => 10000],
+                'thinking'   => ['type' => 'adaptive', 'budget_tokens' => 10000],
                 'system'     => $this->systemPrompt(),
                 'messages'   => [
                     ['role' => 'user', 'content' => $this->userPrompt($dados)],

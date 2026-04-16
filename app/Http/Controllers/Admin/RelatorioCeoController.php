@@ -35,7 +35,35 @@ class RelatorioCeoController extends Controller
 
         GerarRelatorioCeoJob::dispatch($relatorio->id);
 
+        $this->dispararQueueWorker();
+
         return back()->with('success', "Relatório #{$relatorio->id} enfileirado. A geração leva entre 3 e 8 minutos.");
+    }
+
+    private function dispararQueueWorker(): void
+    {
+        if (!function_exists('pcntl_fork')) {
+            return;
+        }
+
+        $pid = pcntl_fork();
+
+        if ($pid === 0) {
+            // Filho: desacopla completamente do processo FPM pai
+            posix_setsid();
+            pcntl_exec(PHP_BINARY, [
+                base_path('artisan'),
+                'queue:work',
+                'database',
+                '--stop-when-empty',
+                '--timeout=900',
+                '--tries=1',
+            ]);
+            exit(0);
+        } elseif ($pid > 0) {
+            // Pai: não espera o filho (WNOHANG = não bloqueia)
+            pcntl_wait($status, WNOHANG);
+        }
     }
 
     public function download(RelatorioCeo $relatorioCeo)
