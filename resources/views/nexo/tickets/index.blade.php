@@ -378,6 +378,12 @@
     const CSRF = '{{ csrf_token() }}';
     let currentTicketId = null;
 
+    // Auto-open ticket modal when ?abrir=ID is in the URL (e.g. from email link)
+    document.addEventListener('DOMContentLoaded', function() {
+        const abrirId = new URLSearchParams(window.location.search).get('abrir');
+        if (abrirId) openModalDetalhe(parseInt(abrirId));
+    });
+
     function headers(isJson = true) {
         const h = {
             'X-CSRF-TOKEN': CSRF,
