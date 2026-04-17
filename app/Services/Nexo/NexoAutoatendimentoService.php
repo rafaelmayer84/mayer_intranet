@@ -386,7 +386,7 @@ class NexoAutoatendimentoService
     // 4. TICKETS DE RETORNO
     // =====================================================
 
-    public function abrirTicket(string $telefone, string $assunto, ?string $mensagem = null): array
+    public function abrirTicket(string $telefone, string $assunto, ?string $mensagem = null, ?string $nomeContato = null): array
     {
         $telefoneNormalizado = $this->normalizarTelefone($telefone);
 
@@ -403,8 +403,13 @@ class NexoAutoatendimentoService
             $nomeCliente = $cliente->nome;
         }
 
-        // Rate limit: máximo 3 tickets abertos por telefone (CRM service requests)
-        $ticketsAbertos = CrmServiceRequest::where('phone_contato', $telefoneNormalizado)
+        // Fallback: usa nome do contato WhatsApp ({{contact.name}} do SendPulse)
+        if (!$nomeCliente && $nomeContato) {
+            $nomeCliente = trim($nomeContato);
+        }
+
+        // Rate limit: máximo 3 tickets abertos por telefone
+        $ticketsAbertos = NexoTicket::where('telefone', $telefoneNormalizado)
             ->whereIn('status', ['aberto', 'em_andamento'])
             ->where('origem', 'autoatendimento')
             ->count();

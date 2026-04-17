@@ -87,16 +87,18 @@ class NexoAutoatendimentoController extends Controller
         }
 
         $request->validate([
-            'telefone' => 'required|string',
-            'assunto' => 'required|string|max:255',
-            'mensagem' => 'nullable|string|max:2000',
+            'telefone'      => 'required|string',
+            'assunto'       => 'required|string|max:255',
+            'mensagem'      => 'nullable|string|max:2000',
+            'nome_contato'  => 'nullable|string|max:255',
         ]);
 
         try {
             $resultado = $this->service->abrirTicket(
                 $request->telefone,
                 $request->assunto,
-                $request->mensagem
+                $request->mensagem,
+                $request->nome_contato
             );
             return response()->json($resultado);
         } catch (\Exception $e) {

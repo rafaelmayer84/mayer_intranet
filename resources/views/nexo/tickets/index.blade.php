@@ -3,53 +3,65 @@
 @section('title', 'WhatsApp Tickets')
 
 @section('content')
-<div class="w-full px-4 sm:px-6 py-6">
+<div class="w-full min-w-0 px-3 sm:px-5 py-5">
 
     {{-- HEADER --}}
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-800">🎫 WhatsApp Tickets</h1>
-            <p class="text-sm text-gray-500 mt-1">Gerencie solicitações recebidas via autoatendimento</p>
+    <div class="flex items-center justify-between mb-5 gap-3">
+        <div class="min-w-0">
+            <h1 class="text-xl sm:text-2xl font-bold text-gray-800 truncate">🎫 WhatsApp Tickets</h1>
+            <p class="text-xs sm:text-sm text-gray-500 mt-0.5 hidden sm:block">Gerencie solicitações recebidas via autoatendimento</p>
         </div>
-        <button onclick="openModalCriar()" class="mt-3 sm:mt-0 inline-flex items-center px-4 py-2 bg-[#1B334A] hover:bg-[#385776] text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-            Novo Ticket
+        <button onclick="openModalCriar()" class="shrink-0 inline-flex items-center px-3 sm:px-4 py-2 bg-[#1B334A] hover:bg-[#385776] text-white text-sm font-medium rounded-lg transition-colors shadow-sm">
+            <svg class="w-4 h-4 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            <span class="hidden sm:inline">Novo Ticket</span>
         </button>
     </div>
 
     {{-- KPI CARDS --}}
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-        <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-            <div class="text-2xl font-bold text-red-400">{{ $kpis['abertos'] }}</div>
-            <div class="text-xs text-gray-500 mt-1">Abertos</div>
+    <div class="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-3 mb-5">
+        <div class="bg-white rounded-lg p-3 sm:p-4 border border-gray-200 shadow-sm">
+            <div class="text-xl sm:text-2xl font-bold text-red-400">{{ $kpis['abertos'] }}</div>
+            <div class="text-xs text-gray-500 mt-0.5 leading-tight">Abertos</div>
         </div>
-        <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-            <div class="text-2xl font-bold text-yellow-400">{{ $kpis['em_andamento'] }}</div>
-            <div class="text-xs text-gray-500 mt-1">Em andamento</div>
+        <div class="bg-white rounded-lg p-3 sm:p-4 border border-gray-200 shadow-sm">
+            <div class="text-xl sm:text-2xl font-bold text-yellow-400">{{ $kpis['em_andamento'] }}</div>
+            <div class="text-xs text-gray-500 mt-0.5 leading-tight">Andamento</div>
         </div>
-        <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-            <div class="text-2xl font-bold text-green-400">{{ $kpis['concluidos_30d'] }}</div>
-            <div class="text-xs text-gray-500 mt-1">Concluídos (30d)</div>
+        <div class="bg-white rounded-lg p-3 sm:p-4 border border-gray-200 shadow-sm">
+            <div class="text-xl sm:text-2xl font-bold text-green-400">{{ $kpis['concluidos_30d'] }}</div>
+            <div class="text-xs text-gray-500 mt-0.5 leading-tight">Concluídos 30d</div>
         </div>
-        <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-            <div class="text-2xl font-bold {{ $kpis['urgentes'] > 0 ? 'text-red-500 animate-pulse' : 'text-gray-500' }}">{{ $kpis['urgentes'] }}</div>
-            <div class="text-xs text-gray-500 mt-1">Urgentes</div>
+        <div class="bg-white rounded-lg p-3 sm:p-4 border border-gray-200 shadow-sm">
+            <div class="text-xl sm:text-2xl font-bold {{ $kpis['urgentes'] > 0 ? 'text-red-500 animate-pulse' : 'text-gray-500' }}">{{ $kpis['urgentes'] }}</div>
+            <div class="text-xs text-gray-500 mt-0.5 leading-tight">Urgentes</div>
         </div>
-        <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-            <div class="text-2xl font-bold {{ $kpis['sla_violados'] > 0 ? 'text-orange-400' : 'text-gray-500' }}">{{ $kpis['sla_violados'] }}</div>
-            <div class="text-xs text-gray-500 mt-1">SLA > 24h</div>
+        <div class="bg-white rounded-lg p-3 sm:p-4 border border-gray-200 shadow-sm">
+            <div class="text-xl sm:text-2xl font-bold {{ $kpis['sla_violados'] > 0 ? 'text-orange-400' : 'text-gray-500' }}">{{ $kpis['sla_violados'] }}</div>
+            <div class="text-xs text-gray-500 mt-0.5 leading-tight">SLA &gt;24h</div>
         </div>
-        <div class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-            <div class="text-2xl font-bold text-blue-400">{{ $kpis['tempo_medio_horas'] ?? '—' }}h</div>
-            <div class="text-xs text-gray-500 mt-1">Tempo médio resolução</div>
+        <div class="bg-white rounded-lg p-3 sm:p-4 border border-gray-200 shadow-sm">
+            <div class="text-xl sm:text-2xl font-bold text-blue-400">{{ $kpis['tempo_medio_horas'] ?? '—' }}h</div>
+            <div class="text-xs text-gray-500 mt-0.5 leading-tight">Tempo médio</div>
         </div>
     </div>
 
     {{-- FILTROS --}}
-    <form method="GET" action="{{ route('nexo.tickets') }}" class="bg-white rounded-lg p-4 border border-gray-200 shadow-sm mb-6">
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+    <form method="GET" action="{{ route('nexo.tickets') }}" class="bg-white rounded-lg p-3 sm:p-4 border border-gray-200 shadow-sm mb-5">
+        {{-- Linha 1: busca + submit sempre visíveis --}}
+        <div class="flex gap-2 mb-2 sm:mb-0">
+            <input type="text" name="busca" value="{{ $filtros['busca'] ?? '' }}" placeholder="Buscar por nome, protocolo…"
+                class="flex-1 min-w-0 bg-white border-gray-300 text-gray-700 text-sm rounded-lg placeholder-gray-400 focus:ring-[#385776] focus:border-[#385776]">
+            <button type="submit" class="shrink-0 px-3 py-2 bg-[#385776] hover:bg-[#1B334A] text-white text-sm rounded-lg transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            </button>
+            <button type="button" onclick="toggleFiltros()" class="sm:hidden shrink-0 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm rounded-lg transition-colors" id="btn-toggle-filtros">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18M7 8h10M11 12h2"/></svg>
+            </button>
+        </div>
+        {{-- Linha 2: filtros avançados (sempre visíveis no desktop, colapsáveis no mobile) --}}
+        <div id="filtros-avancados" class="hidden sm:grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:mt-3">
             <div>
-                <label class="text-xs text-gray-600">Status</label>
+                <label class="text-xs text-gray-500">Status</label>
                 <select name="status" class="w-full mt-1 bg-white border-gray-300 text-gray-700 text-sm rounded-lg focus:ring-[#385776] focus:border-[#385776]">
                     <option value="" {{ empty($filtros['status']) ? 'selected' : '' }}>Todos</option>
                     <option value="ativos" {{ ($filtros['status'] ?? '') === 'ativos' ? 'selected' : '' }}>Ativos</option>
@@ -60,8 +72,8 @@
                 </select>
             </div>
             <div>
-                <label class="text-xs text-gray-600">Tipo</label>
-                <select name="tipo" class="w-full mt-1 bg-white border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                <label class="text-xs text-gray-500">Tipo</label>
+                <select name="tipo" class="w-full mt-1 bg-white border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-[#385776] focus:border-[#385776]">
                     <option value="">Todos</option>
                     <option value="documento" {{ ($filtros['tipo'] ?? '') === 'documento' ? 'selected' : '' }}>Documento</option>
                     <option value="agendamento" {{ ($filtros['tipo'] ?? '') === 'agendamento' ? 'selected' : '' }}>Agendamento</option>
@@ -71,16 +83,16 @@
                 </select>
             </div>
             <div>
-                <label class="text-xs text-gray-600">Prioridade</label>
-                <select name="prioridade" class="w-full mt-1 bg-white border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                <label class="text-xs text-gray-500">Prioridade</label>
+                <select name="prioridade" class="w-full mt-1 bg-white border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-[#385776] focus:border-[#385776]">
                     <option value="">Todas</option>
                     <option value="urgente" {{ ($filtros['prioridade'] ?? '') === 'urgente' ? 'selected' : '' }}>Urgente</option>
                     <option value="normal" {{ ($filtros['prioridade'] ?? '') === 'normal' ? 'selected' : '' }}>Normal</option>
                 </select>
             </div>
             <div>
-                <label class="text-xs text-gray-600">Responsável</label>
-                <select name="responsavel_id" class="w-full mt-1 bg-white border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                <label class="text-xs text-gray-500">Responsável</label>
+                <select name="responsavel_id" class="w-full mt-1 bg-white border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-[#385776] focus:border-[#385776]">
                     <option value="">Todos</option>
                     <option value="sem" {{ ($filtros['responsavel_id'] ?? '') === 'sem' ? 'selected' : '' }}>Sem responsável</option>
                     @foreach($usuarios as $u)
@@ -89,41 +101,88 @@
                 </select>
             </div>
             <div>
-                <label class="text-xs text-gray-600">Busca</label>
-                <input type="text" name="busca" value="{{ $filtros['busca'] ?? '' }}" placeholder="Nome, protocolo..." class="w-full mt-1 bg-white border-gray-300 text-gray-700 text-sm rounded-lg placeholder-gray-400 focus:ring-[#385776] focus:border-[#385776]">
+                <label class="text-xs text-gray-500">De</label>
+                <input type="date" name="data_inicio" value="{{ $filtros['data_inicio'] ?? '' }}" class="w-full mt-1 bg-white border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-[#385776] focus:border-[#385776]">
             </div>
             <div>
-                <label class="text-xs text-gray-600">De</label>
-                <input type="date" name="data_inicio" value="{{ $filtros['data_inicio'] ?? '' }}" class="w-full mt-1 bg-white border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
-            </div>
-            <div class="flex items-end gap-2">
-                <div class="flex-1">
-                    <label class="text-xs text-gray-600">Até</label>
-                    <input type="date" name="data_fim" value="{{ $filtros['data_fim'] ?? '' }}" class="w-full mt-1 bg-white border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500">
-                </div>
-                <button type="submit" class="px-3 py-2 bg-[#385776] hover:bg-[#1B334A] text-white text-sm rounded-lg transition-colors">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                </button>
+                <label class="text-xs text-gray-500">Até</label>
+                <input type="date" name="data_fim" value="{{ $filtros['data_fim'] ?? '' }}" class="w-full mt-1 bg-white border-gray-300 text-gray-800 text-sm rounded-lg focus:ring-[#385776] focus:border-[#385776]">
             </div>
         </div>
     </form>
 
-    {{-- TABELA --}}
-    <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+    {{-- LISTA MOBILE (cards) --}}
+    <div class="sm:hidden space-y-2 mb-4">
+        @forelse($tickets as $ticket)
+        <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-3 {{ $ticket->prioridade === 'urgente' && $ticket->isAberto() ? 'border-l-4 border-l-red-500' : ($ticket->status === 'em_andamento' ? 'border-l-4 border-l-yellow-400' : '') }} {{ in_array($ticket->status, ['concluido','cancelado']) ? 'opacity-60' : '' }}" id="card-{{ $ticket->id }}">
+            <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2 flex-wrap mb-1">
+                        <span class="font-mono text-xs font-bold text-[#385776]">{{ $ticket->protocolo ?? '—' }}</span>
+                        @php
+                            $badgeClass = match($ticket->status) {
+                                'aberto'      => 'bg-red-100 text-red-700',
+                                'em_andamento'=> 'bg-yellow-100 text-yellow-700',
+                                'concluido'   => 'bg-green-100 text-green-700',
+                                default       => 'bg-gray-100 text-gray-600',
+                            };
+                            $badgeLabel = match($ticket->status) {
+                                'aberto'      => 'Aberto',
+                                'em_andamento'=> 'Andamento',
+                                'concluido'   => 'Concluído',
+                                'cancelado'   => 'Cancelado',
+                                default       => $ticket->status,
+                            };
+                        @endphp
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium {{ $badgeClass }}">{{ $badgeLabel }}</span>
+                        @if($ticket->prioridade === 'urgente')
+                            <span class="text-xs text-red-500 font-semibold">🔴 Urgente</span>
+                        @endif
+                        @if($ticket->created_at->diffInHours(now()) > 24 && $ticket->isAberto())
+                            <span class="text-xs text-orange-500" title="SLA > 24h">⚠️</span>
+                        @endif
+                    </div>
+                    <div class="font-medium text-gray-800 text-sm truncate">{{ $ticket->nome_cliente ?? 'Desconhecido' }}</div>
+                    <div class="text-xs text-gray-500 truncate mt-0.5">{{ $ticket->assunto }}</div>
+                    <div class="flex items-center gap-3 mt-1.5 text-xs text-gray-400">
+                        <span>{{ $ticket->created_at->format('d/m H:i') }}</span>
+                        @if($ticket->responsavel)
+                            <span>· {{ $ticket->responsavel->name }}</span>
+                        @endif
+                        @if(($ticket->notas_count ?? 0) > 0)
+                            <span>· {{ $ticket->notas_count }} nota{{ $ticket->notas_count > 1 ? 's' : '' }}</span>
+                        @endif
+                    </div>
+                </div>
+                <button onclick="openModalDetalhe({{ $ticket->id }})" class="shrink-0 p-2 text-[#385776] hover:bg-blue-50 rounded-lg transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                </button>
+            </div>
+        </div>
+        @empty
+        <div class="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400 text-sm">Nenhum ticket encontrado.</div>
+        @endforelse
+        @if($tickets->hasPages())
+        <div class="py-2">{{ $tickets->links() }}</div>
+        @endif
+    </div>
+
+    {{-- TABELA DESKTOP --}}
+    <div class="hidden sm:block bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="w-full text-sm text-left">
+            <table class="w-full text-sm text-left" style="min-width:860px">
                 <thead class="bg-gray-50 text-gray-500 text-xs uppercase border-b border-gray-200">
                     <tr>
-                        <th class="px-4 py-3">Protocolo</th>
-                        <th class="px-4 py-3">Cliente</th>
-                        <th class="px-4 py-3">Tipo</th>
-                        <th class="px-4 py-3">Assunto</th>
-                        <th class="px-4 py-3">Status</th>
-                        <th class="px-4 py-3">Prior.</th>
-                        <th class="px-4 py-3">Responsável</th>
-                        <th class="px-4 py-3">Criado</th>
-                        <th class="px-4 py-3">Notas</th>
-                        <th class="px-4 py-3 text-center">Ações</th>
+                        <th class="px-3 py-3 whitespace-nowrap">Protocolo</th>
+                        <th class="px-3 py-3">Cliente</th>
+                        <th class="px-3 py-3 hidden lg:table-cell">Tipo</th>
+                        <th class="px-3 py-3">Assunto</th>
+                        <th class="px-3 py-3 whitespace-nowrap">Status</th>
+                        <th class="px-3 py-3 hidden lg:table-cell text-center">Prior.</th>
+                        <th class="px-3 py-3 whitespace-nowrap">Responsável</th>
+                        <th class="px-3 py-3 whitespace-nowrap hidden md:table-cell">Criado</th>
+                        <th class="px-3 py-3 text-center hidden lg:table-cell">Notas</th>
+                        <th class="px-3 py-3 text-center">Ações</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -133,55 +192,53 @@
                         {{ $ticket->status === 'aberto' ? 'bg-white hover:bg-gray-50' : '' }}
                         {{ in_array($ticket->status, ['concluido', 'cancelado']) ? 'bg-gray-50 opacity-50 hover:opacity-75' : '' }}
                         {{ $ticket->prioridade === 'urgente' && $ticket->isAberto() ? 'border-l-4 border-red-500' : '' }}" id="row-{{ $ticket->id }}">
-                        <td class="px-4 py-3">
-                            <span class="font-mono text-xs text-[#385776] font-semibold">{{ $ticket->protocolo ?? '—' }}</span>
+                        <td class="px-3 py-3">
+                            <span class="font-mono text-xs text-[#385776] font-semibold whitespace-nowrap">{{ $ticket->protocolo ?? '—' }}</span>
                         </td>
-                        <td class="px-4 py-3">
-                            <div class="font-medium text-gray-800">{{ $ticket->nome_cliente ?? 'Desconhecido' }}</div>
+                        <td class="px-3 py-3 max-w-[140px]">
+                            <div class="font-medium text-gray-800 truncate">{{ $ticket->nome_cliente ?? 'Desconhecido' }}</div>
                             @if($ticket->telefone)
-                            <div class="text-xs text-gray-400">{{ $ticket->telefone }}</div>
+                            <div class="text-xs text-gray-400 truncate">{{ $ticket->telefone }}</div>
                             @endif
                         </td>
-                        <td class="px-4 py-3 text-xs text-gray-600">{{ $ticket->tipo_label }}</td>
-                        <td class="px-4 py-3">
-                            <div class="text-gray-700 max-w-xs truncate" title="{{ $ticket->assunto }}">{{ $ticket->assunto }}</div>
+                        <td class="px-3 py-3 text-xs text-gray-600 hidden lg:table-cell whitespace-nowrap">{{ $ticket->tipo_label }}</td>
+                        <td class="px-3 py-3 max-w-[180px]">
+                            <div class="text-gray-700 truncate text-xs" title="{{ $ticket->assunto }}">{{ $ticket->assunto }}</div>
                         </td>
-                        <td class="px-4 py-3">
-                            <select onchange="mudarStatus({{ $ticket->id }}, this.value)" class="bg-white border-gray-300 text-xs rounded px-2 py-1 text-gray-700 focus:ring-[#385776]">
+                        <td class="px-3 py-3">
+                            <select onchange="mudarStatus({{ $ticket->id }}, this.value)" class="bg-white border-gray-300 text-xs rounded px-1.5 py-1 text-gray-700 focus:ring-[#385776] max-w-[130px]">
                                 <option value="aberto" {{ $ticket->status === 'aberto' ? 'selected' : '' }}>🔴 Aberto</option>
-                                <option value="em_andamento" {{ $ticket->status === 'em_andamento' ? 'selected' : '' }}>🟡 Em andamento</option>
+                                <option value="em_andamento" {{ $ticket->status === 'em_andamento' ? 'selected' : '' }}>🟡 Andamento</option>
                                 <option value="concluido" {{ $ticket->status === 'concluido' ? 'selected' : '' }}>🟢 Concluído</option>
                                 <option value="cancelado" {{ $ticket->status === 'cancelado' ? 'selected' : '' }}>⚪ Cancelado</option>
                             </select>
                         </td>
-                        <td class="px-4 py-3 text-center">
+                        <td class="px-3 py-3 text-center hidden lg:table-cell">
                             <span class="text-xs {{ $ticket->prioridade === 'urgente' ? 'text-red-400 font-semibold' : 'text-green-400' }}">
                                 {{ $ticket->prioridade === 'urgente' ? '🔴' : '🟢' }}
                             </span>
                         </td>
-                        <td class="px-4 py-3">
-                            <select onchange="atribuirResponsavel({{ $ticket->id }}, this.value)" class="bg-white border-gray-300 text-xs rounded px-2 py-1 text-gray-800 focus:ring-blue-500">
+                        <td class="px-3 py-3">
+                            <select onchange="atribuirResponsavel({{ $ticket->id }}, this.value)" class="bg-white border-gray-300 text-xs rounded px-1.5 py-1 text-gray-800 focus:ring-[#385776] max-w-[130px]">
                                 <option value="">Ninguém</option>
                                 @foreach($usuarios as $u)
                                     <option value="{{ $u->id }}" {{ $ticket->responsavel_id == $u->id ? 'selected' : '' }}>{{ $u->name }}</option>
                                 @endforeach
                             </select>
                         </td>
-                        <td class="px-4 py-3 text-xs text-gray-500">
+                        <td class="px-3 py-3 text-xs text-gray-500 whitespace-nowrap hidden md:table-cell">
                             {{ $ticket->created_at->format('d/m H:i') }}
                             @if($ticket->created_at->diffInHours(now()) > 24 && $ticket->isAberto())
                                 <span class="text-orange-400 font-semibold ml-1" title="SLA > 24h">⚠️</span>
                             @endif
                         </td>
-                        <td class="px-4 py-3 text-center">
-                            <span class="text-xs text-gray-400">{{ $ticket->notas_count ?? 0 }}</span>
-                        </td>
-                        <td class="px-4 py-3 text-center">
+                        <td class="px-3 py-3 text-center text-xs text-gray-400 hidden lg:table-cell">{{ $ticket->notas_count ?? 0 }}</td>
+                        <td class="px-3 py-3 text-center">
                             <button onclick="openModalDetalhe({{ $ticket->id }})" class="text-[#385776] hover:text-[#1B334A] transition-colors" title="Ver detalhes">
-                                <svg class="w-5 h-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                             </button>
                             @if(auth()->user()->role === 'admin')
-                            <button onclick="excluirTicket({{ $ticket->id }})" class="text-red-400 hover:text-red-600 transition-colors ml-2" title="Excluir">
+                            <button onclick="excluirTicket({{ $ticket->id }})" class="text-red-400 hover:text-red-600 transition-colors ml-1" title="Excluir">
                                 <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                             </button>
                             @endif
@@ -380,9 +437,24 @@
 
     // Auto-open ticket modal when ?abrir=ID is in the URL (e.g. from email link)
     document.addEventListener('DOMContentLoaded', function() {
-        const abrirId = new URLSearchParams(window.location.search).get('abrir');
+        const params = new URLSearchParams(window.location.search);
+        const abrirId = params.get('abrir');
         if (abrirId) openModalDetalhe(parseInt(abrirId));
+
+        // Show advanced filters if any filter is active
+        const activeFilters = ['status','tipo','prioridade','responsavel_id','data_inicio','data_fim'];
+        if (activeFilters.some(k => params.get(k))) {
+            document.getElementById('filtros-avancados').classList.remove('hidden');
+            document.getElementById('filtros-avancados').classList.add('grid');
+        }
     });
+
+    function toggleFiltros() {
+        const el = document.getElementById('filtros-avancados');
+        const visible = !el.classList.contains('hidden');
+        el.classList.toggle('hidden', visible);
+        el.classList.toggle('grid', !visible);
+    }
 
     function headers(isJson = true) {
         const h = {
