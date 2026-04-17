@@ -23,7 +23,7 @@ class NexoAutoatendimentoController extends Controller
 
     public function titulosAbertos(Request $request)
     {
-        if (!$this->validarWebhook($request)) {
+        if (!$this->validarWebhookFlexivel($request)) {
             return response()->json(['erro' => 'Não autorizado'], 401);
         }
 
@@ -40,7 +40,7 @@ class NexoAutoatendimentoController extends Controller
 
     public function segundaVia(Request $request)
     {
-        if (!$this->validarWebhook($request)) {
+        if (!$this->validarWebhookFlexivel($request)) {
             return response()->json(['erro' => 'Não autorizado'], 401);
         }
 
@@ -61,7 +61,7 @@ class NexoAutoatendimentoController extends Controller
 
     public function proximosCompromissos(Request $request)
     {
-        if (!$this->validarWebhook($request)) {
+        if (!$this->validarWebhookFlexivel($request)) {
             return response()->json(['erro' => 'Não autorizado'], 401);
         }
 
@@ -109,7 +109,7 @@ class NexoAutoatendimentoController extends Controller
 
     public function listarTickets(Request $request)
     {
-        if (!$this->validarWebhook($request)) {
+        if (!$this->validarWebhookFlexivel($request)) {
             return response()->json(['erro' => 'Não autorizado'], 401);
         }
 
@@ -132,7 +132,7 @@ class NexoAutoatendimentoController extends Controller
 
     public function resumoLeigo(Request $request)
     {
-        if (!$this->validarWebhook($request)) {
+        if (!$this->validarWebhookFlexivel($request)) {
             return response()->json(['erro' => 'Não autorizado'], 401);
         }
 
@@ -322,7 +322,7 @@ class NexoAutoatendimentoController extends Controller
 
     public function processosAdministrativos(Request $request)
     {
-        if (!$this->validarWebhook($request)) {
+        if (!$this->validarWebhookFlexivel($request)) {
             return response()->json(['erro' => 'Não autorizado'], 401);
         }
 
