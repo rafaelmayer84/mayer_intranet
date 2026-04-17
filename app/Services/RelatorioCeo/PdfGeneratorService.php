@@ -1,4 +1,5 @@
 <?php
+// ESTÁVEL desde 17/04/2026
 
 namespace App\Services\RelatorioCeo;
 
@@ -6,6 +7,7 @@ use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class PdfGeneratorService
 {
@@ -153,6 +155,9 @@ class PdfGeneratorService
         $cruzamentos   = $analise['cruzamentos_estrategicos'] ?? [];
         $recomendacoes = $analise['recomendacoes_priorizadas'] ?? [];
         $monitorar     = $analise['o_que_monitorar_proximo_periodo'] ?? [];
+        $ctxMercado    = $analise['contexto_mercado'] ?? [];
+        $topClientes   = $fin['top_clientes_receita'] ?? [];
+        $topDevedores  = $fin['top_devedores'] ?? [];
 
         $dreAt     = $fin['dre_atual'] ?? [];
         $inadim    = $fin['inadimplencia'] ?? [];
@@ -393,7 +398,7 @@ table.dt tr:nth-child(even) td { background:#F8F9FA; }
   <div style="text-align:center; margin-bottom:14px;">
     <div style="font-size:6.5px; color:#8896A6; text-transform:uppercase; letter-spacing:.8px; font-weight:bold; margin-bottom:5px;">Saúde Geral do Escritório</div>
     <div style="font-size:30px; font-weight:bold; color:<?= $scoreCor ?>; line-height:1;"><?= $scoreGeral ?><span style="font-size:14px; color:#8896A6;">/10</span></div>
-    <div style="font-size:7.5px; color:#8896A6; margin-top:2px; font-style:italic; max-width:120px; margin-left:auto; margin-right:auto; line-height:1.4;"><?= htmlspecialchars(mb_substr($tituloPeriodo, 0, 60)) ?></div>
+    <div style="font-size:7.5px; color:#8896A6; margin-top:2px; font-style:italic; max-width:120px; margin-left:auto; margin-right:auto; line-height:1.4;"><?= htmlspecialchars(Str::limit($tituloPeriodo, 80, '…')) ?></div>
   </div>
 
   <hr style="border:none; border-top:1px solid #D8DEE6; margin:0 0 12px;">
@@ -508,7 +513,7 @@ table.dt tr:nth-child(even) td { background:#F8F9FA; }
         ?>
         <tr style="background:<?= $i % 2 === 0 ? '#fff' : '#F8F9FA' ?>;">
           <td style="padding:4px 8px; border-bottom:1px solid #E8ECF1; color:#c9a84c; font-weight:bold;"><?= $rec['prioridade'] ?? ($i+1) ?></td>
-          <td style="padding:4px 8px; border-bottom:1px solid #E8ECF1; color:#1B334A;"><?= htmlspecialchars(mb_substr($rec['decisao'] ?? '', 0, 70)) ?></td>
+          <td style="padding:4px 8px; border-bottom:1px solid #E8ECF1; color:#1B334A;"><?= htmlspecialchars(Str::limit($rec['decisao'] ?? '', 90, '…')) ?></td>
           <td style="padding:4px 8px; border-bottom:1px solid #E8ECF1;">
             <span style="display:inline-block; padding:1px 5px; border-radius:2px; font-size:6.5px; font-weight:bold; background:#0a1628; color:#c9a84c;"><?= htmlspecialchars(strtoupper($rec['area'] ?? '')) ?></span>
           </td>
@@ -697,6 +702,47 @@ table.dt tr:nth-child(even) td { background:#F8F9FA; }
   <?php endforeach; ?>
   <?php endif; ?>
 
+  <?php if (!empty($aFin['concentracao_receita'])): ?>
+  <div class="callout callout-warn"><strong>Concentração de receita:</strong> <?= htmlspecialchars($aFin['concentracao_receita']) ?></div>
+  <?php endif; ?>
+
+  <?php if (!empty($aFin['inadimplencia_detalhe'])): ?>
+  <div class="callout callout-alert"><strong>Inadimplência — detalhe:</strong> <?= htmlspecialchars($aFin['inadimplencia_detalhe']) ?></div>
+  <?php endif; ?>
+
+  <?php if (!empty($topClientes)): ?>
+  <div class="two" style="margin-top:10px;">
+    <div class="cl">
+      <strong style="font-size:8px;">Top clientes por receita:</strong>
+      <table class="dt" style="margin-top:4px;">
+        <tr><th>Cliente</th><th>Receita</th><th>%</th></tr>
+        <?php foreach (array_slice($topClientes, 0, 8) as $tc): ?>
+        <tr>
+          <td><?= htmlspecialchars($tc['cliente']) ?></td>
+          <td>R$ <?= number_format($tc['receita_total'], 0, ',', '.') ?></td>
+          <td><?= $tc['percentual_receita'] ?>%</td>
+        </tr>
+        <?php endforeach; ?>
+      </table>
+    </div>
+    <?php if (!empty($topDevedores)): ?>
+    <div class="cr">
+      <strong style="font-size:8px;">Top devedores (inadimplentes):</strong>
+      <table class="dt" style="margin-top:4px;">
+        <tr><th>Cliente</th><th>Valor</th><th>Títulos</th></tr>
+        <?php foreach (array_slice($topDevedores, 0, 6) as $td): ?>
+        <tr>
+          <td><?= htmlspecialchars($td['cliente']) ?></td>
+          <td style="color:#dc2626;">R$ <?= number_format($td['valor_devido'], 0, ',', '.') ?></td>
+          <td><?= $td['titulos'] ?></td>
+        </tr>
+        <?php endforeach; ?>
+      </table>
+    </div>
+    <?php endif; ?>
+  </div>
+  <?php endif; ?>
+
   <?php if (!empty($aFin['recomendacoes'])): ?>
   <ul class="ul">
     <?php foreach ($aFin['recomendacoes'] as $r): ?>
@@ -845,6 +891,41 @@ table.dt tr:nth-child(even) td { background:#F8F9FA; }
 <?php endif; ?>
 
 <!-- ══════════════════════════════════════════════════════
+     CONTEXTO DE MERCADO
+     ══════════════════════════════════════════════════════ -->
+<?php if (!empty($ctxMercado['noticias_relevantes']) || !empty($dados['mercado']['noticias'])): ?>
+<div class="section page-break">
+  <div class="sh"><h2>Contexto de Mercado</h2><div class="sh-sub">Inteligência setorial · Notícias jurídicas do período</div></div>
+
+  <?php if (!empty($ctxMercado['noticias_relevantes'])): ?>
+  <div class="analise">
+    <?php foreach (explode("\n", $ctxMercado['noticias_relevantes']) as $p): if(trim($p)): ?>
+    <p><?= htmlspecialchars(trim($p)) ?></p>
+    <?php endif; endforeach; ?>
+  </div>
+  <?php endif; ?>
+
+  <?php if (!empty($ctxMercado['implicacao_estrategica'])): ?>
+  <div class="callout callout-info"><strong>Implicação estratégica:</strong> <?= htmlspecialchars($ctxMercado['implicacao_estrategica']) ?></div>
+  <?php endif; ?>
+
+  <?php if (!empty($dados['mercado']['noticias'])): ?>
+  <strong style="font-size:8px; display:block; margin-top:8px;">Notícias coletadas:</strong>
+  <table class="dt" style="margin-top:4px;">
+    <tr><th>Data</th><th>Título</th><th>Fonte</th></tr>
+    <?php foreach (array_slice($dados['mercado']['noticias'], 0, 10) as $n): ?>
+    <tr>
+      <td style="white-space:nowrap;"><?= htmlspecialchars($n['data'] ?? '') ?></td>
+      <td><?= htmlspecialchars(Str::limit($n['titulo'] ?? '', 80, '…')) ?></td>
+      <td style="white-space:nowrap;"><?= htmlspecialchars($n['fonte'] ?? '') ?></td>
+    </tr>
+    <?php endforeach; ?>
+  </table>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<!-- ══════════════════════════════════════════════════════
      RECOMENDAÇÕES PRIORIZADAS
      ══════════════════════════════════════════════════════ -->
 <div class="section page-break">
@@ -878,7 +959,7 @@ table.dt tr:nth-child(even) td { background:#F8F9FA; }
   <!-- FOOTER -->
   <div style="text-align:center; font-size:7px; color:#aaa; margin-top:24px; padding-top:10px; border-top:1px solid #E8ECF1;">
     Mayer Sociedade de Advogados · OAB/SC 2097 · Relatório de Inteligência Executiva · <?= htmlspecialchars($periodoLabel) ?><br>
-    Gerado em <?= $geradoEm ?> · Claude Opus 4.7 com Extended Thinking · CONFIDENCIAL — uso exclusivo da diretoria
+    Gerado em <?= $geradoEm ?> · Claude Opus 4.7 com Extended Thinking (budget 8k tokens) · CONFIDENCIAL — uso exclusivo da diretoria
   </div>
 </div>
 

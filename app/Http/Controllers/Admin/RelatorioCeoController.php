@@ -1,4 +1,5 @@
 <?php
+// ESTÁVEL desde 17/04/2026
 
 namespace App\Http\Controllers\Admin;
 
@@ -27,6 +28,16 @@ class RelatorioCeoController extends Controller
         $inicio = Carbon::parse($request->periodo_inicio)->startOfDay();
         $fim    = Carbon::parse($request->periodo_fim)->endOfDay();
 
+        // Evita duplicata de período já em andamento
+        $emAndamento = RelatorioCeo::whereIn('status', ['queued', 'running'])
+            ->where('periodo_inicio', $inicio->toDateString())
+            ->where('periodo_fim', $fim->toDateString())
+            ->exists();
+
+        if ($emAndamento) {
+            return back()->with('error', 'Já existe uma geração em andamento para esse período.');
+        }
+
         $relatorio = RelatorioCeo::create([
             'periodo_inicio' => $inicio->toDateString(),
             'periodo_fim'    => $fim->toDateString(),
@@ -35,35 +46,7 @@ class RelatorioCeoController extends Controller
 
         GerarRelatorioCeoJob::dispatch($relatorio->id);
 
-        $this->dispararQueueWorker();
-
-        return back()->with('success', "Relatório #{$relatorio->id} enfileirado. A geração leva entre 3 e 8 minutos.");
-    }
-
-    private function dispararQueueWorker(): void
-    {
-        if (!function_exists('pcntl_fork')) {
-            return;
-        }
-
-        $pid = pcntl_fork();
-
-        if ($pid === 0) {
-            // Filho: desacopla completamente do processo FPM pai
-            posix_setsid();
-            pcntl_exec(PHP_BINARY, [
-                base_path('artisan'),
-                'queue:work',
-                'database',
-                '--stop-when-empty',
-                '--timeout=900',
-                '--tries=1',
-            ]);
-            exit(0);
-        } elseif ($pid > 0) {
-            // Pai: não espera o filho (WNOHANG = não bloqueia)
-            pcntl_wait($status, WNOHANG);
-        }
+        return back()->with('success', "Relatório #{$relatorio->id} enfileirado para o período {$inicio->format('d/m/Y')} a {$fim->format('d/m/Y')}. Aguarde o processamento.");
     }
 
     public function download(RelatorioCeo $relatorioCeo)

@@ -1,4 +1,5 @@
 <?php
+// ESTÁVEL desde 17/04/2026
 
 namespace App\Jobs;
 
@@ -90,8 +91,8 @@ class GerarRelatorioCeoJob implements ShouldQueue
 
     private function notificarAdmins(RelatorioCeo $relatorio, string $periodo, array $analise): void
     {
-        $score = $analise['resumo_executivo']['score_geral'] ?? null;
-        $titulo = $analise['resumo_executivo']['titulo'] ?? 'Novo relatório disponível';
+        $score = $analise['score_geral'] ?? null;
+        $titulo = $analise['titulo_periodo'] ?? 'Novo relatório disponível';
         $scoreLabel = $score ? " · Score {$score}/10" : '';
 
         $admins = User::where('role', 'admin')->where('ativo', true)->get();

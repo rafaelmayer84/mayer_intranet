@@ -1,4 +1,5 @@
 <?php
+// ESTÁVEL desde 17/04/2026
 
 namespace App\Services\RelatorioCeo;
 
@@ -47,15 +48,59 @@ class FinanceiroCollector
             ->values()
             ->toArray();
 
+        // Top clientes por receita no mês (movimentos.pessoa)
+        $topClientesRaw = DB::table('movimentos')
+            ->where('mes', $mesAtual)
+            ->where('ano', $anoAtual)
+            ->whereIn('classificacao', ['RECEITA_PF', 'RECEITA_PJ', 'RECEITA_FINANCEIRA', 'OUTRAS_RECEITAS'])
+            ->whereNotNull('pessoa')
+            ->where('pessoa', '!=', '')
+            ->select('pessoa', DB::raw('SUM(ABS(valor)) as receita_total'), DB::raw('COUNT(*) as transacoes'))
+            ->groupBy('pessoa')
+            ->orderByDesc('receita_total')
+            ->take(10)
+            ->get()
+            ->toArray();
+
+        $receitaTotal = $dreAtual['receita_total'] ?: 1;
+        $topClientesReceita = array_map(fn($c) => [
+            'cliente'             => ((array)$c)['pessoa'],
+            'receita_total'       => round(((array)$c)['receita_total'], 2),
+            'percentual_receita'  => round(((array)$c)['receita_total'] / $receitaTotal * 100, 1),
+            'transacoes'          => ((array)$c)['transacoes'],
+        ], $topClientesRaw);
+
+        // Top devedores (inadimplentes por cliente)
+        $topDevedoresRaw = DB::table('contas_receber')
+            ->where('status', 'Não lançado')
+            ->whereNotNull('data_vencimento')
+            ->where('data_vencimento', '<', now())
+            ->whereNotNull('cliente')
+            ->where('cliente', '!=', '')
+            ->select('cliente', DB::raw('SUM(ABS(valor)) as valor_devido'), DB::raw('COUNT(*) as titulos'))
+            ->groupBy('cliente')
+            ->orderByDesc('valor_devido')
+            ->take(8)
+            ->get()
+            ->toArray();
+
+        $topDevedores = array_map(fn($d) => [
+            'cliente'      => ((array)$d)['cliente'],
+            'valor_devido' => round(((array)$d)['valor_devido'], 2),
+            'titulos'      => ((array)$d)['titulos'],
+        ], $topDevedoresRaw);
+
         return [
-            'periodo'            => "{$inicio->format('d/m/Y')} a {$fim->format('d/m/Y')}",
-            'mes_referencia'     => $fim->format('F/Y'),
-            'dre_atual'          => $dreAtual,
-            'dre_anterior'       => $dreAnterior,
+            'periodo'              => "{$inicio->format('d/m/Y')} a {$fim->format('d/m/Y')}",
+            'mes_referencia'       => $fim->format('F/Y'),
+            'dre_atual'            => $dreAtual,
+            'dre_anterior'         => $dreAnterior,
             'variacao_receita_pct' => $variacaoReceita,
-            'inadimplencia'      => $inadimplencia,
-            'historico_6meses'   => $historico,
-            'top_despesas'       => $topDespesas,
+            'inadimplencia'        => $inadimplencia,
+            'historico_6meses'     => $historico,
+            'top_despesas'         => $topDespesas,
+            'top_clientes_receita' => $topClientesReceita,
+            'top_devedores'        => $topDevedores,
         ];
     }
 }

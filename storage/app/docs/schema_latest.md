@@ -1,159 +1,171 @@
 # RESULTADOS! — Schema do Banco de Dados
 
 **Banco:** u492856976_intranet
-**Gerado em:** 06/04/2026 16:00:08 BRT
-**Tabelas:** 148
+**Gerado em:** 17/04/2026 09:08:08 BRT
+**Tabelas:** 160
 
 ## Indice
 
 1. **advogados** (17 registros)
-2. **ai_monthly_budgets** (2 registros)
+2. **ai_monthly_budgets** (3 registros)
 3. **ai_runs** (32 registros)
-4. **andamentos_fase** (233161 registros)
-5. **atividades** (9984 registros)
-6. **atividades_datajuri** (9885 registros)
-7. **audit_logs** (526 registros)
-8. **avisos** (9 registros)
-9. **avisos_lidos** (32 registros)
+4. **andamentos_fase** (232677 registros)
+5. **atividades** (10008 registros)
+6. **atividades_datajuri** (10064 registros)
+7. **audit_logs** (664 registros)
+8. **avisos** (10 registros)
+9. **avisos_lidos** (37 registros)
 10. **bsc_insight_cards** (135 registros)
 11. **bsc_insight_cards_v2** (139 registros)
-12. **bsc_insight_runs** (12 registros)
+12. **bsc_insight_runs** (14 registros)
 13. **bsc_insight_snapshots** (33 registros)
-14. **cache** (106 registros)
+14. **cache** (80 registros)
 15. **cache_locks** (0 registros)
 16. **categorias_avisos** (8 registros)
-17. **classificacao_regras** (38 registros)
+17. **classificacao_regras** (39 registros)
 18. **clientes** (293 registros)
 19. **configuracoes** (38 registros)
-20. **contas_receber** (1743 registros)
+20. **contas_receber** (1670 registros)
 21. **contas_receber_backup_final** (1764 registros)
 22. **contas_receber_backup_saneamento** (1764 registros)
-23. **contratos** (430 registros)
-24. **crm_accounts** (1061 registros)
-25. **crm_activities** (378 registros)
-26. **crm_ai_insights** (9 registros)
-27. **crm_alertas_enviados** (166 registros)
-28. **crm_cadence_tasks** (32 registros)
-29. **crm_cadence_templates** (1 registros)
-30. **crm_distribution_proposals** (2 registros)
-31. **crm_distribution_queue** (0 registros)
-32. **crm_documents** (7 registros)
-33. **crm_events** (2389 registros)
-34. **crm_identities** (3283 registros)
-35. **crm_opportunities** (113 registros)
-36. **crm_owner_profiles** (4 registros)
-37. **crm_pulso_alertas** (10 registros)
-38. **crm_pulso_config** (4 registros)
-39. **crm_pulso_diario** (72 registros)
-40. **crm_pulso_phone_uploads** (4 registros)
-41. **crm_service_request_comments** (55 registros)
-42. **crm_service_requests** (47 registros)
-43. **crm_stages** (6 registros)
-44. **espocrm_accounts** (865 registros)
-45. **espocrm_contacts** (2 registros)
-46. **espocrm_leads** (175 registros)
-47. **failed_jobs** (0 registros)
-48. **fases_processo** (3163 registros)
-49. **gdp_acompanhamentos** (0 registros)
-50. **gdp_audit_log** (74 registros)
-51. **gdp_ciclos** (1 registros)
-52. **gdp_eixos** (4 registros)
-53. **gdp_eval180_action_items** (8 registros)
-54. **gdp_eval180_forms** (9 registros)
-55. **gdp_eval180_responses** (6 registros)
-56. **gdp_indicadores** (14 registros)
-57. **gdp_metas_individuais** (336 registros)
-58. **gdp_penalizacao_config** (0 registros)
-59. **gdp_penalizacao_tipos** (26 registros)
-60. **gdp_penalizacoes** (0 registros)
-61. **gdp_remuneracao_faixas** (6 registros)
-62. **gdp_resultados_mensais** (112 registros)
-63. **gdp_snapshots** (12 registros)
-64. **gdp_validacao_financeira** (0 registros)
-65. **horas_trabalhadas** (2000 registros)
-66. **horas_trabalhadas_datajuri** (2830 registros)
-67. **integration_logs** (124 registros)
-68. **job_batches** (0 registros)
-69. **jobs** (2 registros)
-70. **justus_approvals** (0 registros)
-71. **justus_attachments** (45 registros)
-72. **justus_conversations** (57 registros)
-73. **justus_document_chunks** (968 registros)
-74. **justus_document_pages** (3906 registros)
-75. **justus_jurisprudencia** (1 registros)
-76. **justus_messages** (188 registros)
-77. **justus_process_profiles** (57 registros)
-78. **justus_prompt_templates** (15 registros)
-79. **justus_rag_feedback** (0 registros)
-80. **justus_style_guides** (3 registros)
-81. **justus_usage_monthly** (5 registros)
-82. **kpi_monthly_targets** (245 registros)
-83. **lancamentos** (130 registros)
-84. **lead_messages** (7362 registros)
-85. **lead_tracking** (32 registros)
-86. **leads** (300 registros)
-87. **leads_backup_20260306** (697 registros)
-88. **leads_legacy** (198 registros)
-89. **leads_tracking** (0 registros)
-90. **manuais_documentos** (7 registros)
-91. **manuais_grupo_user** (0 registros)
-92. **manuais_grupos** (6 registros)
-93. **metas** (0 registros)
-94. **metas_financeiras** (0 registros)
-95. **modulos** (32 registros)
-96. **movimentos** (5932 registros)
-97. **movimentos_audit** (15600 registros)
-98. **nexo_auth_attempts** (1 registros)
-99. **nexo_automation_logs** (83 registros)
-100. **nexo_clientes_validacao** (3 registros)
-101. **nexo_escala_diaria** (50 registros)
-102. **nexo_notificacoes** (45 registros)
-103. **nexo_qa_aggregates_weekly** (9 registros)
-104. **nexo_qa_campaigns** (2 registros)
-105. **nexo_qa_responses_content** (16 registros)
-106. **nexo_qa_responses_identity** (15 registros)
-107. **nexo_qa_sampled_targets** (135 registros)
-108. **nexo_ticket_notas** (51 registros)
-109. **nexo_tickets** (28 registros)
-110. **notifications** (27 registros)
-111. **notifications_intranet** (820 registros)
-112. **oportunidades** (94 registros)
-113. **ordens_servico** (259 registros)
-114. **password_reset_tokens** (0 registros)
-115. **plano_conta_mappings** (1 registros)
-116. **pricing_calibrations** (7 registros)
-117. **pricing_proposals** (33 registros)
-118. **processos** (1626 registros)
-119. **sessions** (0 registros)
-120. **sincronizacao_log** (3 registros)
-121. **siric_consultas** (12 registros)
-122. **siric_evidencias** (23 registros)
-123. **siric_relatorios** (0 registros)
-124. **sisrh_ajustes** (1 registros)
-125. **sisrh_apuracoes** (10 registros)
-126. **sisrh_banco_creditos_movs** (0 registros)
-127. **sisrh_documentos** (11 registros)
-128. **sisrh_frequencia_logins** (610 registros)
-129. **sisrh_holerite_lancamentos** (2 registros)
-130. **sisrh_rb_niveis** (5 registros)
-131. **sisrh_rb_overrides** (0 registros)
-132. **sisrh_rubricas** (10 registros)
-133. **sisrh_vinculos** (4 registros)
-134. **sync_finance_rules** (9 registros)
-135. **sync_runs** (930 registros)
-136. **system_error_logs** (161 registros)
-137. **system_events** (1543 registros)
-138. **user_home_shortcuts** (9 registros)
-139. **user_permissions** (72 registros)
-140. **users** (5 registros)
-141. **vigilia_cruzamentos** (375 registros)
-142. **wa_conversation_sources** (0 registros)
-143. **wa_conversation_tag** (28 registros)
-144. **wa_conversations** (410 registros)
-145. **wa_events** (10793 registros)
-146. **wa_messages** (19422 registros)
-147. **wa_notes** (197 registros)
-148. **wa_tags** (23 registros)
+23. **contratos** (435 registros)
+24. **crm_accounts** (1074 registros)
+25. **crm_activities** (586 registros)
+26. **crm_admin_process_ato_anexos** (1 registros)
+27. **crm_admin_process_atos** (3 registros)
+28. **crm_admin_process_checklist** (44 registros)
+29. **crm_admin_process_documents** (0 registros)
+30. **crm_admin_process_steps** (10 registros)
+31. **crm_admin_process_templates** (0 registros)
+32. **crm_admin_process_timeline** (23 registros)
+33. **crm_admin_process_tramitacoes** (1 registros)
+34. **crm_admin_processes** (3 registros)
+35. **crm_ai_insights** (14 registros)
+36. **crm_alertas_enviados** (274 registros)
+37. **crm_cadence_tasks** (40 registros)
+38. **crm_cadence_templates** (1 registros)
+39. **crm_distribution_proposals** (2 registros)
+40. **crm_distribution_queue** (0 registros)
+41. **crm_documents** (13 registros)
+42. **crm_events** (3348 registros)
+43. **crm_identities** (3460 registros)
+44. **crm_opportunities** (128 registros)
+45. **crm_owner_profiles** (4 registros)
+46. **crm_pulso_alertas** (14 registros)
+47. **crm_pulso_config** (4 registros)
+48. **crm_pulso_diario** (136 registros)
+49. **crm_pulso_phone_uploads** (5 registros)
+50. **crm_service_request_comments** (67 registros)
+51. **crm_service_requests** (63 registros)
+52. **crm_stages** (6 registros)
+53. **espocrm_accounts** (865 registros)
+54. **espocrm_contacts** (2 registros)
+55. **espocrm_leads** (175 registros)
+56. **failed_jobs** (0 registros)
+57. **fases_processo** (3187 registros)
+58. **gdp_acompanhamentos** (1 registros)
+59. **gdp_audit_log** (101 registros)
+60. **gdp_ciclos** (1 registros)
+61. **gdp_eixos** (4 registros)
+62. **gdp_eval180_action_items** (15 registros)
+63. **gdp_eval180_forms** (14 registros)
+64. **gdp_eval180_responses** (18 registros)
+65. **gdp_indicadores** (14 registros)
+66. **gdp_metas_individuais** (336 registros)
+67. **gdp_penalizacao_config** (0 registros)
+68. **gdp_penalizacao_tipos** (26 registros)
+69. **gdp_penalizacoes** (88 registros)
+70. **gdp_remuneracao_faixas** (6 registros)
+71. **gdp_resultados_mensais** (168 registros)
+72. **gdp_snapshots** (16 registros)
+73. **gdp_validacao_financeira** (0 registros)
+74. **horas_trabalhadas** (2000 registros)
+75. **horas_trabalhadas_datajuri** (2921 registros)
+76. **integration_logs** (124 registros)
+77. **job_batches** (0 registros)
+78. **jobs** (2 registros)
+79. **justus_approvals** (0 registros)
+80. **justus_attachments** (57 registros)
+81. **justus_conversations** (64 registros)
+82. **justus_document_chunks** (1576 registros)
+83. **justus_document_pages** (5087 registros)
+84. **justus_jurisprudencia** (1 registros)
+85. **justus_messages** (278 registros)
+86. **justus_process_profiles** (64 registros)
+87. **justus_prompt_templates** (15 registros)
+88. **justus_rag_feedback** (0 registros)
+89. **justus_style_guides** (3 registros)
+90. **justus_usage_monthly** (7 registros)
+91. **kpi_monthly_targets** (245 registros)
+92. **lancamentos** (130 registros)
+93. **lead_messages** (6624 registros)
+94. **lead_tracking** (55 registros)
+95. **leads** (339 registros)
+96. **leads_backup_20260306** (697 registros)
+97. **leads_legacy** (198 registros)
+98. **leads_tracking** (0 registros)
+99. **manuais_documentos** (7 registros)
+100. **manuais_grupo_user** (0 registros)
+101. **manuais_grupos** (6 registros)
+102. **metas** (0 registros)
+103. **metas_financeiras** (0 registros)
+104. **modulos** (32 registros)
+105. **movimentos** (5516 registros)
+106. **movimentos_audit** (15211 registros)
+107. **nexo_auth_attempts** (3 registros)
+108. **nexo_automation_logs** (101 registros)
+109. **nexo_clientes_validacao** (3 registros)
+110. **nexo_escala_diaria** (50 registros)
+111. **nexo_notificacoes** (72 registros)
+112. **nexo_public_tokens** (0 registros)
+113. **nexo_qa_aggregates_weekly** (12 registros)
+114. **nexo_qa_campaigns** (2 registros)
+115. **nexo_qa_responses_content** (17 registros)
+116. **nexo_qa_responses_identity** (17 registros)
+117. **nexo_qa_sampled_targets** (168 registros)
+118. **nexo_ticket_notas** (69 registros)
+119. **nexo_tickets** (41 registros)
+120. **notifications** (48 registros)
+121. **notifications_intranet** (1219 registros)
+122. **oportunidades** (94 registros)
+123. **ordens_servico** (263 registros)
+124. **password_reset_tokens** (0 registros)
+125. **plano_conta_mappings** (1 registros)
+126. **pricing_calibrations** (7 registros)
+127. **pricing_proposals** (31 registros)
+128. **processos** (1525 registros)
+129. **relatorios_ceo** (3 registros)
+130. **sessions** (0 registros)
+131. **sincronizacao_log** (3 registros)
+132. **sipex_settings** (1 registros)
+133. **siric_consultas** (12 registros)
+134. **siric_evidencias** (26 registros)
+135. **siric_relatorios** (0 registros)
+136. **sisrh_ajustes** (1 registros)
+137. **sisrh_apuracoes** (10 registros)
+138. **sisrh_banco_creditos_movs** (0 registros)
+139. **sisrh_documentos** (11 registros)
+140. **sisrh_frequencia_logins** (610 registros)
+141. **sisrh_holerite_lancamentos** (2 registros)
+142. **sisrh_rb_niveis** (5 registros)
+143. **sisrh_rb_overrides** (0 registros)
+144. **sisrh_rubricas** (10 registros)
+145. **sisrh_vinculos** (4 registros)
+146. **sync_finance_rules** (9 registros)
+147. **sync_runs** (1137 registros)
+148. **system_error_logs** (280 registros)
+149. **system_events** (2081 registros)
+150. **user_home_shortcuts** (7 registros)
+151. **user_permissions** (72 registros)
+152. **users** (5 registros)
+153. **vigilia_cruzamentos** (458 registros)
+154. **wa_conversation_sources** (0 registros)
+155. **wa_conversation_tag** (43 registros)
+156. **wa_conversations** (474 registros)
+157. **wa_events** (14243 registros)
+158. **wa_messages** (23015 registros)
+159. **wa_notes** (303 registros)
+160. **wa_tags** (23 registros)
 
 ---
 
@@ -182,7 +194,7 @@
 
 ## ai_monthly_budgets
 
-**Registros:** 2
+**Registros:** 3
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -231,7 +243,7 @@
 
 ## andamentos_fase
 
-**Registros:** 233161
+**Registros:** 232677
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -268,7 +280,7 @@
 
 ## atividades
 
-**Registros:** 9984
+**Registros:** 10008
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -299,7 +311,7 @@
 
 ## atividades_datajuri
 
-**Registros:** 9885
+**Registros:** 10064
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -338,7 +350,7 @@
 
 ## audit_logs
 
-**Registros:** 526
+**Registros:** 664
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -367,7 +379,7 @@
 
 ## avisos
 
-**Registros:** 9
+**Registros:** 10
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -396,7 +408,7 @@
 
 ## avisos_lidos
 
-**Registros:** 32
+**Registros:** 37
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -479,7 +491,7 @@
 
 ## bsc_insight_runs
 
-**Registros:** 12
+**Registros:** 14
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -540,7 +552,7 @@
 
 ## cache
 
-**Registros:** 106
+**Registros:** 80
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -585,7 +597,7 @@
 
 ## classificacao_regras
 
-**Registros:** 38
+**Registros:** 39
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -704,7 +716,7 @@
 
 ## contas_receber
 
-**Registros:** 1743
+**Registros:** 1670
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -781,7 +793,7 @@
 
 ## contratos
 
-**Registros:** 430
+**Registros:** 435
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -813,7 +825,7 @@
 
 ## crm_accounts
 
-**Registros:** 1061
+**Registros:** 1074
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -831,11 +843,15 @@
 | 12 | `next_touch_at` | datetime | SIM | `NULL` |
 | 13 | `tags` | text | SIM | `NULL` |
 | 14 | `notes` | text | SIM | `NULL` |
-| 15 | `segment` | varchar(50) | SIM | `NULL` |
-| 16 | `segment_summary` | text | SIM | `NULL` |
-| 17 | `segment_cached_at` | timestamp | SIM | `NULL` |
-| 18 | `created_at` | timestamp | SIM | `NULL` |
-| 19 | `updated_at` | timestamp | SIM | `NULL` |
+| 15 | `profissao` | varchar(255) | SIM | `NULL` |
+| 16 | `data_nascimento` | date | SIM | `NULL` |
+| 17 | `endereco_cidade` | varchar(100) | SIM | `NULL` |
+| 18 | `endereco_estado` | varchar(2) | SIM | `NULL` |
+| 19 | `segment` | varchar(50) | SIM | `NULL` |
+| 20 | `segment_summary` | text | SIM | `NULL` |
+| 21 | `segment_cached_at` | timestamp | SIM | `NULL` |
+| 22 | `created_at` | timestamp | SIM | `NULL` |
+| 23 | `updated_at` | timestamp | SIM | `NULL` |
 
 **Indices:**
 - `crm_accounts_datajuri_pessoa_id_unique` -> `datajuri_pessoa_id` (UNIQUE)
@@ -850,7 +866,7 @@
 
 ## crm_activities
 
-**Registros:** 378
+**Registros:** 586
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -890,9 +906,254 @@
 
 ---
 
+## crm_admin_process_ato_anexos
+
+**Registros:** 1
+
+| # | Coluna | Tipo | Nullable | Default |
+|---|--------|------|----------|---------|
+| 1 | `id` | bigint(20) unsigned | NAO | NULL |
+| 2 | `ato_id` | bigint(20) unsigned | NAO | NULL |
+| 3 | `uploaded_by_user_id` | bigint(20) unsigned | NAO | NULL |
+| 4 | `original_name` | varchar(255) | NAO | NULL |
+| 5 | `disk_path` | varchar(255) | NAO | NULL |
+| 6 | `mime_type` | varchar(255) | SIM | `NULL` |
+| 7 | `size_bytes` | bigint(20) unsigned | SIM | `NULL` |
+| 8 | `created_at` | timestamp | SIM | `NULL` |
+| 9 | `updated_at` | timestamp | SIM | `NULL` |
+
+**Indices:**
+- `crm_admin_process_ato_anexos_ato_id_index` -> `ato_id`
+
+---
+
+## crm_admin_process_atos
+
+**Registros:** 3
+
+| # | Coluna | Tipo | Nullable | Default |
+|---|--------|------|----------|---------|
+| 1 | `id` | bigint(20) unsigned | NAO | NULL |
+| 2 | `admin_process_id` | bigint(20) unsigned | NAO | NULL |
+| 3 | `numero` | int(10) unsigned | NAO | NULL |
+| 4 | `user_id` | bigint(20) unsigned | NAO | NULL |
+| 5 | `tipo` | varchar(40) | NAO | NULL |
+| 6 | `titulo` | varchar(255) | NAO | NULL |
+| 7 | `corpo` | text | SIM | `NULL` |
+| 8 | `is_client_visible` | tinyint(1) | NAO | `0` |
+| 9 | `assinado_por_user_id` | bigint(20) unsigned | SIM | `NULL` |
+| 10 | `assinado_at` | timestamp | SIM | `NULL` |
+| 11 | `created_at` | timestamp | SIM | `NULL` |
+| 12 | `updated_at` | timestamp | SIM | `NULL` |
+
+**Indices:**
+- `crm_admin_process_atos_admin_process_id_numero_unique` -> `admin_process_id` (UNIQUE)
+- `crm_admin_process_atos_admin_process_id_numero_unique` -> `numero` (UNIQUE)
+- `crm_admin_process_atos_admin_process_id_index` -> `admin_process_id`
+
+---
+
+## crm_admin_process_checklist
+
+**Registros:** 44
+
+| # | Coluna | Tipo | Nullable | Default |
+|---|--------|------|----------|---------|
+| 1 | `id` | bigint(20) unsigned | NAO | NULL |
+| 2 | `admin_process_id` | bigint(20) unsigned | NAO | NULL |
+| 3 | `nome` | varchar(255) | NAO | NULL |
+| 4 | `descricao` | text | SIM | `NULL` |
+| 5 | `status` | enum('pendente','recebido','dispensado') | NAO | `'pendente'` |
+| 6 | `document_id` | bigint(20) unsigned | SIM | `NULL` |
+| 7 | `requested_at` | timestamp | SIM | `NULL` |
+| 8 | `received_at` | timestamp | SIM | `NULL` |
+| 9 | `dispensed_reason` | text | SIM | `NULL` |
+| 10 | `created_at` | timestamp | SIM | `NULL` |
+| 11 | `updated_at` | timestamp | SIM | `NULL` |
+
+**Indices:**
+- `crm_admin_process_checklist_admin_process_id_index` -> `admin_process_id`
+
+---
+
+## crm_admin_process_documents
+
+**Registros:** 0
+
+| # | Coluna | Tipo | Nullable | Default |
+|---|--------|------|----------|---------|
+| 1 | `id` | bigint(20) unsigned | NAO | NULL |
+| 2 | `admin_process_id` | bigint(20) unsigned | NAO | NULL |
+| 3 | `step_id` | bigint(20) unsigned | SIM | `NULL` |
+| 4 | `uploaded_by_user_id` | bigint(20) unsigned | NAO | NULL |
+| 5 | `category` | enum('requerido_cliente','produzido_interno','recebido_terceiro','enviado_terceiro','geral') | NAO | `'geral'` |
+| 6 | `original_name` | varchar(255) | NAO | NULL |
+| 7 | `disk_path` | varchar(255) | NAO | NULL |
+| 8 | `mime_type` | varchar(255) | SIM | `NULL` |
+| 9 | `size_bytes` | bigint(20) unsigned | SIM | `NULL` |
+| 10 | `is_client_visible` | tinyint(1) | NAO | `0` |
+| 11 | `notes` | text | SIM | `NULL` |
+| 12 | `created_at` | timestamp | SIM | `NULL` |
+| 13 | `updated_at` | timestamp | SIM | `NULL` |
+
+**Indices:**
+- `crm_admin_process_documents_admin_process_id_index` -> `admin_process_id`
+
+---
+
+## crm_admin_process_steps
+
+**Registros:** 10
+
+| # | Coluna | Tipo | Nullable | Default |
+|---|--------|------|----------|---------|
+| 1 | `id` | bigint(20) unsigned | NAO | NULL |
+| 2 | `admin_process_id` | bigint(20) unsigned | NAO | NULL |
+| 3 | `order` | int(10) unsigned | NAO | `0` |
+| 4 | `titulo` | varchar(255) | NAO | NULL |
+| 5 | `descricao` | text | SIM | `NULL` |
+| 6 | `tipo` | enum('interno','externo','cliente','aprovacao') | NAO | `'interno'` |
+| 7 | `orgao` | varchar(255) | SIM | `NULL` |
+| 8 | `status` | enum('pendente','em_andamento','aguardando','concluido','nao_aplicavel','bloqueado') | NAO | `'pendente'` |
+| 9 | `responsible_user_id` | bigint(20) unsigned | SIM | `NULL` |
+| 10 | `deadline_days` | int(10) unsigned | SIM | `NULL` |
+| 11 | `deadline_at` | date | SIM | `NULL` |
+| 12 | `scheduled_return_at` | timestamp | SIM | `NULL` |
+| 13 | `started_at` | timestamp | SIM | `NULL` |
+| 14 | `completed_at` | timestamp | SIM | `NULL` |
+| 15 | `depends_on_step_id` | bigint(20) unsigned | SIM | `NULL` |
+| 16 | `is_client_visible` | tinyint(1) | NAO | `0` |
+| 17 | `requires_document` | tinyint(1) | NAO | `0` |
+| 18 | `notes` | text | SIM | `NULL` |
+| 19 | `created_at` | timestamp | SIM | `NULL` |
+| 20 | `updated_at` | timestamp | SIM | `NULL` |
+
+**Indices:**
+- `crm_admin_process_steps_admin_process_id_index` -> `admin_process_id`
+- `crm_admin_process_steps_status_index` -> `status`
+- `crm_admin_process_steps_responsible_user_id_index` -> `responsible_user_id`
+
+---
+
+## crm_admin_process_templates
+
+**Registros:** 0
+
+| # | Coluna | Tipo | Nullable | Default |
+|---|--------|------|----------|---------|
+| 1 | `id` | bigint(20) unsigned | NAO | NULL |
+| 2 | `tipo` | varchar(60) | NAO | NULL |
+| 3 | `nome` | varchar(255) | NAO | NULL |
+| 4 | `descricao` | text | SIM | `NULL` |
+| 5 | `prazo_estimado_dias` | int(10) unsigned | NAO | `30` |
+| 6 | `steps` | longtext | NAO | `'[]'` |
+| 7 | `checklist` | longtext | NAO | `'[]'` |
+| 8 | `active` | tinyint(1) | NAO | `1` |
+| 9 | `created_at` | timestamp | SIM | `NULL` |
+| 10 | `updated_at` | timestamp | SIM | `NULL` |
+
+**Indices:**
+- `crm_admin_process_templates_tipo_unique` -> `tipo` (UNIQUE)
+
+---
+
+## crm_admin_process_timeline
+
+**Registros:** 23
+
+| # | Coluna | Tipo | Nullable | Default |
+|---|--------|------|----------|---------|
+| 1 | `id` | bigint(20) unsigned | NAO | NULL |
+| 2 | `admin_process_id` | bigint(20) unsigned | NAO | NULL |
+| 3 | `step_id` | bigint(20) unsigned | SIM | `NULL` |
+| 4 | `user_id` | bigint(20) unsigned | SIM | `NULL` |
+| 5 | `tipo` | varchar(60) | NAO | NULL |
+| 6 | `titulo` | varchar(255) | NAO | NULL |
+| 7 | `corpo` | text | SIM | `NULL` |
+| 8 | `is_client_visible` | tinyint(1) | NAO | `0` |
+| 9 | `is_internal` | tinyint(1) | NAO | `0` |
+| 10 | `metadata` | longtext | SIM | `NULL` |
+| 11 | `happened_at` | timestamp | NAO | `current_timestamp()` |
+| 12 | `created_at` | timestamp | SIM | `NULL` |
+| 13 | `updated_at` | timestamp | SIM | `NULL` |
+
+**Indices:**
+- `crm_admin_process_timeline_admin_process_id_index` -> `admin_process_id`
+- `crm_admin_process_timeline_happened_at_index` -> `happened_at`
+
+---
+
+## crm_admin_process_tramitacoes
+
+**Registros:** 1
+
+| # | Coluna | Tipo | Nullable | Default |
+|---|--------|------|----------|---------|
+| 1 | `id` | bigint(20) unsigned | NAO | NULL |
+| 2 | `admin_process_id` | bigint(20) unsigned | NAO | NULL |
+| 3 | `de_user_id` | bigint(20) unsigned | NAO | NULL |
+| 4 | `para_user_id` | bigint(20) unsigned | NAO | NULL |
+| 5 | `tipo` | enum('tramitacao','devolucao','encaminhamento') | NAO | `'tramitacao'` |
+| 6 | `despacho` | text | SIM | `NULL` |
+| 7 | `recebido_at` | timestamp | SIM | `NULL` |
+| 8 | `created_at` | timestamp | SIM | `NULL` |
+| 9 | `updated_at` | timestamp | SIM | `NULL` |
+
+**Indices:**
+- `crm_admin_process_tramitacoes_admin_process_id_index` -> `admin_process_id`
+- `crm_admin_process_tramitacoes_para_user_id_index` -> `para_user_id`
+
+---
+
+## crm_admin_processes
+
+**Registros:** 3
+
+| # | Coluna | Tipo | Nullable | Default |
+|---|--------|------|----------|---------|
+| 1 | `id` | bigint(20) unsigned | NAO | NULL |
+| 2 | `protocolo` | varchar(20) | NAO | NULL |
+| 3 | `account_id` | bigint(20) unsigned | NAO | NULL |
+| 4 | `opportunity_id` | bigint(20) unsigned | SIM | `NULL` |
+| 5 | `template_id` | bigint(20) unsigned | SIM | `NULL` |
+| 6 | `tipo` | varchar(60) | NAO | NULL |
+| 7 | `titulo` | varchar(255) | NAO | NULL |
+| 8 | `descricao` | text | SIM | `NULL` |
+| 9 | `status` | enum('rascunho','aberto','em_andamento','aguardando_cliente','aguardando_terceiro','suspenso','concluido','cancelado') | NAO | `'aberto'` |
+| 10 | `prioridade` | enum('baixa','normal','alta','urgente') | NAO | `'normal'` |
+| 11 | `nivel_acesso` | enum('normal','restrito') | NAO | `'normal'` |
+| 12 | `owner_user_id` | bigint(20) unsigned | NAO | NULL |
+| 13 | `com_user_id` | bigint(20) unsigned | SIM | `NULL` |
+| 14 | `orgao_destino` | varchar(255) | SIM | `NULL` |
+| 15 | `numero_externo` | varchar(255) | SIM | `NULL` |
+| 16 | `prazo_estimado` | date | SIM | `NULL` |
+| 17 | `prazo_final` | date | SIM | `NULL` |
+| 18 | `valor_honorarios` | decimal(10,2) | SIM | `NULL` |
+| 19 | `valor_despesas` | decimal(10,2) | SIM | `NULL` |
+| 20 | `client_visible` | tinyint(1) | NAO | `1` |
+| 21 | `suspended_reason` | text | SIM | `NULL` |
+| 22 | `suspended_until` | timestamp | SIM | `NULL` |
+| 23 | `suspended_at` | timestamp | SIM | `NULL` |
+| 24 | `concluded_at` | timestamp | SIM | `NULL` |
+| 25 | `cancelled_at` | timestamp | SIM | `NULL` |
+| 26 | `cancelled_reason` | text | SIM | `NULL` |
+| 27 | `created_at` | timestamp | SIM | `NULL` |
+| 28 | `updated_at` | timestamp | SIM | `NULL` |
+| 29 | `deleted_at` | timestamp | SIM | `NULL` |
+
+**Indices:**
+- `crm_admin_processes_protocolo_unique` -> `protocolo` (UNIQUE)
+- `crm_admin_processes_account_id_index` -> `account_id`
+- `crm_admin_processes_owner_user_id_index` -> `owner_user_id`
+- `crm_admin_processes_status_index` -> `status`
+- `crm_admin_processes_tipo_index` -> `tipo`
+- `crm_admin_processes_com_user_id_index` -> `com_user_id`
+
+---
+
 ## crm_ai_insights
 
-**Registros:** 9
+**Registros:** 14
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -917,7 +1178,7 @@
 
 ## crm_alertas_enviados
 
-**Registros:** 166
+**Registros:** 274
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -940,7 +1201,7 @@
 
 ## crm_cadence_tasks
 
-**Registros:** 32
+**Registros:** 40
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -1038,7 +1299,7 @@
 
 ## crm_documents
 
-**Registros:** 7
+**Registros:** 13
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -1063,7 +1324,7 @@
 
 ## crm_events
 
-**Registros:** 2389
+**Registros:** 3348
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -1089,7 +1350,7 @@
 
 ## crm_identities
 
-**Registros:** 3283
+**Registros:** 3460
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -1110,7 +1371,7 @@
 
 ## crm_opportunities
 
-**Registros:** 113
+**Registros:** 128
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -1173,7 +1434,7 @@
 
 ## crm_pulso_alertas
 
-**Registros:** 10
+**Registros:** 14
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -1216,7 +1477,7 @@
 
 ## crm_pulso_diario
 
-**Registros:** 72
+**Registros:** 136
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -1244,7 +1505,7 @@
 
 ## crm_pulso_phone_uploads
 
-**Registros:** 4
+**Registros:** 5
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -1265,7 +1526,7 @@
 
 ## crm_service_request_comments
 
-**Registros:** 55
+**Registros:** 67
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -1285,7 +1546,7 @@
 
 ## crm_service_requests
 
-**Registros:** 47
+**Registros:** 63
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -1293,31 +1554,33 @@
 | 2 | `protocolo` | varchar(15) | SIM | `NULL` |
 | 3 | `account_id` | bigint(20) unsigned | SIM | `NULL` |
 | 4 | `category` | varchar(60) | NAO | NULL |
-| 5 | `subject` | varchar(255) | NAO | NULL |
-| 6 | `description` | text | NAO | NULL |
-| 7 | `priority` | enum('baixa','normal','alta','urgente') | NAO | `'normal'` |
-| 8 | `status` | enum('aberto','em_andamento','aguardando_aprovacao','aprovado','rejeitado','concluido','cancelado','devolvido') | NAO | `'aberto'` |
-| 9 | `requested_by_user_id` | bigint(20) unsigned | NAO | NULL |
-| 10 | `assigned_to_user_id` | bigint(20) unsigned | SIM | `NULL` |
-| 11 | `approved_by_user_id` | bigint(20) unsigned | SIM | `NULL` |
-| 12 | `requires_approval` | tinyint(1) | NAO | `0` |
-| 13 | `resolution_notes` | text | SIM | `NULL` |
-| 14 | `assigned_at` | timestamp | SIM | `NULL` |
-| 15 | `approved_at` | timestamp | SIM | `NULL` |
-| 16 | `resolved_at` | timestamp | SIM | `NULL` |
-| 17 | `sla_deadline` | datetime | SIM | `NULL` |
-| 18 | `sla_hours` | decimal(6,1) | SIM | `NULL` |
-| 19 | `sla_complexity` | varchar(20) | SIM | `NULL` |
-| 20 | `sla_justification` | text | SIM | `NULL` |
-| 21 | `sla_analyzed_at` | timestamp | SIM | `NULL` |
-| 22 | `desired_deadline` | date | SIM | `NULL` |
-| 23 | `cost_center` | varchar(30) | SIM | `NULL` |
-| 24 | `estimated_value` | decimal(12,2) | SIM | `NULL` |
-| 25 | `impact` | varchar(30) | SIM | `NULL` |
-| 26 | `attachments` | longtext | SIM | `NULL` |
-| 27 | `ai_triage` | longtext | SIM | `NULL` |
-| 28 | `created_at` | timestamp | SIM | `NULL` |
-| 29 | `updated_at` | timestamp | SIM | `NULL` |
+| 5 | `origem` | varchar(30) | NAO | `'crm'` |
+| 6 | `phone_contato` | varchar(30) | SIM | `NULL` |
+| 7 | `subject` | varchar(255) | NAO | NULL |
+| 8 | `description` | text | NAO | NULL |
+| 9 | `priority` | enum('baixa','normal','alta','urgente') | NAO | `'normal'` |
+| 10 | `status` | enum('aberto','em_andamento','aguardando_aprovacao','aprovado','rejeitado','concluido','cancelado','devolvido') | NAO | `'aberto'` |
+| 11 | `requested_by_user_id` | bigint(20) unsigned | SIM | `NULL` |
+| 12 | `assigned_to_user_id` | bigint(20) unsigned | SIM | `NULL` |
+| 13 | `approved_by_user_id` | bigint(20) unsigned | SIM | `NULL` |
+| 14 | `requires_approval` | tinyint(1) | NAO | `0` |
+| 15 | `resolution_notes` | text | SIM | `NULL` |
+| 16 | `assigned_at` | timestamp | SIM | `NULL` |
+| 17 | `approved_at` | timestamp | SIM | `NULL` |
+| 18 | `resolved_at` | timestamp | SIM | `NULL` |
+| 19 | `sla_deadline` | datetime | SIM | `NULL` |
+| 20 | `sla_hours` | decimal(6,1) | SIM | `NULL` |
+| 21 | `sla_complexity` | varchar(20) | SIM | `NULL` |
+| 22 | `sla_justification` | text | SIM | `NULL` |
+| 23 | `sla_analyzed_at` | timestamp | SIM | `NULL` |
+| 24 | `desired_deadline` | date | SIM | `NULL` |
+| 25 | `cost_center` | varchar(30) | SIM | `NULL` |
+| 26 | `estimated_value` | decimal(12,2) | SIM | `NULL` |
+| 27 | `impact` | varchar(30) | SIM | `NULL` |
+| 28 | `attachments` | longtext | SIM | `NULL` |
+| 29 | `ai_triage` | longtext | SIM | `NULL` |
+| 30 | `created_at` | timestamp | SIM | `NULL` |
+| 31 | `updated_at` | timestamp | SIM | `NULL` |
 
 **Indices:**
 - `crm_service_requests_protocolo_unique` -> `protocolo` (UNIQUE)
@@ -1450,7 +1713,7 @@
 
 ## fases_processo
 
-**Registros:** 3163
+**Registros:** 3187
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -1489,7 +1752,7 @@
 
 ## gdp_acompanhamentos
 
-**Registros:** 0
+**Registros:** 1
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -1521,7 +1784,7 @@
 
 ## gdp_audit_log
 
-**Registros:** 74
+**Registros:** 101
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -1589,7 +1852,7 @@
 
 ## gdp_eval180_action_items
 
-**Registros:** 8
+**Registros:** 15
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -1612,7 +1875,7 @@
 
 ## gdp_eval180_forms
 
-**Registros:** 9
+**Registros:** 14
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -1639,7 +1902,7 @@
 
 ## gdp_eval180_responses
 
-**Registros:** 6
+**Registros:** 18
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -1773,7 +2036,7 @@
 
 ## gdp_penalizacoes
 
-**Registros:** 0
+**Registros:** 88
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -1838,7 +2101,7 @@
 
 ## gdp_resultados_mensais
 
-**Registros:** 112
+**Registros:** 168
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -1874,7 +2137,7 @@
 
 ## gdp_snapshots
 
-**Registros:** 12
+**Registros:** 16
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -1979,7 +2242,7 @@
 
 ## horas_trabalhadas_datajuri
 
-**Registros:** 2830
+**Registros:** 2921
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -2116,7 +2379,7 @@
 
 ## justus_attachments
 
-**Registros:** 45
+**Registros:** 57
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -2142,7 +2405,7 @@
 
 ## justus_conversations
 
-**Registros:** 57
+**Registros:** 64
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -2171,7 +2434,7 @@
 
 ## justus_document_chunks
 
-**Registros:** 968
+**Registros:** 1576
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -2195,7 +2458,7 @@
 
 ## justus_document_pages
 
-**Registros:** 3906
+**Registros:** 5087
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -2266,7 +2529,7 @@
 
 ## justus_messages
 
-**Registros:** 188
+**Registros:** 278
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -2296,7 +2559,7 @@
 
 ## justus_process_profiles
 
-**Registros:** 57
+**Registros:** 64
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -2398,7 +2661,7 @@
 
 ## justus_usage_monthly
 
-**Registros:** 5
+**Registros:** 7
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -2475,7 +2738,7 @@
 
 ## lead_messages
 
-**Registros:** 7362
+**Registros:** 6624
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -2497,7 +2760,7 @@
 
 ## lead_tracking
 
-**Registros:** 32
+**Registros:** 55
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -2527,7 +2790,7 @@
 
 ## leads
 
-**Registros:** 300
+**Registros:** 339
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -2561,12 +2824,13 @@
 | 28 | `referrer_url` | text | SIM | `NULL` |
 | 29 | `status` | varchar(255) | NAO | `'novo'` |
 | 30 | `crm_account_id` | bigint(20) unsigned | SIM | `NULL` |
-| 31 | `espocrm_id` | varchar(255) | SIM | `NULL` |
-| 32 | `erro_processamento` | text | SIM | `NULL` |
-| 33 | `metadata` | longtext | SIM | `NULL` |
-| 34 | `data_entrada` | timestamp | NAO | `current_timestamp()` |
-| 35 | `created_at` | timestamp | SIM | `NULL` |
-| 36 | `updated_at` | timestamp | SIM | `NULL` |
+| 31 | `cliente_id` | bigint(20) unsigned | SIM | `NULL` |
+| 32 | `espocrm_id` | varchar(255) | SIM | `NULL` |
+| 33 | `erro_processamento` | text | SIM | `NULL` |
+| 34 | `metadata` | longtext | SIM | `NULL` |
+| 35 | `data_entrada` | timestamp | NAO | `current_timestamp()` |
+| 36 | `created_at` | timestamp | SIM | `NULL` |
+| 37 | `updated_at` | timestamp | SIM | `NULL` |
 
 **Indices:**
 - `uq_leads_telefone_dedup` -> `telefone` (UNIQUE)
@@ -2581,6 +2845,7 @@
 - `idx_leads_urgencia` -> `urgencia`
 - `idx_leads_sub_area` -> `sub_area`
 - `idx_leads_email` -> `email`
+- `leads_cliente_id_foreign` -> `cliente_id`
 
 ---
 
@@ -2825,7 +3090,7 @@
 
 ## movimentos
 
-**Registros:** 5932
+**Registros:** 5516
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -2884,7 +3149,7 @@
 
 ## movimentos_audit
 
-**Registros:** 15600
+**Registros:** 15211
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -2914,7 +3179,7 @@
 
 ## nexo_auth_attempts
 
-**Registros:** 1
+**Registros:** 3
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -2936,7 +3201,7 @@
 
 ## nexo_automation_logs
 
-**Registros:** 83
+**Registros:** 101
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -3002,7 +3267,7 @@
 
 ## nexo_notificacoes
 
-**Registros:** 45
+**Registros:** 72
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -3033,9 +3298,35 @@
 
 ---
 
+## nexo_public_tokens
+
+**Registros:** 0
+
+| # | Coluna | Tipo | Nullable | Default |
+|---|--------|------|----------|---------|
+| 1 | `id` | bigint(20) unsigned | NAO | NULL |
+| 2 | `token` | char(36) | NAO | NULL |
+| 3 | `tipo` | varchar(30) | NAO | NULL |
+| 4 | `cliente_id` | bigint(20) unsigned | SIM | `NULL` |
+| 5 | `telefone` | varchar(20) | NAO | NULL |
+| 6 | `payload` | longtext | NAO | NULL |
+| 7 | `expires_at` | timestamp | NAO | NULL |
+| 8 | `access_count` | int(10) unsigned | NAO | `0` |
+| 9 | `last_accessed_at` | timestamp | SIM | `NULL` |
+| 10 | `created_at` | timestamp | SIM | `NULL` |
+| 11 | `updated_at` | timestamp | SIM | `NULL` |
+
+**Indices:**
+- `nexo_public_tokens_token_unique` -> `token` (UNIQUE)
+- `idx_expires` -> `expires_at`
+- `idx_telefone_tipo` -> `telefone`
+- `idx_telefone_tipo` -> `tipo`
+
+---
+
 ## nexo_qa_aggregates_weekly
 
-**Registros:** 9
+**Registros:** 12
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -3086,7 +3377,7 @@
 
 ## nexo_qa_responses_content
 
-**Registros:** 16
+**Registros:** 17
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -3106,7 +3397,7 @@
 
 ## nexo_qa_responses_identity
 
-**Registros:** 15
+**Registros:** 17
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -3125,7 +3416,7 @@
 
 ## nexo_qa_sampled_targets
 
-**Registros:** 135
+**Registros:** 168
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -3157,7 +3448,7 @@
 
 ## nexo_ticket_notas
 
-**Registros:** 51
+**Registros:** 69
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -3178,7 +3469,7 @@
 
 ## nexo_tickets
 
-**Registros:** 28
+**Registros:** 41
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -3216,7 +3507,7 @@
 
 ## notifications
 
-**Registros:** 27
+**Registros:** 48
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -3237,7 +3528,7 @@
 
 ## notifications_intranet
 
-**Registros:** 820
+**Registros:** 1219
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -3299,7 +3590,7 @@
 
 ## ordens_servico
 
-**Registros:** 259
+**Registros:** 263
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -3379,7 +3670,7 @@
 
 ## pricing_proposals
 
-**Registros:** 33
+**Registros:** 31
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -3409,13 +3700,15 @@
 | 24 | `proposta_premium` | longtext | SIM | `NULL` |
 | 25 | `recomendacao_ia` | varchar(20) | SIM | `NULL` |
 | 26 | `justificativa_ia` | text | SIM | `NULL` |
-| 27 | `proposta_escolhida` | varchar(20) | SIM | `NULL` |
-| 28 | `valor_final` | decimal(15,2) | SIM | `NULL` |
-| 29 | `status` | varchar(30) | NAO | `'gerada'` |
-| 30 | `observacao_advogado` | text | SIM | `NULL` |
-| 31 | `texto_proposta_cliente` | longtext | SIM | `NULL` |
-| 32 | `created_at` | timestamp | SIM | `NULL` |
-| 33 | `updated_at` | timestamp | SIM | `NULL` |
+| 27 | `modelo_ia_utilizado` | varchar(50) | SIM | `NULL` |
+| 28 | `analise_yield` | longtext | SIM | `NULL` |
+| 29 | `proposta_escolhida` | varchar(20) | SIM | `NULL` |
+| 30 | `valor_final` | decimal(15,2) | SIM | `NULL` |
+| 31 | `status` | varchar(30) | NAO | `'gerada'` |
+| 32 | `observacao_advogado` | text | SIM | `NULL` |
+| 33 | `texto_proposta_cliente` | longtext | SIM | `NULL` |
+| 34 | `created_at` | timestamp | SIM | `NULL` |
+| 35 | `updated_at` | timestamp | SIM | `NULL` |
 
 **Indices:**
 - `pricing_proposals_user_id_foreign` -> `user_id`
@@ -3430,7 +3723,7 @@
 
 ## processos
 
-**Registros:** 1626
+**Registros:** 1525
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -3494,6 +3787,30 @@
 
 ---
 
+## relatorios_ceo
+
+**Registros:** 3
+
+| # | Coluna | Tipo | Nullable | Default |
+|---|--------|------|----------|---------|
+| 1 | `id` | bigint(20) unsigned | NAO | NULL |
+| 2 | `periodo_inicio` | date | NAO | NULL |
+| 3 | `periodo_fim` | date | NAO | NULL |
+| 4 | `status` | enum('queued','running','success','failed') | NAO | `'queued'` |
+| 5 | `dados_json` | longtext | SIM | `NULL` |
+| 6 | `analise_json` | longtext | SIM | `NULL` |
+| 7 | `pdf_path` | varchar(500) | SIM | `NULL` |
+| 8 | `metadata` | longtext | SIM | `NULL` |
+| 9 | `erro` | varchar(2000) | SIM | `NULL` |
+| 10 | `created_at` | timestamp | SIM | `NULL` |
+| 11 | `updated_at` | timestamp | SIM | `NULL` |
+
+**Indices:**
+- `relatorios_ceo_status_created_at_index` -> `status`
+- `relatorios_ceo_status_created_at_index` -> `created_at`
+
+---
+
 ## sessions
 
 **Registros:** 0
@@ -3532,6 +3849,25 @@
 - `sincronizacao_log_fonte_index` -> `fonte`
 - `sincronizacao_log_status_index` -> `status`
 - `sincronizacao_log_created_at_index` -> `created_at`
+
+---
+
+## sipex_settings
+
+**Registros:** 1
+
+| # | Coluna | Tipo | Nullable | Default |
+|---|--------|------|----------|---------|
+| 1 | `id` | bigint(20) unsigned | NAO | NULL |
+| 2 | `chave` | varchar(100) | NAO | NULL |
+| 3 | `valor` | text | SIM | `NULL` |
+| 4 | `descricao` | varchar(255) | SIM | `NULL` |
+| 5 | `updated_by` | bigint(20) unsigned | SIM | `NULL` |
+| 6 | `created_at` | timestamp | SIM | `NULL` |
+| 7 | `updated_at` | timestamp | SIM | `NULL` |
+
+**Indices:**
+- `sipex_settings_chave_unique` -> `chave` (UNIQUE)
 
 ---
 
@@ -3612,7 +3948,7 @@
 
 ## siric_evidencias
 
-**Registros:** 23
+**Registros:** 26
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -3955,7 +4291,7 @@
 
 ## sync_runs
 
-**Registros:** 930
+**Registros:** 1137
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -3989,7 +4325,7 @@
 
 ## system_error_logs
 
-**Registros:** 161
+**Registros:** 280
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -4016,7 +4352,7 @@
 
 ## system_events
 
-**Registros:** 1543
+**Registros:** 2081
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -4051,7 +4387,7 @@
 
 ## user_home_shortcuts
 
-**Registros:** 9
+**Registros:** 7
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -4132,7 +4468,7 @@
 
 ## vigilia_cruzamentos
 
-**Registros:** 375
+**Registros:** 458
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -4185,7 +4521,7 @@
 
 ## wa_conversation_tag
 
-**Registros:** 28
+**Registros:** 43
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -4204,7 +4540,7 @@
 
 ## wa_conversations
 
-**Registros:** 410
+**Registros:** 474
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -4219,17 +4555,19 @@
 | 9 | `assigned_at` | datetime | SIM | `NULL` |
 | 10 | `last_message_at` | datetime | SIM | `NULL` |
 | 11 | `last_incoming_at` | datetime | SIM | `NULL` |
-| 12 | `first_response_at` | datetime | SIM | `NULL` |
-| 13 | `unread_count` | int(10) unsigned | NAO | `0` |
-| 14 | `marked_unread` | tinyint(1) | NAO | `0` |
-| 15 | `priority` | enum('normal','alta','urgente','critica') | NAO | `'normal'` |
-| 16 | `bot_ativo` | tinyint(1) | NAO | `1` |
-| 17 | `category` | varchar(20) | SIM | `NULL` |
-| 18 | `linked_lead_id` | bigint(20) unsigned | SIM | `NULL` |
-| 19 | `linked_cliente_id` | bigint(20) unsigned | SIM | `NULL` |
-| 20 | `linked_processo_id` | bigint(20) unsigned | SIM | `NULL` |
-| 21 | `created_at` | timestamp | SIM | `NULL` |
-| 22 | `updated_at` | timestamp | SIM | `NULL` |
+| 12 | `lembrete_inatividade_at` | timestamp | SIM | `NULL` |
+| 13 | `first_response_at` | datetime | SIM | `NULL` |
+| 14 | `unread_count` | int(10) unsigned | NAO | `0` |
+| 15 | `marked_unread` | tinyint(1) | NAO | `0` |
+| 16 | `priority` | enum('normal','alta','urgente','critica') | NAO | `'normal'` |
+| 17 | `bot_ativo` | tinyint(1) | NAO | `1` |
+| 18 | `category` | varchar(20) | SIM | `NULL` |
+| 19 | `linked_lead_id` | bigint(20) unsigned | SIM | `NULL` |
+| 20 | `linked_cliente_id` | bigint(20) unsigned | SIM | `NULL` |
+| 21 | `linked_crm_account_id` | bigint(20) unsigned | SIM | `NULL` |
+| 22 | `linked_processo_id` | bigint(20) unsigned | SIM | `NULL` |
+| 23 | `created_at` | timestamp | SIM | `NULL` |
+| 24 | `updated_at` | timestamp | SIM | `NULL` |
 
 **Indices:**
 - `wa_conversations_chat_id_unique` -> `chat_id` (UNIQUE)
@@ -4243,12 +4581,13 @@
 - `wa_conversations_linked_cliente_id_index` -> `linked_cliente_id`
 - `wa_conv_linked_processo_idx` -> `linked_processo_id`
 - `idx_wa_conversations_priority` -> `priority`
+- `wa_conversations_linked_crm_account_id_index` -> `linked_crm_account_id`
 
 ---
 
 ## wa_events
 
-**Registros:** 10793
+**Registros:** 14243
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -4266,7 +4605,7 @@
 
 ## wa_messages
 
-**Registros:** 19422
+**Registros:** 23015
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|
@@ -4299,7 +4638,7 @@
 
 ## wa_notes
 
-**Registros:** 197
+**Registros:** 303
 
 | # | Coluna | Tipo | Nullable | Default |
 |---|--------|------|----------|---------|

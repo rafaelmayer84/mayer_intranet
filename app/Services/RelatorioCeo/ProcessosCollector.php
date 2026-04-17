@@ -1,4 +1,5 @@
 <?php
+// ESTÁVEL desde 17/04/2026
 
 namespace App\Services\RelatorioCeo;
 
@@ -27,25 +28,23 @@ class ProcessosCollector
             ->get()
             ->toArray();
 
-        // Por proprietário (advogado responsável)
-        $porProprietario = DB::table('processos as p')
-            ->join('users as u', 'u.id', '=', 'p.proprietario_id')
-            ->whereNull('p.data_encerramento')
-            ->whereNotNull('p.proprietario_id')
-            ->select('u.name', DB::raw('count(*) as total'), DB::raw('SUM(p.valor_causa) as valor_total'))
-            ->groupBy('u.id', 'u.name')
+        // Por proprietário (advogado responsável) — usa advogado_responsavel pois proprietario_id é ID DataJuri
+        $porProprietario = DB::table('processos')
+            ->whereNull('data_encerramento')
+            ->whereNotNull('advogado_responsavel')
+            ->select('advogado_responsavel as name', DB::raw('count(*) as total'), DB::raw('SUM(valor_causa) as valor_total'))
+            ->groupBy('advogado_responsavel')
             ->orderByDesc('total')
             ->get()
             ->toArray();
 
-        // Prazos críticos próximos (próximos 30 dias)
-        $prazos = DB::table('atividades_datajuri as a')
-            ->join('users as u', 'u.id', '=', 'a.proprietario_id')
-            ->whereNull('a.data_conclusao')
-            ->whereNotNull('a.data_prazo_fatal')
-            ->whereBetween('a.data_prazo_fatal', [now()->toDateTimeString(), now()->addDays(30)->toDateTimeString()])
-            ->select('a.processo_pasta', 'a.data_prazo_fatal', 'a.status', 'u.name as responsavel')
-            ->orderBy('a.data_prazo_fatal')
+        // Prazos críticos próximos (próximos 30 dias) — usa responsavel_nome pois proprietario_id é ID DataJuri
+        $prazos = DB::table('atividades_datajuri')
+            ->whereNull('data_conclusao')
+            ->whereNotNull('data_prazo_fatal')
+            ->whereBetween('data_prazo_fatal', [now()->toDateString(), now()->addDays(30)->toDateString()])
+            ->select('processo_pasta', 'data_prazo_fatal', 'status', 'responsavel_nome as responsavel')
+            ->orderBy('data_prazo_fatal')
             ->take(20)
             ->get()
             ->toArray();

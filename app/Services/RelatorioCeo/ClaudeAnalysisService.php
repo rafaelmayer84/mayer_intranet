@@ -1,4 +1,5 @@
 <?php
+// ESTÁVEL desde 17/04/2026
 
 namespace App\Services\RelatorioCeo;
 
@@ -11,7 +12,7 @@ class ClaudeAnalysisService
 
     public function __construct()
     {
-        $this->apiKey = env('JUSTUS_ANTHROPIC_API_KEY', '');
+        $this->apiKey = config('services.anthropic.api_key', env('JUSTUS_ANTHROPIC_API_KEY', ''));
     }
 
     public function analisar(array $dados): array
@@ -27,11 +28,13 @@ class ClaudeAnalysisService
                 'Content-Type'      => 'application/json',
             ])
             ->post('https://api.anthropic.com/v1/messages', [
-                'model'      => 'claude-opus-4-7',
-                'max_tokens' => 20000,
-                'thinking'   => ['type' => 'adaptive', 'budget_tokens' => 10000],
-                'system'     => $this->systemPrompt(),
-                'messages'   => [
+                'model'         => 'claude-opus-4-7',
+                'max_tokens'    => 20000,
+                'temperature'   => 1,
+                'thinking'      => ['type' => 'adaptive'],
+                'output_config' => ['effort' => 'high'],
+                'system'        => $this->systemPrompt(),
+                'messages'      => [
                     ['role' => 'user', 'content' => $this->userPrompt($dados)],
                 ],
             ]);
@@ -67,6 +70,111 @@ class ClaudeAnalysisService
         return $analise;
     }
 
+    private function gerarInventario(array $dados): string
+    {
+        $linhas = ["INVENTÁRIO DE DADOS DISPONÍVEIS NESTE CICLO:", ""];
+
+        // Financeiro
+        $fin = $dados['financeiro'] ?? [];
+        if (isset($fin['erro'])) {
+            $linhas[] = "✗ FINANCEIRO: falha na coleta — {$fin['erro']}";
+        } else {
+            $receita   = number_format($fin['dre_atual']['receita_total'] ?? 0, 0, ',', '.');
+            $resultado = number_format($fin['dre_atual']['resultado'] ?? 0, 0, ',', '.');
+            $var       = $fin['variacao_receita_pct'] ?? 0;
+            $inadim    = number_format($fin['inadimplencia']['valor'] ?? 0, 0, ',', '.');
+            $nTop      = count($fin['top_clientes_receita'] ?? []);
+            $nDevedor  = count($fin['top_devedores'] ?? []);
+            $linhas[] = "✓ FINANCEIRO: receita R\${$receita}, resultado R\${$resultado}, variação {$var}%, inadimplência R\${$inadim} | top {$nTop} clientes mapeados, {$nDevedor} devedores";
+        }
+
+        // GDP
+        $gdp = $dados['gdp'] ?? [];
+        if (isset($gdp['erro'])) {
+            $linhas[] = "✗ GDP: falha na coleta — {$gdp['erro']}";
+        } else {
+            $nAdv   = count($gdp['snapshots'] ?? []);
+            $nPen   = count($gdp['penalizacoes'] ?? []);
+            $nMetas = count($gdp['metas_vs_realizado'] ?? []);
+            $linhas[] = "✓ GDP: {$nAdv} advogados com snapshot, {$nPen} penalizações, {$nMetas} registros de metas vs. realizado";
+        }
+
+        // Processos
+        $proc = $dados['processos'] ?? [];
+        if (isset($proc['erro'])) {
+            $linhas[] = "✗ PROCESSOS: falha na coleta — {$proc['erro']}";
+        } else {
+            $ativos   = number_format($proc['total_ativos'] ?? 0);
+            $vencidos = $proc['prazos_vencidos'] ?? 0;
+            $proximos = count($proc['prazos_proximos'] ?? []);
+            $andamentos = number_format($proc['andamentos_periodo'] ?? 0);
+            $linhas[] = "✓ PROCESSOS: {$ativos} ativos, {$vencidos} prazos vencidos, {$proximos} prazos críticos (30 dias), {$andamentos} andamentos no período";
+        }
+
+        // Leads
+        $leads = $dados['leads'] ?? [];
+        if (isset($leads['erro'])) {
+            $linhas[] = "✗ LEADS: falha na coleta — {$leads['erro']}";
+        } else {
+            $total    = $leads['total'] ?? 0;
+            $comResumo = count($leads['leads_com_demanda'] ?? []);
+            $convertidos = $leads['convertidos_para_cliente'] ?? 0;
+            $linhas[] = "✓ LEADS: {$total} total, {$comResumo} com resumo de demanda (qualitativo), {$convertidos} convertidos para cliente";
+            if ($comResumo === 0 && $total > 0) {
+                $linhas[] = "  ⚠ leads_com_demanda vazio — analise os agregados por_area, por_intencao_contratar, por_gatilho_emocional, por_potencial_honorarios";
+            }
+        }
+
+        // WhatsApp
+        $wa = $dados['whatsapp'] ?? [];
+        if (isset($wa['erro'])) {
+            $linhas[] = "✗ WHATSAPP: falha na coleta — {$wa['erro']}";
+        } else {
+            $nConv    = $wa['total_conversas_analisadas'] ?? 0;
+            $nCritico = $wa['conversas_criticas_urgentes'] ?? 0;
+            $linhas[] = "✓ WHATSAPP: {$nConv} conversas com conteúdo analisável, {$nCritico} críticas/urgentes";
+            if ($nConv === 0) {
+                $linhas[] = "  ⚠ sem conteúdo de mensagens — analise dados agregados do nexo (volume, status, qa_scores, tempo_resposta)";
+            }
+        }
+
+        // NEXO
+        $nexo = $dados['nexo'] ?? [];
+        if (!isset($nexo['erro'])) {
+            $nQa = count($nexo['qa_scores'] ?? []);
+            $tempoResp = $nexo['tempo_medio_resposta_min'] ?? 0;
+            $linhas[] = "✓ NEXO: {$nQa} registros de QA, tempo médio de resposta {$tempoResp}min";
+        }
+
+        // Mercado (notícias)
+        $mercado = $dados['mercado'] ?? [];
+        if (isset($mercado['erro'])) {
+            $linhas[] = "✗ MERCADO: falha na coleta — {$mercado['erro']}";
+        } else {
+            $nNoticias = $mercado['total_noticias'] ?? 0;
+            $linhas[] = "✓ MERCADO: {$nNoticias} notícias do setor jurídico coletadas";
+        }
+
+        // GA
+        $ga = $dados['ga'] ?? [];
+        if (($ga['configurado'] ?? false) === false) {
+            $linhas[] = "✗ GOOGLE ANALYTICS: não configurado (ignorar esta fonte)";
+        } elseif (isset($ga['erro'])) {
+            $linhas[] = "✗ GOOGLE ANALYTICS: falha na coleta — {$ga['erro']}";
+        } else {
+            $sessoes  = number_format($ga['visao_geral']['sessions'] ?? 0);
+            $usuarios = number_format($ga['visao_geral']['active_users'] ?? 0);
+            $linhas[] = "✓ GOOGLE ANALYTICS: {$sessoes} sessões, {$usuarios} usuários ativos";
+        }
+
+        $linhas[] = "";
+        $linhas[] = "INSTRUÇÃO CRÍTICA: Os dados marcados com ✓ ESTÃO DISPONÍVEIS e DEVEM ser analisados.";
+        $linhas[] = "Nunca diga 'sem dados' para uma seção marcada com ✓. Se campos qualitativos estiverem vazios (⚠),";
+        $linhas[] = "analise os dados quantitativos disponíveis e informe explicitamente o que está e o que não está disponível.";
+
+        return implode("\n", $linhas);
+    }
+
     private function systemPrompt(): string
     {
         return <<<'PROMPT'
@@ -86,11 +194,15 @@ Você não resume planilhas. Você interpreta, cruza dados de fontes distintas, 
 
 REGRAS OBRIGATÓRIAS:
 1. Analise os dados com ceticismo: números bons podem esconder problemas estruturais; números ruins podem ser circunstanciais.
-2. Sempre que possível, cruze fontes: WhatsApp × GDP × Financeiro × Leads × Processos. Os cruzamentos revelam o que os silos escondem.
+2. Sempre que possível, cruze fontes: WhatsApp × GDP × Financeiro × Leads × Processos × Mercado. Os cruzamentos revelam o que os silos escondem.
 3. Nomeie pessoas e situações concretas quando os dados permitirem. "A equipe melhorou" é inútil. "João subiu 12 pontos no GDP puxado pelo indicador de retorno de clientes" é acionável.
 4. Identifique pelo menos 2 alertas que o gestor provavelmente não percebeu ainda.
 5. As recomendações devem ser decisões reais — não sugestões vagas. "Avaliar X" não é recomendação. "Renegociar contrato com fornecedor Y até 30/05" é.
 6. O relatório deve ser útil para quem não viu os dados — contextualize os números.
+7. NUNCA declare ausência de dados para uma seção que o inventário marcou como disponível (✓). Se campos qualitativos estiverem vazios, diga isso explicitamente mas analise os quantitativos que existem.
+8. Use o campo 'financeiro.top_clientes_receita' para analisar concentração de receita por cliente. Use 'financeiro.top_devedores' para nomear quem deve.
+9. Use o campo 'mercado.noticias' para contextualizar variações de volume de leads ou tipos de ação — eventos jurídicos explicam sazonalidade.
+10. Se 'ga' estiver disponível, cruze ga.por_canal com leads.por_canal para calcular conversion rate por origem.
 
 RETORNE EXCLUSIVAMENTE um JSON válido, sem texto antes ou depois, no formato especificado na mensagem do usuário.
 PROMPT;
@@ -100,24 +212,14 @@ PROMPT;
     {
         $periodo   = $dados['periodo']['label'] ?? 'período não informado';
         $dadosJson = json_encode($dados, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-
-        // Instrução para análise das conversas WhatsApp
-        $instrucaoWhatsApp = '';
-        $totalConversas = $dados['whatsapp']['total_conversas_analisadas'] ?? 0;
-        if ($totalConversas > 0) {
-            $instrucaoWhatsApp = "\n\nATENÇÃO: O campo 'whatsapp.conversas' contém o conteúdo REAL das mensagens enviadas pelos clientes no período. Leia cada conversa, identifique padrões, problemas recorrentes, situações urgentes não resolvidas, e sentimentos predominantes. Isso é a voz dos clientes — use-a.";
-        }
-
-        $instrucaoLeads = '';
-        $totalLeads = $dados['leads']['total'] ?? 0;
-        if ($totalLeads > 0) {
-            $instrucaoLeads = "\n\nO campo 'leads.leads_com_demanda' contém resumos reais das demandas de cada lead, com gatilho emocional, potencial de honorários e intenção de contratar. Analise o perfil qualitativo desses leads para identificar oportunidades de posicionamento e gargalos de conversão.";
-        }
+        $inventario = $this->gerarInventario($dados);
 
         return <<<JSON
-Período analisado: {$periodo}{$instrucaoWhatsApp}{$instrucaoLeads}
+Período analisado: {$periodo}
 
-DADOS COLETADOS:
+{$inventario}
+
+DADOS COLETADOS (JSON completo):
 {$dadosJson}
 
 ---
@@ -147,7 +249,9 @@ Produza o relatório de inteligência executivo no seguinte formato JSON (retorn
 
   "financeiro": {
     "situacao": "<excelente|bom|neutro|atenção|crítico>",
-    "analise": "<2-3 parágrafos densos. Receita, margem, inadimplência, tendência. O que está crescendo e o que está encolhendo? Há concentração de receita em poucos clientes? A variação frente ao período anterior é estrutural ou circunstancial?>",
+    "analise": "<2-3 parágrafos densos. Receita, margem, inadimplência, tendência. Mencione explicitamente os top clientes por receita (financeiro.top_clientes_receita) e o percentual de concentração. Nomeie os maiores devedores (financeiro.top_devedores). A variação frente ao período anterior é estrutural ou circunstancial?>",
+    "concentracao_receita": "<Análise de concentração: os top 3 clientes respondem por X% da receita — qual o risco disso? Quem são?>",
+    "inadimplencia_detalhe": "<Quem deve? Nomeie os devedores com valor e quantidade de títulos. Quando venceu? Há risco de calote estrutural?>",
     "riscos_identificados": ["<risco específico com dado>"],
     "recomendacoes": ["<decisão concreta, não sugestão>"]
   },
@@ -191,6 +295,11 @@ Produza o relatório de inteligência executivo no seguinte formato JSON (retorn
       "prazo": "<imediato|7 dias|15 dias|30 dias|60 dias>"
     }
   ],
+
+  "contexto_mercado": {
+    "noticias_relevantes": "<Há notícias do setor jurídico (mercado.noticias) que explicam variações observadas? Ex: nova lei, reforma, jurisprudência que aumentou volume de determinada área?>",
+    "implicacao_estrategica": "<Como os eventos externos identificados devem influenciar decisões do escritório no próximo ciclo?>"
+  },
 
   "o_que_monitorar_proximo_periodo": ["<métrica ou situação específica a acompanhar>"]
 }

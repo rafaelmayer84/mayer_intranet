@@ -3,22 +3,56 @@
 @section('title', 'Relatórios CEO')
 
 @section('content')
-<div class="max-w-5xl mx-auto px-4 py-8" x-data="relatorioCeo()">
+<div class="max-w-5xl mx-auto px-4 py-8">
 
   {{-- Cabeçalho --}}
   <div class="flex items-start justify-between mb-8 gap-4">
     <div>
       <h1 style="font-size:1.4rem;font-weight:700;color:var(--ds-navy,#1B334A);">Relatórios de Inteligência Executiva</h1>
       <p style="font-size:.82rem;color:var(--ds-text-3,#8896A6);margin-top:3px;">
-        Análise quinzenal via Claude Opus 4.7 · Financeiro · WhatsApp · Leads · GDP · Processos
+        Geração automática quinzenal via Claude Opus 4.7 · Financeiro · WhatsApp · Leads · GDP · Processos
       </p>
     </div>
-    <button @click="abrirModal()" class="ds-btn ds-btn-primary" style="display:flex;align-items:center;gap:6px;white-space:nowrap;flex-shrink:0;">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-      </svg>
-      Gerar Relatório
-    </button>
+    <div>
+      <button onclick="document.getElementById('modal-gerar').style.display='flex'"
+              style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:var(--ds-navy,#1B334A);color:#fff;border-radius:var(--ds-radius-sm,10px);font-size:.82rem;font-weight:600;border:none;cursor:pointer;">
+        <svg style="width:15px;height:15px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+        </svg>
+        Gerar agora
+      </button>
+    </div>
+  </div>
+
+  {{-- Modal de geração manual --}}
+  <div id="modal-gerar" style="display:none;position:fixed;inset:0;z-index:50;align-items:center;justify-content:center;background:rgba(0,0,0,.4);" onclick="if(event.target===this)this.style.display='none'">
+    <div style="background:#fff;border-radius:16px;padding:28px 32px;width:420px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.2);">
+      <h2 style="font-size:1rem;font-weight:700;color:var(--ds-navy,#1B334A);margin-bottom:4px;">Gerar relatório manualmente</h2>
+      <p style="font-size:.78rem;color:var(--ds-text-3,#8896A6);margin-bottom:20px;">O job será enfileirado e processado pelo queue worker. Pode levar até 10 minutos.</p>
+      <form method="POST" action="{{ route('admin.relatorios-ceo.gerar') }}">
+        @csrf
+        <div style="margin-bottom:14px;">
+          <label style="font-size:.78rem;font-weight:600;color:var(--ds-text-2,#4A5568);display:block;margin-bottom:4px;">Início do período</label>
+          <input type="date" name="periodo_inicio" value="{{ now()->startOfMonth()->toDateString() }}"
+                 style="width:100%;padding:8px 12px;border:1px solid var(--ds-border,#D8DEE6);border-radius:8px;font-size:.85rem;color:var(--ds-navy,#1B334A);" required>
+        </div>
+        <div style="margin-bottom:20px;">
+          <label style="font-size:.78rem;font-weight:600;color:var(--ds-text-2,#4A5568);display:block;margin-bottom:4px;">Fim do período</label>
+          <input type="date" name="periodo_fim" value="{{ now()->toDateString() }}"
+                 style="width:100%;padding:8px 12px;border:1px solid var(--ds-border,#D8DEE6);border-radius:8px;font-size:.85rem;color:var(--ds-navy,#1B334A);" required>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button type="button" onclick="document.getElementById('modal-gerar').style.display='none'"
+                  style="padding:8px 16px;border:1px solid var(--ds-border,#D8DEE6);border-radius:8px;font-size:.82rem;font-weight:600;color:var(--ds-text-2,#4A5568);background:#fff;cursor:pointer;">
+            Cancelar
+          </button>
+          <button type="submit"
+                  style="padding:8px 20px;background:var(--ds-navy,#1B334A);color:#fff;border:none;border-radius:8px;font-size:.82rem;font-weight:600;cursor:pointer;">
+            Gerar relatório
+          </button>
+        </div>
+      </form>
+    </div>
   </div>
 
   {{-- Flash success --}}
@@ -47,13 +81,7 @@
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
     </svg>
     <p style="font-size:.9rem;font-weight:600;color:var(--ds-text,#1B334A);margin-bottom:6px;">Nenhum relatório gerado ainda</p>
-    <p style="font-size:.8rem;color:var(--ds-text-3,#8896A6);margin-bottom:20px;">Clique em "Gerar Relatório" para criar o primeiro. A geração leva de 3 a 8 minutos.</p>
-    <button @click="abrirModal()" class="ds-btn ds-btn-primary" style="display:inline-flex;align-items:center;gap:6px;">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-      </svg>
-      Gerar agora
-    </button>
+    <p style="font-size:.8rem;color:var(--ds-text-3,#8896A6);">O primeiro relatório será gerado automaticamente no próximo ciclo quinzenal (dias 1 e 15 de cada mês).</p>
   </div>
   @else
   <div style="background:var(--ds-surface,#fff);border:1px solid var(--ds-border,#D8DEE6);border-radius:var(--ds-radius,14px);overflow:hidden;">
@@ -168,124 +196,7 @@
 
 </div>
 
-{{-- ══ MODAL GERAR RELATÓRIO ══ --}}
-<div x-show="modal" x-cloak
-     style="position:fixed;inset:0;background:rgba(27,51,74,.5);backdrop-filter:blur(4px);z-index:9998;display:flex;align-items:center;justify-content:center;"
-     @click.self="fecharModal()">
-  <div style="background:#fff;border-radius:var(--ds-radius,14px);width:480px;max-width:95vw;box-shadow:0 8px 32px rgba(27,51,74,.15);"
-       :style="modal ? 'transform:translateY(0);opacity:1;transition:all .2s' : 'transform:translateY(20px);opacity:0'">
-
-    {{-- Header --}}
-    <div style="padding:20px 24px 16px;border-bottom:1px solid var(--ds-border-l,#E8ECF1);display:flex;align-items:center;justify-content:space-between;">
-      <div>
-        <h3 style="font-size:1rem;font-weight:700;color:var(--ds-navy,#1B334A);">Gerar Relatório de Inteligência</h3>
-        <p style="font-size:.75rem;color:var(--ds-text-3,#8896A6);margin-top:2px;">Selecione o período e aguarde de 3 a 8 minutos</p>
-      </div>
-      <button @click="fecharModal()" style="border:none;background:none;cursor:pointer;color:var(--ds-text-3,#8896A6);line-height:1;">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-        </svg>
-      </button>
-    </div>
-
-    {{-- Form --}}
-    <form action="{{ route('admin.relatorios-ceo.gerar') }}" method="POST" style="padding:20px 24px 24px;">
-      @csrf
-
-      <div style="margin-bottom:16px;">
-        <label style="display:block;font-size:.8rem;font-weight:600;color:var(--ds-text,#1B334A);margin-bottom:6px;">Período início</label>
-        <input type="date" name="periodo_inicio" x-model="inicio" required
-               class="ds-input" style="width:100%;">
-      </div>
-
-      <div style="margin-bottom:20px;">
-        <label style="display:block;font-size:.8rem;font-weight:600;color:var(--ds-text,#1B334A);margin-bottom:6px;">Período fim</label>
-        <input type="date" name="periodo_fim" x-model="fim" required
-               class="ds-input" style="width:100%;">
-      </div>
-
-      {{-- Atalhos de período --}}
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
-        <button type="button" @click="setPeriodo(15)" style="font-size:.73rem;padding:4px 10px;border-radius:6px;border:1px solid var(--ds-border,#D8DEE6);background:var(--ds-bg,#F2F5F8);cursor:pointer;color:var(--ds-text-2,#4A5568);">
-          Últimos 15 dias
-        </button>
-        <button type="button" @click="setPeriodo(30)" style="font-size:.73rem;padding:4px 10px;border-radius:6px;border:1px solid var(--ds-border,#D8DEE6);background:var(--ds-bg,#F2F5F8);cursor:pointer;color:var(--ds-text-2,#4A5568);">
-          Últimos 30 dias
-        </button>
-        <button type="button" @click="setMesAtual()" style="font-size:.73rem;padding:4px 10px;border-radius:6px;border:1px solid var(--ds-border,#D8DEE6);background:var(--ds-bg,#F2F5F8);cursor:pointer;color:var(--ds-text-2,#4A5568);">
-          Mês atual
-        </button>
-        <button type="button" @click="setMesAnterior()" style="font-size:.73rem;padding:4px 10px;border-radius:6px;border:1px solid var(--ds-border,#D8DEE6);background:var(--ds-bg,#F2F5F8);cursor:pointer;color:var(--ds-text-2,#4A5568);">
-          Mês anterior
-        </button>
-      </div>
-
-      <div style="background:#fefce8;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;margin-bottom:20px;font-size:.76rem;color:#92400e;display:flex;gap:8px;align-items:flex-start;">
-        <svg style="width:14px;height:14px;flex-shrink:0;margin-top:1px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-        </svg>
-        <span>A geração é assíncrona e leva <strong>3 a 8 minutos</strong>. Você receberá uma notificação ao concluir.</span>
-      </div>
-
-      <div style="display:flex;gap:10px;justify-content:flex-end;">
-        <button type="button" @click="fecharModal()" class="ds-btn" style="padding:8px 18px;">Cancelar</button>
-        <button type="submit" class="ds-btn ds-btn-primary" style="display:flex;align-items:center;gap:6px;padding:8px 20px;">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-          </svg>
-          Gerar relatório
-        </button>
-      </div>
-    </form>
-  </div>
-</div>
-
 <style>
 .hover-row:hover td { background: var(--ds-bg, #F2F5F8); }
 </style>
-
-<script>
-function relatorioCeo() {
-  return {
-    modal: false,
-    inicio: '',
-    fim: '',
-
-    abrirModal() {
-      this.setPeriodo(15);
-      this.modal = true;
-    },
-
-    fecharModal() {
-      this.modal = false;
-    },
-
-    fmt(d) {
-      return d.toISOString().slice(0, 10);
-    },
-
-    setPeriodo(dias) {
-      const hoje = new Date();
-      const ini  = new Date(hoje);
-      ini.setDate(ini.getDate() - dias);
-      this.inicio = this.fmt(ini);
-      this.fim    = this.fmt(hoje);
-    },
-
-    setMesAtual() {
-      const hoje = new Date();
-      this.inicio = this.fmt(new Date(hoje.getFullYear(), hoje.getMonth(), 1));
-      this.fim    = this.fmt(hoje);
-    },
-
-    setMesAnterior() {
-      const hoje = new Date();
-      const ini  = new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1);
-      const fim  = new Date(hoje.getFullYear(), hoje.getMonth(), 0);
-      this.inicio = this.fmt(ini);
-      this.fim    = this.fmt(fim);
-    },
-  }
-}
-</script>
 @endsection
