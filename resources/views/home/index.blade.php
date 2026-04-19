@@ -107,33 +107,6 @@
 .cmdpal-item svg { color: var(--gold-600); flex-shrink: 0; }
 .cmdpal-hint { margin-left: auto; font-size: 11px; color: var(--ink-3); font-variant-caps: all-small-caps; letter-spacing: .06em; }
 
-/* ── Tweaks panel ── */
-.tweaks-panel {
-    position: fixed; right: -310px; top: 64px; bottom: 0;
-    width: 290px; padding: 26px 22px;
-    background: var(--surface); border-left: 1px solid var(--rule);
-    box-shadow: var(--shadow-lg); transition: right .4s var(--ease-out);
-    z-index: 300; overflow-y: auto;
-}
-.tweaks-panel.open { right: 0; }
-.tweak-row { margin-bottom: 20px; }
-.tweak-label-hdr { font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; margin-bottom: 10px; }
-.tweak-chips { display: flex; gap: 6px; flex-wrap: wrap; }
-.tweak-chip {
-    padding: 5px 13px; border-radius: 999px; font-size: 12px;
-    border: 1px solid var(--rule); background: var(--paper-2);
-    color: var(--ink-2); cursor: pointer; font-family: var(--sans);
-    transition: all .2s var(--ease);
-}
-.tweak-chip:hover { border-color: var(--gold-400); color: var(--gold-700); }
-.tweak-chip.active { background: var(--navy-700); color: var(--paper); border-color: var(--navy-700); }
-.tweak-color {
-    width: 26px; height: 26px; border-radius: 50%;
-    cursor: pointer; border: 2px solid transparent;
-    transition: transform .2s, border-color .2s;
-}
-.tweak-color:hover { transform: scale(1.15); }
-.tweak-color.active { border-color: var(--gold-500); transform: scale(1.1); box-shadow: 0 0 0 3px rgba(201,163,91,.25); }
 </style>
 @endpush
 
@@ -803,29 +776,6 @@
     </div>
 </div>
 
-{{-- ══════ TWEAKS PANEL ══════ --}}
-<div class="tweaks-panel" id="tweaks-panel">
-    <h4 style="font-size:13px;font-weight:600;color:var(--ink);margin:0 0 22px;display:flex;justify-content:space-between;align-items:center;">
-        <span><em style="font-style:normal;color:var(--gold-700);">Tweaks</em> · aparência</span>
-        <button onclick="document.getElementById('tweaks-panel').classList.remove('open')" style="font-size:18px;color:var(--ink-3);border:0;background:none;cursor:pointer;">×</button>
-    </h4>
-    <div class="tweak-row">
-        <div class="tweak-label-hdr">Modo</div>
-        <div class="tweak-chips">
-            <button class="tweak-chip active" id="tw-light" onclick="setTheme('light')">Claro</button>
-            <button class="tweak-chip" id="tw-dark" onclick="setTheme('dark')">Escuro</button>
-        </div>
-    </div>
-    <div class="tweak-row">
-        <div class="tweak-label-hdr">Paleta</div>
-        <div class="tweak-chips" style="gap:8px;">
-            <div class="tweak-color active" id="tc-navy" onclick="setPalette('navy','#1B334A','#C9A35B')" style="background:linear-gradient(135deg,#1B334A 60%,#C9A35B 60%);"></div>
-            <div class="tweak-color" id="tc-forest" onclick="setPalette('forest','#2B4A3A','#C9A35B')" style="background:linear-gradient(135deg,#2B4A3A 60%,#C9A35B 60%);"></div>
-            <div class="tweak-color" id="tc-bordeaux" onclick="setPalette('bordeaux','#5A2830','#D4B168')" style="background:linear-gradient(135deg,#5A2830 60%,#D4B168 60%);"></div>
-            <div class="tweak-color" id="tc-ink" onclick="setPalette('ink','#14293F','#B9925A')" style="background:linear-gradient(135deg,#14293F 60%,#B9925A 60%);"></div>
-        </div>
-    </div>
-</div>
 
 @push('scripts')
 <script>
@@ -884,56 +834,10 @@ document.addEventListener('keydown', e => {
         e.preventDefault();
         document.getElementById('cmdpal-overlay').classList.contains('open') ? closeCmdPal() : openCmdPal();
     }
-    if (e.key === 'Escape') {
-        closeCmdPal();
-        document.getElementById('tweaks-panel')?.classList.remove('open');
-    }
+    if (e.key === 'Escape') closeCmdPal();
 });
 
-// ── Tweaks: theme + palette ──
-function setTheme(t) {
-    document.documentElement.setAttribute('data-theme', t);
-    document.getElementById('tw-light')?.classList.toggle('active', t === 'light');
-    document.getElementById('tw-dark')?.classList.toggle('active', t === 'dark');
-    localStorage.setItem('mayer_theme', t);
-}
-function setPalette(name, primary, gold) {
-    const r = document.documentElement;
-    r.style.setProperty('--navy-700', primary);
-    r.style.setProperty('--navy-900', primary);
-    r.style.setProperty('--navy-800', primary);
-    r.style.setProperty('--navy-600', primary);
-    r.style.setProperty('--gold-500', gold);
-    document.querySelectorAll('.tweak-color').forEach(el => el.classList.remove('active'));
-    document.getElementById('tc-'+name)?.classList.add('active');
-}
-// Restore saved theme
-(function() {
-    const t = localStorage.getItem('mayer_theme');
-    if (t) setTheme(t);
-})();
 
-// ── Wire tweaks button in topbar ──
-document.addEventListener('DOMContentLoaded', () => {
-    // Inject ⌘K button into notification bar
-    const notifBar = document.getElementById('notification-bar');
-    if (notifBar) {
-        // Add tweaks button
-        const tweaksBtn = document.createElement('button');
-        tweaksBtn.title = 'Tweaks';
-        tweaksBtn.id = 'topbar-tweaks-btn';
-        tweaksBtn.innerHTML = '<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.6" d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.6 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>';
-        tweaksBtn.style.cssText = 'width:38px;height:38px;border-radius:999px;border:1px solid var(--rule);background:var(--surface);color:var(--ink-2);display:grid;place-items:center;cursor:pointer;transition:all .2s;flex-shrink:0;';
-        tweaksBtn.onmouseover = () => { tweaksBtn.style.borderColor = 'var(--gold-400)'; tweaksBtn.style.transform = 'translateY(-1px)'; };
-        tweaksBtn.onmouseout = () => { tweaksBtn.style.borderColor = 'var(--rule)'; tweaksBtn.style.transform = ''; };
-        tweaksBtn.onclick = () => document.getElementById('tweaks-panel')?.classList.toggle('open');
-
-        const profileWrapper = document.getElementById('profile-wrapper');
-        if (profileWrapper) {
-            profileWrapper.parentNode.insertBefore(tweaksBtn, profileWrapper);
-        }
-    }
-});
 </script>
 
 <script>

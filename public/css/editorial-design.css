@@ -766,42 +766,6 @@ body::before {
 .badge.bad  { background: #FAEBE4; border-color: #EDD1C2; color: var(--bad); }
 .badge.gold { background: var(--gold-50); border-color: var(--gold-300); color: var(--gold-700); }
 
-/* Tweaks panel */
-.tweaks {
-  position: fixed; right: -320px; top: 64px; bottom: 0;
-  width: 300px; padding: 28px 24px;
-  background: var(--surface);
-  border-left: 1px solid var(--rule);
-  box-shadow: var(--shadow-lg);
-  transition: right .4s var(--ease-out);
-  z-index: 300;
-  overflow-y: auto;
-}
-.tweaks.open { right: 0; }
-.tweaks h4 {
-  font-size: 13px; font-weight: 600;
-  color: var(--ink); margin: 0 0 22px;
-  display: flex; justify-content: space-between; align-items: center;
-}
-.tweaks h4 em { font-style: normal; color: var(--gold-700); }
-.tweak-row { margin-bottom: 20px; }
-.tweak-label { font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; margin-bottom: 10px; }
-.tweak-chips { display: flex; gap: 6px; flex-wrap: wrap; }
-.tweak-chip {
-  padding: 5px 13px; border-radius: 999px; font-size: 12px;
-  border: 1px solid var(--rule); background: var(--paper-2);
-  color: var(--ink-2); cursor: pointer; font-family: var(--sans);
-  transition: all .2s var(--ease);
-}
-.tweak-chip:hover { border-color: var(--gold-400); color: var(--gold-700); }
-.tweak-chip.active { background: var(--navy-700); color: var(--paper); border-color: var(--navy-700); }
-.tweak-color {
-  width: 26px; height: 26px; border-radius: 50%;
-  cursor: pointer; border: 2px solid transparent;
-  transition: transform .2s var(--ease), border-color .2s var(--ease);
-}
-.tweak-color:hover { transform: scale(1.15); }
-.tweak-color.active { border-color: var(--gold-500); transform: scale(1.1); box-shadow: 0 0 0 3px rgba(201,163,91,.25); }
 
 /* Command palette */
 .cmdpalette-overlay {
