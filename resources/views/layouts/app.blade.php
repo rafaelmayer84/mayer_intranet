@@ -14,6 +14,8 @@
     <link rel="stylesheet" href="{{ asset('css/intranet-ui.css') }}?v=242">
     <!-- Design System Mayer -->
     <link rel="stylesheet" href="{{ asset('css/theme.css') }}?v={{ filemtime(public_path('css/theme.css')) }}">
+    <!-- Design Editorial Mayer v2 -->
+    <link rel="stylesheet" href="{{ asset('css/editorial-design.css') }}?v={{ filemtime(public_path('css/editorial-design.css')) }}">
     <!-- Identidade Visual Unificada Mayer Advogados -->
     <link rel="stylesheet" href="{{ asset('css/mayer-brand.css') }}?v={{ filemtime(public_path('css/mayer-brand.css')) }}">
     @stack('styles')
@@ -747,7 +749,7 @@ body { font-family: 'Montserrat', 'Inter', system-ui, sans-serif; }
                 <!-- Theme toggle removido - modo unico light -->
             </header>
 
-            <div class="p-4 md:p-8">
+            <div id="page-content-wrapper" class="p-4 md:p-8">
                 @yield('content')
             </div>
         </main>
