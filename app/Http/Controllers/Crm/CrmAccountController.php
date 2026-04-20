@@ -16,6 +16,8 @@ use App\Services\Crm\CrmSegmentationService;
 use App\Services\Crm\CrmCadenceService;
 use App\Services\Crm\CrmHealthScoreService;
 use App\Models\Crm\CrmDocument;
+use App\Models\Crm\CrmInadimplenciaDecisao;
+use App\Models\Crm\CrmOpportunity;
 use Illuminate\Support\Facades\Storage;
 
 class CrmAccountController extends Controller
@@ -81,6 +83,35 @@ class CrmAccountController extends Controller
         $documents = CrmDocument::where('account_id', $id)->with('uploadedBy')->latest()->get();
         $docCategorias = CrmDocument::categorias();
 
+        // Inadimplência: tarefa aberta de cobrança + decisão ativa + histórico
+        $inadTarefaAberta = CrmActivity::where('account_id', $id)
+            ->where('type', 'task')
+            ->where('purpose', 'cobranca')
+            ->where('requires_evidence', true)
+            ->whereNull('done_at')
+            ->with('createdBy')
+            ->first();
+
+        $inadEvidencias = $inadTarefaAberta
+            ? CrmDocument::where('account_id', $id)
+                ->where('activity_id', $inadTarefaAberta->id)
+                ->with('uploadedBy')
+                ->latest()
+                ->get()
+            : collect();
+
+        $inadDecisaoAtiva = CrmInadimplenciaDecisao::where('account_id', $id)
+            ->where('status', 'ativa')
+            ->with('createdBy')
+            ->latest()
+            ->first();
+
+        $inadHistoricoDecisoes = CrmInadimplenciaDecisao::where('account_id', $id)
+            ->with('createdBy')
+            ->latest()
+            ->limit(5)
+            ->get();
+
         $serviceRequests = \App\Models\Crm\CrmServiceRequest::where('account_id', $id)
             ->with(['requestedBy', 'assignedTo'])
             ->latest()
@@ -105,7 +136,9 @@ class CrmAccountController extends Controller
         }
 
         return view('crm.accounts.show', compact(
-            'account', 'timeline', 'djContext', 'commContext', 'users', 'segmentation', 'finSummary', 'documents', 'docCategorias', 'serviceRequests', 'srCategorias', 'nexoPendentes', 'adminProcesses'
+            'account', 'timeline', 'djContext', 'commContext', 'users', 'segmentation', 'finSummary',
+            'documents', 'docCategorias', 'serviceRequests', 'srCategorias', 'nexoPendentes', 'adminProcesses',
+            'inadTarefaAberta', 'inadEvidencias', 'inadDecisaoAtiva', 'inadHistoricoDecisoes'
         ));
     }
 
@@ -827,6 +860,181 @@ class CrmAccountController extends Controller
         return back()->with('success', 'Documento removido.')->withFragment('documentos');
     }
 
+
+    /**
+     * POST /crm/accounts/{id}/inadimplencia/decisao
+     * Apenas admin. Registra decisão de escalação: aguardar, renegociar ou sinistrar.
+     */
+    public function storeDecisaoInadimplencia(Request $request, int $id)
+    {
+        if (!auth()->user()->isAdmin()) {
+            return response()->json(['error' => 'Sem permissão'], 403);
+        }
+
+        $request->validate([
+            'decisao'       => 'required|in:aguardar,renegociar,sinistrar',
+            'justificativa' => 'required|string|min:20|max:2000',
+            'sinistro_notas'=> 'nullable|string|max:1000',
+        ]);
+
+        $account = CrmAccount::findOrFail($id);
+        $decisao = $request->decisao;
+
+        // Encerrar decisão ativa anterior desta conta
+        CrmInadimplenciaDecisao::where('account_id', $id)
+            ->where('status', 'ativa')
+            ->update(['status' => 'encerrada', 'updated_at' => now()]);
+
+        $prazoRevisao = $decisao === 'aguardar' ? now()->addDays(30)->toDateString() : null;
+
+        $oportunidadeId = null;
+        if ($decisao === 'renegociar') {
+            $opp = CrmOpportunity::create([
+                'account_id'     => $id,
+                'stage_id'       => 4, // Negociação
+                'type'           => 'carteira',
+                'title'          => 'Renegociação de inadimplência — ' . $account->name,
+                'owner_user_id'  => $account->owner_user_id,
+                'status'         => 'open',
+            ]);
+            $oportunidadeId = $opp->id;
+
+            CrmEvent::create([
+                'account_id'         => $id,
+                'type'               => 'opportunity_created',
+                'payload'            => ['opp_id' => $opp->id, 'title' => $opp->title, 'origem' => 'inadimplencia'],
+                'happened_at'        => now(),
+                'created_by_user_id' => auth()->id(),
+            ]);
+        }
+
+        $rec = CrmInadimplenciaDecisao::create([
+            'account_id'          => $id,
+            'decisao'             => $decisao,
+            'justificativa'       => $request->justificativa,
+            'prazo_revisao'       => $prazoRevisao,
+            'created_by_user_id'  => auth()->id(),
+            'status'              => 'ativa',
+            'oportunidade_id'     => $oportunidadeId,
+            'sinistro_notas'      => $request->sinistro_notas,
+        ]);
+
+        // Evento na timeline
+        $decisaoLabel = match ($decisao) {
+            'aguardar'   => 'Decisão: Aguardar (30 dias)',
+            'renegociar' => 'Decisão: Iniciar Renegociação',
+            'sinistrar'  => 'Decisão: Contrato Sinistrado',
+        };
+        CrmEvent::create([
+            'account_id'         => $id,
+            'type'               => 'inadimplencia_decisao',
+            'payload'            => [
+                'decisao'       => $decisao,
+                'decisao_id'    => $rec->id,
+                'prazo_revisao' => $prazoRevisao,
+                'justificativa' => mb_substr($request->justificativa, 0, 100),
+            ],
+            'happened_at'        => now(),
+            'created_by_user_id' => auth()->id(),
+        ]);
+
+        Log::info('[CRM] Decisão inadimplência registrada', ['account' => $id, 'decisao' => $decisao, 'by' => auth()->id()]);
+
+        return response()->json([
+            'ok'            => true,
+            'decisao'       => $decisao,
+            'prazo_revisao' => $prazoRevisao,
+            'oportunidade_id' => $oportunidadeId,
+        ]);
+    }
+
+    /**
+     * POST /crm/accounts/{id}/inadimplencia/evidencia/{activityId}
+     * Advogado responsável faz upload de prova de cobrança vinculada à tarefa.
+     * Validação sistêmica: MIME (img/pdf), tamanho mínimo, metadados obrigatórios.
+     */
+    public function uploadEvidenciaCobranca(Request $request, int $id, int $activityId)
+    {
+        $request->validate([
+            'file'           => [
+                'required', 'file',
+                'mimes:jpg,jpeg,png,webp,pdf',
+                'max:10240',   // 10 MB
+                'min:15',      // 15 KB mínimo — bloqueia arquivo vazio/branco
+            ],
+            'tipo_contato'   => 'required|in:whatsapp,email,ligacao,visita,outro',
+            'data_cobranca'  => 'required|date|before_or_equal:today|after:' . now()->subDays(30)->toDateString(),
+            'descricao'      => 'required|string|min:100|max:2000',
+        ], [
+            'file.min'          => 'O arquivo está vazio ou muito pequeno para ser uma evidência válida.',
+            'descricao.min'     => 'Descreva detalhadamente o que foi feito na cobrança (mínimo 100 caracteres).',
+            'data_cobranca.after' => 'A data da cobrança deve ser dos últimos 30 dias.',
+        ]);
+
+        $activity = CrmActivity::where('id', $activityId)
+            ->where('account_id', $id)
+            ->where('type', 'task')
+            ->where('purpose', 'cobranca')
+            ->where('requires_evidence', true)
+            ->whereNull('done_at')
+            ->firstOrFail();
+
+        $file = $request->file('file');
+        $tipoLabel = [
+            'whatsapp' => 'WhatsApp',
+            'email'    => 'E-mail',
+            'ligacao'  => 'Ligação',
+            'visita'   => 'Visita',
+            'outro'    => 'Outro',
+        ][$request->tipo_contato] ?? $request->tipo_contato;
+
+        $normalizedName = CrmDocument::normalizarNome(
+            $file->getClientOriginalName(),
+            'evidencia_cobranca',
+            $id
+        );
+
+        $path = $file->storeAs('crm/documents/' . $id, $normalizedName, 'public');
+
+        $doc = CrmDocument::create([
+            'account_id'          => $id,
+            'activity_id'         => $activityId,
+            'uploaded_by_user_id' => auth()->id(),
+            'category'            => 'evidencia_cobranca',
+            'original_name'       => $file->getClientOriginalName(),
+            'normalized_name'     => $normalizedName,
+            'disk_path'           => $path,
+            'mime_type'           => $file->getMimeType(),
+            'size_bytes'          => $file->getSize(),
+            'notes'               => "[{$tipoLabel} — {$request->data_cobranca}] {$request->descricao}",
+        ]);
+
+        // Fechar a tarefa automaticamente ao registrar evidência
+        $activity->update([
+            'done_at'              => now(),
+            'resolution_status'    => 'procedente',
+            'resolution_notes'     => "Evidência registrada: {$tipoLabel} em {$request->data_cobranca}. {$request->descricao}",
+            'completed_by_user_id' => auth()->id(),
+        ]);
+
+        CrmEvent::create([
+            'account_id'         => $id,
+            'type'               => 'document_uploaded',
+            'payload'            => [
+                'document_id' => $doc->id,
+                'name'        => $normalizedName,
+                'category'    => 'evidencia_cobranca',
+                'tipo_contato' => $request->tipo_contato,
+                'data_cobranca' => $request->data_cobranca,
+            ],
+            'happened_at'        => now(),
+            'created_by_user_id' => auth()->id(),
+        ]);
+
+        Log::info('[CRM] Evidência cobrança registrada', ['account' => $id, 'activity' => $activityId, 'doc' => $doc->id]);
+
+        return response()->json(['ok' => true, 'doc_id' => $doc->id, 'tarefa_fechada' => true]);
+    }
 
     public function destroy(int $id)
     {

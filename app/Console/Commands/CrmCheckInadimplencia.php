@@ -11,7 +11,7 @@ use Carbon\Carbon;
 class CrmCheckInadimplencia extends Command
 {
     protected $signature = 'crm:check-inadimplencia';
-    protected $description = 'Verifica contas vencidas, notifica responsáveis e escala se não houver ação de cobrança';
+    protected $description = 'Verifica contas vencidas, cria tarefas de cobrança, notifica responsáveis e escala se não houver ação';
 
     private const CHEFIA_USER_ID = 1;
 
@@ -21,6 +21,10 @@ class CrmCheckInadimplencia extends Command
         $hojeFmt = $hoje->toDateString();
         $notificados = 0;
         $escalados = 0;
+        $tarefasCriadas = 0;
+
+        // Expirar decisões "aguardar" vencidas e notificar admin para revisão
+        $this->expirarDecisoesVencidas($hoje);
 
         $inadimplentes = DB::table('contas_receber')
             ->where('is_stale', false)
@@ -35,10 +39,29 @@ class CrmCheckInadimplencia extends Command
         foreach ($inadimplentes as $inad) {
             $account = DB::table('crm_accounts')
                 ->where('datajuri_pessoa_id', $inad->pessoa_datajuri_id)
-                ->whereNotIn('lifecycle', ['archived'])
+                ->whereNotIn('lifecycle', ['arquivado'])
                 ->first(['id', 'name', 'owner_user_id']);
 
             if (!$account) continue;
+
+            // Pular conta com decisão ativa de "aguardar" (deliberada pelo admin)
+            $temDecisaoAtiva = DB::table('crm_inadimplencia_decisoes')
+                ->where('account_id', $account->id)
+                ->where('status', 'ativa')
+                ->where('decisao', 'aguardar')
+                ->where('prazo_revisao', '>=', $hojeFmt)
+                ->exists();
+
+            if ($temDecisaoAtiva) continue;
+
+            // Pular conta sinistrada (encerramento permanente)
+            $sinistrada = DB::table('crm_inadimplencia_decisoes')
+                ->where('account_id', $account->id)
+                ->where('status', 'ativa')
+                ->where('decisao', 'sinistrar')
+                ->exists();
+
+            if ($sinistrada) continue;
 
             $responsavelId = $account->owner_user_id ?? self::CHEFIA_USER_ID;
             $link = url('/crm/accounts/' . $account->id);
@@ -46,17 +69,7 @@ class CrmCheckInadimplencia extends Command
             $cliente = $inad->cliente ?? $account->name;
             $diasAtraso = Carbon::parse($inad->venc_mais_antiga)->diffInDays($hoje);
 
-            // Verificar se já notificou hoje para este cliente
-            $jaNotificou = DB::table('notifications_intranet')
-                ->where('user_id', $responsavelId)
-                ->where('tipo', 'LIKE', 'crm_inadim%')
-                ->where('link', $link)
-                ->whereDate('created_at', $hojeFmt)
-                ->exists();
-
-            if ($jaNotificou) continue;
-
-            // Verificar se houve interação de cobrança recente para este account
+            // Verificar última interação de cobrança
             $ultimaCobranca = DB::table('crm_activities')
                 ->where('account_id', $account->id)
                 ->where('purpose', 'cobranca')
@@ -67,15 +80,55 @@ class CrmCheckInadimplencia extends Command
                 ? Carbon::parse($ultimaCobranca->created_at)->diffInDays($hoje)
                 : null;
 
-            // Determinar nível de escalação
             $nivel = $this->determinarNivel($diasAtraso, $diasSemCobranca);
+
+            // Amigável e Reiteração: criar tarefa formal de cobrança (idempotente)
+            if (in_array($nivel, ['amigavel', 'reiteracao'])) {
+                $tarefaAberta = DB::table('crm_activities')
+                    ->where('account_id', $account->id)
+                    ->where('type', 'task')
+                    ->where('purpose', 'cobranca')
+                    ->where('requires_evidence', true)
+                    ->whereNull('done_at')
+                    ->exists();
+
+                if (!$tarefaAberta) {
+                    $prazo = $nivel === 'amigavel'
+                        ? $hoje->copy()->addDays(3)->toDateTimeString()
+                        : $hoje->copy()->addDay()->toDateTimeString();
+
+                    DB::table('crm_activities')->insert([
+                        'account_id'         => $account->id,
+                        'type'               => 'task',
+                        'purpose'            => 'cobranca',
+                        'requires_evidence'  => true,
+                        'title'              => "Cobrar inadimplência: {$cliente}",
+                        'body'               => "{$inad->qty} título(s) vencido(s) — {$valorFmt} — {$diasAtraso}d de atraso. Registre o contato e anexe a evidência (print WhatsApp, e-mail, etc.).",
+                        'due_at'             => $prazo,
+                        'created_by_user_id' => self::CHEFIA_USER_ID,
+                        'created_at'         => now(),
+                        'updated_at'         => now(),
+                    ]);
+                    $tarefasCriadas++;
+                }
+            }
+
+            // Deduplicar notificação do dia
+            $jaNotificou = DB::table('notifications_intranet')
+                ->where('user_id', $responsavelId)
+                ->where('tipo', 'LIKE', 'crm_inadim%')
+                ->where('link', $link)
+                ->whereDate('created_at', $hojeFmt)
+                ->exists();
+
+            if ($jaNotificou) continue;
 
             if ($nivel === 'amigavel') {
                 DB::table('notifications_intranet')->insert([
                     'user_id'    => $responsavelId,
                     'tipo'       => 'crm_inadimplencia',
                     'titulo'     => 'Cobrança pendente: ' . mb_substr($cliente, 0, 40),
-                    'mensagem'   => "{$cliente} possui {$inad->qty} título(s) vencido(s) totalizando {$valorFmt} ({$diasAtraso} dia(s) de atraso). Acesse o CRM e registre uma interação de cobrança (tipo: ligação, WhatsApp ou visita / propósito: cobrança).",
+                    'mensagem'   => "{$cliente} possui {$inad->qty} título(s) vencido(s) totalizando {$valorFmt} ({$diasAtraso} dia(s) de atraso). Uma tarefa de cobrança foi criada — registre o contato e anexe a evidência.",
                     'link'       => $link,
                     'icone'      => 'alert-circle',
                     'lida'       => false,
@@ -93,7 +146,7 @@ class CrmCheckInadimplencia extends Command
                     'user_id'    => $responsavelId,
                     'tipo'       => 'crm_inadimplencia',
                     'titulo'     => '⚠ Cobrança não registrada: ' . mb_substr($cliente, 0, 35),
-                    'mensagem'   => "REITERAÇÃO: {$cliente} possui {$inad->qty} título(s) vencido(s) ({$valorFmt}, {$diasAtraso}d de atraso). {$cobMsg} Registre uma interação de cobrança no CRM com urgência. A chefia será notificada caso a ação não seja registrada.",
+                    'mensagem'   => "REITERAÇÃO: {$cliente} possui {$inad->qty} título(s) vencido(s) ({$valorFmt}, {$diasAtraso}d de atraso). {$cobMsg} A tarefa de cobrança exige evidência anexada. A chefia será notificada se não houver ação.",
                     'link'       => $link,
                     'icone'      => 'alert-triangle',
                     'lida'       => false,
@@ -109,12 +162,11 @@ class CrmCheckInadimplencia extends Command
                     ? 'NUNCA foi registrada interação de cobrança.'
                     : "Última cobrança há {$diasSemCobranca} dia(s).";
 
-                // Notificação para o advogado
                 DB::table('notifications_intranet')->insert([
                     'user_id'    => $responsavelId,
                     'tipo'       => 'crm_inadimplencia',
                     'titulo'     => '⚠ Inadimplência sem ação: ' . mb_substr($cliente, 0, 35),
-                    'mensagem'   => "ESCALAÇÃO: {$cliente} possui {$inad->qty} título(s) vencido(s) ({$valorFmt}, {$diasAtraso}d). {$cobMsg} A chefia foi notificada. A omissão na cobrança impacta o indicador de conformidade (PEN-D04) e será considerada na apuração do GDP.",
+                    'mensagem'   => "ESCALAÇÃO: {$cliente} possui {$inad->qty} título(s) vencido(s) ({$valorFmt}, {$diasAtraso}d). {$cobMsg} A chefia foi notificada. A omissão impacta o indicador PEN-D04 no GDP.",
                     'link'       => $link,
                     'icone'      => 'alert-triangle',
                     'lida'       => false,
@@ -122,22 +174,30 @@ class CrmCheckInadimplencia extends Command
                     'updated_at' => now(),
                 ]);
 
-                // Notificação para chefia
                 if ($responsavelId !== self::CHEFIA_USER_ID) {
-                    DB::table('notifications_intranet')->insert([
-                        'user_id'    => self::CHEFIA_USER_ID,
-                        'tipo'       => 'crm_inadimplencia_chefia',
-                        'titulo'     => "Inadimplência sem cobrança: {$nomeResp}",
-                        'mensagem'   => "{$nomeResp} não registrou cobrança para {$cliente} — {$inad->qty} título(s), {$valorFmt}, {$diasAtraso}d de atraso. {$cobMsg}",
-                        'link'       => $link,
-                        'icone'      => 'alert-triangle',
-                        'lida'       => false,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ]);
+                    // Verificar se chefia já foi notificada hoje para esta escalação
+                    $chefiaJaNotificada = DB::table('notifications_intranet')
+                        ->where('user_id', self::CHEFIA_USER_ID)
+                        ->where('tipo', 'crm_inadimplencia_chefia')
+                        ->where('link', $link)
+                        ->whereDate('created_at', $hojeFmt)
+                        ->exists();
+
+                    if (!$chefiaJaNotificada) {
+                        DB::table('notifications_intranet')->insert([
+                            'user_id'    => self::CHEFIA_USER_ID,
+                            'tipo'       => 'crm_inadimplencia_chefia',
+                            'titulo'     => "Inadimplência sem cobrança: {$nomeResp}",
+                            'mensagem'   => "{$nomeResp} não registrou cobrança para {$cliente} — {$inad->qty} título(s), {$valorFmt}, {$diasAtraso}d de atraso. {$cobMsg} Acesse para deliberar: Aguardar / Renegociar / Sinistrar.",
+                            'link'       => $link,
+                            'icone'      => 'alert-triangle',
+                            'lida'       => false,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
                 }
 
-                // Email escalação
                 if ($responsavel && $responsavel->email) {
                     try {
                         $chefia = DB::table('users')->where('id', self::CHEFIA_USER_ID)->first();
@@ -151,8 +211,8 @@ class CrmCheckInadimplencia extends Command
                             "Ações requeridas:\n" .
                             "1. Realize contato imediato com o cliente (telefone, WhatsApp ou visita).\n" .
                             "2. Registre a interação no CRM com propósito 'cobrança'.\n" .
-                            "3. Registre o resultado: pagou, negociou prazo ou não atendeu.\n\n" .
-                            "A ausência de ação de cobrança configura ocorrência de conformidade (PEN-D04) no GDP.\n\n" .
+                            "3. Anexe a evidência (print, e-mail, etc.) na tarefa aberta no CRM.\n\n" .
+                            "A ausência de ação configura ocorrência PEN-D04 no GDP.\n\n" .
                             "Acesse: {$link}\n\n" .
                             "Atenciosamente,\nGestão — Mayer Advogados\n(Mensagem automática do Sistema RESULTADOS!)",
                             function ($msg) use ($responsavel, $ccEmail, $cliente) {
@@ -173,19 +233,50 @@ class CrmCheckInadimplencia extends Command
             }
         }
 
-        $msg = "Inadimplência: {$inadimplentes->count()} clientes, {$notificados} notificados, {$escalados} escalados à chefia.";
+        $msg = "Inadimplência: {$inadimplentes->count()} clientes, {$notificados} notificados, {$escalados} escalados à chefia, {$tarefasCriadas} tarefas criadas.";
         $this->info($msg);
-        Log::info('CRM Inadimplência', ['clientes' => $inadimplentes->count(), 'notificados' => $notificados, 'escalados' => $escalados]);
+        Log::info('CRM Inadimplência', [
+            'clientes'       => $inadimplentes->count(),
+            'notificados'    => $notificados,
+            'escalados'      => $escalados,
+            'tarefas_criadas' => $tarefasCriadas,
+        ]);
 
         return self::SUCCESS;
     }
 
-    /**
-     * Determinar nível de notificação:
-     * - amigavel: atraso <= 5 dias OU cobrança registrada nos últimos 3 dias
-     * - reiteracao: atraso 6-14 dias sem cobrança recente (últimos 3 dias)
-     * - escalacao: atraso 15+ dias sem cobrança recente OU nunca cobrado com 6+ dias
-     */
+    private function expirarDecisoesVencidas(Carbon $hoje): void
+    {
+        $expiradas = DB::table('crm_inadimplencia_decisoes')
+            ->where('status', 'ativa')
+            ->where('decisao', 'aguardar')
+            ->where('prazo_revisao', '<', $hoje->toDateString())
+            ->get(['id', 'account_id']);
+
+        foreach ($expiradas as $dec) {
+            DB::table('crm_inadimplencia_decisoes')
+                ->where('id', $dec->id)
+                ->update(['status' => 'expirada', 'updated_at' => now()]);
+
+            $account = DB::table('crm_accounts')->where('id', $dec->account_id)->first(['name']);
+            $link = url('/crm/accounts/' . $dec->account_id);
+
+            DB::table('notifications_intranet')->insert([
+                'user_id'    => self::CHEFIA_USER_ID,
+                'tipo'       => 'crm_inadimplencia_revisao',
+                'titulo'     => 'Revisão de inadimplência: ' . mb_substr($account->name ?? 'Cliente', 0, 40),
+                'mensagem'   => "O prazo de 30 dias para aguardar a inadimplência de " . ($account->name ?? 'cliente') . " expirou. É necessário deliberar novamente: Aguardar, Renegociar ou Sinistrar.",
+                'link'       => $link,
+                'icone'      => 'clock',
+                'lida'       => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            Log::info('CRM Inadimplência: decisão aguardar expirada', ['decisao_id' => $dec->id, 'account_id' => $dec->account_id]);
+        }
+    }
+
     private function determinarNivel(int $diasAtraso, ?int $diasSemCobranca): string
     {
         $cobrancaRecente = $diasSemCobranca !== null && $diasSemCobranca <= 3;

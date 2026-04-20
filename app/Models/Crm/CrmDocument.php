@@ -7,7 +7,7 @@ class CrmDocument extends Model
     protected $table = 'crm_documents';
 
     protected $fillable = [
-        'account_id', 'uploaded_by_user_id', 'category',
+        'account_id', 'activity_id', 'uploaded_by_user_id', 'category',
         'original_name', 'normalized_name', 'disk_path',
         'mime_type', 'size_bytes', 'notes',
     ];
@@ -20,6 +20,11 @@ class CrmDocument extends Model
     public function uploadedBy()
     {
         return $this->belongsTo(\App\Models\User::class, 'uploaded_by_user_id');
+    }
+
+    public function activity()
+    {
+        return $this->belongsTo(CrmActivity::class, 'activity_id');
     }
 
     public function getUrlAttribute(): string
@@ -43,7 +48,8 @@ class CrmDocument extends Model
             'notificacao'   => 'Notificação',
             'correspondencia' => 'Correspondência',
             'financeiro'    => 'Documento Financeiro',
-            'geral'         => 'Outros',
+            'geral'             => 'Outros',
+            'evidencia_cobranca' => 'Evidência de Cobrança',
         ];
     }
 

@@ -1112,6 +1112,171 @@
             @else
                 <div class="bg-white rounded-lg shadow-sm border p-6"><p class="text-gray-400 text-sm">Nenhuma conta a receber encontrada.</p></div>
             @endif
+
+            {{-- ============================================================ --}}
+            {{-- PAINEL DE INADIMPLÊNCIA                                        --}}
+            {{-- ============================================================ --}}
+            @if($contasVencidas->count() > 0 || $inadTarefaAberta || $inadDecisaoAtiva || $inadHistoricoDecisoes->count() > 0)
+            <div class="bg-white rounded-lg shadow-sm border border-red-200 p-6" id="painel-inadimplencia">
+                <div class="flex items-center gap-3 mb-5">
+                    <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                    </div>
+                    <h2 class="text-lg font-semibold text-red-800">Gestão de Inadimplência</h2>
+                    @if($inadDecisaoAtiva)
+                        @php $badgeColor = match($inadDecisaoAtiva->decisao) { 'aguardar' => 'bg-yellow-100 text-yellow-800', 'renegociar' => 'bg-blue-100 text-blue-800', 'sinistrar' => 'bg-gray-100 text-gray-600', default => 'bg-gray-100 text-gray-600' }; @endphp
+                        <span class="text-xs px-2 py-1 rounded-full font-medium {{ $badgeColor }}">
+                            {{ match($inadDecisaoAtiva->decisao) { 'aguardar' => '⏸ Aguardando', 'renegociar' => '🔄 Renegociando', 'sinistrar' => '🔒 Sinistrado', default => $inadDecisaoAtiva->decisao } }}
+                        </span>
+                    @endif
+                </div>
+
+                {{-- Decisão ativa --}}
+                @if($inadDecisaoAtiva)
+                <div class="mb-5 p-4 rounded-lg {{ match($inadDecisaoAtiva->decisao) { 'aguardar' => 'bg-yellow-50 border border-yellow-200', 'renegociar' => 'bg-blue-50 border border-blue-200', 'sinistrar' => 'bg-gray-50 border border-gray-200', default => 'bg-gray-50' } }}">
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="flex-1">
+                            <p class="text-sm font-medium text-gray-700 mb-1">
+                                Decisão registrada em {{ $inadDecisaoAtiva->created_at->format('d/m/Y') }} por {{ $inadDecisaoAtiva->createdBy?->name ?? '—' }}
+                                @if($inadDecisaoAtiva->prazo_revisao)
+                                — revisão em <strong>{{ $inadDecisaoAtiva->prazo_revisao->format('d/m/Y') }}</strong>
+                                @endif
+                            </p>
+                            <p class="text-sm text-gray-600">{{ $inadDecisaoAtiva->justificativa }}</p>
+                            @if($inadDecisaoAtiva->sinistro_notas)
+                                <p class="text-xs text-gray-500 mt-1"><strong>Notas do contrato:</strong> {{ $inadDecisaoAtiva->sinistro_notas }}</p>
+                            @endif
+                        </div>
+                        @if(auth()->user()->isAdmin() && $contasVencidas->count() > 0)
+                        <button onclick="document.getElementById('painel-decisao').scrollIntoView({behavior:'smooth'})" class="text-xs text-gray-500 underline hover:text-gray-700 whitespace-nowrap flex-shrink-0 mt-0.5">Alterar decisão</button>
+                        @endif
+                    </div>
+                </div>
+                @endif
+
+                {{-- Tarefa aberta de cobrança --}}
+                @if($inadTarefaAberta && (!$inadDecisaoAtiva || $inadDecisaoAtiva->decisao !== 'sinistrar'))
+                <div class="mb-5 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                    <div class="flex items-center gap-2 mb-2">
+                        <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                        <span class="text-sm font-semibold text-orange-800">Tarefa de Cobrança Aberta</span>
+                        @if($inadTarefaAberta->due_at && $inadTarefaAberta->due_at->isPast())
+                            <span class="text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-700">Atrasada</span>
+                        @endif
+                    </div>
+                    <p class="text-sm text-orange-700 mb-3">{{ $inadTarefaAberta->title }}</p>
+                    <p class="text-xs text-orange-600 mb-3">{{ $inadTarefaAberta->body }}</p>
+                    @if($inadTarefaAberta->due_at)
+                        <p class="text-xs text-gray-500 mb-3">Prazo: {{ $inadTarefaAberta->due_at->format('d/m/Y H:i') }}</p>
+                    @endif
+
+                    {{-- Evidências já enviadas --}}
+                    @if($inadEvidencias->count() > 0)
+                    <div class="mb-3">
+                        <p class="text-xs font-medium text-gray-600 mb-1">Evidências enviadas:</p>
+                        @foreach($inadEvidencias as $ev)
+                        <div class="flex items-center gap-2 text-xs text-gray-600 py-1 border-b border-orange-100">
+                            <svg class="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <a href="{{ $ev->url }}" target="_blank" class="text-blue-600 hover:underline truncate max-w-[200px]">{{ $ev->original_name }}</a>
+                            <span class="text-gray-400">{{ $ev->uploadedBy?->name }}</span>
+                            <span class="text-gray-400">{{ $ev->created_at->format('d/m H:i') }}</span>
+                        </div>
+                        @endforeach
+                    </div>
+                    @endif
+
+                    {{-- Form upload evidência --}}
+                    <form id="form-evidencia-cobranca" class="mt-3 space-y-3" enctype="multipart/form-data">
+                        @csrf
+                        <p class="text-xs font-semibold text-orange-800">Registrar evidência de cobrança:</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Tipo de contato *</label>
+                                <select name="tipo_contato" required class="w-full text-sm border border-gray-300 rounded px-2 py-1.5">
+                                    <option value="">Selecione...</option>
+                                    <option value="whatsapp">WhatsApp</option>
+                                    <option value="email">E-mail</option>
+                                    <option value="ligacao">Ligação</option>
+                                    <option value="visita">Visita</option>
+                                    <option value="outro">Outro</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-600 mb-1">Data da cobrança *</label>
+                                <input type="date" name="data_cobranca" required max="{{ date('Y-m-d') }}" min="{{ date('Y-m-d', strtotime('-30 days')) }}" class="w-full text-sm border border-gray-300 rounded px-2 py-1.5">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">Descrição detalhada do contato * <span class="text-gray-400">(mín. 100 caracteres)</span></label>
+                            <textarea name="descricao" required minlength="100" rows="3" placeholder="Descreva o que foi feito: com quem falou, o que foi discutido, qual foi a resposta do cliente..." class="w-full text-sm border border-gray-300 rounded px-2 py-1.5 resize-none"></textarea>
+                            <p class="text-xs text-gray-400 mt-0.5" id="desc-counter">0 / 100 caracteres mínimos</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">Arquivo de evidência * <span class="text-gray-400">(JPG, PNG, WebP ou PDF — mín. 15 KB)</span></label>
+                            <input type="file" name="file" required accept=".jpg,.jpeg,.png,.webp,.pdf" class="w-full text-sm border border-gray-300 rounded px-2 py-1.5 bg-white">
+                        </div>
+                        <div id="evidencia-error" class="hidden text-sm text-red-600 bg-red-50 p-2 rounded"></div>
+                        <button type="submit" id="btn-enviar-evidencia" class="px-4 py-2 bg-orange-600 text-white text-sm rounded hover:bg-orange-700 font-medium transition-colors">
+                            Enviar evidência e fechar tarefa
+                        </button>
+                    </form>
+                </div>
+                @endif
+
+                {{-- Painel decisório (admin) --}}
+                @if(auth()->user()->isAdmin() && $contasVencidas->count() > 0)
+                <div class="mb-5 p-4 bg-red-50 border border-red-300 rounded-lg" id="painel-decisao">
+                    <p class="text-sm font-semibold text-red-800 mb-3">Deliberar sobre inadimplência</p>
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        <button onclick="abrirDecisao('aguardar')" class="px-3 py-1.5 text-sm bg-yellow-500 text-white rounded hover:bg-yellow-600 font-medium transition-colors">⏸ Aguardar (30 dias)</button>
+                        <button onclick="abrirDecisao('renegociar')" class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 font-medium transition-colors">🔄 Renegociar</button>
+                        <button onclick="abrirDecisao('sinistrar')" class="px-3 py-1.5 text-sm bg-gray-700 text-white rounded hover:bg-gray-800 font-medium transition-colors">🔒 Sinistrar contrato</button>
+                    </div>
+                    <form id="form-decisao-inadimplencia" class="hidden space-y-3">
+                        @csrf
+                        <input type="hidden" name="decisao" id="decisao-valor">
+                        <div id="decisao-label" class="text-sm font-medium text-gray-700"></div>
+                        <div id="sinistro-notas-wrap" class="hidden">
+                            <label class="block text-xs text-gray-600 mb-1">Identificação do contrato sinistrado</label>
+                            <input type="text" name="sinistro_notas" maxlength="1000" placeholder="N° do contrato, data, valor..." class="w-full text-sm border border-gray-300 rounded px-2 py-1.5">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-600 mb-1">Justificativa * <span class="text-gray-400">(mín. 20 caracteres)</span></label>
+                            <textarea name="justificativa" required minlength="20" rows="3" placeholder="Descreva o motivo da decisão..." class="w-full text-sm border border-gray-300 rounded px-2 py-1.5 resize-none"></textarea>
+                        </div>
+                        <div id="decisao-error" class="hidden text-sm text-red-600 bg-red-50 p-2 rounded"></div>
+                        <div class="flex gap-2">
+                            <button type="submit" class="px-4 py-2 bg-[#1B334A] text-white text-sm rounded hover:bg-[#2a4a64] font-medium transition-colors">Confirmar decisão</button>
+                            <button type="button" onclick="fecharDecisao()" class="px-4 py-2 bg-gray-200 text-gray-700 text-sm rounded hover:bg-gray-300 font-medium transition-colors">Cancelar</button>
+                        </div>
+                    </form>
+                </div>
+                @endif
+
+                {{-- Histórico de decisões --}}
+                @if($inadHistoricoDecisoes->count() > 0)
+                <div>
+                    <p class="text-xs font-medium text-gray-500 uppercase mb-2">Histórico de decisões</p>
+                    <div class="space-y-2">
+                        @foreach($inadHistoricoDecisoes as $hd)
+                        <div class="flex items-start gap-3 text-xs text-gray-500 py-1.5 border-b border-gray-100">
+                            <span class="shrink-0">{{ $hd->created_at->format('d/m/Y') }}</span>
+                            <span class="font-medium {{ match($hd->decisao) { 'aguardar' => 'text-yellow-700', 'renegociar' => 'text-blue-700', 'sinistrar' => 'text-gray-700', default => 'text-gray-600' } }}">
+                                {{ match($hd->decisao) { 'aguardar' => 'Aguardar', 'renegociar' => 'Renegociar', 'sinistrar' => 'Sinistrar', default => $hd->decisao } }}
+                            </span>
+                            <span class="text-gray-400">{{ $hd->createdBy?->name }}</span>
+                            <span class="shrink-0 px-1.5 py-0.5 rounded {{ match($hd->status) { 'ativa' => 'bg-green-100 text-green-700', 'expirada' => 'bg-yellow-100 text-yellow-700', 'encerrada' => 'bg-gray-100 text-gray-500', default => '' } }}">
+                                {{ match($hd->status) { 'ativa' => 'Ativa', 'expirada' => 'Expirada', 'encerrada' => 'Encerrada', default => $hd->status } }}
+                            </span>
+                            <span class="flex-1 truncate">{{ \Illuminate\Support\Str::limit($hd->justificativa, 60) }}</span>
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+                @endif
+            </div>
+            @endif
+
         </div>
     </div>
 </div>
@@ -2011,4 +2176,106 @@ document.addEventListener('DOMContentLoaded', function() { var m = document.getE
     </div>
 </div>
 @endif
+
+{{-- ============================================================ --}}
+{{-- JS — Painel Inadimplência                                     --}}
+{{-- ============================================================ --}}
+<script>
+(function () {
+    // --- Evidência de cobrança ---
+    const formEv = document.getElementById('form-evidencia-cobranca');
+    if (formEv) {
+        const textarea = formEv.querySelector('textarea[name="descricao"]');
+        const counter  = document.getElementById('desc-counter');
+        const errBox   = document.getElementById('evidencia-error');
+        const btnEnv   = document.getElementById('btn-enviar-evidencia');
+
+        textarea?.addEventListener('input', () => {
+            const len = textarea.value.length;
+            counter.textContent = len + ' / 100 caracteres mínimos';
+            counter.className = 'text-xs mt-0.5 ' + (len >= 100 ? 'text-green-600' : 'text-gray-400');
+        });
+
+        formEv.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errBox.classList.add('hidden');
+            btnEnv.disabled = true;
+            btnEnv.textContent = 'Enviando...';
+
+            const fd = new FormData(formEv);
+            const url = '/crm/accounts/{{ $account->id }}/inadimplencia/evidencia/{{ $inadTarefaAberta?->id ?? 0 }}';
+
+            try {
+                const r = await fetch(url, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                const data = await r.json();
+                if (r.ok && data.ok) {
+                    window.location.reload();
+                } else {
+                    const msgs = data.errors ? Object.values(data.errors).flat().join(' ') : (data.message || 'Erro ao enviar.');
+                    errBox.textContent = msgs;
+                    errBox.classList.remove('hidden');
+                    btnEnv.disabled = false;
+                    btnEnv.textContent = 'Enviar evidência e fechar tarefa';
+                }
+            } catch {
+                errBox.textContent = 'Falha de comunicação. Tente novamente.';
+                errBox.classList.remove('hidden');
+                btnEnv.disabled = false;
+                btnEnv.textContent = 'Enviar evidência e fechar tarefa';
+            }
+        });
+    }
+
+    // --- Decisão de inadimplência (admin) ---
+    const formDec = document.getElementById('form-decisao-inadimplencia');
+    const errDec  = document.getElementById('decisao-error');
+
+    window.abrirDecisao = function (decisao) {
+        if (!formDec) return;
+        formDec.classList.remove('hidden');
+        document.getElementById('decisao-valor').value = decisao;
+        const labels = {
+            aguardar:   '⏸ Aguardar 30 dias — o sistema silenciará as notificações até a revisão.',
+            renegociar: '🔄 Renegociar — uma oportunidade "Negociação" será criada no pipeline.',
+            sinistrar:  '🔒 Sinistrar — contrato encerrado. Notificações de inadimplência suprimidas permanentemente.'
+        };
+        document.getElementById('decisao-label').textContent = labels[decisao] || '';
+        const sinistroWrap = document.getElementById('sinistro-notas-wrap');
+        sinistroWrap.classList.toggle('hidden', decisao !== 'sinistrar');
+    };
+
+    window.fecharDecisao = function () {
+        formDec?.classList.add('hidden');
+        if (errDec) errDec.classList.add('hidden');
+    };
+
+    formDec?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (errDec) errDec.classList.add('hidden');
+        const btn = formDec.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        btn.textContent = 'Salvando...';
+
+        const fd = new FormData(formDec);
+        const url = '/crm/accounts/{{ $account->id }}/inadimplencia/decisao';
+
+        try {
+            const r = await fetch(url, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+            const data = await r.json();
+            if (r.ok && data.ok) {
+                window.location.reload();
+            } else {
+                const msgs = data.errors ? Object.values(data.errors).flat().join(' ') : (data.error || data.message || 'Erro ao salvar.');
+                if (errDec) { errDec.textContent = msgs; errDec.classList.remove('hidden'); }
+                btn.disabled = false;
+                btn.textContent = 'Confirmar decisão';
+            }
+        } catch {
+            if (errDec) { errDec.textContent = 'Falha de comunicação.'; errDec.classList.remove('hidden'); }
+            btn.disabled = false;
+            btn.textContent = 'Confirmar decisão';
+        }
+    });
+})();
+</script>
 @endpush
