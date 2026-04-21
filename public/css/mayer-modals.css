@@ -1,0 +1,387 @@
+/* ============================================================
+   INTRANET MAYER — Modais Unificados (editorial navy/gold)
+   ============================================================
+   Carregado APÓS theme.css / editorial-design.css / mayer-brand.css.
+   Resolve:
+   - overrides nucleares que quebravam max-width dos cards;
+   - contextos em que position:fixed era escopado pelo main-content;
+   - contraste/legibilidade (fontes, labels, botões);
+   - overlay + blur consistentes em todos os módulos.
+
+   Abrange os padrões existentes encontrados no código:
+   - div.fixed.inset-0.z-50 (Tailwind)
+   - div.fixed.inset-0 com style background
+   - [id^="modal-"] / [id*="Modal"]
+   - .modal-overlay (classes customizadas NEXO/SIPEX)
+   ============================================================ */
+
+/* ---------- Overlay: força viewport fixed + backdrop navy ---------- */
+.fixed.inset-0.z-50,
+.fixed.inset-0.z-\[50\],
+.fixed.inset-0.z-\[9999\],
+.fixed.inset-0.z-\[200\],
+[id^="modal-"].fixed.inset-0,
+[id$="Modal"].fixed.inset-0,
+.template-modal-overlay,
+.nova-conversa-overlay,
+#modal-escolha-overlay {
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    z-index: 9000;
+}
+
+/* Backdrop unificado para modais que usam bg-black/* ou styles inline */
+.fixed.inset-0[class*="bg-black"],
+.fixed.inset-0[class*="bg-opacity"],
+.fixed.inset-0[style*="rgba(0,0,0"],
+.fixed.inset-0[style*="rgba(0, 0, 0"],
+.fixed.inset-0.bg-gray-500,
+.template-modal-overlay,
+.nova-conversa-overlay,
+#modal-escolha-overlay {
+    background: rgba(14, 31, 51, 0.55) !important;
+    backdrop-filter: blur(4px) !important;
+    -webkit-backdrop-filter: blur(4px) !important;
+}
+
+/* ---------- Exceção ao "nuclear max-width" do theme.css ---------- */
+/* theme.css força max-width:100%!important em qualquer max-w-* dentro de
+   #main-content. Isso faz cards de modal spanarem full-width. Restauramos. */
+#main-content .fixed.inset-0 [class*="max-w-"],
+#main-content [id^="modal-"] [class*="max-w-"],
+#main-content .template-modal-overlay [class*="max-w-"],
+#main-content .nova-conversa-overlay [class*="max-w-"],
+#main-content #modal-escolha-overlay [class*="max-w-"] {
+    max-width: revert !important;
+    width: revert !important;
+}
+#main-content .fixed.inset-0 .w-full,
+#main-content [id^="modal-"] .w-full {
+    width: 100% !important;
+}
+#main-content .fixed.inset-0 .max-w-sm { max-width: 24rem !important; }
+#main-content .fixed.inset-0 .max-w-md { max-width: 28rem !important; }
+#main-content .fixed.inset-0 .max-w-lg { max-width: 32rem !important; }
+#main-content .fixed.inset-0 .max-w-xl { max-width: 36rem !important; }
+#main-content .fixed.inset-0 .max-w-2xl { max-width: 42rem !important; }
+#main-content .fixed.inset-0 .max-w-3xl { max-width: 48rem !important; }
+#main-content .fixed.inset-0 .max-w-4xl { max-width: 56rem !important; }
+#main-content .fixed.inset-0 .max-w-5xl { max-width: 64rem !important; }
+
+/* ---------- Card (corpo do modal) ---------- */
+.fixed.inset-0 > .bg-white,
+.fixed.inset-0 > div > .bg-white,
+[id^="modal-"] .bg-white.rounded-xl,
+[id^="modal-"] .bg-white.rounded-2xl,
+[id^="modal-"] .bg-white.rounded-lg,
+.template-modal-content,
+.nova-conversa-modal,
+#modal-escolha {
+    background: #FFFFFF !important;
+    border-radius: 16px !important;
+    box-shadow: 0 30px 80px rgba(14, 31, 51, .28),
+                0 4px 16px rgba(14, 31, 51, .12),
+                0 0 0 1px rgba(14, 31, 51, .06) !important;
+    color: #1B334A !important;
+}
+
+/* ---------- Headers dos modais ---------- */
+/* Harmoniza: navy escuro + texto branco + subtítulo gold suave */
+.fixed.inset-0 .bg-white > div:first-child:not(form):not([class*="p-"]),
+[id^="modal-"] .bg-white > div.border-b,
+[id^="modal-"] .bg-white > div.px-6.py-4.border-b,
+[id^="modal-"] .bg-white > div.px-6.py-5.border-b {
+    background: linear-gradient(135deg, #1B334A 0%, #0E1F33 100%) !important;
+    border-bottom: 1px solid rgba(201, 163, 91, .25) !important;
+    padding: 18px 24px !important;
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+}
+
+[id^="modal-"] .bg-white > div.border-b h1,
+[id^="modal-"] .bg-white > div.border-b h2,
+[id^="modal-"] .bg-white > div.border-b h3,
+[id^="modal-"] .bg-white > div.border-b h4,
+.fixed.inset-0 .bg-white > div:first-child h1,
+.fixed.inset-0 .bg-white > div:first-child h2,
+.fixed.inset-0 .bg-white > div:first-child h3,
+.fixed.inset-0 .bg-white > div:first-child h4 {
+    color: #F7F2E5 !important;
+    font-weight: 600 !important;
+    font-size: 16px !important;
+    letter-spacing: .01em !important;
+    margin: 0 !important;
+}
+
+[id^="modal-"] .bg-white > div.border-b p,
+.fixed.inset-0 .bg-white > div:first-child p {
+    color: rgba(247, 242, 229, .65) !important;
+    font-size: 12px !important;
+    margin-top: 2px !important;
+}
+
+/* Botão fechar (X) no header — contraste gold em fundo navy */
+[id^="modal-"] .bg-white > div.border-b button,
+.fixed.inset-0 .bg-white > div:first-child > button {
+    color: rgba(247, 242, 229, .7) !important;
+    font-size: 20px !important;
+    line-height: 1 !important;
+    transition: color .15s ease !important;
+    background: transparent !important;
+}
+[id^="modal-"] .bg-white > div.border-b button:hover,
+.fixed.inset-0 .bg-white > div:first-child > button:hover {
+    color: #C8AA74 !important;
+}
+
+/* ---------- Corpo do modal (labels + inputs) ---------- */
+/* Labels: mais legíveis (13px mínimo, ink-2) */
+[id^="modal-"] label,
+.fixed.inset-0 label {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #385776 !important;
+    letter-spacing: .01em !important;
+}
+
+/* Inputs / selects / textarea dentro de modal */
+[id^="modal-"] input[type="text"],
+[id^="modal-"] input[type="email"],
+[id^="modal-"] input[type="tel"],
+[id^="modal-"] input[type="number"],
+[id^="modal-"] input[type="date"],
+[id^="modal-"] input[type="datetime-local"],
+[id^="modal-"] input[type="search"],
+[id^="modal-"] input[type="url"],
+[id^="modal-"] select,
+[id^="modal-"] textarea,
+.fixed.inset-0 input[type="text"],
+.fixed.inset-0 input[type="email"],
+.fixed.inset-0 input[type="tel"],
+.fixed.inset-0 input[type="number"],
+.fixed.inset-0 input[type="date"],
+.fixed.inset-0 input[type="datetime-local"],
+.fixed.inset-0 input[type="search"],
+.fixed.inset-0 input[type="url"],
+.fixed.inset-0 select,
+.fixed.inset-0 textarea {
+    border: 1px solid #CEC6B0 !important;
+    border-radius: 10px !important;
+    background: #FDFCF8 !important;
+    color: #1B334A !important;
+    font-size: 14px !important;
+    padding: 10px 12px !important;
+    transition: border-color .15s ease, box-shadow .15s ease !important;
+}
+[id^="modal-"] input:focus,
+[id^="modal-"] select:focus,
+[id^="modal-"] textarea:focus,
+.fixed.inset-0 input:focus,
+.fixed.inset-0 select:focus,
+.fixed.inset-0 textarea:focus {
+    outline: none !important;
+    border-color: #385776 !important;
+    box-shadow: 0 0 0 3px rgba(56, 87, 118, .15) !important;
+    background: #FFFFFF !important;
+}
+[id^="modal-"] input::placeholder,
+[id^="modal-"] textarea::placeholder,
+.fixed.inset-0 input::placeholder,
+.fixed.inset-0 textarea::placeholder {
+    color: #98A3B3 !important;
+}
+
+/* Textos cinza-400 dentro de modal — subir contraste */
+[id^="modal-"] .text-gray-400,
+.fixed.inset-0 .text-gray-400 {
+    color: #6B7B8E !important;
+}
+[id^="modal-"] .text-gray-500,
+.fixed.inset-0 .text-gray-500 {
+    color: #5B7693 !important;
+}
+[id^="modal-"] .text-red-400,
+.fixed.inset-0 .text-red-400 {
+    color: #B3422F !important;
+}
+/* Fontes muito pequenas (<= 11px) viram 12px dentro do modal */
+[id^="modal-"] .text-\[10px\],
+[id^="modal-"] .text-\[11px\],
+.fixed.inset-0 .text-\[10px\],
+.fixed.inset-0 .text-\[11px\] {
+    font-size: 12px !important;
+}
+
+/* ---------- Footer (botões) ---------- */
+/* Botões primários (gradient navy) — mais presença + hover gold */
+[id^="modal-"] button[type="submit"],
+[id^="modal-"] button[style*="linear-gradient"],
+.fixed.inset-0 button[type="submit"],
+.fixed.inset-0 button[style*="linear-gradient"] {
+    background: linear-gradient(135deg, #385776 0%, #1B334A 100%) !important;
+    color: #F7F2E5 !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    padding: 10px 20px !important;
+    border-radius: 10px !important;
+    border: 1px solid #1B334A !important;
+    box-shadow: 0 2px 8px rgba(14, 31, 51, .15) !important;
+    transition: all .15s ease !important;
+}
+[id^="modal-"] button[type="submit"]:hover,
+[id^="modal-"] button[style*="linear-gradient"]:hover,
+.fixed.inset-0 button[type="submit"]:hover,
+.fixed.inset-0 button[style*="linear-gradient"]:hover {
+    background: linear-gradient(135deg, #294667 0%, #0E1F33 100%) !important;
+    box-shadow: 0 4px 16px rgba(14, 31, 51, .25) !important;
+    transform: translateY(-1px);
+}
+[id^="modal-"] button[type="submit"]:disabled,
+.fixed.inset-0 button[type="submit"]:disabled {
+    opacity: .5 !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+}
+
+/* Botão secundário "Cancelar" — outlined navy */
+[id^="modal-"] button[type="button"]:not([onclick*="confirmar"]):not([x-show]):not(.bg-\[\#1B334A\]),
+.fixed.inset-0 button[type="button"]:not([onclick*="confirmar"]):not([x-show]):not(.bg-\[\#1B334A\]) {
+    /* mantém o estilo original (sem override agressivo)
+       mas melhora contraste mínimo quando for cinza-400/500 */
+}
+
+/* ---------- Animação de entrada ---------- */
+@keyframes mmodalIn {
+    from { opacity: 0; transform: translateY(10px) scale(.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.fixed.inset-0 > .bg-white,
+.fixed.inset-0 > div > .bg-white,
+[id^="modal-"] .bg-white.rounded-xl,
+[id^="modal-"] .bg-white.rounded-2xl {
+    animation: mmodalIn .18s cubic-bezier(.22,.61,.36,1);
+}
+
+/* ---------- Scroll lock quando modal aberto (opcional, evita jank) ---------- */
+/* Necessita classe .body-modal-open aplicada via JS; deixado como hook futuro. */
+
+/* ============================================================
+   UTILITÁRIOS PARA NOVOS MODAIS (padrão oficial)
+   Use: <div class="mmodal-overlay"><div class="mmodal-card"> ... </div></div>
+   ============================================================ */
+.mmodal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(14, 31, 51, .55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    animation: mmodalOverlayIn .18s ease;
+}
+@keyframes mmodalOverlayIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+.mmodal-card {
+    background: #FFFFFF;
+    border-radius: 16px;
+    box-shadow: 0 30px 80px rgba(14, 31, 51, .28),
+                0 4px 16px rgba(14, 31, 51, .12),
+                0 0 0 1px rgba(14, 31, 51, .06);
+    width: 100%;
+    max-width: 32rem;
+    max-height: calc(100vh - 48px);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: mmodalIn .22s cubic-bezier(.22,.61,.36,1);
+}
+.mmodal-header {
+    background: linear-gradient(135deg, #1B334A 0%, #0E1F33 100%);
+    padding: 18px 24px;
+    border-bottom: 1px solid rgba(201, 163, 91, .25);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+.mmodal-header h1,
+.mmodal-header h2,
+.mmodal-header h3,
+.mmodal-title {
+    color: #F7F2E5;
+    font-weight: 600;
+    font-size: 16px;
+    margin: 0;
+}
+.mmodal-subtitle {
+    color: rgba(247, 242, 229, .65);
+    font-size: 12px;
+    margin-top: 2px;
+}
+.mmodal-close {
+    background: transparent;
+    border: 0;
+    color: rgba(247, 242, 229, .7);
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 6px;
+    transition: color .15s ease, background .15s ease;
+}
+.mmodal-close:hover { color: #C8AA74; background: rgba(201, 163, 91, .08); }
+.mmodal-body {
+    padding: 24px;
+    overflow-y: auto;
+    color: #1B334A;
+    font-size: 14px;
+    line-height: 1.5;
+}
+.mmodal-footer {
+    padding: 16px 24px;
+    background: #F7F5F0;
+    border-top: 1px solid #E0DAC9;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+.mmodal-btn-primary {
+    background: linear-gradient(135deg, #385776 0%, #1B334A 100%);
+    color: #F7F2E5;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: 1px solid #1B334A;
+    cursor: pointer;
+    transition: all .15s ease;
+}
+.mmodal-btn-primary:hover {
+    background: linear-gradient(135deg, #294667 0%, #0E1F33 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(14, 31, 51, .25);
+}
+.mmodal-btn-secondary {
+    background: #FFFFFF;
+    color: #385776;
+    font-weight: 600;
+    font-size: 14px;
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: 1px solid #CEC6B0;
+    cursor: pointer;
+    transition: all .15s ease;
+}
+.mmodal-btn-secondary:hover {
+    border-color: #385776;
+    color: #1B334A;
+    background: #F7F5F0;
+}

@@ -387,8 +387,8 @@ class CrmAccountController extends Controller
     public function completeActivity(Request $request, int $id, int $activityId)
     {
         $request->validate([
-            'resolution_status' => 'required|in:procedente,improcedente,parcial,cancelada',
-            'resolution_notes'  => 'required|string|max:3000',
+            'resolution_status' => 'required|in:procedente,improcedente,parcial,cancelada,ciente',
+            'resolution_notes'  => 'nullable|string|max:3000',
         ]);
 
         $activity = CrmActivity::where('id', $activityId)

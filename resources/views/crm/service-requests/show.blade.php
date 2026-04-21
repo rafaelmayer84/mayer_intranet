@@ -338,12 +338,14 @@ document.getElementById('btn-salvar-acao').addEventListener('click', function ()
     }
 });
 
+const resolucaoAtual = @json($sr->resolution_notes ?? '');
+
 function abrirModal(status) {
     const cfg = titulosModal[status] || { titulo: 'Confirmar ação', sub: '', obrig: false };
     document.getElementById('modal-titulo').textContent = cfg.titulo;
     document.getElementById('modal-subtitulo').textContent = cfg.sub;
     document.getElementById('modal-obrig').style.display = cfg.obrig ? 'inline' : 'none';
-    document.getElementById('modal-notes').value = '';
+    document.getElementById('modal-notes').value = resolucaoAtual;
     document.getElementById('modal-resolucao').classList.remove('hidden');
     document.getElementById('modal-resolucao').classList.add('flex');
     document.getElementById('modal-notes').focus();

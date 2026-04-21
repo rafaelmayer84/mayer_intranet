@@ -18,6 +18,8 @@
     <link rel="stylesheet" href="{{ asset('css/editorial-design.css') }}?v={{ filemtime(public_path('css/editorial-design.css')) }}">
     <!-- Identidade Visual Unificada Mayer Advogados -->
     <link rel="stylesheet" href="{{ asset('css/mayer-brand.css') }}?v={{ filemtime(public_path('css/mayer-brand.css')) }}">
+    <!-- Modais Unificados (editorial navy/gold) -->
+    <link rel="stylesheet" href="{{ asset('css/mayer-modals.css') }}?v={{ filemtime(public_path('css/mayer-modals.css')) }}">
     @stack('styles')
     <style>
 body { font-family: 'Montserrat', 'Inter', system-ui, sans-serif; }

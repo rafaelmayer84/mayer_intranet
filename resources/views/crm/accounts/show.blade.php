@@ -782,6 +782,7 @@
                                                     'improcedente' => 'bg-red-100 text-red-700',
                                                     'parcial' => 'bg-yellow-100 text-yellow-700',
                                                     'cancelada' => 'bg-gray-200 text-gray-600',
+                                                    'ciente' => 'bg-blue-100 text-blue-700',
                                                     default => 'bg-green-100 text-green-700',
                                                 };
                                                 $resLabel = match($act->resolution_status ?? '') {
@@ -789,6 +790,7 @@
                                                     'improcedente' => 'Improcedente',
                                                     'parcial' => 'Parcial',
                                                     'cancelada' => 'Cancelada',
+                                                    'ciente' => 'Ciente',
                                                     default => 'Concluída',
                                                 };
                                             @endphp
@@ -797,7 +799,19 @@
                                                 <p class="text-xs text-gray-500 mt-1 italic">{{ Str::limit($act->resolution_notes, 80) }}</p>
                                             @endif
                                         @else
-                                            <button onclick="openCompleteModal({{ $act->id }})" class="px-2 py-1 rounded text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 mt-1">✓ Concluir</button>
+                                            @php
+                                                $authId = auth()->id();
+                                                $authUser = auth()->user();
+                                                $actIsCreator = $act->created_by_user_id == $authId;
+                                                $actIsOwner = $account->owner_user_id == $authId;
+                                                $actIsSuper = $authUser->isAdmin() || $authUser->isCoordenador();
+                                                $actCanBtn = $actIsCreator || $actIsOwner || $actIsSuper;
+                                                $actBtnMode = ($actIsOwner && !$actIsCreator && !$actIsSuper) ? 'ciente' : 'concluir';
+                                                $actBtnLabel = $actBtnMode === 'ciente' ? '✓ Ciente' : '✓ Concluir';
+                                            @endphp
+                                            @if($actCanBtn)
+                                                <button onclick="openCompleteModal({{ $act->id }}, '{{ $actBtnMode }}')" class="px-2 py-1 rounded text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 mt-1">{{ $actBtnLabel }}</button>
+                                            @endif
                                         @endif
                                         @if($act->due_at && !$act->done_at)
                                             <p class="mt-1 {{ $act->due_at->isPast() ? 'text-red-500 font-medium' : 'text-gray-500' }}">
@@ -1281,13 +1295,14 @@
     </div>
 </div>
 
-{{-- Modal Concluir Atividade --}}
+{{-- Modal Concluir / Ciente --}}
 <div id="modal-complete" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-    <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-        <h3 class="text-lg font-semibold text-[#1B334A] mb-4">Concluir Atividade</h3>
+    <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md mx-4">
+        <h3 class="text-lg font-semibold text-[#1B334A] mb-4" id="modal-complete-title">Concluir Atividade</h3>
         <input type="hidden" id="complete-activity-id">
+        <input type="hidden" id="complete-mode" value="concluir">
         <div class="space-y-3">
-            <div>
+            <div id="complete-status-wrap">
                 <label class="text-xs text-gray-500 mb-1 block">Resultado</label>
                 <select id="complete-status" class="w-full border rounded-lg px-3 py-2 text-sm">
                     <option value="procedente">✅ Procedente — realizado com sucesso</option>
@@ -1297,11 +1312,11 @@
                 </select>
             </div>
             <div>
-                <label class="text-xs text-gray-500 mb-1 block">Anotações <span class="text-red-500">*</span></label>
+                <label class="text-xs text-gray-500 mb-1 block" id="complete-notes-label">Anotações <span class="text-red-500">*</span></label>
                 <textarea id="complete-notes" rows="3" placeholder="Descreva o que foi feito, resultado obtido..." class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
             </div>
             <div class="flex gap-2">
-                <button onclick="submitComplete()" class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">Concluir</button>
+                <button onclick="submitComplete()" class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700" id="modal-complete-btn">Concluir</button>
                 <button onclick="document.getElementById('modal-complete').classList.add('hidden')" class="px-4 py-2 border rounded-lg text-sm">Cancelar</button>
             </div>
         </div>
@@ -1822,29 +1837,42 @@ function saveActivity() {
     });
 }
 
-function openCompleteModal(activityId) {
+function openCompleteModal(activityId, mode = 'concluir') {
     document.getElementById('complete-activity-id').value = activityId;
+    document.getElementById('complete-mode').value = mode;
     document.getElementById('complete-status').value = 'procedente';
     document.getElementById('complete-notes').value = '';
+    const isCiente = mode === 'ciente';
+    document.getElementById('modal-complete-title').textContent = isCiente ? 'Registrar Ciência' : 'Concluir Atividade';
+    document.getElementById('modal-complete-btn').textContent = isCiente ? 'Registrar' : 'Concluir';
+    document.getElementById('complete-status-wrap').style.display = isCiente ? 'none' : '';
+    document.getElementById('complete-notes-label').innerHTML = isCiente
+        ? 'Observação <span class="text-gray-400">(opcional)</span>'
+        : 'Anotações <span class="text-red-500">*</span>';
+    document.getElementById('complete-notes').placeholder = isCiente
+        ? 'Adicione uma observação (opcional)...'
+        : 'Descreva o que foi feito, resultado obtido...';
     document.getElementById('modal-complete').classList.remove('hidden');
 }
 
 function submitComplete() {
     const activityId = document.getElementById('complete-activity-id').value;
-    const status = document.getElementById('complete-status').value;
+    const mode = document.getElementById('complete-mode').value;
+    const isCiente = mode === 'ciente';
+    const status = isCiente ? 'ciente' : document.getElementById('complete-status').value;
     const notes = document.getElementById('complete-notes').value.trim();
-    if (!notes) { alert('Anotações são obrigatórias'); return; }
+    if (!isCiente && !notes) { alert('Anotações são obrigatórias'); return; }
     const btn = event.target;
     btn.disabled = true;
     btn.textContent = 'Salvando...';
     fetch('{{ url("crm/accounts") }}/{{ $account->id }}/activities/' + activityId + '/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content },
-        body: JSON.stringify({ resolution_status: status, resolution_notes: notes })
+        body: JSON.stringify({ resolution_status: status, resolution_notes: notes || null })
     }).then(r => r.json()).then(d => {
         if (d.ok) { location.reload(); }
-        else { alert(d.error || 'Erro ao concluir'); btn.disabled = false; btn.textContent = 'Concluir'; }
-    }).catch(() => { alert('Erro de conexão'); btn.disabled = false; btn.textContent = 'Concluir'; });
+        else { alert(d.error || 'Erro ao concluir'); btn.disabled = false; btn.textContent = isCiente ? 'Registrar' : 'Concluir'; }
+    }).catch(() => { alert('Erro de conexão'); btn.disabled = false; btn.textContent = isCiente ? 'Registrar' : 'Concluir'; });
 }
 
 function transferOwner() {

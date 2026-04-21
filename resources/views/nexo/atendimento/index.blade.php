@@ -84,8 +84,10 @@
 .template-btn-send:hover { background: #1B334A; }
 .template-btn-send:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>
+@push('styles')
+<link rel="stylesheet" href="{{ asset('css/nexo-atendimento.css') }}?v={{ filemtime(public_path('css/nexo-atendimento.css')) }}">
+@endpush
 @section('content')
-<link rel="stylesheet" href="{{ asset('css/nexo-atendimento.css') }}">
 <div class="nexo-fullscreen-wrapper"><div id="nexo-app" class="flex bg-[#f0f2f5] overflow-hidden w-full" style="height:calc(100vh - 64px)">
 
     {{-- ═══════════════════════════════════════════════════════ --}}

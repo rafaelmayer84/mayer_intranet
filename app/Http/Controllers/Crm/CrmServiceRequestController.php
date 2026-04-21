@@ -154,8 +154,16 @@ class CrmServiceRequestController extends Controller
                 $updates['resolved_at'] = now();
             }
 
-            // Salvar notas de resolução apenas se ainda não existe — resolução não pode ser sobrescrita
-            if ($request->filled('resolution_notes') && empty($sr->resolution_notes)) {
+            // Resolução: sempre substitui; a versão anterior vai para a timeline como comentário interno
+            if ($request->filled('resolution_notes')) {
+                if (!empty($sr->resolution_notes) && trim($sr->resolution_notes) !== trim($request->resolution_notes)) {
+                    CrmServiceRequestComment::create([
+                        'service_request_id' => $id,
+                        'user_id'            => auth()->id(),
+                        'body'               => "[Resolução substituída]\n" . $sr->resolution_notes,
+                        'is_internal'        => true,
+                    ]);
+                }
                 $updates['resolution_notes'] = $request->resolution_notes;
             }
 
