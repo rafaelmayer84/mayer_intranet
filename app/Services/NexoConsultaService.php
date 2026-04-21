@@ -85,16 +85,10 @@ class NexoConsultaService
         $cliente = $this->buscarClientePorTelefone($telefoneNorm);
 
         // Fallback: buscar por CPF/CNPJ se informado
+        // SEGURANÇA: não atualizar celular aqui — identificação não é autenticação
         if (!$cliente && !empty($cpf)) {
-            Log::info('[NEXO-CONSULTA] Telefone nao encontrado, tentando CPF', ['cpf' => $cpf]);
+            Log::info('[NEXO-CONSULTA] Telefone nao encontrado, tentando CPF');
             $cliente = $this->buscarClientePorCpf($cpf);
-
-            // Se encontrou por CPF, atualizar celular para futuras consultas
-            if ($cliente && str_starts_with($telefoneNorm, '55') && strlen($telefoneNorm) >= 12) {
-                $celFormatado = '(' . substr($telefoneNorm, 2, 2) . ') ' . substr($telefoneNorm, 4, 5) . '-' . substr($telefoneNorm, 9);
-                DB::table('clientes')->where('id', $cliente->id)->update(['celular' => $celFormatado]);
-                Log::info('[NEXO-CONSULTA] Celular atualizado via CPF', ['cliente_id' => $cliente->id, 'celular' => $celFormatado]);
-            }
         }
 
         if (!$cliente) {
@@ -223,13 +217,13 @@ class NexoConsultaService
         }
 
         Log::info('[NEXO-AUTH-DEBUG]', [
-            'respostas' => $respostas,
-            'cliente_nome' => $cliente->nome,
+            'campos_enviados' => array_keys(array_filter($respostas, fn($v, $k) => str_ends_with($k, '_campo') && !empty($v), ARRAY_FILTER_USE_BOTH)),
+            'cliente_id' => $cliente->id,
             'acertos' => $acertos,
             'total_perguntas' => $totalPerguntas,
         ]);
-        // Exige acerto em TODAS as perguntas enviadas
-        $valido = ($totalPerguntas > 0 && $acertos === $totalPerguntas);
+        // Exige exatamente 4 perguntas respondidas — menos que isso é tentativa de bypass
+        $valido = ($totalPerguntas === 4 && $acertos === 4);
 
         if ($valido) {
             // Reset tentativas e gravar sessão autenticada (30 min)
@@ -267,7 +261,7 @@ class NexoConsultaService
         return [
             'valido' => 'nao',
             'tentativas_restantes' => (string) $restantes,
-            'bloqueado' => $bloqueado ? 'true' : 'false',
+            'bloqueado' => $bloqueado ? 'sim' : 'nao',
         ];
     }
 
