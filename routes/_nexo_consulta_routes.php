@@ -27,6 +27,7 @@ Route::prefix('nexo')->group(function () {
     Route::post('/identificar-cliente', [NexoConsultaController::class, 'identificarCliente']);
     Route::post('/perguntas-auth', [NexoConsultaController::class, 'perguntasAuth']);
     Route::post('/validar-auth', [NexoConsultaController::class, 'validarAuth']);
+    Route::post('/definir-pin', [NexoConsultaController::class, 'definirPin']);
     Route::post('/consulta-status', [NexoConsultaController::class, 'consultaStatus']);
     Route::post('/consulta-status-processo', [NexoConsultaController::class, 'consultaStatusProcesso']);
 });

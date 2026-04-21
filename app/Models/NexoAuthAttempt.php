@@ -15,6 +15,9 @@ class NexoAuthAttempt extends Model
         'bloqueado_ate',
         'ultimo_tentativa',
         'autenticado_ate',
+        'session_token',
+        'session_campos',
+        'session_expires_at',
     ];
 
     protected $casts = [
@@ -22,6 +25,8 @@ class NexoAuthAttempt extends Model
         'bloqueado_ate' => 'datetime',
         'ultimo_tentativa' => 'datetime',
         'autenticado_ate' => 'datetime',
+        'session_campos' => 'array',
+        'session_expires_at' => 'datetime',
     ];
 
     /**

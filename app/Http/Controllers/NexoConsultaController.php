@@ -127,6 +127,8 @@ class NexoConsultaController extends Controller
         $cpf = $request->input('cpf', '') ?: $request->input('documento', '');
 
         $respostas = [
+            'session_token'   => $request->input('session_token', ''),
+            'pin_valor'       => $request->input('pin_valor', ''),
             'pergunta1_campo' => $request->input('pergunta1_campo', ''),
             'pergunta1_valor' => $request->input('pergunta1_valor', ''),
             'pergunta2_campo' => $request->input('pergunta2_campo', ''),
@@ -142,6 +144,31 @@ class NexoConsultaController extends Controller
             return response()->json($resultado);
         } catch (\Exception $e) {
             Log::error('[NEXO-CONSULTA] Erro validar-auth: ' . $e->getMessage());
+            return response()->json(['error' => 'Erro interno'], 500);
+        }
+    }
+
+    /**
+     * POST /api/nexo/definir-pin
+     */
+    public function definirPin(Request $request): JsonResponse
+    {
+        if (!$this->validarToken($request)) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $telefone = $request->input('telefone', '');
+        $pin = $request->input('pin', '');
+
+        if (empty($telefone) || empty($pin)) {
+            return response()->json(['error' => 'Telefone e PIN obrigatórios'], 400);
+        }
+
+        try {
+            $resultado = $this->service->definirPin($telefone, $pin);
+            return response()->json($resultado);
+        } catch (\Exception $e) {
+            Log::error('[NEXO-CONSULTA] Erro definir-pin: ' . $e->getMessage());
             return response()->json(['error' => 'Erro interno'], 500);
         }
     }

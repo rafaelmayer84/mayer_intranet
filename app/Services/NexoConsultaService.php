@@ -114,8 +114,9 @@ class NexoConsultaService
     // ================================================================
 
     /**
-     * Gera 2 perguntas aleatórias com 3 opções (1 correta + 2 falsas).
-     * Campos possíveis: email, cpf_cnpj, data_nascimento, nome
+     * Gera perguntas KBA com 3 opções (1 correta + 2 falsas).
+     * PIN ativo: 2 perguntas. Sem PIN: 4 perguntas.
+     * Retorna session_token (nonce) para vincular ao /validar-auth.
      */
     public function gerarPerguntasAuth(string $telefone, ?string $cpf = null): array
     {
@@ -132,26 +133,42 @@ class NexoConsultaService
             return ['erro' => 'Cliente não encontrado'];
         }
 
-        // Selecionar 2 campos disponíveis (que tenham dado preenchido)
+        $temPin = !empty($cliente->nexo_pin);
+        $qtdPerguntas = $temPin ? 2 : 4;
         $camposDisponiveis = $this->getCamposDisponiveis($cliente);
 
-        if (count($camposDisponiveis) < 4) {
-            Log::warning('[NEXO-CONSULTA] Menos de 4 campos disponíveis para auth', [
+        if (count($camposDisponiveis) < $qtdPerguntas) {
+            Log::warning('[NEXO-CONSULTA] Menos de ' . $qtdPerguntas . ' campos disponíveis para auth', [
                 'cliente_id' => $cliente->id,
                 'campos' => $camposDisponiveis,
             ]);
             return ['erro' => 'Dados insuficientes para autenticação. Entre em contato com o escritório.'];
         }
 
-        // Sortear 4 campos aleatórios do pool disponível
-        $camposSorteados = collect($camposDisponiveis)->shuffle()->take(4)->values()->all();
+        $camposSorteados = collect($camposDisponiveis)->shuffle()->take($qtdPerguntas)->values()->all();
 
-        $resultado = [];
+        // Nonce: gerado no servidor, vincula perguntas→respostas (TTL 5 min)
+        $sessionToken = bin2hex(random_bytes(32));
+        $attempt = NexoAuthAttempt::firstOrCreate(
+            ['telefone' => $telefoneNorm],
+            ['tentativas' => 0, 'bloqueado' => false]
+        );
+        $attempt->update([
+            'session_token'    => $sessionToken,
+            'session_campos'   => $camposSorteados,
+            'session_expires_at' => Carbon::now()->addMinutes(5),
+        ]);
+
+        $resultado = [
+            'session_token' => $sessionToken,
+            'tem_pin'       => $temPin ? 'sim' : 'nao',
+        ];
+
         foreach ($camposSorteados as $i => $campo) {
             $n = $i + 1;
             $pergunta = $this->montarPergunta($cliente, $campo);
-            $resultado["pergunta{$n}_texto"] = $pergunta['texto'];
-            $resultado["pergunta{$n}_campo"] = $campo;
+            $resultado["pergunta{$n}_texto"]   = $pergunta['texto'];
+            $resultado["pergunta{$n}_campo"]   = $campo;
             $resultado["pergunta{$n}_opcao_a"] = $pergunta['opcoes'][0];
             $resultado["pergunta{$n}_opcao_b"] = $pergunta['opcoes'][1];
             $resultado["pergunta{$n}_opcao_c"] = $pergunta['opcoes'][2];
@@ -159,7 +176,8 @@ class NexoConsultaService
 
         Log::info('[NEXO-CONSULTA] Perguntas geradas', [
             'cliente_id' => $cliente->id,
-            'campos' => $camposSorteados,
+            'campos'     => $camposSorteados,
+            'tem_pin'    => $temPin,
         ]);
 
         return $resultado;
@@ -170,7 +188,9 @@ class NexoConsultaService
     // ================================================================
 
     /**
-     * Valida as respostas da autenticação multifator.
+     * Valida respostas KBA (+ PIN opcional).
+     * Verifica session_token para vincular com as perguntas emitidas — impede substituição de campos.
+     * PIN ativo: valida PIN + 2 KBA. Sem PIN: valida 4 KBA.
      */
     public function validarAuth(string $telefone, array $respostas, ?string $cpf = null): array
     {
@@ -187,8 +207,6 @@ class NexoConsultaService
             return ['valido' => 'nao', 'tentativas_restantes' => '0', 'bloqueado' => 'sim'];
         }
 
-        // Obter ou criar registro de tentativas
-        // Limpar tentativas antigas (>24h)
         NexoAuthAttempt::where('updated_at', '<', now()->subHours(24))->delete();
 
         $attempt = NexoAuthAttempt::firstOrCreate(
@@ -196,72 +214,156 @@ class NexoConsultaService
             ['tentativas' => 0, 'bloqueado' => false]
         );
 
-        // Verificar bloqueio
         if ($attempt->estaBloqueado()) {
             return ['valido' => 'nao', 'tentativas_restantes' => '0', 'bloqueado' => 'sim'];
         }
 
-        // Validar cada pergunta (4 perguntas)
+        // Verificar nonce de sessão
+        $sessionToken = trim($respostas['session_token'] ?? '');
+        $sessionValid = false;
+        $sessionCampos = null;
+
+        if (!empty($sessionToken) && $attempt->session_token) {
+            if (
+                hash_equals($attempt->session_token, $sessionToken) &&
+                $attempt->session_expires_at &&
+                Carbon::now()->lt($attempt->session_expires_at)
+            ) {
+                $sessionValid = true;
+                $sessionCampos = $attempt->session_campos; // array
+            }
+        }
+
+        // Consumir nonce (one-time use) antes de qualquer retorno de erro
+        $attempt->update([
+            'session_token'      => null,
+            'session_campos'     => null,
+            'session_expires_at' => null,
+        ]);
+
+        if (!empty($sessionToken) && !$sessionValid) {
+            Log::warning('[NEXO-AUTH] Session token inválido ou expirado', ['telefone' => $telefoneNorm]);
+            return $this->registrarFalha($attempt, $cliente->id);
+        }
+
+        // Determinar modo: PIN + 2 KBA ou 4 KBA puro
+        $pinValor     = trim($respostas['pin_valor'] ?? '');
+        $temPin       = !empty($cliente->nexo_pin);
+        $pinMode      = $temPin && !empty($pinValor);
+        $totalEsperado = $pinMode ? 2 : 4;
+
+        if ($pinMode) {
+            if (!\Illuminate\Support\Facades\Hash::check($pinValor, $cliente->nexo_pin)) {
+                Log::warning('[NEXO-AUTH] PIN inválido', ['cliente_id' => $cliente->id]);
+                return $this->registrarFalha($attempt, $cliente->id);
+            }
+        }
+
+        // Validar respostas KBA
         $acertos = 0;
         $totalPerguntas = 0;
-        foreach ([1, 2, 3, 4] as $n) {
+        foreach (range(1, $totalEsperado) as $n) {
             $campo = $respostas["pergunta{$n}_campo"] ?? '';
             $valor = $respostas["pergunta{$n}_valor"] ?? '';
 
             if (empty($campo)) continue;
-            $totalPerguntas++;
 
+            // Se sessão válida: rejeitar campo que não corresponde à sessão (previne substituição)
+            if ($sessionValid && $sessionCampos !== null) {
+                $esperado = $sessionCampos[$n - 1] ?? '';
+                if ($campo !== $esperado) {
+                    Log::warning('[NEXO-AUTH] Campo não corresponde à sessão', [
+                        'n' => $n, 'esperado' => $esperado, 'recebido' => $campo,
+                    ]);
+                    continue;
+                }
+            }
+
+            $totalPerguntas++;
             if ($this->validarResposta($cliente, $campo, $valor)) {
                 $acertos++;
             }
         }
 
         Log::info('[NEXO-AUTH-DEBUG]', [
-            'campos_enviados' => array_keys(array_filter($respostas, fn($v, $k) => str_ends_with($k, '_campo') && !empty($v), ARRAY_FILTER_USE_BOTH)),
-            'cliente_id' => $cliente->id,
-            'acertos' => $acertos,
+            'cliente_id'     => $cliente->id,
+            'acertos'        => $acertos,
             'total_perguntas' => $totalPerguntas,
+            'total_esperado' => $totalEsperado,
+            'pin_mode'       => $pinMode,
+            'session_valid'  => $sessionValid,
         ]);
-        // Exige exatamente 4 perguntas respondidas — menos que isso é tentativa de bypass
-        $valido = ($totalPerguntas === 4 && $acertos === 4);
+
+        // Exige exatamente totalEsperado perguntas respondidas com acerto
+        $valido = ($totalPerguntas === $totalEsperado && $acertos === $totalEsperado);
 
         if ($valido) {
-            // Reset tentativas e gravar sessão autenticada (30 min)
             $attempt->update([
-                'tentativas' => 0,
-                'bloqueado' => false,
-                'bloqueado_ate' => null,
+                'tentativas'     => 0,
+                'bloqueado'      => false,
+                'bloqueado_ate'  => null,
                 'autenticado_ate' => Carbon::now()->addMinutes(30),
             ]);
-
             Log::info('[NEXO-CONSULTA] Auth OK - sessão 30min', ['cliente_id' => $cliente->id]);
-
             return ['valido' => 'sim', 'tentativas_restantes' => (string) self::MAX_TENTATIVAS, 'bloqueado' => 'nao'];
         }
 
-        // Incrementar tentativas
+        return $this->registrarFalha($attempt, $cliente->id);
+    }
+
+    /**
+     * Define ou atualiza o PIN NEXO do cliente autenticado (4-6 dígitos).
+     * Exige sessão ativa (autenticado_ate não expirado).
+     */
+    public function definirPin(string $telefone, string $pin): array
+    {
+        $telefoneNorm = $this->normalizarTelefone($telefone);
+
+        $attempt = NexoAuthAttempt::where('telefone', $telefoneNorm)->first();
+        if (!$attempt || !$attempt->autenticado_ate || Carbon::now()->gte($attempt->autenticado_ate)) {
+            return ['sucesso' => 'nao', 'erro' => 'Sessão não autenticada'];
+        }
+
+        if (!preg_match('/^\d{4,6}$/', $pin)) {
+            return ['sucesso' => 'nao', 'erro' => 'PIN deve ter entre 4 e 6 dígitos numéricos'];
+        }
+
+        $cliente = $this->buscarClientePorTelefone($telefoneNorm);
+        if (!$cliente) {
+            return ['sucesso' => 'nao', 'erro' => 'Cliente não encontrado'];
+        }
+
+        DB::table('clientes')
+            ->where('id', $cliente->id)
+            ->update(['nexo_pin' => \Illuminate\Support\Facades\Hash::make($pin)]);
+
+        Log::info('[NEXO-CONSULTA] PIN definido', ['cliente_id' => $cliente->id]);
+
+        return ['sucesso' => 'sim'];
+    }
+
+    private function registrarFalha(NexoAuthAttempt $attempt, int $clienteId): array
+    {
         $tentativas = $attempt->tentativas + 1;
-        $bloqueado = $tentativas >= self::MAX_TENTATIVAS;
+        $bloqueado  = $tentativas >= self::MAX_TENTATIVAS;
 
         $attempt->update([
-            'tentativas' => $tentativas,
-            'bloqueado' => $bloqueado,
-            'bloqueado_ate' => $bloqueado ? Carbon::now()->addMinutes(self::BLOQUEIO_MINUTOS) : null,
+            'tentativas'     => $tentativas,
+            'bloqueado'      => $bloqueado,
+            'bloqueado_ate'  => $bloqueado ? Carbon::now()->addMinutes(self::BLOQUEIO_MINUTOS) : null,
             'ultimo_tentativa' => Carbon::now(),
         ]);
 
-        $restantes = max(0, self::MAX_TENTATIVAS - $tentativas);
-
         Log::warning('[NEXO-CONSULTA] Auth FALHOU', [
-            'cliente_id' => $cliente->id,
+            'cliente_id' => $clienteId,
             'tentativas' => $tentativas,
-            'bloqueado' => $bloqueado,
+            'bloqueado'  => $bloqueado,
         ]);
 
         return [
-            'valido' => 'nao',
-            'tentativas_restantes' => (string) $restantes,
-            'bloqueado' => $bloqueado ? 'sim' : 'nao',
+            'valido'              => 'nao',
+            'tentativas_restantes' => (string) max(0, self::MAX_TENTATIVAS - $tentativas),
+            'bloqueado'           => $bloqueado ? 'sim' : 'nao',
         ];
     }
 
