@@ -420,6 +420,26 @@ class NexoConsultaService
         if (!empty($cliente->profissao) && !in_array(strtolower(trim($cliente->profissao)), ['-', 'n/a', 'nao informado', 'não informado', ''])) {
             $campos[] = 'profissao';
         }
+        if (!empty($cliente->rg) && strlen(preg_replace('/\D/', '', $cliente->rg)) >= 4) {
+            $campos[] = 'rg';
+        }
+        if (!empty($cliente->endereco_numero) && preg_replace('/\D/', '', $cliente->endereco_numero) !== '') {
+            $campos[] = 'endereco_numero';
+        }
+        // Dados do processo: adverso e ano de abertura (1 processo aleatório por sessão)
+        if (!empty($cliente->datajuri_id)) {
+            $processo = DB::table('processos')
+                ->where('cliente_datajuri_id', $cliente->datajuri_id)
+                ->where('status', 'Ativo')
+                ->whereNotNull('adverso_nome')->where('adverso_nome', '!=', '')
+                ->whereNotNull('data_abertura')
+                ->inRandomOrder()
+                ->first();
+            if ($processo) {
+                $campos[] = 'adverso_nome:' . $processo->id;
+                $campos[] = 'ano_processo:' . $processo->id;
+            }
+        }
         // Nome como fallback se ainda não tem campos suficientes
         if (!empty($cliente->nome) && count($campos) < 7) {
             $campos[] = 'nome';
@@ -445,7 +465,17 @@ class NexoConsultaService
                 return $this->perguntaCep($cliente);
             case 'profissao':
                 return $this->perguntaProfissao($cliente);
+            case 'rg':
+                return $this->perguntaRg($cliente);
+            case 'endereco_numero':
+                return $this->perguntaEnderecoNumero($cliente);
             default:
+                if (str_starts_with($campo, 'adverso_nome:')) {
+                    return $this->perguntaAdverso((int) explode(':', $campo, 2)[1]);
+                }
+                if (str_starts_with($campo, 'ano_processo:')) {
+                    return $this->perguntaAnoProcesso((int) explode(':', $campo, 2)[1]);
+                }
                 return ['texto' => 'Erro', 'opcoes' => ['A', 'B', 'C']];
         }
     }
@@ -722,6 +752,106 @@ class NexoConsultaService
         ];
     }
 
+    private function perguntaRg(object $cliente): array
+    {
+        $rg = preg_replace('/\D/', '', $cliente->rg ?? '');
+        $ultimos4 = substr($rg, -4);
+
+        $falso1 = str_pad(rand(1000, 9999), 4, '0', STR_PAD_LEFT);
+        $falso2 = str_pad(rand(1000, 9999), 4, '0', STR_PAD_LEFT);
+        while ($falso1 === $ultimos4) $falso1 = str_pad(rand(1000, 9999), 4, '0', STR_PAD_LEFT);
+        while ($falso2 === $ultimos4 || $falso2 === $falso1) $falso2 = str_pad(rand(1000, 9999), 4, '0', STR_PAD_LEFT);
+
+        $opcoes = ["***{$ultimos4}", "***{$falso1}", "***{$falso2}"];
+        shuffle($opcoes);
+
+        return [
+            'texto' => 'Quais são os últimos 4 dígitos do seu RG?',
+            'opcoes' => $opcoes,
+        ];
+    }
+
+    private function perguntaEnderecoNumero(object $cliente): array
+    {
+        $numReal = (int) preg_replace('/\D/', '', $cliente->endereco_numero ?? '');
+
+        $offset1 = rand(5, 60);
+        $offset2 = rand(5, 60);
+        while ($offset2 === $offset1) $offset2 = rand(5, 60);
+
+        $falso1 = max(1, $numReal + (rand(0, 1) ? $offset1 : -$offset1));
+        $falso2 = max(1, $numReal + (rand(0, 1) ? $offset2 : -$offset2));
+        while ($falso2 === $falso1) $falso2 = max(1, $numReal + $offset2 + rand(1, 10));
+
+        $opcoes = [(string) $numReal, (string) $falso1, (string) $falso2];
+        shuffle($opcoes);
+
+        return [
+            'texto' => 'Qual é o número da sua residência?',
+            'opcoes' => $opcoes,
+        ];
+    }
+
+    private function perguntaAdverso(int $processoId): array
+    {
+        $processo = DB::table('processos')->where('id', $processoId)->first();
+        if (!$processo || empty($processo->adverso_nome)) {
+            return ['texto' => 'Erro', 'opcoes' => ['A', 'B', 'C']];
+        }
+
+        $real = $processo->adverso_nome;
+
+        $fakes = DB::table('processos')
+            ->where('id', '!=', $processoId)
+            ->whereNotNull('adverso_nome')
+            ->where('adverso_nome', '!=', $real)
+            ->inRandomOrder()
+            ->limit(2)
+            ->pluck('adverso_nome')
+            ->toArray();
+
+        while (count($fakes) < 2) {
+            $fakes[] = 'Não identificado';
+        }
+
+        $opcoes = [$real, $fakes[0], $fakes[1]];
+        shuffle($opcoes);
+
+        return [
+            'texto' => 'Qual é o nome da parte contrária em um dos seus processos?',
+            'opcoes' => $opcoes,
+        ];
+    }
+
+    private function perguntaAnoProcesso(int $processoId): array
+    {
+        $processo = DB::table('processos')->where('id', $processoId)->first();
+        if (!$processo || empty($processo->data_abertura)) {
+            return ['texto' => 'Erro', 'opcoes' => ['A', 'B', 'C']];
+        }
+
+        $anoReal = (int) date('Y', strtotime($processo->data_abertura));
+        $anoMin = max(2010, $anoReal - 5);
+        $anoMax = min((int) date('Y'), $anoReal + 2);
+
+        $candidatos = array_values(array_filter(range($anoMin, $anoMax), fn($y) => $y !== $anoReal));
+        shuffle($candidatos);
+        $fakes = array_slice($candidatos, 0, 2);
+
+        // Se não houver anos suficientes no range, usar distâncias fixas
+        if (count($fakes) < 2) {
+            $fakes = [$anoReal - 1, $anoReal + 1];
+        }
+
+        $opcoes = [(string) $anoReal, (string) $fakes[0], (string) $fakes[1]];
+        shuffle($opcoes);
+
+        return [
+            'texto' => 'Em que ano um dos seus processos foi iniciado?',
+            'opcoes' => $opcoes,
+        ];
+    }
+
     private function validarResposta(object $cliente, string $campo, string $valor): bool
     {
         $valor = trim($valor);
@@ -761,7 +891,27 @@ class NexoConsultaService
             case 'profissao':
                 return strtolower($valor) === strtolower(trim($cliente->profissao ?? ''));
 
+            case 'rg':
+                $rg = preg_replace('/\D/', '', $cliente->rg ?? '');
+                $ultimos4Rg = substr($rg, -4);
+                $valorRg = substr(preg_replace('/\D/', '', $valor), -4);
+                return strlen($ultimos4Rg) === 4 && $valorRg === $ultimos4Rg;
+
+            case 'endereco_numero':
+                $numReal = preg_replace('/\D/', '', $cliente->endereco_numero ?? '');
+                $numValor = preg_replace('/\D/', '', $valor);
+                return !empty($numReal) && $numValor === $numReal;
+
             default:
+                if (str_starts_with($campo, 'adverso_nome:')) {
+                    $proc = DB::table('processos')->where('id', (int) explode(':', $campo, 2)[1])->first();
+                    return $proc && strtolower(trim($valor)) === strtolower(trim($proc->adverso_nome ?? ''));
+                }
+                if (str_starts_with($campo, 'ano_processo:')) {
+                    $proc = DB::table('processos')->where('id', (int) explode(':', $campo, 2)[1])->first();
+                    if (!$proc || empty($proc->data_abertura)) return false;
+                    return (int) $valor === (int) date('Y', strtotime($proc->data_abertura));
+                }
                 return false;
         }
     }
