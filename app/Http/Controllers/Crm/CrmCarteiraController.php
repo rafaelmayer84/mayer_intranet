@@ -170,12 +170,14 @@ class CrmCarteiraController extends Controller
             : new CrmAccount;
 
         $totals = [
-            'total'      => (clone $baseQuery)->count(),
-            'ativos'     => (clone $baseQuery)->byLifecycle('ativo')->count(),
-            'adormecido' => (clone $baseQuery)->byLifecycle('adormecido')->count(),
-            'arquivado'  => (clone $baseQuery)->byLifecycle('arquivado')->count(),
-            'onboarding' => (clone $baseQuery)->byLifecycle('onboarding')->count(),
-            'sem_contato_30d' => (clone $baseQuery)->byLifecycle('ativo')->withoutContactSince(30)->count(),
+            'total'          => (clone $baseQuery)->count(),
+            'ativos'         => (clone $baseQuery)->byLifecycle('ativo')->count(),
+            'inadimplente'   => (clone $baseQuery)->byLifecycle('inadimplente')->count(),
+            'adormecido'     => (clone $baseQuery)->byLifecycle('adormecido')->count(),
+            'arquivado'      => (clone $baseQuery)->byLifecycle('arquivado')->count(),
+            'onboarding'     => (clone $baseQuery)->byLifecycle('onboarding')->count(),
+            'bloqueado'      => (clone $baseQuery)->byLifecycle('bloqueado_adversa')->count(),
+            'sem_contato_30d'=> (clone $baseQuery)->byLifecycle('ativo')->withoutContactSince(30)->count(),
         ];
 
         $segments = \App\Models\Crm\CrmAccount::whereNotNull('segment')

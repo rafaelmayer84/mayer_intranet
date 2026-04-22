@@ -2,6 +2,32 @@
 @section('title', 'CRM - ' . $account->name)
 
 @section('content')
+@if(!empty($gatesAtivos) && count($gatesAtivos) > 0)
+<div class="max-w-7xl mx-auto px-4 pt-4">
+    <div class="bg-amber-50 border-l-4 border-amber-500 rounded p-3 flex items-start gap-3">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+        </svg>
+        <div class="flex-1 text-sm">
+            <p class="text-amber-900 font-semibold mb-1">
+                Esta conta tem {{ count($gatesAtivos) }} pendência(s) de qualidade de dados aguardando correção no DataJuri.
+            </p>
+            <ul class="text-amber-800 list-disc pl-5">
+                @foreach($gatesAtivos as $g)
+                    <li>
+                        {{ $gateLabels[$g->tipo] ?? $g->tipo }}
+                        @if($g->status === 'escalado')
+                            <span class="ml-2 px-1.5 py-0.5 text-xs bg-red-600 text-white rounded">ESCALADO — gera penalidade GDP</span>
+                        @elseif($g->status === 'em_revisao')
+                            <span class="ml-2 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded">em revisão (aguardando sync DJ)</span>
+                        @endif
+                    </li>
+                @endforeach
+            </ul>
+        </div>
+    </div>
+</div>
+@endif
 @php
     $cli = $djContext['cliente'] ?? null;
     $hasDj = $djContext['available'];

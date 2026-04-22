@@ -98,39 +98,74 @@ class CrmCarteiraService
         return $stats;
     }
 
+    /**
+     * Lifecycle segue a mesma lógica do comando crm:reclassificar-lifecycle.
+     * Precedência:
+     *   1) DJ explicitamente marca Adversa/Contraparte/Fornecedor -> bloqueado_adversa
+     *   2) contas_receber c/ data_vencimento NULL (protesto/judicial) OU DJ Inadimplente -> inadimplente
+     *   3) heurística: DJ-id bate com adverso em processos (se DJ não disse que é cliente) -> bloqueado_adversa
+     *   4) espelha status_pessoa do DJ: Inativo/Onboarding/Ativo/Estratégico
+     *   5) fallback: arquivado
+     */
     private function calcularLifecycle(object $acc, ?int $djPessoaId): string
     {
-        if (!$djPessoaId) {
-            return $acc->kind === 'prospect' ? 'onboarding' : 'adormecido';
+        $cache = $djPessoaId
+            ? DB::table('clientes')->where('datajuri_id', $djPessoaId)->first(['status_pessoa','is_cliente'])
+            : null;
+        $statusDj = $cache->status_pessoa ?? null;
+
+        // 1) DJ autoritativo: adversa/contraparte/fornecedor
+        if ($statusDj && preg_match('/Adversa|Contraparte|Fornecedor/i', $statusDj)) {
+            return 'bloqueado_adversa';
         }
 
-        // Processo ativo?
-        $processosAtivos = DB::table('processos')
-            ->where('cliente_datajuri_id', $djPessoaId)
-            ->where('status', 'Ativo')
-            ->count();
+        // Sinal de cliente: cache DJ diz "Cliente", is_cliente=1 OU figura como cliente_datajuri_id em processos.
+        // contas_receber sozinho NÃO qualifica — pode ser honorário sucumbencial contra adversa.
+        $ehClienteCache = $statusDj && stripos($statusDj, 'Cliente') !== false;
+        $ehClienteFlag  = ($cache->is_cliente ?? 0) == 1;
+        $ehClienteProc  = $djPessoaId
+            ? DB::table('processos')->where('cliente_datajuri_id', $djPessoaId)->exists()
+            : false;
+        $ehCliente = $ehClienteCache || $ehClienteFlag || $ehClienteProc;
 
-        // Contrato recente (assinado nos últimos 24 meses)?
-        $contratosRecentes = DB::table('contratos')
-            ->where('contratante_id_datajuri', $djPessoaId)
-            ->whereNotNull('data_assinatura')
-            ->where('data_assinatura', '>=', now()->subMonths(24)->toDateString())
-            ->count();
-
-        if ($processosAtivos > 0 || $contratosRecentes > 0) {
-            return 'ativo';
+        // 2) se NÃO é cliente, checar heurística adversa ANTES de inadimplência
+        if (!$ehCliente) {
+            if ($djPessoaId) {
+                $ehAdv = DB::table('processos')->where('adverso_datajuri_id', $djPessoaId)->exists();
+                if ($ehAdv) return 'bloqueado_adversa';
+            }
+            if (!$djPessoaId && !empty($acc->name) && mb_strlen(trim($acc->name)) >= 10) {
+                $ehAdv = DB::table('processos')
+                    ->whereRaw('LOWER(adverso_nome) = ?', [trim(mb_strtolower($acc->name))])
+                    ->exists();
+                if ($ehAdv) return 'bloqueado_adversa';
+            }
         }
 
-        // Movimento financeiro no último ano?
-        $ultimoMov = DB::table('movimentos')
-            ->where('pessoa_id_datajuri', $djPessoaId)
-            ->where('valor', '>', 0)
-            ->max('data');
-
-        if ($ultimoMov && $ultimoMov >= now()->subMonths(12)->toDateString()) {
-            return 'adormecido';
+        // 3) inadimplência — só se é cliente nosso
+        if ($ehCliente && $djPessoaId) {
+            $protesto = DB::table('contas_receber')
+                ->where('pessoa_datajuri_id', $djPessoaId)
+                ->where('is_stale', false)
+                ->whereNull('data_vencimento')
+                ->whereNotIn('status', ['Excluido','Excluído','Concluído','Concluido'])
+                ->where('valor', '>', 0)
+                ->exists();
+            if ($protesto) return 'inadimplente';
+        }
+        if ($statusDj && stripos($statusDj, 'Inadimplente') !== false) {
+            return 'inadimplente';
         }
 
+        // 4) espelhar DJ (Inativo ANTES de Ativo — substring)
+        if ($statusDj) {
+            if (stripos($statusDj, 'Inativo') !== false)    return 'adormecido';
+            if (stripos($statusDj, 'Onboarding') !== false) return 'onboarding';
+            if (stripos($statusDj, 'Estratégico') !== false || stripos($statusDj, 'Estrategico') !== false) return 'ativo';
+            if (stripos($statusDj, 'Ativo') !== false)      return 'ativo';
+        }
+
+        // 5) fallback
         return 'arquivado';
     }
 

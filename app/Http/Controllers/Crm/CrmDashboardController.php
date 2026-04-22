@@ -35,9 +35,50 @@ class CrmDashboardController extends Controller
         // ── Dados para gráficos ──
         $charts = $this->buildCharts($ownerId);
 
+        // ── Gates de qualidade de dados (ranking por owner p/ gestor, contagem p/ advogado) ──
+        $gatesQualidade = $this->buildGatesQualidade($ownerId, $isRestricted);
+
         return view('crm.dashboard.index', compact(
-            'user', 'isRestricted', 'kpis', 'agenda', 'alertas', 'recentClients', 'openOpps', 'charts'
+            'user', 'isRestricted', 'kpis', 'agenda', 'alertas', 'recentClients', 'openOpps', 'charts',
+            'gatesQualidade'
         ));
+    }
+
+    /**
+     * Para advogado: mostra apenas contagem por status dos seus gates.
+     * Para gestor/admin: ranking por owner (abertos, em revisao, escalados).
+     */
+    private function buildGatesQualidade(?int $ownerId, bool $isRestricted): array
+    {
+        if ($isRestricted) {
+            $rows = DB::table('crm_account_data_gates')
+                ->where('owner_user_id', $ownerId)
+                ->whereIn('status', ['aberto', 'em_revisao', 'escalado'])
+                ->select('status', DB::raw('COUNT(*) as n'))
+                ->groupBy('status')
+                ->pluck('n', 'status')
+                ->toArray();
+            return ['modo' => 'advogado', 'totais' => $rows];
+        }
+
+        $rank = DB::table('crm_account_data_gates as g')
+            ->leftJoin('users as u', 'u.id', '=', 'g.owner_user_id')
+            ->whereIn('g.status', ['aberto', 'em_revisao', 'escalado'])
+            ->select(
+                'g.owner_user_id',
+                'u.name as owner_name',
+                DB::raw("SUM(CASE WHEN g.status='aberto' THEN 1 ELSE 0 END) as abertos"),
+                DB::raw("SUM(CASE WHEN g.status='em_revisao' THEN 1 ELSE 0 END) as em_revisao"),
+                DB::raw("SUM(CASE WHEN g.status='escalado' THEN 1 ELSE 0 END) as escalados"),
+                DB::raw('COUNT(*) as total')
+            )
+            ->groupBy('g.owner_user_id', 'u.name')
+            ->orderByDesc('escalados')
+            ->orderByDesc('total')
+            ->limit(15)
+            ->get();
+
+        return ['modo' => 'gestor', 'ranking' => $rank];
     }
 
     private function buildKpis(?int $ownerId): array

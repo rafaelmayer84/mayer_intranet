@@ -47,14 +47,16 @@
     </div>
 
     {{-- Cards KPI --}}
-    <div class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-6">
         @php
             $kpis = [
                 ['label' => 'Total', 'value' => $totals['total'], 'color' => 'text-[#1B334A]', 'link' => route('crm.carteira', ['lifecycle' => 'todos'])],
                 ['label' => 'Ativos', 'value' => $totals['ativos'], 'color' => 'text-green-600', 'link' => route('crm.carteira', ['lifecycle' => 'ativo'])],
+                ['label' => 'Inadimplentes', 'value' => $totals['inadimplente'] ?? 0, 'color' => 'text-red-700', 'link' => route('crm.carteira', ['lifecycle' => 'inadimplente']), 'border' => 'border-red-300'],
+                ['label' => 'Onboarding', 'value' => $totals['onboarding'], 'color' => 'text-blue-600', 'link' => route('crm.carteira', ['lifecycle' => 'onboarding'])],
                 ['label' => 'Adormecidos', 'value' => $totals['adormecido'], 'color' => 'text-yellow-600', 'link' => route('crm.carteira', ['lifecycle' => 'adormecido'])],
                 ['label' => 'Arquivados', 'value' => $totals['arquivado'], 'color' => 'text-gray-500', 'link' => route('crm.carteira', ['lifecycle' => 'arquivado'])],
-                ['label' => 'Onboarding', 'value' => $totals['onboarding'], 'color' => 'text-blue-600', 'link' => route('crm.carteira', ['lifecycle' => 'onboarding'])],
+                ['label' => 'Bloqueados', 'value' => $totals['bloqueado'] ?? 0, 'color' => 'text-orange-700', 'link' => route('crm.carteira', ['lifecycle' => 'bloqueado_adversa'])],
                 ['label' => 'Sem Contato 30d', 'value' => $totals['sem_contato_30d'], 'color' => 'text-red-600', 'link' => route('crm.carteira', ['lifecycle' => 'ativo', 'sem_contato_dias' => 30]), 'border' => 'border-red-200'],
             ];
         @endphp
@@ -78,8 +80,18 @@
             </select>
             <select name="lifecycle" class="border rounded-lg px-3 py-2 text-sm">
                 <option value="todos" {{ request('lifecycle') === 'todos' ? 'selected' : '' }}>Todos os ciclos</option>
-                @foreach(['onboarding','ativo','adormecido','arquivado'] as $lc)
-                    <option value="{{ $lc }}" {{ (request('lifecycle', 'ativo')) === $lc ? 'selected' : '' }}>{{ ucfirst($lc) }}</option>
+                @php
+                    $lcOptions = [
+                        'ativo' => 'Ativo',
+                        'inadimplente' => 'Inadimplente',
+                        'onboarding' => 'Onboarding',
+                        'adormecido' => 'Adormecido',
+                        'arquivado' => 'Arquivado',
+                        'bloqueado_adversa' => 'Bloqueado (adversa)',
+                    ];
+                @endphp
+                @foreach($lcOptions as $lc => $label)
+                    <option value="{{ $lc }}" {{ (request('lifecycle', 'ativo')) === $lc ? 'selected' : '' }}>{{ $label }}</option>
                 @endforeach
             </select>
             <select name="owner_user_id" class="border rounded-lg px-3 py-2 text-sm">
@@ -246,10 +258,21 @@
                     </td>
                     <td class="px-3 py-2.5">
                         @php
-                            $lcColors = ['onboarding' => 'bg-blue-100 text-blue-700', 'ativo' => 'bg-green-100 text-green-700', 'adormecido' => 'bg-yellow-100 text-yellow-700', 'arquivado' => 'bg-gray-200 text-gray-600'];
+                            $lcColors = [
+                                'onboarding'        => 'bg-blue-100 text-blue-700',
+                                'ativo'             => 'bg-green-100 text-green-700',
+                                'inadimplente'      => 'bg-red-100 text-red-700 font-semibold',
+                                'adormecido'        => 'bg-yellow-100 text-yellow-700',
+                                'arquivado'         => 'bg-gray-200 text-gray-600',
+                                'bloqueado_adversa' => 'bg-orange-100 text-orange-700',
+                            ];
+                            $lcLabels = [
+                                'bloqueado_adversa' => 'Bloqueado',
+                                'inadimplente'      => 'Inadimplente',
+                            ];
                         @endphp
                         <span class="px-2 py-0.5 rounded text-xs {{ $lcColors[$acc->lifecycle] ?? 'bg-gray-100 text-gray-600' }}">
-                            {{ ucfirst($acc->lifecycle) }}
+                            {{ $lcLabels[$acc->lifecycle] ?? ucfirst($acc->lifecycle) }}
                         </span>
                     </td>
                     <td class="px-3 py-2.5">

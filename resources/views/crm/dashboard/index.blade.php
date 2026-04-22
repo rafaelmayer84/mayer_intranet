@@ -369,6 +369,68 @@
             </div>
         </div>
     </div>
+
+    @if(!empty($gatesQualidade))
+    <div class="mt-6 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div class="px-5 py-3 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-amber-50 to-white">
+            <div>
+                <h3 class="font-semibold text-gray-800 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+                    </svg>
+                    Qualidade de dados (gates DJ × CRM)
+                </h3>
+                <p class="text-xs text-gray-500 mt-0.5">Divergências entre DataJuri e realidade. Escalado = penalidade PEN-C01 (3 pts, Atendimento).</p>
+            </div>
+        </div>
+
+        @if($gatesQualidade['modo'] === 'advogado')
+            <div class="px-5 py-4 grid grid-cols-3 gap-3 text-center">
+                <div class="p-3 rounded-lg bg-amber-50 border border-amber-200">
+                    <div class="text-2xl font-bold text-amber-700">{{ $gatesQualidade['totais']['aberto'] ?? 0 }}</div>
+                    <div class="text-xs text-amber-800">Aguardando revisão</div>
+                </div>
+                <div class="p-3 rounded-lg bg-blue-50 border border-blue-200">
+                    <div class="text-2xl font-bold text-blue-700">{{ $gatesQualidade['totais']['em_revisao'] ?? 0 }}</div>
+                    <div class="text-xs text-blue-800">Em revisão (pós-DJ)</div>
+                </div>
+                <div class="p-3 rounded-lg bg-red-50 border border-red-300">
+                    <div class="text-2xl font-bold text-red-700">{{ $gatesQualidade['totais']['escalado'] ?? 0 }}</div>
+                    <div class="text-xs text-red-800">Escalado (gera PEN-C01)</div>
+                </div>
+            </div>
+        @else
+            @if($gatesQualidade['ranking']->isEmpty())
+                <div class="px-5 py-6 text-center text-sm text-gray-500">Nenhum gate ativo no momento.</div>
+            @else
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 text-xs text-gray-600">
+                        <tr>
+                            <th class="px-4 py-2 text-left">Responsável</th>
+                            <th class="px-3 py-2 text-right">Aberto</th>
+                            <th class="px-3 py-2 text-right">Em revisão</th>
+                            <th class="px-3 py-2 text-right">Escalado</th>
+                            <th class="px-3 py-2 text-right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($gatesQualidade['ranking'] as $r)
+                        <tr class="border-t border-gray-100 hover:bg-gray-50">
+                            <td class="px-4 py-2 font-medium text-gray-800">{{ $r->owner_name ?? '(sem responsável)' }}</td>
+                            <td class="px-3 py-2 text-right text-amber-700">{{ $r->abertos }}</td>
+                            <td class="px-3 py-2 text-right text-blue-700">{{ $r->em_revisao }}</td>
+                            <td class="px-3 py-2 text-right font-bold {{ $r->escalados > 0 ? 'text-red-700' : 'text-gray-500' }}">{{ $r->escalados }}</td>
+                            <td class="px-3 py-2 text-right font-semibold">{{ $r->total }}</td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+            @endif
+        @endif
+    </div>
+    @endif
 </div>
 
 @push('scripts')

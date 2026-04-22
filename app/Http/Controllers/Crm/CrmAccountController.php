@@ -18,6 +18,7 @@ use App\Services\Crm\CrmHealthScoreService;
 use App\Models\Crm\CrmDocument;
 use App\Models\Crm\CrmInadimplenciaDecisao;
 use App\Models\Crm\CrmOpportunity;
+use App\Models\Crm\CrmAccountDataGate;
 use Illuminate\Support\Facades\Storage;
 
 class CrmAccountController extends Controller
@@ -33,6 +34,26 @@ class CrmAccountController extends Controller
             'opportunities' => fn($q) => $q->with('stage', 'owner')->latest(),
             'activities'    => fn($q) => $q->latest()->limit(20),
         ])->findOrFail($id);
+
+        // Gate de qualidade de dados: se ha gate(s) status=aberto, exige revisao
+        // obrigatoria antes de liberar a conta. Admin passa direto.
+        $gatesAbertos = CrmAccountDataGate::where('account_id', $id)
+            ->where('status', CrmAccountDataGate::STATUS_ABERTO)
+            ->orderBy('opened_at')
+            ->get();
+
+        if ($gatesAbertos->isNotEmpty() && !(auth()->user() && auth()->user()->isAdmin())) {
+            return view('crm.accounts.gate-bloqueio', [
+                'account'    => $account,
+                'gates'      => $gatesAbertos,
+                'gateLabels' => $this->gateLabels(),
+            ]);
+        }
+
+        $gatesAtivos = CrmAccountDataGate::where('account_id', $id)
+            ->whereIn('status', CrmAccountDataGate::STATUS_ATIVOS)
+            ->orderBy('opened_at')
+            ->get();
 
         // Timeline: events + activities merged
         $events     = CrmEvent::where('account_id', $id)->latest('happened_at')->limit(30)->get();
@@ -135,11 +156,58 @@ class CrmAccountController extends Controller
                 ->get();
         }
 
+        $gateLabels = $this->gateLabels();
+
         return view('crm.accounts.show', compact(
             'account', 'timeline', 'djContext', 'commContext', 'users', 'segmentation', 'finSummary',
             'documents', 'docCategorias', 'serviceRequests', 'srCategorias', 'nexoPendentes', 'adminProcesses',
-            'inadTarefaAberta', 'inadEvidencias', 'inadDecisaoAtiva', 'inadHistoricoDecisoes'
+            'inadTarefaAberta', 'inadEvidencias', 'inadDecisaoAtiva', 'inadHistoricoDecisoes',
+            'gatesAtivos', 'gateLabels'
         ));
+    }
+
+    /**
+     * Marca que o advogado revisou o DJ. Move gates de aberto -> em_revisao.
+     * A resolucao definitiva so acontece na proxima sync DJ (verifica se o campo
+     * foi realmente corrigido). Se nao for corrigido em 7 dias, escala e penaliza.
+     */
+    public function marcarRevisao(Request $request, int $id)
+    {
+        $request->validate([
+            'confirmo' => 'required|accepted',
+        ], [
+            'confirmo.required' => 'Confirme que revisou o DataJuri.',
+            'confirmo.accepted' => 'Confirme que revisou o DataJuri.',
+        ]);
+
+        $count = CrmAccountDataGate::where('account_id', $id)
+            ->where('status', CrmAccountDataGate::STATUS_ABERTO)
+            ->update([
+                'status' => CrmAccountDataGate::STATUS_EM_REVISAO,
+                'first_seen_by_owner_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+        Log::info('[CrmAccount][gate-revisar] marcado revisao', [
+            'account_id' => $id,
+            'user_id'    => auth()->id(),
+            'gates'      => $count,
+        ]);
+
+        return redirect()
+            ->route('crm.accounts.show', $id)
+            ->with('status', "Revisão registrada em {$count} pendência(s). Aguardando validação na próxima sincronização DJ.");
+    }
+
+    private function gateLabels(): array
+    {
+        return [
+            CrmAccountDataGate::TIPO_ONBOARDING_COM_CONTRATO     => 'Onboarding no DJ, mas já existe contrato/processo',
+            CrmAccountDataGate::TIPO_STATUS_CLIENTE_SEM_VINCULO  => 'Marcado como Cliente no DJ, sem contrato nem processo',
+            CrmAccountDataGate::TIPO_ADVERSA_COM_CONTRATO        => 'DJ classifica como Adversa/Contraparte/Fornecedor, mas existe contrato',
+            CrmAccountDataGate::TIPO_INADIMPLENCIA_SUSPEITA_2099 => 'Contas com vencimento 2099-12-31 (judicial/indefinido) sem marca de inadimplência',
+            CrmAccountDataGate::TIPO_SEM_STATUS_PESSOA           => 'Cadastro DJ sem status_pessoa preenchido',
+        ];
     }
 
     /**

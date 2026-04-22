@@ -56,6 +56,27 @@ Schedule::command('crm:recalcular-carteira')
     ->timezone('America/Sao_Paulo')
     ->appendOutputTo(storage_path('logs/cron-crm-carteira.log'));
 
+// CRM Gates: detectar divergências e processar resolução/escalação (após carteira)
+Schedule::command('crm:gates-detectar')
+    ->dailyAt('02:20')
+    ->timezone('America/Sao_Paulo')
+    ->appendOutputTo(storage_path('logs/cron-crm-gates.log'));
+
+Schedule::command('crm:gates-processar')
+    ->dailyAt('02:25')
+    ->timezone('America/Sao_Paulo')
+    ->appendOutputTo(storage_path('logs/cron-crm-gates.log'));
+
+Schedule::command('crm:gates-detectar')
+    ->dailyAt('12:20')
+    ->timezone('America/Sao_Paulo')
+    ->appendOutputTo(storage_path('logs/cron-crm-gates.log'));
+
+Schedule::command('crm:gates-processar')
+    ->dailyAt('12:25')
+    ->timezone('America/Sao_Paulo')
+    ->appendOutputTo(storage_path('logs/cron-crm-gates.log'));
+
 // ===== NEXO: Purge tokens públicos expirados =====
 Schedule::command('nexo:purge-expired-tokens')
     ->hourly()

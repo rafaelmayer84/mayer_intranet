@@ -109,6 +109,7 @@ class GdpPenalizacaoScanner
             'scanD01','scanD02','scanD03','scanD04',
             'scanS01',
             'scanV01','scanV02','scanV03',
+            'scanC01',
         ];
 
         foreach ($methods as $method) {
@@ -1198,6 +1199,40 @@ class GdpPenalizacaoScanner
             $count += $this->registrar('PEN-S01', $userId, $cfg,
                 "Chamado " . $ch->protocolo . " com SLA estourado ha " . $horas . "h (status: " . $ch->status . ").",
                 'service_request', $ch->id);
+        }
+        return $count;
+    }
+
+    /**
+     * PEN-C01: Gate de qualidade de dados CRM escalado (>7d sem correcao no DJ).
+     * Fonte: crm_account_data_gates (owner_user_id, status=escalado, penalidade_registrada=0)
+     * Eixo: Atendimento (4). Peso: 3 pts.
+     */
+    private function scanC01(int $userId): int
+    {
+        $cfg = $this->getTipo('PEN-C01');
+        if (!$cfg) return 0;
+
+        $gates = DB::table('crm_account_data_gates as g')
+            ->leftJoin('crm_accounts as a', 'a.id', '=', 'g.account_id')
+            ->where('g.owner_user_id', $userId)
+            ->where('g.status', 'escalado')
+            ->where('g.penalidade_registrada', false)
+            ->select('g.id', 'g.tipo', 'g.escalated_at', 'a.name as account_name')
+            ->get();
+
+        $count = 0;
+        foreach ($gates as $g) {
+            $inserido = $this->registrar('PEN-C01', $userId, $cfg,
+                "Gate '{$g->tipo}' na conta '{$g->account_name}' sem correcao no DJ em 7+ dias.",
+                'crm_account_data_gate', $g->id);
+
+            if ($inserido > 0) {
+                DB::table('crm_account_data_gates')
+                    ->where('id', $g->id)
+                    ->update(['penalidade_registrada' => true, 'updated_at' => now()]);
+            }
+            $count += $inserido;
         }
         return $count;
     }
