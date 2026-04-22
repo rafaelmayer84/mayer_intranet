@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\Crm\CrmAccountState;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -155,97 +156,17 @@ class CrmReclassificarLifecycle extends Command
         return self::SUCCESS;
     }
 
+    /**
+     * Delega para CrmAccountState (fonte única da verdade).
+     * O $acc vem com status_pessoa e is_cliente já JOINados da query — encapsulamos em um
+     * objeto djCache para a assinatura do State.
+     */
     private function classificar(object $acc): array
     {
-        $djId = $acc->datajuri_pessoa_id;
-        $statusDj = $acc->status_pessoa;
-
-        // Regra 1: DJ autoritativo: adversa/contraparte/fornecedor (prioridade máxima)
-        if ($statusDj && preg_match('/Adversa|Contraparte|Fornecedor/i', $statusDj)) {
-            return ['bloqueado_adversa', "DJ: {$statusDj}"];
-        }
-
-        // Determinar se HÁ qualquer sinal de que é cliente nosso.
-        // contas_receber sozinho NÃO qualifica — pode ser honorário sucumbencial contra adversa.
-        $ehClienteCache = $statusDj && stripos($statusDj, 'Cliente') !== false;
-        $ehClienteFlag  = ($acc->is_cliente ?? 0) == 1;
-        $ehClienteProc  = false;
-        if ($djId) {
-            $ehClienteProc = DB::table('processos')
-                ->where('cliente_datajuri_id', $djId)
-                ->exists();
-        }
-        $ehCliente = $ehClienteCache || $ehClienteFlag || $ehClienteProc;
-
-        // Regra 2: se NÃO é cliente, checar heurística adversa ANTES de qualquer coisa
-        if (!$ehCliente) {
-            if ($djId) {
-                $ehAdv = DB::table('processos')->where('adverso_datajuri_id', $djId)->exists();
-                if ($ehAdv) {
-                    return ['bloqueado_adversa', 'adverso em processos (não é cliente)'];
-                }
-            }
-            if (!$djId && !empty($acc->name) && mb_strlen(trim($acc->name)) >= 10) {
-                $nomeNorm = trim(mb_strtolower($acc->name));
-                $ehAdv = DB::table('processos')
-                    ->whereRaw('LOWER(adverso_nome) = ?', [$nomeNorm])
-                    ->exists();
-                if ($ehAdv) {
-                    return ['bloqueado_adversa', 'nome = adverso_nome em processos (sem DJ)'];
-                }
-            }
-        }
-
-        // Regra 3: inadimplência — só se É cliente (evita confundir sucumbência com dívida)
-        if ($ehCliente && $djId) {
-            $temContasProtestoJudicial = DB::table('contas_receber')
-                ->where('pessoa_datajuri_id', $djId)
-                ->where('is_stale', false)
-                ->whereNull('data_vencimento')
-                ->whereNotIn('status', ['Excluido', 'Excluído', 'Concluído', 'Concluido'])
-                ->where('valor', '>', 0)
-                ->exists();
-            if ($temContasProtestoJudicial) {
-                return ['inadimplente', 'contas_receber c/ data_venc NULL'];
-            }
-        }
-        if ($statusDj && stripos($statusDj, 'Inadimplente') !== false) {
-            return ['inadimplente', "DJ: {$statusDj}"];
-        }
-
-        // Regra 4: sem DJ e sem atividade 6m
-        if (!$djId) {
-            $seisMeses = Carbon::now()->subMonths(6);
-            $lastTouch = $acc->last_touch_at ? Carbon::parse($acc->last_touch_at) : null;
-            $criado = $acc->created_at ? Carbon::parse($acc->created_at) : Carbon::now();
-
-            $inatividade = (!$lastTouch || $lastTouch->lt($seisMeses)) && $criado->lt($seisMeses);
-
-            if ($inatividade) {
-                return ['arquivado_orfao', 'sem DJ e sem atividade 6m+'];
-            }
-        }
-
-        // Regra 4–6: espelhar DJ. IMPORTANTE testar Inativo ANTES de Ativo (substring).
-        if ($statusDj) {
-            if (stripos($statusDj, 'Inativo') !== false) {
-                return ['adormecido', "DJ: {$statusDj}"];
-            }
-            if (stripos($statusDj, 'Onboarding') !== false) {
-                return ['onboarding', "DJ: {$statusDj}"];
-            }
-            if (stripos($statusDj, 'Estratégico') !== false || stripos($statusDj, 'Estrategico') !== false) {
-                return ['ativo', "DJ: {$statusDj}"];
-            }
-            if (stripos($statusDj, 'Ativo') !== false) {
-                return ['ativo', "DJ: {$statusDj}"];
-            }
-        }
-
-        // Regra 7
-        if (!$djId) {
-            return ['arquivado', 'sem DJ'];
-        }
-        return ['arquivado', 'sem status DJ classificável'];
+        $djCache = (object) [
+            'status_pessoa' => $acc->status_pessoa ?? null,
+            'is_cliente'    => $acc->is_cliente ?? 0,
+        ];
+        return CrmAccountState::computeLifecycle($acc, $djCache);
     }
 }
