@@ -8,6 +8,7 @@ use App\Http\Controllers\Crm\CrmPipelineController;
 use App\Http\Controllers\Crm\CrmAccountController;
 use App\Http\Controllers\Crm\CrmOpportunityController;
 use App\Http\Controllers\Crm\CrmReportsController;
+use App\Http\Controllers\Crm\CrmComandoController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -18,6 +19,9 @@ use Illuminate\Support\Facades\Route;
 
 
 Route::middleware(['auth','modulo:operacional.crm,visualizar'])->prefix('crm')->name('crm.')->group(function () {
+
+    // ── Painel do Dono (admin only) ──
+    Route::get('/comando', [CrmComandoController::class, 'index'])->name('comando');
 
     // ── Painel Gerencial CRM ──
     Route::get('/painel', [\App\Http\Controllers\CrmPainelController::class, 'index'])->name('painel');
