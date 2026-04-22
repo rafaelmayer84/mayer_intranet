@@ -55,6 +55,31 @@ class CrmAccountController extends Controller
             ->orderBy('opened_at')
             ->get();
 
+        // Ciente diario obrigatorio: gates em_revisao/escalado (inclusive p/ admin)
+        // exigem compromisso registrado a cada dia que o usuario acessa a conta.
+        $userId = auth()->id();
+        $gatesPendentesCiente = $gatesAtivos
+            ->whereIn('status', [
+                CrmAccountDataGate::STATUS_EM_REVISAO,
+                CrmAccountDataGate::STATUS_ESCALADO,
+            ])
+            ->filter(function ($g) use ($userId) {
+                return !DB::table('crm_account_data_gate_cientes')
+                    ->where('gate_id', $g->id)
+                    ->where('user_id', $userId)
+                    ->where('given_date', now()->toDateString())
+                    ->exists();
+            })
+            ->values();
+
+        if ($userId && $gatesPendentesCiente->isNotEmpty()) {
+            return view('crm.accounts.gate-ciente', [
+                'account'    => $account,
+                'gates'      => $gatesPendentesCiente,
+                'gateLabels' => $this->gateLabels(),
+            ]);
+        }
+
         // Timeline: events + activities merged
         $events     = CrmEvent::where('account_id', $id)->latest('happened_at')->limit(30)->get();
         $activities = CrmActivity::where('account_id', $id)->latest('created_at')->limit(30)->get();
@@ -180,23 +205,103 @@ class CrmAccountController extends Controller
             'confirmo.accepted' => 'Confirme que revisou o DataJuri.',
         ]);
 
-        $count = CrmAccountDataGate::where('account_id', $id)
+        $userId = auth()->id();
+        $gates = CrmAccountDataGate::where('account_id', $id)
             ->where('status', CrmAccountDataGate::STATUS_ABERTO)
-            ->update([
+            ->get();
+
+        foreach ($gates as $gate) {
+            $gate->update([
                 'status' => CrmAccountDataGate::STATUS_EM_REVISAO,
                 'first_seen_by_owner_at' => now(),
-                'updated_at' => now(),
             ]);
+            // Ja registra ciente de hoje (evita modal duplo no mesmo acesso)
+            try {
+                DB::table('crm_account_data_gate_cientes')->insert([
+                    'gate_id'           => $gate->id,
+                    'user_id'           => $userId,
+                    'given_date'        => now()->toDateString(),
+                    'given_at'          => now(),
+                    'ip'                => $request->ip(),
+                    'user_agent'        => substr((string)$request->userAgent(), 0, 1000),
+                    'compromisso_texto' => 'Revisão inicial: confirmei revisão dos dados no DataJuri. Ciente da penalidade PEN-C01 se não corrigir em 7 dias.',
+                    'created_at'        => now(),
+                    'updated_at'        => now(),
+                ]);
+            } catch (\Illuminate\Database\QueryException $e) {
+                if ($e->getCode() !== '23000') throw $e;
+            }
+        }
 
-        Log::info('[CrmAccount][gate-revisar] marcado revisao', [
+        $count = $gates->count();
+        Log::info('[CrmAccount][gate-revisar] marcado revisao + ciente', [
             'account_id' => $id,
-            'user_id'    => auth()->id(),
+            'user_id'    => $userId,
             'gates'      => $count,
         ]);
 
         return redirect()
             ->route('crm.accounts.show', $id)
             ->with('status', "Revisão registrada em {$count} pendência(s). Aguardando validação na próxima sincronização DJ.");
+    }
+
+    /**
+     * Registra ciente/compromisso diario dos gates ativos. Chave unica
+     * (gate_id, user_id, given_date) garante 1 por dia por gate por user.
+     */
+    public function darCiente(Request $request, int $id)
+    {
+        $request->validate([
+            'gate_ids'    => 'required|array|min:1',
+            'gate_ids.*'  => 'integer|exists:crm_account_data_gates,id',
+            'compromisso' => 'required|accepted',
+        ], [
+            'compromisso.required' => 'Você precisa assumir o compromisso.',
+            'compromisso.accepted' => 'Você precisa assumir o compromisso.',
+        ]);
+
+        $userId = auth()->id();
+        $today  = now()->toDateString();
+        $ip     = $request->ip();
+        $ua     = substr((string)$request->userAgent(), 0, 1000);
+
+        $texto = 'Declaro ciente das pendências de qualidade de dados desta conta e me comprometo a ajustar o cadastro no DataJuri. Estou ciente que a não correção em 7 dias gera penalidade PEN-C01 (3 pts, eixo Atendimento) no GDP.';
+
+        $registrados = 0;
+        foreach ($request->input('gate_ids') as $gateId) {
+            $gate = CrmAccountDataGate::where('account_id', $id)
+                ->where('id', $gateId)
+                ->whereIn('status', CrmAccountDataGate::STATUS_ATIVOS)
+                ->first();
+            if (!$gate) continue;
+
+            try {
+                DB::table('crm_account_data_gate_cientes')->insert([
+                    'gate_id'            => $gate->id,
+                    'user_id'            => $userId,
+                    'given_date'         => $today,
+                    'given_at'           => now(),
+                    'ip'                 => $ip,
+                    'user_agent'         => $ua,
+                    'compromisso_texto'  => $texto,
+                    'created_at'         => now(),
+                    'updated_at'         => now(),
+                ]);
+                $registrados++;
+            } catch (\Illuminate\Database\QueryException $e) {
+                // Unique constraint: ja deu ciente hoje — ignora silenciosamente
+                if ($e->getCode() !== '23000') throw $e;
+            }
+        }
+
+        Log::info('[CrmAccount][gate-ciente] registrado', [
+            'account_id' => $id,
+            'user_id'    => $userId,
+            'gates'      => $registrados,
+            'ip'         => $ip,
+        ]);
+
+        return redirect()->route('crm.accounts.show', $id);
     }
 
     private function gateLabels(): array
@@ -629,15 +734,19 @@ class CrmAccountController extends Controller
                 ])
                 ->toArray();
 
-            // 3. Contratos via contratante_id_datajuri
+            // 3. Contratos via contratante_id_datajuri (TODOS — aba dedicada exibe)
             $ctx['contratos'] = DB::table('contratos')
                 ->where('contratante_id_datajuri', $djId)
                 ->orderByDesc('data_assinatura')
-                ->limit(10)
                 ->get([
-                    'id', 'numero', 'valor', 'data_assinatura',
-                    'proprietario_nome',
+                    'id', 'datajuri_id', 'numero', 'valor', 'data_assinatura',
+                    'proprietario_nome', 'payload_raw', 'updated_at_api',
                 ])
+                ->map(function ($c) {
+                    $payload = $c->payload_raw ? json_decode($c->payload_raw, true) : [];
+                    $c->data_cadastro = $payload['dataCadastro'] ?? null;
+                    return $c;
+                })
                 ->toArray();
 
             // 4. Receita total + último movimento (movimentos por pessoa_id_datajuri)

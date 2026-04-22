@@ -283,6 +283,9 @@
                 <button onclick="switchTab('processos')" data-tab="processos" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
                     ⚖️ Processos <span class="ml-1 px-1.5 py-0.5 rounded-full text-xs bg-gray-100 text-gray-600">{{ count($djContext['processos']) }}</span>
                 </button>
+                <button onclick="switchTab('contratos')" data-tab="contratos" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                    📄 Contratos <span class="ml-1 px-1.5 py-0.5 rounded-full text-xs {{ count($djContext['contratos']) > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600' }}">{{ count($djContext['contratos']) }}</span>
+                </button>
                 <button onclick="switchTab('proc-adm')" data-tab="proc-adm" class="tab-btn px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">
                     🏛️ Proc. Adm.
                     @if($adminProcesses->count() > 0)
@@ -890,20 +893,106 @@
                 <div class="bg-white rounded-lg shadow-sm border p-6"><p class="text-gray-400 text-sm">Nenhum processo encontrado.</p></div>
             @endif
 
-            @if(!empty($djContext['contratos']))
-            <div class="bg-white rounded-lg shadow-sm border p-6">
-                <h2 class="text-lg font-semibold text-[#1B334A] mb-4">Contratos ({{ count($djContext['contratos']) }})</h2>
-                <div class="space-y-2">
-                    @foreach($djContext['contratos'] as $ct)
-                    <div class="flex items-center justify-between border rounded-lg p-3 hover:bg-gray-50">
-                        <div><span class="font-medium text-gray-800">Contrato #{{ $ct->numero ?? $ct->id }}</span>@if($ct->proprietario_nome ?? null)<span class="text-xs text-gray-400 ml-2">{{ $ct->proprietario_nome }}</span>@endif</div>
-                        <div class="text-right"><span class="font-medium text-[#1B334A]">R$ {{ number_format($ct->valor ?? 0, 2, ',', '.') }}</span>@if($ct->data_assinatura ?? null)<span class="text-xs text-gray-400 block">{{ \Carbon\Carbon::parse($ct->data_assinatura)->format('d/m/Y') }}</span>@endif</div>
-                    </div>
-                    @endforeach
+        </div>
+    </div>
+
+    {{-- ================================================================== --}}
+    {{-- TAB: CONTRATOS                                                      --}}
+    {{-- ================================================================== --}}
+    <div id="tab-contratos" class="tab-content hidden">
+        @php
+            $contratosSorted = collect($djContext['contratos'])->sortByDesc('data_assinatura')->values();
+            $contratosComData = $contratosSorted->filter(fn($c) => !empty($c->data_assinatura));
+            $contratosSemData = $contratosSorted->filter(fn($c) => empty($c->data_assinatura));
+            $valorTotal = $contratosSorted->sum(fn($c) => (float)($c->valor ?? 0));
+            $maisRecente = $contratosComData->first();
+            $maisAntigo = $contratosComData->last();
+        @endphp
+
+        @if($contratosSorted->isEmpty())
+            <div class="bg-white rounded-lg shadow-sm border p-8 text-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <p class="text-gray-500 text-sm">Nenhum contrato vinculado a este cliente no DataJuri.</p>
+                @if(!$account->datajuri_pessoa_id)
+                    <p class="text-xs text-amber-600 mt-2">Conta sem DJ ID — contratos são consultados via <code>contratante_id_datajuri</code>.</p>
+                @endif
+            </div>
+        @else
+            {{-- KPIs --}}
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                <div class="bg-white rounded-lg border p-4">
+                    <p class="text-xs text-gray-400 uppercase tracking-wide">Total de contratos</p>
+                    <p class="text-2xl font-bold text-[#1B334A]">{{ $contratosSorted->count() }}</p>
+                </div>
+                <div class="bg-white rounded-lg border p-4">
+                    <p class="text-xs text-gray-400 uppercase tracking-wide">Valor somado</p>
+                    <p class="text-2xl font-bold text-emerald-700">R$ {{ number_format($valorTotal, 2, ',', '.') }}</p>
+                </div>
+                <div class="bg-white rounded-lg border p-4">
+                    <p class="text-xs text-gray-400 uppercase tracking-wide">Assinatura mais antiga</p>
+                    <p class="text-sm font-semibold text-gray-700">{{ $maisAntigo && $maisAntigo->data_assinatura ? \Carbon\Carbon::parse($maisAntigo->data_assinatura)->format('d/m/Y') : '—' }}</p>
+                </div>
+                <div class="bg-white rounded-lg border p-4">
+                    <p class="text-xs text-gray-400 uppercase tracking-wide">Assinatura mais recente</p>
+                    <p class="text-sm font-semibold text-gray-700">{{ $maisRecente && $maisRecente->data_assinatura ? \Carbon\Carbon::parse($maisRecente->data_assinatura)->format('d/m/Y') : '—' }}</p>
                 </div>
             </div>
+
+            {{-- Tabela --}}
+            <div class="bg-white rounded-lg border overflow-hidden">
+                <div class="px-4 py-3 border-b bg-gray-50 flex items-center justify-between">
+                    <h3 class="font-semibold text-gray-800 text-sm">Contratos registrados no DataJuri</h3>
+                    <span class="text-xs text-gray-500">Fonte: tabela <code>contratos</code> · <code>contratante_id_datajuri</code> = {{ $account->datajuri_pessoa_id ?? '—' }}</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="text-xs text-gray-600 bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-4 py-2 text-left">Número</th>
+                                <th class="px-3 py-2 text-left">Assinatura</th>
+                                <th class="px-3 py-2 text-right">Valor</th>
+                                <th class="px-3 py-2 text-left">Proprietário</th>
+                                <th class="px-3 py-2 text-left">Cadastrado em</th>
+                                <th class="px-3 py-2 text-left">Atualizado DJ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($contratosSorted as $ct)
+                                <tr class="border-t border-gray-100 hover:bg-gray-50">
+                                    <td class="px-4 py-2 font-medium text-gray-800">
+                                        #{{ $ct->numero ?? $ct->id }}
+                                        @if($ct->datajuri_id)
+                                            <a href="https://mayer.datajuri.com.br/datajuri/pages/publico/cadastro/contrato/contrato.faces?id={{ $ct->datajuri_id }}"
+                                               target="_blank" rel="noopener"
+                                               class="text-xs text-blue-600 hover:underline ml-1">DJ</a>
+                                        @endif
+                                    </td>
+                                    <td class="px-3 py-2 text-gray-700">
+                                        @if($ct->data_assinatura)
+                                            {{ \Carbon\Carbon::parse($ct->data_assinatura)->format('d/m/Y') }}
+                                        @else
+                                            <span class="text-amber-600 text-xs">sem data</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-3 py-2 text-right font-semibold text-[#1B334A]">R$ {{ number_format((float)($ct->valor ?? 0), 2, ',', '.') }}</td>
+                                    <td class="px-3 py-2 text-gray-700">{{ $ct->proprietario_nome ?? '—' }}</td>
+                                    <td class="px-3 py-2 text-xs text-gray-500">{{ $ct->data_cadastro ?? '—' }}</td>
+                                    <td class="px-3 py-2 text-xs text-gray-500">{{ $ct->updated_at_api ? \Carbon\Carbon::parse($ct->updated_at_api)->format('d/m/Y H:i') : '—' }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            @if($contratosSemData->isNotEmpty())
+                <div class="mt-3 bg-amber-50 border border-amber-200 rounded p-3 text-sm text-amber-900">
+                    <strong>{{ $contratosSemData->count() }} contrato(s) sem data de assinatura.</strong> Verifique no DataJuri.
+                </div>
             @endif
-        </div>
+        @endif
     </div>
 
     {{-- ================================================================== --}}

@@ -60,6 +60,7 @@ Route::middleware(['auth','modulo:operacional.crm,visualizar'])->prefix('crm')->
     // Account 360
     Route::get('/accounts/{id}', [CrmAccountController::class, 'show'])->name('accounts.show');
     Route::post('/accounts/{id}/gate-revisar', [CrmAccountController::class, 'marcarRevisao'])->name('accounts.gate-revisar');
+    Route::post('/accounts/{id}/gate-ciente', [CrmAccountController::class, 'darCiente'])->name('accounts.gate-ciente');
     Route::delete('/accounts/{id}', [CrmAccountController::class, 'destroy'])->name('accounts.destroy');
     Route::put('/accounts/{id}', [CrmAccountController::class, 'update'])->name('accounts.update');
     Route::post('/accounts/{id}/opportunities', [CrmAccountController::class, 'createOpportunity'])->name('accounts.create-opp');
