@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\NexoConsultaLog;
 use App\Services\NexoConsultaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,6 +15,22 @@ class NexoConsultaController extends Controller
     public function __construct(NexoConsultaService $service)
     {
         $this->service = $service;
+    }
+
+    private function registrarLog(Request $request, string $acao, string $resultado, ?int $clienteId = null, array $meta = []): void
+    {
+        try {
+            NexoConsultaLog::create([
+                'telefone'   => $request->input('telefone', ''),
+                'cliente_id' => $clienteId,
+                'acao'       => $acao,
+                'resultado'  => $resultado,
+                'ip'         => $request->ip(),
+                'meta'       => $meta ?: null,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('[NEXO-LOG] Falha ao gravar nexo_consulta_log: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -72,6 +89,9 @@ class NexoConsultaController extends Controller
 
         try {
             $resultado = $this->service->identificarCliente($telefone, $cpf ?: null);
+            $encontrado = $resultado['encontrado'] ?? 'nao';
+            $acao = $encontrado === 'nao' ? 'probe_suspeito' : 'identificar';
+            $this->registrarLog($request, $acao, $encontrado === 'sim' ? 'ok' : 'nao_encontrado');
             return response()->json($resultado);
         } catch (\Exception $e) {
             Log::error('[NEXO-CONSULTA] Erro identificar-cliente: ' . $e->getMessage());
@@ -141,6 +161,11 @@ class NexoConsultaController extends Controller
 
         try {
             $resultado = $this->service->validarAuth($telefone, $respostas, $cpf ?: null);
+            $valido = $resultado['valido'] ?? 'nao';
+            $bloqueado = $resultado['bloqueado'] ?? 'nao';
+            $acao = $valido === 'sim' ? 'auth_ok' : 'auth_falha';
+            $logResultado = $bloqueado === 'sim' ? 'bloqueado' : ($valido === 'sim' ? 'ok' : 'falha');
+            $this->registrarLog($request, $acao, $logResultado);
             return response()->json($resultado);
         } catch (\Exception $e) {
             Log::error('[NEXO-CONSULTA] Erro validar-auth: ' . $e->getMessage());
@@ -196,6 +221,9 @@ class NexoConsultaController extends Controller
                 return response()->json(['error' => $resultado['erro']], 404);
             }
 
+            $this->registrarLog($request, 'consulta_status', 'ok', null, [
+                'total_processos' => $resultado['total'] ?? null,
+            ]);
             return response()->json($resultado);
         } catch (\Exception $e) {
             Log::error('[NEXO-CONSULTA] Erro consulta-status: ' . $e->getMessage());
@@ -226,6 +254,9 @@ class NexoConsultaController extends Controller
                 return response()->json(['error' => $resultado['erro']], 404);
             }
 
+            $this->registrarLog($request, 'consulta_processo', 'ok', null, [
+                'pasta' => $pasta,
+            ]);
             return response()->json($resultado);
         } catch (\Exception $e) {
             Log::error('[NEXO-CONSULTA] Erro consulta-status-processo: ' . $e->getMessage());

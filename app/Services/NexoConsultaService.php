@@ -67,6 +67,7 @@ class NexoConsultaService
      */
     public function identificarCliente(string $telefone, ?string $cpf = null): array
     {
+        $inicio = microtime(true);
         $telefoneNorm = $this->normalizarTelefone($telefone);
 
         Log::info('[NEXO-CONSULTA] identificarCliente', ['telefone' => $telefoneNorm, 'cpf' => $cpf ?? 'nao informado']);
@@ -93,6 +94,7 @@ class NexoConsultaService
 
         if (!$cliente) {
             Log::info('[NEXO-CONSULTA] Cliente não encontrado', ['telefone' => $telefoneNorm]);
+            $this->normalizarTempoResposta($inicio, 300);
             return [
                 'encontrado' => 'nao',
                 'nome' => '',
@@ -102,11 +104,20 @@ class NexoConsultaService
 
         Log::info('[NEXO-CONSULTA] Cliente encontrado', ['id' => $cliente->id, 'nome' => $cliente->nome]);
 
+        $this->normalizarTempoResposta($inicio, 300);
         return [
             'encontrado' => 'sim',
             'nome' => $cliente->nome ?? '',
             'bloqueado' => 'nao',
         ];
+    }
+
+    private function normalizarTempoResposta(float $inicio, int $minMs): void
+    {
+        $decorrido = (microtime(true) - $inicio) * 1000;
+        if ($decorrido < $minMs) {
+            usleep((int)(($minMs - $decorrido) * 1000));
+        }
     }
 
     // ================================================================

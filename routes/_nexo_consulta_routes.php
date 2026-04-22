@@ -22,7 +22,7 @@
 
 use App\Http\Controllers\NexoConsultaController;
 
-Route::prefix('nexo')->group(function () {
+Route::prefix('nexo')->middleware('throttle:nexo-consulta')->group(function () {
     Route::post('/verificar-sessao', [NexoConsultaController::class, 'verificarSessao']);
     Route::post('/identificar-cliente', [NexoConsultaController::class, 'identificarCliente']);
     Route::post('/perguntas-auth', [NexoConsultaController::class, 'perguntasAuth']);
