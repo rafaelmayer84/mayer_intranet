@@ -99,6 +99,33 @@
                     </button>
                 </form>
             </div>
+
+            {{-- Justificar como exceção --}}
+            <details class="mt-5 border-t pt-4">
+                <summary class="cursor-pointer text-sm text-gray-600 hover:text-gray-900 font-medium">
+                    Esta conta é um caso especial que não pode ser corrigido no DataJuri? →
+                </summary>
+                <form method="POST" action="{{ route('crm.accounts.gate-excecao', $account->id) }}" class="mt-3 space-y-3">
+                    @csrf
+                    @foreach($gates as $gate)
+                        <input type="hidden" name="gate_ids[]" value="{{ $gate->id }}">
+                    @endforeach
+                    <p class="text-xs text-gray-600">
+                        Use somente quando o DataJuri <strong>não tem como</strong> representar a realidade (ex: PF sócia
+                        de PJ cliente, cônjuge incluído, herdeiros). A justificativa fica em log auditável e fecha a pendência
+                        <strong>sem</strong> gerar penalidade PEN-C01.
+                    </p>
+                    <textarea name="justificativa" rows="3" minlength="15" maxlength="1000" required
+                              placeholder="Ex: PF sócia da PJ Artefatos de Cimento Raimondi (conta #1508) — contrato está no CNPJ da empresa."
+                              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500"></textarea>
+                    <div class="flex justify-end">
+                        <button type="submit"
+                                class="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 text-sm">
+                            Fechar como exceção justificada
+                        </button>
+                    </div>
+                </form>
+            </details>
         </div>
     </div>
 

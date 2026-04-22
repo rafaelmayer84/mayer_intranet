@@ -14,6 +14,7 @@ class CrmAccountDataGate extends Model
         'dj_valor_snapshot', 'evidencia_local', 'status',
         'opened_at', 'first_seen_by_owner_at', 'resolved_at',
         'escalated_at', 'dj_valor_no_fechamento', 'penalidade_registrada',
+        'excecao_justificativa', 'excecao_by_user_id', 'excecao_at',
     ];
 
     protected $casts = [
@@ -22,6 +23,7 @@ class CrmAccountDataGate extends Model
         'first_seen_by_owner_at' => 'datetime',
         'resolved_at'            => 'datetime',
         'escalated_at'           => 'datetime',
+        'excecao_at'             => 'datetime',
         'penalidade_registrada'  => 'bool',
     ];
 
@@ -29,6 +31,7 @@ class CrmAccountDataGate extends Model
     public const STATUS_EM_REVISAO       = 'em_revisao';
     public const STATUS_RESOLVIDO_AUTO   = 'resolvido_auto';
     public const STATUS_RESOLVIDO_MANUAL = 'resolvido_manual';
+    public const STATUS_EXCECAO          = 'excecao_justificada';
     public const STATUS_ESCALADO         = 'escalado';
     public const STATUS_CANCELADO        = 'cancelado';
 

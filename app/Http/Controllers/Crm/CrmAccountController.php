@@ -182,12 +182,13 @@ class CrmAccountController extends Controller
         }
 
         $gateLabels = $this->gateLabels();
+        $accountFlags = app(\App\Services\Crm\CrmAccountFlagsService::class)->calcular($id);
 
         return view('crm.accounts.show', compact(
             'account', 'timeline', 'djContext', 'commContext', 'users', 'segmentation', 'finSummary',
             'documents', 'docCategorias', 'serviceRequests', 'srCategorias', 'nexoPendentes', 'adminProcesses',
             'inadTarefaAberta', 'inadEvidencias', 'inadDecisaoAtiva', 'inadHistoricoDecisoes',
-            'gatesAtivos', 'gateLabels'
+            'gatesAtivos', 'gateLabels', 'accountFlags'
         ));
     }
 
@@ -302,6 +303,54 @@ class CrmAccountController extends Controller
         ]);
 
         return redirect()->route('crm.accounts.show', $id);
+    }
+
+    /**
+     * Justifica gate como excecao (ex: PF socia de PJ cliente, conjuge no
+     * cadastro, heranca). Fecha como resolvido_manual com justificativa
+     * textual auditavel. Nao cai em PEN-C01.
+     */
+    public function justificarExcecao(Request $request, int $id)
+    {
+        $request->validate([
+            'gate_ids'      => 'required|array|min:1',
+            'gate_ids.*'    => 'integer|exists:crm_account_data_gates,id',
+            'justificativa' => 'required|string|min:15|max:1000',
+        ], [
+            'justificativa.min' => 'Justificativa precisa ter ao menos 15 caracteres.',
+        ]);
+
+        $userId = auth()->id();
+        $fechados = 0;
+
+        foreach ($request->input('gate_ids') as $gateId) {
+            $gate = CrmAccountDataGate::where('account_id', $id)
+                ->where('id', $gateId)
+                ->whereIn('status', CrmAccountDataGate::STATUS_ATIVOS)
+                ->first();
+            if (!$gate) continue;
+
+            $gate->update([
+                'status'                => CrmAccountDataGate::STATUS_EXCECAO,
+                'excecao_justificativa' => $request->input('justificativa'),
+                'excecao_by_user_id'    => $userId,
+                'excecao_at'            => now(),
+                'resolved_at'           => now(),
+            ]);
+            $fechados++;
+        }
+
+        Log::info('[CrmAccount][gate-excecao] justificado', [
+            'account_id'    => $id,
+            'user_id'       => $userId,
+            'gates'         => $fechados,
+            'ip'            => $request->ip(),
+            'justificativa' => mb_substr($request->input('justificativa'), 0, 200),
+        ]);
+
+        return redirect()
+            ->route('crm.accounts.show', $id)
+            ->with('status', "{$fechados} pendência(s) fechada(s) como exceção justificada.");
     }
 
     private function gateLabels(): array

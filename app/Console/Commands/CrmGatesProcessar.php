@@ -41,6 +41,16 @@ class CrmGatesProcessar extends Command
                         'resolved_at'            => now(),
                         'dj_valor_no_fechamento' => $this->lerStatusDjAtual($gate),
                     ]);
+                    // Auto-promover lifecycle a 'inadimplente' quando o gate
+                    // dessa natureza foi resolvido pelo DJ marcando Inadimplente.
+                    if ($gate->tipo === CrmAccountDataGate::TIPO_INADIMPLENCIA_SUSPEITA_2099) {
+                        $status = $this->lerStatusDjAtual($gate);
+                        if ($status && stripos($status, 'Inadimplente') !== false) {
+                            DB::table('crm_accounts')
+                                ->where('id', $gate->account_id)
+                                ->update(['lifecycle' => 'inadimplente', 'updated_at' => now()]);
+                        }
+                    }
                 }
                 $stats['resolvidos']++;
                 continue;

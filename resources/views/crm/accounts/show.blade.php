@@ -62,32 +62,69 @@
                     @if($cli && $cli->nome_fantasia)
                         <p class="text-blue-200 text-sm mt-0.5">{{ $cli->nome_fantasia }}</p>
                     @endif
+                    {{-- LINHA 1: Marcas oficiais (realidade local, alta prioridade) --}}
                     <div class="flex flex-wrap items-center gap-2 mt-2">
-                        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium {{ $account->kind === 'client' ? 'bg-green-400/20 text-green-200' : 'bg-blue-400/20 text-blue-200' }}">
-                            {{ $account->kind === 'client' ? 'Cliente' : 'Prospect' }}
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-bold {{ $account->kind === 'client' ? 'bg-green-400/30 text-white ring-1 ring-green-300' : 'bg-blue-400/30 text-white ring-1 ring-blue-300' }}">
+                            {{ $account->kind === 'client' ? '✓ CLIENTE' : 'PROSPECT' }}
                         </span>
-                        <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/20 text-white">
-                            {{ ucfirst($account->lifecycle ?? 'onboarding') }}
+                        @php
+                            $lcOfficial = [
+                                'onboarding'        => ['ONBOARDING', 'bg-blue-500/40 text-white ring-blue-300'],
+                                'ativo'             => ['ATIVO', 'bg-emerald-500/40 text-white ring-emerald-300'],
+                                'adormecido'        => ['ADORMECIDO', 'bg-yellow-500/40 text-white ring-yellow-300'],
+                                'inadimplente'     => ['INADIMPLENTE', 'bg-red-600/50 text-white ring-red-300'],
+                                'bloqueado_adversa' => ['BLOQUEADO (ADVERSA)', 'bg-orange-600/50 text-white ring-orange-300'],
+                                'arquivado'         => ['ARQUIVADO', 'bg-gray-500/40 text-white ring-gray-300'],
+                                'risco'             => ['EM RISCO', 'bg-red-500/40 text-white ring-red-300'],
+                            ];
+                            $lcInfo = $lcOfficial[$account->lifecycle ?? 'onboarding'] ?? [strtoupper($account->lifecycle ?? ''), 'bg-white/20 text-white'];
+                        @endphp
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-bold ring-1 {{ $lcInfo[1] }}">
+                            {{ $lcInfo[0] }}
                         </span>
-                        @if($cli && $cli->tipo)
-                            <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/10 text-white/80">
-                                {{ $cli->tipo === 'PF' ? 'Pessoa Física' : 'Pessoa Jurídica' }}
+
+                        {{-- Flags derivadas: COM PROTESTO, COM EXECUÇÃO JUDICIAL, EM ACORDO, etc --}}
+                        @foreach($accountFlags as $flag)
+                            @php
+                                $flagColors = [
+                                    'red'    => 'bg-red-600 text-white ring-red-300',
+                                    'orange' => 'bg-orange-600 text-white ring-orange-300',
+                                    'amber'  => 'bg-amber-500 text-white ring-amber-300',
+                                    'yellow' => 'bg-yellow-500 text-white ring-yellow-300',
+                                    'blue'   => 'bg-blue-500 text-white ring-blue-300',
+                                    'gray'   => 'bg-gray-500 text-white ring-gray-300',
+                                ];
+                                $flagCss = $flagColors[$flag['color']] ?? 'bg-gray-500 text-white';
+                            @endphp
+                            <span class="px-2.5 py-0.5 rounded-full text-xs font-bold ring-1 {{ $flagCss }}" title="{{ $flag['tooltip'] }}">
+                                ⚠ {{ $flag['label'] }}
                             </span>
+                        @endforeach
+                    </div>
+
+                    {{-- LINHA 2: Referência (cinza, menor) — cadastro DJ + métricas --}}
+                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[11px]">
+                        @if($cli && $cli->tipo)
+                            <span class="text-white/60">{{ $cli->tipo === 'PF' ? 'Pessoa Física' : 'Pessoa Jurídica' }}</span>
                         @endif
-                        @if($cli && $cli->status_pessoa && !(isset($segmentation) && $segmentation))
-                            <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/10 text-white/80">
-                                {{ $cli->status_pessoa }}
+                        @if($cli && $cli->status_pessoa)
+                            @php
+                                $djDivergente = !empty($gatesAtivos) && count($gatesAtivos) > 0;
+                            @endphp
+                            <span class="text-white/60" title="status_pessoa no DataJuri — pode estar defasado">
+                                DJ: {{ $cli->status_pessoa }}
+                                @if($djDivergente)<span class="text-amber-300 font-semibold" title="Divergente da realidade — ver pendências">⚠ defasado</span>@endif
                             </span>
                         @endif
                         @if($account->health_score !== null)
                             @php $hs = $account->health_score; @endphp
-                            <span class="px-2.5 py-0.5 rounded-full text-xs font-medium {{ $hs >= 70 ? 'bg-green-400/20 text-green-200' : ($hs >= 40 ? 'bg-yellow-400/20 text-yellow-200' : 'bg-red-400/20 text-red-200') }}">
-                                Saúde: {{ $hs }}
+                            <span class="{{ $hs >= 70 ? 'text-green-200' : ($hs >= 40 ? 'text-yellow-200' : 'text-red-200') }}">
+                                Saúde {{ $hs }}/100
                             </span>
                         @endif
                         @if(isset($segmentation) && $segmentation)
-                            <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-400/20 text-purple-200" title="{{ $segmentation['summary'] ?? '' }}">
-                                {{ $segmentation['segment'] }}
+                            <span class="text-purple-200" title="{{ $segmentation['summary'] ?? '' }}">
+                                IA: {{ $segmentation['segment'] }}
                             </span>
                         @endif
                     </div>
