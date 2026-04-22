@@ -7,6 +7,7 @@ use App\Models\Crm\CrmAccount;
 use App\Models\Crm\CrmEvent;
 use App\Models\Crm\CrmActivity;
 use App\Models\User;
+use App\Services\Crm\CrmAccountShowService;
 use App\Services\Crm\CrmIdentityResolver;
 use App\Services\Crm\CrmOpportunityService;
 use Illuminate\Http\Request;
@@ -25,178 +26,12 @@ class CrmAccountController extends Controller
 {
     /**
      * Cliente 360 — Perfil enriquecido.
+     * Delega para CrmAccountShowService (orquestra toda preparação de dados).
      */
-    public function show(int $id)
+    public function show(int $id, CrmAccountShowService $svc)
     {
-        $account = CrmAccount::with([
-            'owner',
-            'identities',
-            'opportunities' => fn($q) => $q->with('stage', 'owner')->latest(),
-            'activities'    => fn($q) => $q->latest()->limit(20),
-        ])->findOrFail($id);
-
-        // Gate de qualidade de dados: se ha gate(s) status=aberto, exige revisao
-        // obrigatoria antes de liberar a conta. Admin passa direto.
-        $gatesAbertos = CrmAccountDataGate::where('account_id', $id)
-            ->where('status', CrmAccountDataGate::STATUS_ABERTO)
-            ->orderBy('opened_at')
-            ->get();
-
-        if ($gatesAbertos->isNotEmpty() && !(auth()->user() && auth()->user()->isAdmin())) {
-            return view('crm.accounts.gate-bloqueio', [
-                'account'    => $account,
-                'gates'      => $gatesAbertos,
-                'gateLabels' => $this->gateLabels(),
-            ]);
-        }
-
-        $gatesAtivos = CrmAccountDataGate::where('account_id', $id)
-            ->whereIn('status', CrmAccountDataGate::STATUS_ATIVOS)
-            ->orderBy('opened_at')
-            ->get();
-
-        // Ciente diario obrigatorio: gates em_revisao/escalado (inclusive p/ admin)
-        // exigem compromisso registrado a cada dia que o usuario acessa a conta.
-        $userId = auth()->id();
-        $gatesPendentesCiente = $gatesAtivos
-            ->whereIn('status', [
-                CrmAccountDataGate::STATUS_EM_REVISAO,
-                CrmAccountDataGate::STATUS_ESCALADO,
-            ])
-            ->filter(function ($g) use ($userId) {
-                return !DB::table('crm_account_data_gate_cientes')
-                    ->where('gate_id', $g->id)
-                    ->where('user_id', $userId)
-                    ->where('given_date', now()->toDateString())
-                    ->exists();
-            })
-            ->values();
-
-        if ($userId && $gatesPendentesCiente->isNotEmpty()) {
-            return view('crm.accounts.gate-ciente', [
-                'account'    => $account,
-                'gates'      => $gatesPendentesCiente,
-                'gateLabels' => $this->gateLabels(),
-            ]);
-        }
-
-        // Timeline: events + activities merged
-        $events     = CrmEvent::where('account_id', $id)->latest('happened_at')->limit(30)->get();
-        $activities = CrmActivity::where('account_id', $id)->latest('created_at')->limit(30)->get();
-
-        $timeline = collect()
-            ->merge($events->map(fn($e) => [
-                'type'    => 'event',
-                'subtype' => $e->type,
-                'title'   => $this->eventTitle($e),
-                'payload' => $e->payload,
-                'date'    => $e->happened_at,
-                'user'    => $e->createdBy?->name,
-            ]))
-            ->merge($activities->map(fn($a) => [
-                'type'    => 'activity',
-                'subtype' => $a->type,
-                'title'   => $a->title,
-                'body'    => $a->body,
-                'date'    => $a->created_at,
-                'done'    => $a->isDone(),
-                'user'    => $a->createdBy?->name,
-            ]))
-            ->sortByDesc('date')
-            ->values()
-            ->take(50);
-
-        // DataJuri context enriquecido
-        $djContext = $this->loadDataJuriContext($account);
-
-        // Comunicação: WhatsApp + Tickets
-        $commContext = $this->loadCommunicationContext($account, $djContext);
-
-        $users = User::orderBy('name')->get(['id', 'name']);
-
-        // Segmentação IA (cache 7 dias)
-        $segmentation = null;
-        try {
-            $segService = app(CrmSegmentationService::class);
-            $segmentation = $segService->segmentar($account->id);
-        } catch (\Exception $e) {
-            Log::warning('[CRM] Segmentação falhou account #' . $account->id . ': ' . $e->getMessage());
-        }
-
-        // Aging financeiro
-        $finSummary = $this->buildFinancialSummary($djContext);
-
-        $documents = CrmDocument::where('account_id', $id)->with('uploadedBy')->latest()->get();
-        $docCategorias = CrmDocument::categorias();
-
-        // Inadimplência: tarefa aberta de cobrança + decisão ativa + histórico
-        $inadTarefaAberta = CrmActivity::where('account_id', $id)
-            ->where('type', 'task')
-            ->where('purpose', 'cobranca')
-            ->where('requires_evidence', true)
-            ->whereNull('done_at')
-            ->with('createdBy')
-            ->first();
-
-        $inadEvidencias = $inadTarefaAberta
-            ? CrmDocument::where('account_id', $id)
-                ->where('activity_id', $inadTarefaAberta->id)
-                ->with('uploadedBy')
-                ->latest()
-                ->get()
-            : collect();
-
-        $inadDecisaoAtiva = CrmInadimplenciaDecisao::where('account_id', $id)
-            ->where('status', 'ativa')
-            ->with('createdBy')
-            ->latest()
-            ->first();
-
-        $inadHistoricoDecisoes = CrmInadimplenciaDecisao::where('account_id', $id)
-            ->with('createdBy')
-            ->latest()
-            ->limit(5)
-            ->get();
-
-        $serviceRequests = \App\Models\Crm\CrmServiceRequest::where('account_id', $id)
-            ->with(['requestedBy', 'assignedTo'])
-            ->latest()
-            ->get();
-        $srCategorias = \App\Models\Crm\CrmServiceRequest::categorias();
-
-        // Processos administrativos
-        $adminProcesses = \App\Models\Crm\CrmAdminProcess::where('account_id', $id)
-            ->with('owner')
-            ->orderByDesc('created_at')
-            ->get();
-
-        // Notificações WhatsApp pendentes (Nexo) vinculadas a este cliente
-        $nexoPendentes = collect();
-        $clienteLocal = $djContext['cliente'] ?? null;
-        if ($clienteLocal && isset($clienteLocal->id)) {
-            $nexoPendentes = DB::table('nexo_notificacoes')
-                ->where('cliente_id', $clienteLocal->id)
-                ->where('status', 'pending')
-                ->orderByDesc('created_at')
-                ->get();
-        }
-
-        $gateLabels = $this->gateLabels();
-        $flagsService = app(\App\Services\Crm\CrmAccountFlagsService::class);
-        $accountFlags = $flagsService->calcular($id);
-        $flagsCatalogo = $flagsService->catalogoLista();
-        $flagsManuaisAtivas = DB::table('crm_account_manual_flags')
-            ->where('account_id', $id)
-            ->whereNull('removed_at')
-            ->orderBy('created_at')
-            ->get();
-
-        return view('crm.accounts.show', compact(
-            'account', 'timeline', 'djContext', 'commContext', 'users', 'segmentation', 'finSummary',
-            'documents', 'docCategorias', 'serviceRequests', 'srCategorias', 'nexoPendentes', 'adminProcesses',
-            'inadTarefaAberta', 'inadEvidencias', 'inadDecisaoAtiva', 'inadHistoricoDecisoes',
-            'gatesAtivos', 'gateLabels', 'accountFlags', 'flagsCatalogo', 'flagsManuaisAtivas'
-        ));
+        $prepared = $svc->prepare($id, auth()->user());
+        return view($prepared['view'], $prepared['data']);
     }
 
     /**
@@ -436,17 +271,6 @@ class CrmAccountController extends Controller
 
         return redirect()->route('crm.accounts.show', $id)
             ->with('status', 'Marca manual removida.');
-    }
-
-    private function gateLabels(): array
-    {
-        return [
-            CrmAccountDataGate::TIPO_ONBOARDING_COM_CONTRATO     => 'Onboarding no DJ, mas já existe contrato/processo',
-            CrmAccountDataGate::TIPO_STATUS_CLIENTE_SEM_VINCULO  => 'Marcado como Cliente no DJ, sem contrato nem processo',
-            CrmAccountDataGate::TIPO_ADVERSA_COM_CONTRATO        => 'DJ classifica como Adversa/Contraparte/Fornecedor, mas existe contrato',
-            CrmAccountDataGate::TIPO_INADIMPLENCIA_SUSPEITA_2099 => 'Contas com vencimento 2099-12-31 (judicial/indefinido) sem marca de inadimplência',
-            CrmAccountDataGate::TIPO_SEM_STATUS_PESSOA           => 'Cadastro DJ sem status_pessoa preenchido',
-        ];
     }
 
     /**
@@ -814,12 +638,12 @@ class CrmAccountController extends Controller
     }
 
     // =========================================================================
-    // PRIVATE — Data Loaders
+    // PRIVATE — Data Loaders (extraídos para CrmAccountShowService;
+    // mantidos aqui como dead-code referência até cleanup dedicado)
     // =========================================================================
 
     /**
-     * Carrega contexto DataJuri enriquecido: dados pessoais, processos,
-     * contratos, financeiro (movimentos + contas a receber).
+     * @deprecated Extraído para App\Services\Crm\CrmAccountShowService::loadDataJuriContext
      */
     private function loadDataJuriContext(CrmAccount $account): array
     {
