@@ -182,13 +182,20 @@ class CrmAccountController extends Controller
         }
 
         $gateLabels = $this->gateLabels();
-        $accountFlags = app(\App\Services\Crm\CrmAccountFlagsService::class)->calcular($id);
+        $flagsService = app(\App\Services\Crm\CrmAccountFlagsService::class);
+        $accountFlags = $flagsService->calcular($id);
+        $flagsCatalogo = $flagsService->catalogoLista();
+        $flagsManuaisAtivas = DB::table('crm_account_manual_flags')
+            ->where('account_id', $id)
+            ->whereNull('removed_at')
+            ->orderBy('created_at')
+            ->get();
 
         return view('crm.accounts.show', compact(
             'account', 'timeline', 'djContext', 'commContext', 'users', 'segmentation', 'finSummary',
             'documents', 'docCategorias', 'serviceRequests', 'srCategorias', 'nexoPendentes', 'adminProcesses',
             'inadTarefaAberta', 'inadEvidencias', 'inadDecisaoAtiva', 'inadHistoricoDecisoes',
-            'gatesAtivos', 'gateLabels', 'accountFlags'
+            'gatesAtivos', 'gateLabels', 'accountFlags', 'flagsCatalogo', 'flagsManuaisAtivas'
         ));
     }
 
@@ -351,6 +358,84 @@ class CrmAccountController extends Controller
         return redirect()
             ->route('crm.accounts.show', $id)
             ->with('status', "{$fechados} pendência(s) fechada(s) como exceção justificada.");
+    }
+
+    /**
+     * Adiciona uma marca manual a conta (admin ou owner).
+     * Reativa se ja existir mesma marca removida.
+     */
+    public function addManualFlag(Request $request, int $id)
+    {
+        $catalogo = \App\Services\Crm\CrmAccountFlagsService::CATALOGO_MANUAL;
+        $request->validate([
+            'codigo' => 'required|in:' . implode(',', array_keys($catalogo)),
+            'nota'   => 'nullable|string|max:500',
+        ]);
+
+        $user = auth()->user();
+        $account = CrmAccount::findOrFail($id);
+        if (!$user->isAdmin() && $account->owner_user_id !== $user->id) {
+            abort(403, 'Apenas admin ou responsável pela conta podem editar marcas.');
+        }
+
+        // Se já existe ativa, só atualiza nota
+        $existente = DB::table('crm_account_manual_flags')
+            ->where('account_id', $id)
+            ->where('codigo', $request->input('codigo'))
+            ->whereNull('removed_at')
+            ->first();
+
+        if ($existente) {
+            DB::table('crm_account_manual_flags')
+                ->where('id', $existente->id)
+                ->update(['nota' => $request->input('nota'), 'updated_at' => now()]);
+        } else {
+            DB::table('crm_account_manual_flags')->insert([
+                'account_id'         => $id,
+                'codigo'             => $request->input('codigo'),
+                'nota'               => $request->input('nota'),
+                'created_by_user_id' => $user->id,
+                'created_at'         => now(),
+                'updated_at'         => now(),
+            ]);
+        }
+
+        Log::info('[CrmAccount][manual-flag] adicionada', [
+            'account_id' => $id,
+            'codigo'     => $request->input('codigo'),
+            'user_id'    => $user->id,
+        ]);
+
+        return redirect()->route('crm.accounts.show', $id)
+            ->with('status', 'Marca manual adicionada.');
+    }
+
+    public function removeManualFlag(Request $request, int $id, int $flagId)
+    {
+        $user = auth()->user();
+        $account = CrmAccount::findOrFail($id);
+        if (!$user->isAdmin() && $account->owner_user_id !== $user->id) {
+            abort(403);
+        }
+
+        DB::table('crm_account_manual_flags')
+            ->where('id', $flagId)
+            ->where('account_id', $id)
+            ->whereNull('removed_at')
+            ->update([
+                'removed_at'         => now(),
+                'removed_by_user_id' => $user->id,
+                'updated_at'         => now(),
+            ]);
+
+        Log::info('[CrmAccount][manual-flag] removida', [
+            'account_id' => $id,
+            'flag_id'    => $flagId,
+            'user_id'    => $user->id,
+        ]);
+
+        return redirect()->route('crm.accounts.show', $id)
+            ->with('status', 'Marca manual removida.');
     }
 
     private function gateLabels(): array

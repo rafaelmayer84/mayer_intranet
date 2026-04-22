@@ -5,19 +5,32 @@ namespace App\Services\Crm;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Deriva as "marcas" rapidas de um cliente a partir da realidade observavel
- * (contas_receber, decisoes de inadimplencia, status DJ). Sao badges visuais
- * que aparecem no topo da ficha — info rapida e acessivel.
+ * Deriva as "marcas" rapidas de um cliente. Combina:
+ *   - Automaticas: derivadas de contas_receber e decisoes de inadimplencia
+ *   - Manuais: adicionadas pelo advogado via UI (crm_account_manual_flags)
+ *     Manual sempre VENCE a automatica quando o codigo coincide.
  *
- * As marcas sao CUMULATIVAS: um cliente pode ter COM PROTESTO e EM ACORDO,
- * ou COM EXECUCAO JUDICIAL e CONTRATO SINISTRADO ao mesmo tempo.
+ * As marcas sao CUMULATIVAS: um cliente pode ter varias ao mesmo tempo.
  *
- * Convenção data_vencimento em contas_receber:
- *   NULL        = protesto / pendente judicial (memória: projeto_inadimplencia_regra)
- *   2099-12-31  = judicial / indefinido
+ * Convencao data_vencimento em contas_receber:
+ *   NULL OU 2099-12-31 = cobranca travada (pode ser protesto OU judicial;
+ *     o banco nao distingue, por isso a flag automatica eh generica).
+ *     O advogado usa flag MANUAL para especificar COM_PROTESTO ou EM_EXECUCAO_JUDICIAL.
  */
 class CrmAccountFlagsService
 {
+    public const CATALOGO_MANUAL = [
+        'COM_PROTESTO'            => ['COM PROTESTO', 'red', 10, 'Protesto em cartório já efetivado.'],
+        'EM_EXECUCAO_JUDICIAL'    => ['EM EXECUÇÃO JUDICIAL', 'red', 10, 'Ação de execução ajuizada.'],
+        'EM_ACAO_MONITORIA'       => ['EM AÇÃO MONITÓRIA', 'red', 9, 'Ação monitória em curso.'],
+        'EM_ACAO_COBRANCA'        => ['EM AÇÃO DE COBRANÇA', 'red', 9, 'Ação de cobrança em curso.'],
+        'EM_RECUPERACAO_JUDICIAL' => ['EM RECUPERAÇÃO JUDICIAL', 'orange', 9, 'Cliente em recuperação judicial.'],
+        'EM_FALENCIA'             => ['EM FALÊNCIA', 'gray', 9, 'Processo de falência.'],
+        'VIP'                     => ['VIP', 'purple', 3, 'Cliente estratégico.'],
+        'PARCEIRO'                => ['PARCEIRO', 'purple', 3, 'Parceiro comercial.'],
+        'SOCIO_DE_PJ_CLIENTE'     => ['SÓCIO DE PJ CLIENTE', 'blue', 2, 'PF ligada a PJ cliente — contrato na empresa.'],
+    ];
+
     public function calcular(int $accountId): array
     {
         $account = DB::table('crm_accounts')->where('id', $accountId)->first();
@@ -26,6 +39,7 @@ class CrmAccountFlagsService
         $djId = $account->datajuri_pessoa_id;
         $flags = [];
 
+        // ─── Automáticas (derivadas de dados) ───────────────────────────
         if ($djId) {
             $cr = DB::table('contas_receber')
                 ->where('pessoa_datajuri_id', $djId)
@@ -34,51 +48,45 @@ class CrmAccountFlagsService
                 ->where('valor', '>', 0)
                 ->get(['id', 'valor', 'data_vencimento', 'status']);
 
-            $comProtesto = $cr->filter(fn($c) => is_null($c->data_vencimento))->sum('valor');
-            $comJudicial = $cr->filter(fn($c) => $c->data_vencimento === '2099-12-31')->sum('valor');
+            // NULL ou 2099-12-31 = cobranca travada (nao distingue)
+            $travadas = $cr->filter(fn($c) =>
+                is_null($c->data_vencimento) || $c->data_vencimento === '2099-12-31'
+            );
             $vencidas = $cr->filter(fn($c) =>
                 $c->data_vencimento && $c->data_vencimento !== '2099-12-31'
                 && $c->data_vencimento < now()->toDateString()
             )->sum('valor');
 
-            if ($comProtesto > 0) {
+            if ($travadas->isNotEmpty()) {
                 $flags[] = [
-                    'codigo'  => 'COM_PROTESTO',
-                    'label'   => 'COM PROTESTO',
+                    'codigo'  => 'COBRANCA_TRAVADA',
+                    'label'   => 'COM COBRANÇA TRAVADA',
                     'color'   => 'red',
-                    'peso'    => 10,
-                    'tooltip' => sprintf('R$ %s em contas sem data de vencimento (convenção protesto).',
-                        number_format($comProtesto, 2, ',', '.')),
+                    'peso'    => 7,
+                    'origem'  => 'auto',
+                    'tooltip' => sprintf('R$ %s em %d conta(s) sem vencimento ou com 2099-12-31. Pode ser protesto OU judicial — use marca manual para especificar.',
+                        number_format($travadas->sum('valor'), 2, ',', '.'),
+                        $travadas->count()),
                 ];
             }
-            if ($comJudicial > 0) {
+            if ($vencidas > 0) {
                 $flags[] = [
-                    'codigo'  => 'EM_EXECUCAO_JUDICIAL',
-                    'label'   => 'COM EXECUÇÃO JUDICIAL',
-                    'color'   => 'red',
-                    'peso'    => 10,
-                    'tooltip' => sprintf('R$ %s em contas com vencimento 2099-12-31 (convenção judicial).',
-                        number_format($comJudicial, 2, ',', '.')),
-                ];
-            }
-            if ($vencidas > 0 && $comProtesto == 0 && $comJudicial == 0) {
-                $flags[] = [
-                    'codigo'  => 'COM_CONTAS_VENCIDAS',
+                    'codigo'  => 'CONTAS_VENCIDAS',
                     'label'   => 'COM CONTAS VENCIDAS',
                     'color'   => 'orange',
                     'peso'    => 6,
-                    'tooltip' => sprintf('R$ %s em contas vencidas (ainda não protestadas).',
-                        number_format($vencidas, 2, ',', '.')),
+                    'origem'  => 'auto',
+                    'tooltip' => sprintf('R$ %s em contas vencidas.', number_format($vencidas, 2, ',', '.')),
                 ];
             }
         }
 
-        // Decisões ativas de inadimplência
+        // Decisões de inadimplência ativas
         $dec = DB::table('crm_inadimplencia_decisoes')
             ->where('account_id', $accountId)
             ->where('status', 'ativa')
             ->orderByDesc('created_at')
-            ->first(['decisao', 'justificativa', 'sinistro_notas']);
+            ->first(['decisao', 'justificativa']);
 
         if ($dec) {
             $byDecisao = [
@@ -96,14 +104,50 @@ class CrmAccountFlagsService
                     'label'   => $label,
                     'color'   => $color,
                     'peso'    => 8,
+                    'origem'  => 'decisao',
                     'tooltip' => $tip . ($dec->justificativa ? ' · ' . $dec->justificativa : ''),
                 ];
             }
         }
 
-        // Ordena por peso desc (mais graves primeiro)
+        // ─── Manuais (tabela crm_account_manual_flags) ──────────────────
+        $manuais = DB::table('crm_account_manual_flags')
+            ->where('account_id', $accountId)
+            ->whereNull('removed_at')
+            ->get(['codigo', 'nota']);
+
+        foreach ($manuais as $m) {
+            if (!isset(self::CATALOGO_MANUAL[$m->codigo])) continue;
+            [$label, $color, $peso, $hint] = self::CATALOGO_MANUAL[$m->codigo];
+            $flags[] = [
+                'codigo'  => $m->codigo,
+                'label'   => $label,
+                'color'   => $color,
+                'peso'    => $peso + 10, // manual sempre acima das automaticas
+                'origem'  => 'manual',
+                'tooltip' => $hint . ($m->nota ? ' · ' . $m->nota : ''),
+            ];
+        }
+
+        // Se flags manuais específicas de cobrança existem, remove a genérica COBRANCA_TRAVADA
+        $manualesCobranca = ['COM_PROTESTO', 'EM_EXECUCAO_JUDICIAL', 'EM_ACAO_MONITORIA', 'EM_ACAO_COBRANCA'];
+        $temCobrancaManual = collect($manuais)->whereIn('codigo', $manualesCobranca)->isNotEmpty();
+        if ($temCobrancaManual) {
+            $flags = array_values(array_filter($flags, fn($f) => $f['codigo'] !== 'COBRANCA_TRAVADA'));
+        }
+
+        // Ordena por peso desc
         usort($flags, fn($a, $b) => $b['peso'] <=> $a['peso']);
 
         return $flags;
+    }
+
+    public function catalogoLista(): array
+    {
+        $out = [];
+        foreach (self::CATALOGO_MANUAL as $codigo => [$label, $color, $peso, $hint]) {
+            $out[] = compact('codigo', 'label', 'color', 'peso', 'hint');
+        }
+        return $out;
     }
 }

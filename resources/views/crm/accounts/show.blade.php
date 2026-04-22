@@ -83,7 +83,7 @@
                             {{ $lcInfo[0] }}
                         </span>
 
-                        {{-- Flags derivadas: COM PROTESTO, COM EXECUÇÃO JUDICIAL, EM ACORDO, etc --}}
+                        {{-- Flags derivadas + manuais --}}
                         @foreach($accountFlags as $flag)
                             @php
                                 $flagColors = [
@@ -93,13 +93,22 @@
                                     'yellow' => 'bg-yellow-500 text-white ring-yellow-300',
                                     'blue'   => 'bg-blue-500 text-white ring-blue-300',
                                     'gray'   => 'bg-gray-500 text-white ring-gray-300',
+                                    'purple' => 'bg-purple-600 text-white ring-purple-300',
                                 ];
                                 $flagCss = $flagColors[$flag['color']] ?? 'bg-gray-500 text-white';
+                                $prefix = $flag['origem'] === 'manual' ? '★' : '⚠';
                             @endphp
                             <span class="px-2.5 py-0.5 rounded-full text-xs font-bold ring-1 {{ $flagCss }}" title="{{ $flag['tooltip'] }}">
-                                ⚠ {{ $flag['label'] }}
+                                {{ $prefix }} {{ $flag['label'] }}
                             </span>
                         @endforeach
+
+                        @if(auth()->user()->isAdmin() || $account->owner_user_id === auth()->id())
+                            <button type="button" onclick="document.getElementById('modal-manual-flag').classList.remove('hidden')"
+                                    class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/10 text-white/90 hover:bg-white/20 ring-1 ring-white/30">
+                                + marca
+                            </button>
+                        @endif
                     </div>
 
                     {{-- LINHA 2: Referência (cinza, menor) — cadastro DJ + métricas --}}
@@ -1706,6 +1715,74 @@
                 @csrf @method('DELETE')
                 <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 font-medium">Sim, excluir</button>
             </form>
+        </div>
+    </div>
+</div>
+@endif
+
+{{-- ============ MODAL: Editar Marcas Manuais ============ --}}
+@if(auth()->user()->isAdmin() || $account->owner_user_id === auth()->id())
+<div id="modal-manual-flag" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="px-5 py-4 border-b flex items-center justify-between bg-gradient-to-r from-[#1B334A] to-[#385776] text-white rounded-t-xl">
+            <h3 class="font-semibold">Marcas manuais da conta</h3>
+            <button onclick="document.getElementById('modal-manual-flag').classList.add('hidden')" class="text-white/70 hover:text-white text-xl leading-none">&times;</button>
+        </div>
+
+        <div class="px-5 py-4">
+            {{-- Marcas ativas --}}
+            @if($flagsManuaisAtivas->isNotEmpty())
+                <h4 class="text-sm font-semibold text-gray-700 mb-2">Marcas ativas</h4>
+                <div class="space-y-2 mb-5">
+                    @foreach($flagsManuaisAtivas as $mf)
+                        @php $info = \App\Services\Crm\CrmAccountFlagsService::CATALOGO_MANUAL[$mf->codigo] ?? null; @endphp
+                        @if($info)
+                            <div class="flex items-start justify-between border border-gray-200 rounded-lg p-3 bg-gray-50">
+                                <div class="flex-1 min-w-0">
+                                    <span class="font-semibold text-gray-800">★ {{ $info[0] }}</span>
+                                    @if($mf->nota)
+                                        <p class="text-xs text-gray-600 mt-1">{{ $mf->nota }}</p>
+                                    @endif
+                                    <p class="text-[10px] text-gray-400 mt-1">Adicionada em {{ \Carbon\Carbon::parse($mf->created_at)->format('d/m/Y') }}</p>
+                                </div>
+                                <form method="POST" action="{{ route('crm.accounts.manual-flag-remove', ['id' => $account->id, 'flagId' => $mf->id]) }}" onsubmit="return confirm('Remover esta marca?')">
+                                    @csrf @method('DELETE')
+                                    <button type="submit" class="text-red-600 hover:text-red-800 text-sm px-2">Remover</button>
+                                </form>
+                            </div>
+                        @endif
+                    @endforeach
+                </div>
+            @endif
+
+            {{-- Adicionar nova --}}
+            <h4 class="text-sm font-semibold text-gray-700 mb-2">Adicionar marca</h4>
+            <form method="POST" action="{{ route('crm.accounts.manual-flag-add', $account->id) }}" class="space-y-3">
+                @csrf
+                <select name="codigo" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                    <option value="">— escolha uma marca —</option>
+                    @php
+                        $ativosCodigos = $flagsManuaisAtivas->pluck('codigo')->toArray();
+                    @endphp
+                    @foreach($flagsCatalogo as $cf)
+                        <option value="{{ $cf['codigo'] }}" {{ in_array($cf['codigo'], $ativosCodigos) ? 'disabled' : '' }}>
+                            {{ $cf['label'] }} — {{ $cf['hint'] }}{{ in_array($cf['codigo'], $ativosCodigos) ? ' (já ativa)' : '' }}
+                        </option>
+                    @endforeach
+                </select>
+                <textarea name="nota" rows="2" maxlength="500" placeholder="Nota opcional (ex: protesto lavrado em 15/03/2026, cartório 2º ofício...)"
+                          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea>
+                <div class="flex justify-end gap-2">
+                    <button type="button" onclick="document.getElementById('modal-manual-flag').classList.add('hidden')"
+                            class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-[#385776] text-white rounded-lg text-sm hover:bg-[#1B334A]">Adicionar marca</button>
+                </div>
+            </form>
+
+            <p class="text-[11px] text-gray-500 mt-4">
+                Marcas manuais sobrepõem as automáticas quando há sobreposição (ex: <strong>COM PROTESTO</strong> manual substitui <strong>COM COBRANÇA TRAVADA</strong> automática).
+                Log auditável em <code>crm_account_manual_flags</code>.
+            </p>
         </div>
     </div>
 </div>
