@@ -2,15 +2,26 @@
 @section('title', 'CRM - ' . $opp->title)
 
 @section('content')
-<div class="w-full px-4 py-6">
-    {{-- Breadcrumb --}}
-    <div class="flex items-center gap-2 text-sm text-gray-500 mb-4">
-        <a href="{{ route('crm.pipeline') }}" class="hover:text-[#385776]">Pipeline</a>
-        <span>›</span>
-        <a href="{{ route('crm.accounts.show', $opp->account_id) }}" class="hover:text-[#385776]">{{ $opp->account?->name }}</a>
-        <span>›</span>
-        <span class="text-gray-700">{{ $opp->title }}</span>
-    </div>
+<div>
+    {{-- ══════════════ HERO EDITORIAL ══════════════ --}}
+    <section class="crm-hero">
+        <div>
+            <div class="crm-hero-eyebrow">
+                <a href="{{ route('crm.pipeline') }}" style="color:inherit;text-decoration:none;">Pipeline</a>
+                <span>›</span>
+                <a href="{{ route('crm.accounts.show', $opp->account_id) }}" style="color:inherit;text-decoration:none;">{{ $opp->account?->name }}</a>
+            </div>
+            <h1>{{ $opp->title }}</h1>
+            <p class="crm-hero-sub">
+                {{ $opp->stage?->name ?? 'Sem estágio' }}
+                @if($opp->value_estimated) · <em>R$ {{ number_format($opp->value_estimated, 0, ',', '.') }}</em> @endif
+                @if($opp->owner) · {{ $opp->owner->name }} @endif
+            </p>
+        </div>
+        <div class="crm-hero-right">
+            <a href="{{ route('crm.accounts.show', $opp->account_id) }}" class="crm-section-head-action">← Voltar à conta</a>
+        </div>
+    </section>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {{-- Coluna principal (2/3) --}}

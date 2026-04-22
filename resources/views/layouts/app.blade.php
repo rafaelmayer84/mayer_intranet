@@ -20,6 +20,10 @@
     <link rel="stylesheet" href="{{ asset('css/mayer-brand.css') }}?v={{ filemtime(public_path('css/mayer-brand.css')) }}">
     <!-- Modais Unificados (editorial navy/gold) -->
     <link rel="stylesheet" href="{{ asset('css/mayer-modals.css') }}?v={{ filemtime(public_path('css/mayer-modals.css')) }}">
+    @if(request()->is('crm*'))
+    <!-- CRM Editorial Overlay (Navy + Gold + paper cream) -->
+    <link rel="stylesheet" href="{{ asset('css/crm-editorial.css') }}?v={{ filemtime(public_path('css/crm-editorial.css')) }}">
+    @endif
     @stack('styles')
     <style>
 body { font-family: 'Montserrat', 'Inter', system-ui, sans-serif; }
@@ -212,7 +216,7 @@ body { font-family: 'Montserrat', 'Inter', system-ui, sans-serif; }
         <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
         <style>[x-cloak]{display:none!important}</style>
 </head>
-<body class="min-h-screen">
+<body class="min-h-screen{{ request()->is('crm*') ? ' crm-context' : '' }}">
     <div class="flex min-h-screen">
         <!-- Sidebar -->
         <aside id="sidebar" class="sidebar w-64 flex flex-col" style="background: linear-gradient(180deg, #0F2030 0%, #1B334A 100%); border-right: 1px solid rgba(255,255,255,.06);"
@@ -511,6 +515,12 @@ body { font-family: 'Montserrat', 'Inter', system-ui, sans-serif; }
                             <svg class="w-3 h-3 transition-transform" :class="crmOpen ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                         </button>
                         <div x-show="crmOpen" x-transition class="ml-4 mt-1 space-y-0.5">
+                            @if(auth()->check() && method_exists(auth()->user(), 'isAdmin') && auth()->user()->isAdmin())
+                            <a href="{{ route('crm.comando') }}" class="flex items-center px-3 py-1 text-xs rounded-lg hover:bg-gradient-to-r hover:from-[#1B334A] hover:to-[#385776] hover:text-white {{ request()->routeIs('crm.comando') ? 'bg-gradient-to-r from-[#1B334A] to-[#385776] text-white font-medium' : 'text-[#385776] font-medium' }}">
+                                <svg class="w-3.5 h-3.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                                Painel do Dono
+                            </a>
+                            @endif
                             <a href="{{ route('crm.painel') }}" class="flex items-center px-3 py-1 text-xs rounded-lg hover:bg-gray-100 {{ request()->routeIs('crm.painel') ? 'text-[#385776] font-medium' : 'text-gray-400' }}">
                                 <svg class="w-3.5 h-3.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
                                 Painel
@@ -756,6 +766,10 @@ body { font-family: 'Montserrat', 'Inter', system-ui, sans-serif; }
             </div>
         </main>
     </div>
+
+    {{-- Modais renderizados aqui (fora do <main overflow-auto>) garantem
+         position:fixed sempre relativo ao viewport, independente de scroll. --}}
+    @stack('modals')
 
     <script>
         function toggleSubmenu(name) {

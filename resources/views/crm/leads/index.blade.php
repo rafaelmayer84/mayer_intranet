@@ -2,18 +2,20 @@
 @section('title', 'CRM - Leads')
 
 @section('content')
-<div class="px-4 py-6">
-    <div class="flex items-center justify-between mb-6">
+<div>
+    {{-- ══════════════ HERO EDITORIAL ══════════════ --}}
+    <section class="crm-hero">
         <div>
-            <h1 class="text-2xl font-bold text-[#1B334A]">Leads</h1>
-            <p class="text-sm text-gray-500 mt-1">Central de Leads + Pipeline CRM unificados</p>
+            <div class="crm-hero-eyebrow">{{ number_format($totals['total'] ?? 0, 0, ',', '.') }} leads · Central + CRM unificados</div>
+            <h1>Leads <em>ativos</em>.</h1>
+            <p class="crm-hero-sub">Prospects qualificados vindos de marketing, indicação, relacionamento e autoatendimento.</p>
         </div>
-        <div class="flex gap-2">
-            <a href="{{ route('leads.index') }}" class="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition">Central de Leads</a>
-            <a href="{{ route('crm.pipeline') }}" class="px-3 py-2 bg-[#385776] text-white rounded-lg text-sm hover:bg-[#1B334A] transition">Oportunidades</a>
-            <button onclick="document.getElementById('modalLeadManual').classList.remove('hidden')" class="px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition">+ Novo Lead</button>
+        <div class="crm-hero-right" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;justify-content:flex-end;">
+            <a href="{{ route('leads.index') }}" class="crm-section-head-action">Central de Leads →</a>
+            <a href="{{ route('crm.pipeline') }}" class="crm-section-head-action">Oportunidades →</a>
+            <button type="button" onclick="document.getElementById('modalLeadManual').classList.remove('hidden')" class="crm-section-head-action" style="border:0;background:none;cursor:pointer;font-family:var(--sans);color:var(--gold-700);">+ Novo Lead</button>
         </div>
-    </div>
+    </section>
 
     <div class="grid grid-cols-3 md:grid-cols-6 gap-3 mb-6">
         <a href="{{ route('crm.leads', ['status' => 'novo']) }}" class="bg-white rounded-lg shadow-sm border p-4 hover:shadow-md transition {{ request('status') === 'novo' ? 'ring-2 ring-blue-400' : '' }}">

@@ -22,29 +22,23 @@
 @endphp
 
 @section('content')
-<div class="px-4 py-6">
+<div>
 
-    {{-- Header --}}
-    <div class="flex items-center justify-between mb-6">
+    {{-- ══════════════ HERO EDITORIAL ══════════════ --}}
+    <section class="crm-hero">
         <div>
-            <h1 class="text-2xl font-bold text-[#1B334A]">Carteira de Clientes</h1>
-            <p class="text-sm text-gray-500 mt-1">Visão gerencial de toda a base CRM</p>
+            <div class="crm-hero-eyebrow">Base CRM · {{ number_format($totals['total'] ?? 0, 0, ',', '.') }} registros</div>
+            <h1>Carteira de <em>Clientes</em>.</h1>
+            <p class="crm-hero-sub">Visão gerencial completa — lifecycle, responsáveis, histórico, saúde.</p>
         </div>
-        <div class="flex gap-2">
+        <div class="crm-hero-right" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;justify-content:flex-end;">
             @if($isAdmin)
-            <a href="{{ route('crm.accounts.create') }}" class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition flex items-center gap-1.5">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                Nova Conta
-            </a>
+            <a href="{{ route('crm.accounts.create') }}" class="crm-section-head-action">+ Nova Conta</a>
             @endif
-            <a href="{{ route('crm.distribution') }}" class="px-4 py-2 border border-[#385776] text-[#385776] rounded-lg text-sm hover:bg-[#385776] hover:text-white transition">
-                Distribuição IA
-            </a>
-            <a href="{{ route('crm.pipeline') }}" class="px-4 py-2 bg-[#385776] text-white rounded-lg text-sm hover:bg-[#1B334A] transition">
-                Pipeline →
-            </a>
+            <a href="{{ route('crm.distribution') }}" class="crm-section-head-action">Distribuição IA →</a>
+            <a href="{{ route('crm.pipeline') }}" class="crm-section-head-action">Pipeline →</a>
         </div>
-    </div>
+    </section>
 
     {{-- Cards KPI --}}
     <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-6">

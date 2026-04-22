@@ -1,0 +1,336 @@
+/* ============================================================
+   INTRANET MAYER — CRM Editorial Overlay
+   Versão: 1.0 — Abril 2026
+   Aplica tokens do design editorial a padrões Tailwind legacy
+   usados no módulo CRM. Escopado por body.crm-context.
+   Preserva funcionalmente: gráficos Chart.js, SVG customs,
+   Alpine data, forms, onclick handlers.
+   ============================================================ */
+
+/* ─── Page shell ──────────────────────────────────────────── */
+body.crm-context #page-content-wrapper {
+    padding: 36px 40px 80px !important;
+    max-width: 1520px;
+    margin: 0 auto;
+    background: transparent;
+}
+@media (max-width: 1200px) {
+    body.crm-context #page-content-wrapper {
+        padding: 28px 24px 60px !important;
+    }
+}
+@media (max-width: 768px) {
+    body.crm-context #page-content-wrapper {
+        padding: 20px 16px 48px !important;
+    }
+}
+
+/* ─── Tailwind white cards → editorial cards ────────────── */
+body.crm-context .bg-white.rounded-xl,
+body.crm-context .bg-white.rounded-2xl,
+body.crm-context .bg-white.rounded-lg {
+    background: var(--surface) !important;
+    border: 1px solid var(--rule) !important;
+    box-shadow: none !important;
+    transition: box-shadow .3s var(--ease), border-color .3s var(--ease), transform .3s var(--ease);
+}
+body.crm-context .bg-white.rounded-xl:hover,
+body.crm-context .bg-white.rounded-2xl:hover {
+    border-color: var(--gold-300) !important;
+    box-shadow: var(--shadow-md) !important;
+}
+
+/* Shadows padrão Tailwind → editorial subtle */
+body.crm-context .shadow-sm {
+    box-shadow: var(--shadow-sm) !important;
+}
+body.crm-context .shadow-md,
+body.crm-context .shadow-lg,
+body.crm-context .shadow-xl,
+body.crm-context .shadow-2xl {
+    box-shadow: var(--shadow-md) !important;
+}
+
+/* Rounded utilities → editorial radii */
+body.crm-context .rounded-lg   { border-radius: var(--r-sm) !important; }
+body.crm-context .rounded-xl   { border-radius: var(--r-md) !important; }
+body.crm-context .rounded-2xl  { border-radius: var(--r-md) !important; }
+
+/* Gray borders → rule cream */
+body.crm-context .border-gray-100,
+body.crm-context .border-gray-200,
+body.crm-context .border-gray-300 {
+    border-color: var(--rule) !important;
+}
+
+/* ─── Gradient headers (from #1B334A to #385776) → navy deep ─── */
+body.crm-context .bg-gradient-to-r.from-\[\#1B334A\],
+body.crm-context .bg-gradient-to-br.from-\[\#1B334A\],
+body.crm-context [class*="from-[#1B334A]"],
+body.crm-context [class*="from-[#385776]"] {
+    background: linear-gradient(135deg, var(--navy-900) 0%, var(--navy-700) 60%, var(--navy-500) 100%) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Gradient chips de section-icon */
+body.crm-context [class*="bg-gradient-to-br from-"] {
+    border-radius: var(--r-sm) !important;
+}
+
+/* ─── Tipografia ──────────────────────────────────────────── */
+body.crm-context h1,
+body.crm-context h2,
+body.crm-context h3 {
+    font-family: var(--sans);
+    color: var(--ink);
+    letter-spacing: -.02em;
+}
+body.crm-context h1 { font-weight: 300; }
+body.crm-context h2 { font-weight: 300; }
+body.crm-context h3 { font-weight: 600; }
+body.crm-context h2 em,
+body.crm-context h1 em { font-style: normal; font-weight: 600; color: var(--navy-700); }
+
+/* Números grandes → light + tabular */
+body.crm-context .text-3xl.font-bold,
+body.crm-context .text-4xl.font-bold,
+body.crm-context .text-2xl.font-bold {
+    font-weight: 300 !important;
+    letter-spacing: -.02em !important;
+    color: var(--ink) !important;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Uppercase labels → gold eyebrow */
+body.crm-context .text-xs.uppercase.tracking-wider,
+body.crm-context .text-xs.uppercase.tracking-widest,
+body.crm-context .text-\[10px\].uppercase,
+body.crm-context .text-\[11px\].uppercase {
+    color: var(--gold-700) !important;
+    letter-spacing: .14em !important;
+    font-weight: 600 !important;
+}
+
+/* ─── Buttons ─────────────────────────────────────────────── */
+body.crm-context button.bg-\[\#385776\],
+body.crm-context button.bg-\[\#1B334A\],
+body.crm-context a.bg-\[\#385776\],
+body.crm-context a.bg-\[\#1B334A\],
+body.crm-context .btn-primary {
+    background: var(--navy-700) !important;
+    color: white !important;
+    border-radius: var(--r-sm) !important;
+    font-weight: 500 !important;
+    letter-spacing: .01em;
+    transition: background .2s var(--ease), transform .15s var(--ease);
+}
+body.crm-context button.bg-\[\#385776\]:hover,
+body.crm-context button.bg-\[\#1B334A\]:hover,
+body.crm-context a.bg-\[\#385776\]:hover,
+body.crm-context a.bg-\[\#1B334A\]:hover {
+    background: var(--navy-800) !important;
+    transform: translateY(-1px);
+}
+
+/* ─── Badges Tailwind → editorial badges ────────────────── */
+body.crm-context .bg-green-50,
+body.crm-context .bg-emerald-50  { background: #EDF5F0 !important; }
+body.crm-context .bg-red-50,
+body.crm-context .bg-rose-50     { background: #FAEBE4 !important; }
+body.crm-context .bg-amber-50,
+body.crm-context .bg-yellow-50   { background: var(--gold-50) !important; }
+body.crm-context .bg-blue-50     { background: #EEF3F8 !important; }
+body.crm-context .bg-purple-50   { background: var(--paper-2) !important; }
+body.crm-context .bg-gray-50,
+body.crm-context .bg-slate-50    { background: var(--paper-2) !important; }
+
+body.crm-context .text-green-700,
+body.crm-context .text-green-800,
+body.crm-context .text-emerald-700,
+body.crm-context .text-emerald-800 { color: var(--ok) !important; }
+body.crm-context .text-red-700,
+body.crm-context .text-red-800,
+body.crm-context .text-rose-700    { color: var(--bad) !important; }
+body.crm-context .text-amber-700,
+body.crm-context .text-amber-800,
+body.crm-context .text-yellow-700,
+body.crm-context .text-yellow-800  { color: var(--warn) !important; }
+body.crm-context .text-gray-500,
+body.crm-context .text-gray-600,
+body.crm-context .text-slate-500,
+body.crm-context .text-slate-600   { color: var(--ink-3) !important; }
+body.crm-context .text-gray-700,
+body.crm-context .text-gray-800,
+body.crm-context .text-slate-700,
+body.crm-context .text-slate-800   { color: var(--ink-2) !important; }
+body.crm-context .text-gray-900    { color: var(--ink) !important; }
+
+/* ─── Inputs/selects/textareas ──────────────────────────── */
+body.crm-context input[type="text"],
+body.crm-context input[type="email"],
+body.crm-context input[type="tel"],
+body.crm-context input[type="number"],
+body.crm-context input[type="date"],
+body.crm-context input[type="search"],
+body.crm-context select,
+body.crm-context textarea {
+    background: var(--surface) !important;
+    border-color: var(--rule) !important;
+    color: var(--ink) !important;
+    border-radius: var(--r-sm) !important;
+    font-family: var(--sans);
+    transition: border-color .2s var(--ease), box-shadow .2s var(--ease);
+}
+body.crm-context input:focus,
+body.crm-context select:focus,
+body.crm-context textarea:focus {
+    outline: none !important;
+    border-color: var(--gold-500) !important;
+    box-shadow: 0 0 0 3px rgba(181,144,79,.12) !important;
+}
+
+/* ─── Links ───────────────────────────────────────────────── */
+body.crm-context a.text-blue-600,
+body.crm-context a.text-blue-700 {
+    color: var(--navy-600) !important;
+}
+body.crm-context a.text-blue-600:hover,
+body.crm-context a.text-blue-700:hover {
+    color: var(--gold-700) !important;
+}
+
+/* ─── Tables ──────────────────────────────────────────────── */
+body.crm-context table thead tr {
+    border-bottom: 1px solid var(--rule) !important;
+}
+body.crm-context table thead th {
+    font-size: 10px !important;
+    letter-spacing: .14em !important;
+    text-transform: uppercase;
+    color: var(--ink-3) !important;
+    font-weight: 600 !important;
+    padding: 10px 12px !important;
+    background: transparent !important;
+}
+body.crm-context table tbody tr {
+    border-bottom: 1px solid var(--rule) !important;
+    transition: background .15s var(--ease);
+}
+body.crm-context table tbody tr:hover {
+    background: rgba(201,163,91,.04) !important;
+}
+body.crm-context table tbody td {
+    padding: 12px !important;
+    font-size: 13px !important;
+    color: var(--ink-2) !important;
+}
+
+/* ─── Horizontal rule padrão ─────────────────────────────── */
+body.crm-context hr {
+    border-top-color: var(--rule) !important;
+}
+
+/* ─── Fix: modais dentro de CRM respeitam tokens editoriais ─ */
+body.crm-context .modal-overlay,
+body.crm-context [class*="modal-"] {
+    font-family: var(--sans);
+}
+
+/* ─── Preserve charts ─────────────────────────────────────── */
+body.crm-context canvas,
+body.crm-context svg.chart-preserve {
+    /* Charts should NOT be touched — they have their own color logic */
+}
+
+/* ─── Lifecycle & flag pills: paleta editorial ──────────── */
+body.crm-context .lifecycle-pill,
+body.crm-context [data-lifecycle] {
+    font-family: var(--sans);
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--rule);
+    background: var(--paper-2);
+    color: var(--ink-2);
+}
+body.crm-context [data-lifecycle="ativo"]             { background: #EDF5F0; border-color: #CEE2D5; color: var(--ok); }
+body.crm-context [data-lifecycle="onboarding"]        { background: #EEF3F8; border-color: #CFE0EC; color: var(--navy-600); }
+body.crm-context [data-lifecycle="adormecido"]        { background: var(--gold-50); border-color: var(--gold-300); color: var(--gold-700); }
+body.crm-context [data-lifecycle="inadimplente"]      { background: #FAEBE4; border-color: #EDD1C2; color: var(--bad); }
+body.crm-context [data-lifecycle="bloqueado_adversa"] { background: #F5E7E9; border-color: #E4C7CB; color: #8F2E3E; }
+body.crm-context [data-lifecycle="arquivado"]         { background: var(--paper-2); border-color: var(--rule); color: var(--ink-3); }
+
+/* ─── Standard CRM hero (reutilizável) ──────────────────── */
+body.crm-context .crm-hero {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: 40px;
+    padding-bottom: 28px;
+    margin-bottom: 40px;
+    border-bottom: 1px solid var(--rule);
+}
+body.crm-context .crm-hero-eyebrow {
+    font-size: 11px; letter-spacing: .24em; text-transform: uppercase;
+    color: var(--gold-600); font-weight: 600;
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 14px;
+}
+body.crm-context .crm-hero-eyebrow::before {
+    content: ""; width: 22px; height: 1px; background: var(--gold-500);
+}
+body.crm-context .crm-hero h1 {
+    font-weight: 300;
+    font-size: clamp(36px, 4.5vw, 56px);
+    line-height: 1.02;
+    letter-spacing: -.03em;
+    color: var(--ink);
+    margin: 0 0 8px;
+}
+body.crm-context .crm-hero h1 em {
+    font-style: normal; font-weight: 600; color: var(--navy-700);
+}
+body.crm-context .crm-hero-sub {
+    font-size: 13px; color: var(--ink-3);
+    letter-spacing: .02em; margin: 0;
+    max-width: 620px;
+}
+body.crm-context .crm-hero-right {
+    text-align: right;
+    font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--ink-3); font-weight: 500;
+}
+@media (max-width: 768px) {
+    body.crm-context .crm-hero { grid-template-columns: 1fr; gap: 20px; }
+    body.crm-context .crm-hero-right { text-align: left; }
+}
+
+/* Section head reaproveitado (para quando não usa .editorial-page) */
+body.crm-context .crm-section-head {
+    display: flex; align-items: baseline; gap: 18px;
+    margin-bottom: 20px;
+}
+body.crm-context .crm-section-head-label {
+    font-size: 10px; letter-spacing: .2em; text-transform: uppercase;
+    color: var(--gold-700); font-weight: 600;
+    margin-bottom: 4px;
+}
+body.crm-context .crm-section-head h2 {
+    font-weight: 300; font-size: 26px;
+    letter-spacing: -.02em; color: var(--ink); margin: 0;
+}
+body.crm-context .crm-section-head h2 em {
+    font-style: normal; font-weight: 600; color: var(--navy-700);
+}
+body.crm-context .crm-section-head-line { flex: 1; height: 1px; background: var(--rule); }
+body.crm-context .crm-section-head-action {
+    font-size: 12px; color: var(--navy-600); font-weight: 500;
+    text-decoration: none;
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: color .2s var(--ease), gap .2s var(--ease);
+}
+body.crm-context .crm-section-head-action:hover { color: var(--gold-700); gap: 10px; }

@@ -2,26 +2,36 @@
 @section('title', 'CRM - Distribuição de Carteira')
 
 @section('content')
-<div class="px-4 py-6">
-    <div class="flex items-center justify-between mb-6">
+<div>
+    {{-- ══════════════ HERO EDITORIAL ══════════════ --}}
+    <section class="crm-hero">
         <div>
-            <h1 class="text-2xl font-bold text-[#1B334A]">Distribuição de Carteira</h1>
-            <p class="text-sm text-gray-500 mt-1">Configure responsáveis e distribua clientes ativos via IA</p>
+            <div class="crm-hero-eyebrow">IA · Otimização de carga por advogada</div>
+            <h1>Distribuição <em>de carteira</em>.</h1>
+            <p class="crm-hero-sub">Configure responsáveis, capacidades e deixe a IA propor distribuição balanceada.</p>
         </div>
-        <form action="{{ route('crm.distribution.generate') }}" method="POST">
-            @csrf
-            <button type="submit" class="px-5 py-2.5 bg-[#385776] text-white rounded-lg text-sm hover:bg-[#1B334A] font-medium"
-                    onclick="this.disabled=true; this.innerText='Gerando...'; this.form.submit();">
-                🤖 Gerar Distribuição via IA
-            </button>
-        </form>
-    </div>
+        <div class="crm-hero-right">
+            <form action="{{ route('crm.distribution.generate') }}" method="POST" style="display:inline;">
+                @csrf
+                <button type="submit" class="crm-section-head-action" style="border:1px solid var(--navy-700);background:var(--navy-700);color:white;padding:10px 18px;border-radius:var(--r-sm);cursor:pointer;font-family:var(--sans);letter-spacing:.04em;"
+                        onclick="this.disabled=true; this.innerText='Gerando…'; this.form.submit();">
+                    Gerar via IA →
+                </button>
+            </form>
+        </div>
+    </section>
 
     @if(session('success'))<div class="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">{{ session('success') }}</div>@endif
     @if(session('error'))<div class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{{ session('error') }}</div>@endif
 
     {{-- Perfis dos Responsáveis --}}
-    <h2 class="text-lg font-semibold text-[#1B334A] mb-4">👤 Responsáveis pela Carteira</h2>
+    <div class="crm-section-head">
+        <div>
+            <div class="crm-section-head-label">Equipe</div>
+            <h2>Responsáveis <em>pela carteira</em>.</h2>
+        </div>
+        <div class="crm-section-head-line"></div>
+    </div>
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         @foreach($profiles as $p)
         <div class="bg-white rounded-lg shadow-sm border p-5">

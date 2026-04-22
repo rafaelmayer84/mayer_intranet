@@ -39,29 +39,27 @@
 @section('content')
 <div class="crm-dash">
 
-    {{-- ══════════════ HEADER ══════════════ --}}
-    <div class="crm-page-header mb-5">
-        <div class="flex items-center justify-between flex-wrap gap-3">
-            <div>
-                <h1>{{ $isRestricted ? 'Meu CRM' : 'CRM — Painel Geral' }}</h1>
-                <p>{{ $isRestricted ? 'Sua carteira, agenda e alertas' : 'Visão consolidada · ' . now()->locale('pt_BR')->isoFormat('dddd, D [de] MMMM') }}</p>
-            </div>
-            <div class="flex gap-2 flex-wrap">
-                <a href="{{ route('crm.carteira') }}"
-                   style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.25);padding:0.45rem 1rem;border-radius:8px;font-size:0.82rem;font-weight:600;text-decoration:none;transition:background 0.15s"
-                   onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.12)'">
-                    👥 Carteira
-                </a>
-                <a href="{{ route('crm.pipeline') }}"
-                   style="background:#fff;color:var(--brand-navy);padding:0.45rem 1rem;border-radius:8px;font-size:0.82rem;font-weight:700;text-decoration:none">
-                    🎯 Pipeline →
-                </a>
-            </div>
+    {{-- ══════════════ HERO EDITORIAL ══════════════ --}}
+    <section class="crm-hero">
+        <div>
+            <div class="crm-hero-eyebrow">{{ now()->locale('pt_BR')->isoFormat('dddd, D [de] MMMM') }}</div>
+            <h1>{{ $isRestricted ? 'Meu' : 'CRM — Painel' }} <em>{{ $isRestricted ? 'CRM' : 'Geral' }}</em>.</h1>
+            <p class="crm-hero-sub">{{ $isRestricted ? 'Sua carteira, agenda e alertas.' : 'Visão consolidada das operações comerciais e relacionamento.' }}</p>
         </div>
-    </div>
+        <div class="crm-hero-right" style="display:flex;gap:10px;align-items:flex-end;">
+            <a href="{{ route('crm.carteira') }}" class="crm-section-head-action">Carteira →</a>
+            <a href="{{ route('crm.pipeline') }}" class="crm-section-head-action">Pipeline →</a>
+        </div>
+    </section>
 
     {{-- ══════════════ KPIs ══════════════ --}}
-    <p class="section-title">📊 Indicadores</p>
+    <div class="crm-section-head">
+        <div>
+            <div class="crm-section-head-label">Bloco I</div>
+            <h2>Indicadores <em>chave</em>.</h2>
+        </div>
+        <div class="crm-section-head-line"></div>
+    </div>
     <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
         <div class="crm-kpi-card" style="--kpi-accent:#059669">
             <p class="crm-kpi-label">Clientes Ativos</p>
@@ -101,7 +99,13 @@
     </div>
 
     {{-- ══════════════ GRÁFICOS ══════════════ --}}
-    <p class="section-title">📈 Análises</p>
+    <div class="crm-section-head" style="margin-top:36px;">
+        <div>
+            <div class="crm-section-head-label">Bloco II</div>
+            <h2>Análises <em>visuais</em>.</h2>
+        </div>
+        <div class="crm-section-head-line"></div>
+    </div>
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
 
         {{-- Gráfico 1: Pipeline por Estágio --}}
@@ -173,7 +177,13 @@
     </div>
 
     {{-- ══════════════ AGENDA + SIDEBAR ══════════════ --}}
-    <p class="section-title">📅 Operacional</p>
+    <div class="crm-section-head" style="margin-top:36px;">
+        <div>
+            <div class="crm-section-head-label">Bloco III</div>
+            <h2>Operacional <em>do dia</em>.</h2>
+        </div>
+        <div class="crm-section-head-line"></div>
+    </div>
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {{-- Coluna Esquerda (2/3): Agenda + Opps --}}

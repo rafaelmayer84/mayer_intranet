@@ -6,29 +6,19 @@
 @endpush
 
 @section('content')
-<div class="max-w-full mx-auto px-4 py-6">
-
-    {{-- Header --}}
-    <div class="crm-page-header mb-6">
-        <div class="flex items-center justify-between">
-            <div>
-                <h1>Pipeline</h1>
-                <p>Gestão de oportunidades em andamento</p>
-            </div>
-            <div class="flex gap-2">
-                <a href="{{ route('crm.carteira') }}"
-                   class="px-4 py-2 rounded-lg text-sm font-medium transition"
-                   style="background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.2)">
-                    ← Carteira
-                </a>
-                <a href="{{ route('crm.reports') }}"
-                   class="px-4 py-2 rounded-lg text-sm font-medium transition"
-                   style="background:#fff;color:var(--brand-navy)">
-                    Relatórios
-                </a>
-            </div>
+<div>
+    {{-- ══════════════ HERO EDITORIAL ══════════════ --}}
+    <section class="crm-hero">
+        <div>
+            <div class="crm-hero-eyebrow">{{ $kpis['open_count'] ?? 0 }} oportunidades em aberto</div>
+            <h1>Pipeline <em>comercial</em>.</h1>
+            <p class="crm-hero-sub">Kanban de oportunidades em andamento — estágios, valor estimado, próximas ações.</p>
         </div>
-    </div>
+        <div class="crm-hero-right" style="display:flex;gap:10px;align-items:flex-end;">
+            <a href="{{ route('crm.carteira') }}" class="crm-section-head-action">← Carteira</a>
+            <a href="{{ route('crm.reports') }}" class="crm-section-head-action">Relatórios →</a>
+        </div>
+    </section>
 
     {{-- KPIs + Filtro --}}
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">

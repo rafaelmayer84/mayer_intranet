@@ -2,27 +2,23 @@
 @section('title', 'Processos Administrativos')
 
 @section('content')
-<div class="max-w-full mx-auto px-6 py-6">
-
-    {{-- Breadcrumb --}}
-    <div class="flex items-center gap-2 text-sm text-gray-500 mb-4">
-        <a href="{{ route('crm.dashboard') }}" class="hover:text-[#385776]">CRM</a>
-        <span>›</span>
-        <span class="text-gray-700 font-medium">Processos Administrativos</span>
-    </div>
-
-    {{-- Header --}}
-    <div class="flex items-center justify-between mb-6">
+<div>
+    {{-- ══════════════ HERO EDITORIAL ══════════════ --}}
+    <section class="crm-hero">
         <div>
-            <h1 class="text-2xl font-bold text-[#1B334A]">Processos Administrativos</h1>
-            <p class="text-sm text-gray-500 mt-0.5">Gestão de processos extrajudiciais e cartorários</p>
+            <div class="crm-hero-eyebrow">
+                <a href="{{ route('crm.dashboard') }}" style="color:inherit;text-decoration:none;">CRM</a>
+                <span>›</span> Processos Administrativos
+            </div>
+            <h1>Processos <em>administrativos</em>.</h1>
+            <p class="crm-hero-sub">Extrajudiciais, cartorários, abertura de empresa, divórcios — tudo rastreado com timeline automática.</p>
         </div>
-        <a href="{{ route('crm.admin-processes.create') }}"
-           class="inline-flex items-center gap-2 bg-[#1B334A] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[#385776] transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-            Novo Processo
-        </a>
-    </div>
+        <div class="crm-hero-right">
+            <a href="{{ route('crm.admin-processes.create') }}" class="crm-section-head-action" style="background:var(--navy-700);color:white;padding:10px 18px;border-radius:var(--r-sm);">
+                + Novo Processo
+            </a>
+        </div>
+    </section>
 
     {{-- Stats --}}
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">

@@ -2,25 +2,24 @@
 @section('title', 'Pulso do Cliente')
 
 @section('content')
-<div class="max-w-full mx-auto px-6 py-6">
-    <div class="flex items-center justify-between mb-6">
+<div>
+    {{-- ══════════════ HERO EDITORIAL ══════════════ --}}
+    <section class="crm-hero">
         <div>
-            <h1 class="text-2xl font-bold text-[#1B334A]">Pulso do Cliente</h1>
-            <p class="text-sm text-gray-500">Monitoramento de volume de contatos por cliente</p>
+            <div class="crm-hero-eyebrow">Monitoramento de contato · {{ $alertasPendentes }} alertas pendentes</div>
+            <h1>Pulso <em>do cliente</em>.</h1>
+            <p class="crm-hero-sub">Volume de interações por cliente — detecta excesso ou abandono de comunicação.</p>
         </div>
-        <div class="flex gap-2">
-            <a href="{{ route('crm.pulso.alertas') }}" class="px-4 py-2 bg-white border rounded-lg text-sm hover:bg-gray-50 flex items-center gap-1.5">
-                🔔 Alertas
-                @if($alertasPendentes > 0)
-                    <span class="px-1.5 py-0.5 bg-red-500 text-white text-xs rounded-full">{{ $alertasPendentes }}</span>
-                @endif
+        <div class="crm-hero-right" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;justify-content:flex-end;">
+            <a href="{{ route('crm.pulso.alertas') }}" class="crm-section-head-action">
+                Alertas @if($alertasPendentes > 0) · <em style="font-style:normal;color:var(--bad);font-weight:700;">{{ $alertasPendentes }}</em>@endif →
             </a>
             @if(in_array(Auth::user()->role, ['admin','socio']))
-            <a href="{{ route('crm.pulso.upload') }}" class="px-4 py-2 bg-white border rounded-lg text-sm hover:bg-gray-50">📞 Upload Ligações</a>
-            <a href="{{ route('crm.pulso.config') }}" class="px-4 py-2 bg-white border rounded-lg text-sm hover:bg-gray-50">⚙️ Config</a>
+            <a href="{{ route('crm.pulso.upload') }}" class="crm-section-head-action">Upload Ligações →</a>
+            <a href="{{ route('crm.pulso.config') }}" class="crm-section-head-action">Config →</a>
             @endif
         </div>
-    </div>
+    </section>
 
     {{-- Mega cards --}}
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">

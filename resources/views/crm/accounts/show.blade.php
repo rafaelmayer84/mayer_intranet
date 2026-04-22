@@ -45,12 +45,12 @@
     $lastInsight = \App\Models\CrmAiInsight::where('account_id', $account->id)->where('status', 'active')->where('tipo', 'account_action')->orderByDesc('created_at')->first();
 @endphp
 
-<div class="max-w-full mx-auto px-6 py-6">
-    {{-- Breadcrumb --}}
-    <div class="flex items-center gap-2 text-sm text-gray-500 mb-4">
-        <a href="{{ route('crm.carteira') }}" class="hover:text-[#385776]">Carteira</a>
-        <span>›</span>
-        <span class="text-gray-700 font-medium">{{ $account->name }}</span>
+<div>
+    {{-- Breadcrumb editorial --}}
+    <div class="crm-hero-eyebrow" style="margin-bottom: 20px;">
+        <a href="{{ route('crm.carteira') }}" style="color:inherit;text-decoration:none;">Carteira</a>
+        <span style="margin: 0 4px;">›</span>
+        <span>{{ $account->name }}</span>
     </div>
 
     {{-- HEADER CARD --}}
@@ -104,7 +104,7 @@
                         @endforeach
 
                         @if(auth()->user()->isAdmin() || $account->owner_user_id === auth()->id())
-                            <button type="button" onclick="document.getElementById('modal-manual-flag').classList.remove('hidden')"
+                            <button type="button" onclick="openManualFlagModal()"
                                     class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/10 text-white/90 hover:bg-white/20 ring-1 ring-white/30">
                                 + marca
                             </button>
@@ -1722,11 +1722,34 @@
 
 {{-- ============ MODAL: Editar Marcas Manuais ============ --}}
 @if(auth()->user()->isAdmin() || $account->owner_user_id === auth()->id())
+@push('modals')
+<script>
+function openManualFlagModal() {
+    var m = document.getElementById('modal-manual-flag');
+    if (!m) return;
+    m.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+function closeManualFlagModal() {
+    var m = document.getElementById('modal-manual-flag');
+    if (!m) return;
+    m.classList.add('hidden');
+    document.body.style.overflow = '';
+}
+document.addEventListener('DOMContentLoaded', function() {
+    var m = document.getElementById('modal-manual-flag');
+    if (m) m.addEventListener('click', function(e) { if (e.target === this) closeManualFlagModal(); });
+});
+document.addEventListener('keydown', function(e) {
+    var m = document.getElementById('modal-manual-flag');
+    if (m && e.key === 'Escape' && !m.classList.contains('hidden')) closeManualFlagModal();
+});
+</script>
 <div id="modal-manual-flag" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
     <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div class="px-5 py-4 border-b flex items-center justify-between bg-gradient-to-r from-[#1B334A] to-[#385776] text-white rounded-t-xl">
             <h3 class="font-semibold">Marcas manuais da conta</h3>
-            <button onclick="document.getElementById('modal-manual-flag').classList.add('hidden')" class="text-white/70 hover:text-white text-xl leading-none">&times;</button>
+            <button onclick="closeManualFlagModal()" class="text-white/70 hover:text-white text-xl leading-none">&times;</button>
         </div>
 
         <div class="px-5 py-4">
@@ -1773,7 +1796,7 @@
                 <textarea name="nota" rows="2" maxlength="500" placeholder="Nota opcional (ex: protesto lavrado em 15/03/2026, cartório 2º ofício...)"
                           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></textarea>
                 <div class="flex justify-end gap-2">
-                    <button type="button" onclick="document.getElementById('modal-manual-flag').classList.add('hidden')"
+                    <button type="button" onclick="closeManualFlagModal()"
                             class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300">Cancelar</button>
                     <button type="submit" class="px-4 py-2 bg-[#385776] text-white rounded-lg text-sm hover:bg-[#1B334A]">Adicionar marca</button>
                 </div>
@@ -1786,6 +1809,7 @@
         </div>
     </div>
 </div>
+@endpush
 @endif
 
 @endsection
