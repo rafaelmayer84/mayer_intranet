@@ -183,6 +183,24 @@ class VigiliaController extends Controller
         return response()->json($resumo);
     }
 
+    // ─── OBRIGAÇÕES (Machine C) ──────────────────────────────────────
+
+    public function apiObrigacoes(Request $request)
+    {
+        $this->checkAdmin();
+        $filtros = $request->only(['status', 'tipo_evento', 'advogado', 'page', 'per_page']);
+        $data = $this->service->getObrigacoes($filtros);
+        return response()->json($data);
+    }
+
+    public function apiObrigacaoCumprir(Request $request, int $id)
+    {
+        $this->checkAdmin();
+        $parecer = $request->input('parecer', '');
+        $ok = $this->service->cumpriObrigacao($id, $parecer);
+        return response()->json(['success' => $ok]);
+    }
+
     private function parsePeriodo(Request $request): array
     {
         $periodo = $request->input('periodo', 'mes-atual');

@@ -218,7 +218,9 @@ class VigiliaService
                 'ad.responsavel_nome',
                 'vc.status_cruzamento',
                 'vc.dias_gap',
-                'vc.data_ultimo_andamento'
+                'vc.data_ultimo_andamento',
+                'vc.ai_verdict',
+                'vc.ai_justificativa'
             );
 
         if (!empty($filtros['responsavel'])) {
@@ -880,6 +882,88 @@ class VigiliaService
             'detalhes_pendentes' => array_values($pendentes),
             'detalhes_vencidos' => array_values($vencidos),
         ];
+    }
+
+    // ─── OBRIGAÇÕES (Machine C) ──────────────────────────────────────
+
+    public function getObrigacoes(array $filtros = []): array
+    {
+        $query = DB::table('vigilia_obrigacoes as vo')
+            ->leftJoin('users as u', 'u.id', '=', 'vo.advogado_user_id')
+            ->select(
+                'vo.id',
+                'vo.processo_pasta',
+                'vo.tipo_evento',
+                'vo.descricao_evento',
+                'vo.data_evento',
+                'vo.status',
+                'vo.data_limite',
+                'vo.data_cumprimento',
+                'vo.parecer',
+                'vo.created_at',
+                'u.name as advogado_nome',
+            )
+            ->orderBy('vo.status')
+            ->orderBy('vo.data_limite');
+
+        if (!empty($filtros['status'])) {
+            $query->where('vo.status', $filtros['status']);
+        }
+
+        if (!empty($filtros['tipo_evento'])) {
+            $query->where('vo.tipo_evento', $filtros['tipo_evento']);
+        }
+
+        if (!empty($filtros['advogado'])) {
+            $query->where('vo.advogado_user_id', $filtros['advogado']);
+        }
+
+        $perPage = (int) ($filtros['per_page'] ?? 30);
+        $page    = (int) ($filtros['page'] ?? 1);
+        $total   = (clone $query)->count();
+
+        $data = $query->offset(($page - 1) * $perPage)->limit($perPage)->get()->map(function ($row) {
+            $vencida = $row->data_limite && now()->gt($row->data_limite) && $row->status === 'pendente';
+            return [
+                'id'              => $row->id,
+                'processo_pasta'  => $row->processo_pasta,
+                'tipo_evento'     => $row->tipo_evento,
+                'descricao_evento'=> mb_substr($row->descricao_evento, 0, 150),
+                'data_evento'     => $row->data_evento,
+                'status'          => $row->status,
+                'vencida'         => $vencida,
+                'data_limite'     => $row->data_limite,
+                'data_cumprimento'=> $row->data_cumprimento,
+                'parecer'         => $row->parecer,
+                'advogado_nome'   => $row->advogado_nome ?? 'Não atribuído',
+                'created_at'      => $row->created_at,
+            ];
+        });
+
+        return [
+            'data'         => $data->values()->toArray(),
+            'total'        => $total,
+            'per_page'     => $perPage,
+            'current_page' => $page,
+            'last_page'    => (int) ceil($total / $perPage),
+        ];
+    }
+
+    public function cumpriObrigacao(int $id, string $parecer): bool
+    {
+        return (bool) DB::table('vigilia_obrigacoes')->where('id', $id)->update([
+            'status'           => 'cumprida',
+            'data_cumprimento' => now(),
+            'parecer'          => mb_substr($parecer, 0, 1000),
+            'updated_at'       => now(),
+        ]);
+    }
+
+    public function getContadorObrigacoesPendentes(): int
+    {
+        return DB::table('vigilia_obrigacoes')
+            ->where('status', 'pendente')
+            ->count();
     }
 
 }

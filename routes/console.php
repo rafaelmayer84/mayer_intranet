@@ -295,6 +295,20 @@ Schedule::command('vigilia:cruzar')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/vigilia-cruzar.log'));
 
+// VIGILIA Machine C: Classificação AI de andamentos — 07:30 BRT (após sync DataJuri e cruzamento)
+Schedule::command('vigilia:classificar')
+    ->dailyAt('07:30')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/vigilia-classificar.log'));
+
+// VIGILIA Machine B: Auditoria AI de cruzamentos suspeitos — 08:00 BRT (após classificar)
+Schedule::command('vigilia:auditar')
+    ->dailyAt('08:00')
+    ->timezone('America/Sao_Paulo')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/vigilia-auditar.log'));
+
 Schedule::command('crm:check-deadlines')
     ->dailyAt('08:00')
     ->timezone('America/Sao_Paulo')
