@@ -918,6 +918,10 @@ class VigiliaService
             $query->where('vo.advogado_user_id', $filtros['advogado']);
         }
 
+        if (!empty($filtros['processo'])) {
+            $query->where('vo.processo_pasta', $filtros['processo']);
+        }
+
         $perPage = (int) ($filtros['per_page'] ?? 30);
         $page    = (int) ($filtros['page'] ?? 1);
         $total   = (clone $query)->count();

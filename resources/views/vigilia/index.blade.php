@@ -210,6 +210,10 @@
                 <option value="ACÓRDÃO">Acórdão</option>
                 <option value="DECISÃO_SIGNIFICATIVA">Decisão Significativa</option>
             </select>
+            <span id="obrig-filtro-processo-chip" class="hidden inline-flex items-center gap-2 rounded-lg bg-purple-50 border border-purple-200 px-3 py-1.5 text-xs font-semibold text-purple-700">
+                📁 Processo: <span id="obrig-filtro-processo-label" class="font-mono"></span>
+                <button onclick="clearProcessoFilter()" class="text-purple-500 hover:text-purple-800" title="Limpar filtro">✕</button>
+            </span>
             <button onclick="loadObrigacoes()" class="inline-flex items-center rounded-lg px-4 py-1.5 text-sm font-medium text-white shadow-sm hover:opacity-90" style="background:#385776;">Filtrar</button>
             <span class="ml-auto text-xs text-gray-400" id="obrig-count">—</span>
         </div>
@@ -473,6 +477,19 @@ updateRelLinks();
 loadTriggers();
 loadObrigacoesBadge();
 
+// Deep-link via querystring (?tab=obrigacoes&processo=XXXX) — usado pelo sininho/notificações
+(function applyDeepLink() {
+    const qs = new URLSearchParams(window.location.search);
+    const tab = qs.get('tab');
+    const processo = qs.get('processo');
+    if (processo && (tab === 'obrigacoes' || !tab)) {
+        setProcessoFilter(processo);
+    }
+    if (tab && document.querySelector(`[data-tab="${tab}"]`)) {
+        switchTab(tab);
+    }
+})();
+
 function loadObrigacoesBadge() {
     fetch('/vigilia/api/obrigacoes?status=pendente&per_page=1')
         .then(r => r.json())
@@ -485,6 +502,23 @@ function loadObrigacoesBadge() {
         });
 }
 
+let __obrigProcessoFiltro = null;
+function setProcessoFilter(processo) {
+    __obrigProcessoFiltro = processo || null;
+    const chip = document.getElementById('obrig-filtro-processo-chip');
+    const lbl  = document.getElementById('obrig-filtro-processo-label');
+    if (__obrigProcessoFiltro) {
+        lbl.textContent = __obrigProcessoFiltro;
+        chip.classList.remove('hidden');
+        // Quando vier de notificação, mostrar todos os status (não só pendentes)
+        const stSel = document.getElementById('obrig-filtro-status');
+        if (stSel) stSel.value = '';
+    } else {
+        chip.classList.add('hidden');
+    }
+}
+function clearProcessoFilter() { setProcessoFilter(null); loadObrigacoes(); }
+
 function loadObrigacoes(page) {
     page = page || 1;
     const status = document.getElementById('obrig-filtro-status').value;
@@ -492,6 +526,7 @@ function loadObrigacoes(page) {
     const params = new URLSearchParams({page, per_page: 25});
     if (status) params.set('status', status);
     if (tipo)   params.set('tipo_evento', tipo);
+    if (__obrigProcessoFiltro) params.set('processo', __obrigProcessoFiltro);
 
     fetch(`/vigilia/api/obrigacoes?${params}`)
         .then(r => r.json())

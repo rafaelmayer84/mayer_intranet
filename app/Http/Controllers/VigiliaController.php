@@ -188,7 +188,7 @@ class VigiliaController extends Controller
     public function apiObrigacoes(Request $request)
     {
         $this->checkAdmin();
-        $filtros = $request->only(['status', 'tipo_evento', 'advogado', 'page', 'per_page']);
+        $filtros = $request->only(['status', 'tipo_evento', 'advogado', 'processo', 'page', 'per_page']);
         $data = $this->service->getObrigacoes($filtros);
         return response()->json($data);
     }
