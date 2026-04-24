@@ -261,7 +261,11 @@ class NexoConsultaService
         $pinValor     = trim($respostas['pin_valor'] ?? '');
         $temPin       = !empty($cliente->nexo_pin);
         $pinMode      = $temPin && !empty($pinValor);
-        $totalEsperado = $pinMode ? 2 : 4;
+
+        // Quando sessão válida, usar o número real de campos gerados (imune a variações futuras)
+        $totalEsperado = $sessionValid && $sessionCampos !== null
+            ? count($sessionCampos)
+            : ($pinMode ? 2 : 4);
 
         if ($pinMode) {
             if (!\Illuminate\Support\Facades\Hash::check($pinValor, $cliente->nexo_pin)) {
@@ -293,20 +297,41 @@ class NexoConsultaService
             $totalPerguntas++;
             if ($this->validarResposta($cliente, $campo, $valor)) {
                 $acertos++;
+            } else {
+                Log::warning('[NEXO-AUTH] Resposta errada', [
+                    'n'              => $n,
+                    'campo'          => $campo,
+                    'valor_recebido' => $valor,
+                    'resposta_correta' => $this->resolverRespostaCorreta($cliente, $campo),
+                    'cliente_id'     => $cliente->id,
+                ]);
             }
         }
 
-        Log::info('[NEXO-AUTH-DEBUG]', [
-            'cliente_id'     => $cliente->id,
-            'acertos'        => $acertos,
+        Log::warning('[NEXO-AUTH-DEBUG]', [
+            'cliente_id'      => $cliente->id,
+            'acertos'         => $acertos,
             'total_perguntas' => $totalPerguntas,
-            'total_esperado' => $totalEsperado,
-            'pin_mode'       => $pinMode,
-            'session_valid'  => $sessionValid,
+            'total_esperado'  => $totalEsperado,
+            'pin_mode'        => $pinMode,
+            'session_valid'   => $sessionValid,
+            'campos_recebidos' => array_filter(
+                array_map(fn($n) => $respostas["pergunta{$n}_campo"] ?? '', range(1, 4))
+            ),
         ]);
 
-        // Exige exatamente totalEsperado perguntas respondidas com acerto
-        $valido = ($totalPerguntas === $totalEsperado && $acertos === $totalEsperado);
+        // Com session válida: exige exatamente os campos da sessão. Sem session: aceita >= 2 corretas.
+        if ($sessionValid) {
+            $valido = ($totalPerguntas === $totalEsperado && $acertos === $totalEsperado);
+        } else {
+            if ($totalPerguntas < 4) {
+                Log::warning('[NEXO-AUTH] Modo degradado (sem session_token): ' . $totalPerguntas . '/4 perguntas', [
+                    'cliente_id' => $cliente->id,
+                    'campos'     => $respostas,
+                ]);
+            }
+            $valido = ($totalPerguntas >= 2 && $acertos === $totalPerguntas);
+        }
 
         if ($valido) {
             $attempt->update([
@@ -422,7 +447,7 @@ class NexoConsultaService
         if ($total === 1) {
             // Consultar direto
             $processo = $processos->first();
-            $resposta = $this->montarRespostaProcesso($cliente, $processo);
+            $resposta = $this->tentarResumoLeigoComFallback($cliente, $processo, $telefone);
 
             return [
                 'selecao_necessaria' => 'nao',
@@ -502,9 +527,36 @@ class NexoConsultaService
         $adverso = $processo->adverso_nome ?: 'N/A';
 
         return [
-            'resposta' => $this->montarRespostaProcesso($cliente, $processo),
+            'resposta'           => $this->tentarResumoLeigoComFallback($cliente, $processo, $telefone),
             'processo_descricao' => "Pasta {$processo->pasta} × {$adverso}",
         ];
+    }
+
+    /**
+     * Tenta gerar resumo leigo (Claude + link público) e cai em fallback
+     * (texto simples via montarRespostaProcesso) se falhar.
+     */
+    private function tentarResumoLeigoComFallback(object $cliente, object $processo, string $telefone): string
+    {
+        try {
+            $auto = app(\App\Services\Nexo\NexoAutoatendimentoService::class);
+            $r = $auto->resumoLeigo($telefone, $processo->pasta);
+
+            if (!isset($r['erro']) && !empty($r['resumo'])) {
+                return $r['resumo']; // já contém "\n\n🔗 <link>"
+            }
+            Log::warning('[NEXO-CONSULTA] resumoLeigo retornou erro, usando fallback', [
+                'pasta' => $processo->pasta,
+                'erro'  => $r['erro'] ?? 'sem resumo',
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('[NEXO-CONSULTA] Exceção em resumoLeigo, usando fallback', [
+                'pasta' => $processo->pasta,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return $this->montarRespostaProcesso($cliente, $processo);
     }
 
     // ================================================================
@@ -914,8 +966,10 @@ class NexoConsultaService
 
         $real = $processo->adverso_nome;
 
+        // Excluir fakes de OUTROS processos do mesmo cliente (evita mostrar 3 adversos dele)
         $fakes = DB::table('processos')
             ->where('id', '!=', $processoId)
+            ->where('cliente_datajuri_id', '!=', $processo->cliente_datajuri_id)
             ->whereNotNull('adverso_nome')
             ->where('adverso_nome', '!=', $real)
             ->inRandomOrder()
@@ -927,11 +981,17 @@ class NexoConsultaService
             $fakes[] = 'Não identificado';
         }
 
+        // Contextualizar com ano de abertura para desambiguar clientes com vários processos
+        $ano = $processo->data_abertura ? date('Y', strtotime($processo->data_abertura)) : '';
+        $texto = $ano
+            ? "Qual é o nome da parte contrária no seu processo aberto em {$ano}?"
+            : 'Qual é o nome da parte contrária em um dos seus processos?';
+
         $opcoes = [$real, $fakes[0], $fakes[1]];
         shuffle($opcoes);
 
         return [
-            'texto' => 'Qual é o nome da parte contrária em um dos seus processos?',
+            'texto'  => $texto,
             'opcoes' => $opcoes,
         ];
     }
@@ -939,7 +999,7 @@ class NexoConsultaService
     private function perguntaAnoProcesso(int $processoId): array
     {
         $processo = DB::table('processos')->where('id', $processoId)->first();
-        if (!$processo || empty($processo->data_abertura)) {
+        if (!$processo || empty($processo->data_abertura) || empty($processo->adverso_nome)) {
             return ['texto' => 'Erro', 'opcoes' => ['A', 'B', 'C']];
         }
 
@@ -951,7 +1011,6 @@ class NexoConsultaService
         shuffle($candidatos);
         $fakes = array_slice($candidatos, 0, 2);
 
-        // Se não houver anos suficientes no range, usar distâncias fixas
         if (count($fakes) < 2) {
             $fakes = [$anoReal - 1, $anoReal + 1];
         }
@@ -959,10 +1018,53 @@ class NexoConsultaService
         $opcoes = [(string) $anoReal, (string) $fakes[0], (string) $fakes[1]];
         shuffle($opcoes);
 
+        // Contextualizar com nome do adverso — cliente com múltiplos processos precisa saber qual
         return [
-            'texto' => 'Em que ano um dos seus processos foi iniciado?',
+            'texto'  => "Em que ano foi aberto o seu processo contra {$processo->adverso_nome}?",
             'opcoes' => $opcoes,
         ];
+    }
+
+    /**
+     * Retorna a resposta canônica correta para um campo — usado apenas pelo NexoTestAuthCommand.
+     * @internal
+     */
+    public function resolverRespostaCorreta(object $cliente, string $campo): string
+    {
+        switch ($campo) {
+            case 'email':
+                return strtolower(trim($cliente->email ?? ''));
+            case 'cpf_cnpj':
+                $doc = preg_replace('/\D/', '', $cliente->cpf_cnpj ?: $cliente->cpf ?: $cliente->cnpj ?: '');
+                return '***' . substr($doc, -4);
+            case 'data_nascimento':
+                try { return (string) \Carbon\Carbon::parse($cliente->data_nascimento)->format('Y'); }
+                catch (\Exception $e) { return ''; }
+            case 'nome':
+                return trim($cliente->nome ?? '');
+            case 'bairro':
+                return trim($cliente->endereco_bairro ?? '');
+            case 'cep':
+                $cep = preg_replace('/\D/', '', $cliente->endereco_cep ?? '');
+                return substr($cep, 0, 5) . '-***';
+            case 'profissao':
+                return trim($cliente->profissao ?? '');
+            case 'rg':
+                $rg = preg_replace('/\D/', '', $cliente->rg ?? '');
+                return '***' . substr($rg, -4);
+            case 'endereco_numero':
+                return (string) preg_replace('/\D/', '', $cliente->endereco_numero ?? '');
+            default:
+                if (str_starts_with($campo, 'adverso_nome:')) {
+                    $proc = DB::table('processos')->where('id', (int) explode(':', $campo, 2)[1])->first();
+                    return $proc->adverso_nome ?? '';
+                }
+                if (str_starts_with($campo, 'ano_processo:')) {
+                    $proc = DB::table('processos')->where('id', (int) explode(':', $campo, 2)[1])->first();
+                    return $proc ? (string) date('Y', strtotime($proc->data_abertura)) : '';
+                }
+                return '';
+        }
     }
 
     private function validarResposta(object $cliente, string $campo, string $valor): bool
@@ -1308,7 +1410,8 @@ class NexoConsultaService
         return $cliente;
     }
 
-    private function buscarClientePorTelefone(string $telefoneNorm): ?object
+    /** @internal usado pelo NexoTestAuthCommand */
+    public function buscarClientePorTelefone(string $telefoneNorm): ?object
     {
         // Montar lista de formatos possíveis para busca
         $formatos = [$telefoneNorm];

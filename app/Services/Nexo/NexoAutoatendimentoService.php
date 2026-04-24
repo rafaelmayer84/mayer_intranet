@@ -1413,9 +1413,22 @@ class NexoAutoatendimentoService
 
     private function obterClienteAutenticado(string $telefoneNormalizado)
     {
-        // Verificar sessão ativa em nexo_auth_attempts (tabela do fluxo de auth)
+        // Verificar sessão ativa em nexo_auth_attempts.
+        // Tolera divergência entre PhoneHelper (13 dígitos, com 9) e
+        // NexoConsultaService::normalizarTelefone (12 dígitos, sem 9).
+        $variacoes = [$telefoneNormalizado];
+
+        // Variação sem o 9 (555XXYYYYYYYYY → 555XXYYYYYYYY)
+        if (preg_match('/^(55\d{2})9(\d{8})$/', $telefoneNormalizado, $m)) {
+            $variacoes[] = $m[1] . $m[2];
+        }
+        // Variação com o 9 (555XXYYYYYYYY → 555XX9YYYYYYYY)
+        if (preg_match('/^(55\d{2})(\d{8})$/', $telefoneNormalizado, $m)) {
+            $variacoes[] = $m[1] . '9' . $m[2];
+        }
+
         $auth = DB::table('nexo_auth_attempts')
-            ->where('telefone', $telefoneNormalizado)
+            ->whereIn('telefone', array_unique($variacoes))
             ->first();
 
         if (!$auth) {
