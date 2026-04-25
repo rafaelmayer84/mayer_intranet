@@ -62,6 +62,13 @@ class VigiliaService
      */
     const JANELA_DIAS_ANTES = 5;
 
+    /**
+     * Cutoff: VIGÍLIA só exibe itens a partir desta data.
+     * Obrigações/cobranças/suspeitas anteriores são legados e ficam de fora
+     * da tela Comando.
+     */
+    const CUTOFF_DATA = '2026-04-01';
+
     // ─── RESUMO GERAL ───────────────────────────────────────────────
 
     public function getResumoGeral(?string $periodoInicio = null, ?string $periodoFim = null): array
@@ -810,7 +817,7 @@ class VigiliaService
         $query = DB::table('atividades_datajuri')
             ->where('tipo_atividade', 'Tarefa')
             ->where(function($q) { $q->whereIn('assunto', self::ASSUNTOS_TRIGGER)->orWhereIn('assunto_original', self::ASSUNTOS_TRIGGER); })
-            ->where('data_hora', '>=', '2026-01-01 00:00:00')
+            ->where('data_hora', '>=', self::CUTOFF_DATA)
             ->orderByDesc('data_hora');
 
         if ($responsavel) {
@@ -996,6 +1003,7 @@ class VigiliaService
             $obrQ = DB::table('vigilia_obrigacoes as vo')
                 ->leftJoin('users as u', 'u.id', '=', 'vo.advogado_user_id')
                 ->leftJoin('processos as p', 'p.pasta', '=', 'vo.processo_pasta')
+                ->where('vo.data_evento', '>=', self::CUTOFF_DATA)
                 ->select(
                     'vo.id', 'vo.processo_pasta', 'vo.tipo_evento',
                     'vo.descricao_evento', 'vo.status', 'vo.data_limite',
@@ -1096,6 +1104,7 @@ class VigiliaService
                 ->join('atividades_datajuri as ad', 'ad.id', '=', 'vc.atividade_datajuri_id')
                 ->leftJoin('processos as p', 'p.pasta', '=', 'ad.processo_pasta')
                 ->where('vc.status_cruzamento', 'suspeito')
+                ->where('ad.data_hora', '>=', self::CUTOFF_DATA)
                 ->select(
                     'vc.id', 'vc.dias_gap', 'vc.observacao', 'vc.ai_verdict',
                     'ad.responsavel_nome', 'ad.processo_pasta', 'ad.tipo_atividade',
@@ -1146,11 +1155,26 @@ class VigiliaService
     public function getInboxCounters(): array
     {
         $now = Carbon::now();
-        $obrPendentes = DB::table('vigilia_obrigacoes')->where('status', 'pendente')->count();
-        $obrVencidas  = DB::table('vigilia_obrigacoes')->where('status', 'pendente')->where('data_limite', '<', $now)->count();
+        $obrPendentes = DB::table('vigilia_obrigacoes')
+            ->where('status', 'pendente')
+            ->where('data_evento', '>=', self::CUTOFF_DATA)
+            ->count();
+        $obrVencidas  = DB::table('vigilia_obrigacoes')
+            ->where('status', 'pendente')
+            ->where('data_evento', '>=', self::CUTOFF_DATA)
+            ->where('data_limite', '<', $now)
+            ->count();
         $triggers     = $this->getResumoTriggers();
-        $suspeitas    = DB::table('vigilia_cruzamentos')->where('status_cruzamento', 'suspeito')->count();
-        $cumpridasHoje = DB::table('vigilia_obrigacoes')->where('status', 'cumprida')->whereDate('data_cumprimento', $now->toDateString())->count();
+        $suspeitas    = DB::table('vigilia_cruzamentos as vc')
+            ->join('atividades_datajuri as ad', 'ad.id', '=', 'vc.atividade_datajuri_id')
+            ->where('vc.status_cruzamento', 'suspeito')
+            ->where('ad.data_hora', '>=', self::CUTOFF_DATA)
+            ->count();
+        $cumpridasHoje = DB::table('vigilia_obrigacoes')
+            ->where('status', 'cumprida')
+            ->where('data_evento', '>=', self::CUTOFF_DATA)
+            ->whereDate('data_cumprimento', $now->toDateString())
+            ->count();
 
         $vencidasTotal = $obrVencidas + (int) ($triggers['vencidos'] ?? 0);
 
@@ -1169,18 +1193,16 @@ class VigiliaService
 
     public function getConfiabilidade(?int $dias = 30): array
     {
-        // created_at pode estar NULL (rows legados) — usar updated_at como fallback
+        // created_at pode estar NULL (rows legados) — usa data da atividade + cutoff VIGÍLIA
         $desde = Carbon::now()->subDays($dias);
-        $base = DB::table('vigilia_cruzamentos')
-            ->whereIn('status_cruzamento', ['verificado', 'suspeito', 'sem_acao'])
-            ->where(function ($q) use ($desde) {
-                $q->where('updated_at', '>=', $desde)
-                  ->orWhereNull('updated_at');
-            });
+        $base = DB::table('vigilia_cruzamentos as vc')
+            ->join('atividades_datajuri as ad', 'ad.id', '=', 'vc.atividade_datajuri_id')
+            ->whereIn('vc.status_cruzamento', ['verificado', 'suspeito', 'sem_acao'])
+            ->where('ad.data_hora', '>=', self::CUTOFF_DATA);
 
-        $verificadas = (clone $base)->where('status_cruzamento', 'verificado')->count();
-        $suspeitas   = (clone $base)->where('status_cruzamento', 'suspeito')->count();
-        $semAcao     = (clone $base)->where('status_cruzamento', 'sem_acao')->count();
+        $verificadas = (clone $base)->where('vc.status_cruzamento', 'verificado')->count();
+        $suspeitas   = (clone $base)->where('vc.status_cruzamento', 'suspeito')->count();
+        $semAcao     = (clone $base)->where('vc.status_cruzamento', 'sem_acao')->count();
         $total       = $verificadas + $suspeitas + $semAcao;
         $pct         = $total > 0 ? round(($verificadas / $total) * 100) : 0;
 
