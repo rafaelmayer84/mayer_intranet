@@ -201,6 +201,25 @@ class VigiliaController extends Controller
         return response()->json(['success' => $ok]);
     }
 
+    // ─── INBOX UNIFICADO (editorial v2) ─────────────────────────────
+
+    public function apiInbox(Request $request)
+    {
+        $this->checkAdmin();
+        $filter = $request->input('filter', 'tudo');
+        $limit = (int) $request->input('limit', 40);
+        $items = $this->service->getInbox($filter, $limit);
+        $counters = $this->service->getInboxCounters();
+        return response()->json(['items' => $items, 'counters' => $counters]);
+    }
+
+    public function apiConfiabilidade(Request $request)
+    {
+        $this->checkAdmin();
+        $dias = (int) $request->input('dias', 30);
+        return response()->json($this->service->getConfiabilidade($dias));
+    }
+
     private function parsePeriodo(Request $request): array
     {
         $periodo = $request->input('periodo', 'mes-atual');

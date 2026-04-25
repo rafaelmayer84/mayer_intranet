@@ -1,665 +1,720 @@
 @extends('layouts.app')
-@section('title', 'VIGÍLIA — Controle de Compromissos')
+@section('title', 'VIGÍLIA — Comando')
+
+@push('styles')
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400;1,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ asset('css/editorial-design.css') }}">
+<style>
+/* ── Página editorial: remove padding do wrapper ── */
+#page-content-wrapper { padding: 0 !important; }
+
+/* ── Hero VIGÍLIA (número-comando) ── */
+.vg-hero-greeting {
+    font-weight: 300;
+    font-size: clamp(44px, 5.6vw, 74px);
+    line-height: 1.0; letter-spacing: -.03em;
+    color: var(--ink); margin: 0 0 6px;
+}
+.vg-hero-greeting .num {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-style: italic; font-weight: 600;
+    color: var(--bad); font-size: 1.05em;
+    letter-spacing: -.04em;
+}
+.vg-hero-greeting em { font-style: normal; font-weight: 600; color: var(--navy-700); }
+.vg-hero-greeting .name {
+    font-weight: 700; color: var(--navy-700);
+    display: inline-block; position: relative;
+}
+.vg-hero-greeting .name::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: .08em; height: .45em;
+    background: linear-gradient(to top, rgba(201,163,91,.22), transparent);
+    z-index: -1; border-radius: 2px;
+}
+.hero-stat .val-bad  { color: var(--bad); }
+.hero-stat .val-warn { color: var(--warn); }
+.hero-stat .val-ok   { color: var(--ok); }
+
+/* ── Chips filtro ── */
+.chip-row {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    margin-bottom: 22px; padding-bottom: 18px;
+    border-bottom: 1px dashed var(--rule);
+}
+.chip {
+    font-family: var(--sans);
+    font-size: 12px; font-weight: 600; letter-spacing: .04em;
+    padding: 8px 14px; border-radius: 999px;
+    border: 1px solid var(--rule); background: var(--surface);
+    color: var(--ink-2); cursor: pointer;
+    transition: all .25s var(--ease);
+    display: inline-flex; align-items: center; gap: 8px;
+}
+.chip .ct {
+    font-variant-numeric: tabular-nums; font-weight: 700; font-size: 11px;
+    color: var(--ink-3); background: var(--paper-2);
+    padding: 1px 8px; border-radius: 999px;
+}
+.chip:hover { border-color: var(--gold-400); color: var(--gold-700); }
+.chip--active { background: var(--navy-700); color: var(--paper); border-color: var(--navy-700); }
+.chip--active .ct { background: rgba(255,255,255,.12); color: var(--gold-300); }
+.chip--bad  { border-color: rgba(179,66,47,.35); color: var(--bad); background: #FAEBE4; }
+.chip--bad .ct { background: rgba(179,66,47,.12); color: var(--bad); }
+.chip--warn { border-color: rgba(195,122,42,.35); color: var(--warn); background: #FAF1E4; }
+.chip--warn .ct { background: rgba(195,122,42,.12); color: var(--warn); }
+
+/* ── Inbox ── */
+.inbox { display: flex; flex-direction: column; }
+.inbox-item {
+    display: grid;
+    grid-template-columns: 140px 1fr auto;
+    gap: 24px; align-items: center;
+    padding: 22px 4px 22px 16px;
+    border-bottom: 1px solid var(--rule);
+    transition: all .25s var(--ease);
+    cursor: pointer; position: relative;
+}
+.inbox-item:first-child { border-top: 1px solid var(--rule); }
+.inbox-item:hover { background: rgba(201,163,91,.04); padding-left: 24px; }
+.inbox-item::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px; background: transparent;
+    transition: background .25s var(--ease);
+}
+.inbox-item--critical::before { background: var(--bad); }
+.inbox-item--high::before     { background: var(--warn); }
+.inbox-item--medium::before   { background: var(--gold-400); }
+.inbox-item--suspect::before  { background: var(--navy-500); }
+.inbox-item--low::before      { background: var(--rule-2); }
+.inbox-item--ok::before       { background: var(--ok); }
+.inbox-tag { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.inbox-tag-status {
+    font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 4px;
+}
+.inbox-tag-status.crit { background: var(--bad); color: var(--paper); }
+.inbox-tag-status.high { background: var(--warn); color: var(--paper); }
+.inbox-tag-status.med  { background: var(--gold-100); color: var(--gold-700); }
+.inbox-tag-status.susp { background: var(--paper-2); color: var(--navy-700); border: 1px solid var(--navy-500); }
+.inbox-tag-status.low  { background: var(--paper-2); color: var(--ink-3); }
+.inbox-tag-status.ok   { background: #E9F3EC; color: var(--ok); }
+.inbox-tag-time {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-style: italic; font-size: 12px; color: var(--ink-3);
+}
+.inbox-body { min-width: 0; }
+.inbox-process {
+    font-variant-numeric: tabular-nums;
+    font-size: 11px; letter-spacing: .08em;
+    color: var(--ink-3); font-weight: 600; margin-bottom: 6px;
+}
+.inbox-event {
+    font-size: 15px; line-height: 1.35;
+    color: var(--ink); font-weight: 500; letter-spacing: -.005em;
+    margin-bottom: 8px;
+    overflow: hidden;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.inbox-meta { display: flex; gap: 12px; align-items: center; font-size: 12px; color: var(--ink-3); flex-wrap: wrap; }
+.inbox-meta .who { font-weight: 600; color: var(--ink-2); }
+.inbox-meta .sep { color: var(--rule-2); }
+.inbox-action { display: flex; gap: 6px; flex-shrink: 0; }
+
+.vg-btn {
+    font-family: var(--sans);
+    font-size: 12px; font-weight: 600; letter-spacing: .02em;
+    padding: 9px 16px; border-radius: 8px; border: 1px solid transparent;
+    cursor: pointer; transition: all .2s var(--ease); white-space: nowrap;
+}
+.vg-btn--primary { background: var(--navy-700); color: var(--paper); border-color: var(--navy-700); }
+.vg-btn--primary:hover { background: var(--navy-600); }
+.vg-btn--ghost { background: transparent; color: var(--ink-2); border-color: var(--rule); }
+.vg-btn--ghost:hover { border-color: var(--gold-500); color: var(--gold-700); }
+
+.inbox-empty {
+    padding: 56px 0; text-align: center;
+    color: var(--ink-3); font-size: 14px;
+}
+.inbox-empty strong { color: var(--ok); font-weight: 600; font-size: 16px; display: block; margin-bottom: 6px; }
+
+/* ── Pessoas ── */
+.people-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+@media (max-width: 1100px) { .people-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 720px)  { .people-grid { grid-template-columns: 1fr; } }
+.person {
+    background: var(--surface); border: 1px solid var(--rule);
+    border-radius: var(--r-md); padding: 22px 22px 20px;
+    cursor: pointer; transition: all .3s var(--ease);
+    position: relative; overflow: hidden;
+}
+.person::before {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: var(--gold-500); transform: scaleX(0); transform-origin: left;
+    transition: transform .5s var(--ease);
+}
+.person:hover::before { transform: scaleX(1); }
+.person:hover { border-color: var(--gold-300); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.person--alert::before { background: var(--bad); transform: scaleX(1); }
+.person-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+.person-avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--navy-700), var(--navy-500));
+    color: var(--paper); display: grid; place-items: center;
+    font-weight: 600; font-size: 13px; letter-spacing: .05em; flex-shrink: 0;
+}
+.person--alert .person-avatar { background: linear-gradient(135deg, var(--bad), #8a3324); }
+.person-name { font-size: 15px; font-weight: 600; color: var(--ink); line-height: 1.2; }
+.person-role { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; margin-top: 3px; }
+.person-stats {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 10px; padding: 14px 0;
+    border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+    margin-bottom: 14px;
+}
+.person-stat-val {
+    font-weight: 300; font-size: 26px;
+    letter-spacing: -.02em; line-height: 1;
+    color: var(--ink); font-variant-numeric: tabular-nums;
+}
+.person-stat-val.alert { color: var(--bad); }
+.person-stat-val.warn  { color: var(--warn); }
+.person-stat-val.ok    { color: var(--ok); }
+.person-stat-lbl { font-size: 9px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; margin-top: 6px; }
+.person-progress { height: 4px; background: var(--rule); border-radius: 999px; overflow: hidden; }
+.person-progress-fill { height: 100%; border-radius: 999px; background: var(--gold-500); transition: width .8s var(--ease-out); }
+.person-progress-fill.alert { background: var(--bad); }
+.person-progress-fill.warn  { background: var(--warn); }
+.person-progress-fill.ok    { background: var(--ok); }
+.person-foot { margin-top: 12px; font-size: 11px; color: var(--ink-3); display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+
+/* ── Auditoria ── */
+.audit-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px; }
+@media (max-width: 1100px) { .audit-grid { grid-template-columns: 1fr; } }
+.audit-feature {
+    background: linear-gradient(135deg, var(--navy-900), var(--navy-700) 75%, var(--navy-600));
+    color: var(--paper); border: 1px solid var(--navy-800);
+    border-radius: var(--r-md); padding: 28px 30px;
+    position: relative; overflow: hidden;
+}
+.audit-feature::after {
+    content: ""; position: absolute; right: -50px; bottom: -80px;
+    width: 240px; height: 240px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(201,163,91,.25), transparent 60%);
+    pointer-events: none;
+}
+.audit-feature::before {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: var(--gold-500);
+}
+.audit-eyebrow { font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: var(--gold-400); font-weight: 600; margin-bottom: 18px; }
+.audit-value {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-style: italic; font-weight: 600;
+    font-size: 88px; line-height: .9;
+    letter-spacing: -.04em; color: var(--paper);
+}
+.audit-value .pct { font-family: var(--sans); font-style: normal; font-weight: 300; font-size: .42em; color: var(--gold-400); margin-left: 4px; }
+.audit-breakdown {
+    margin-top: 22px; display: flex; gap: 22px;
+    font-size: 12px; color: var(--gold-300);
+    border-top: 1px solid rgba(201,163,91,.18); padding-top: 16px;
+}
+.audit-breakdown b { color: var(--paper); font-size: 18px; font-weight: 300; display: block; margin-bottom: 2px; }
+.audit-note { margin-top: 18px; font-size: 11px; color: var(--gold-300); letter-spacing: .06em; }
+
+.export-card {
+    background: var(--surface); border: 1px solid var(--rule);
+    border-radius: var(--r-md); padding: 22px;
+    transition: all .3s var(--ease);
+    position: relative; overflow: hidden;
+    display: flex; flex-direction: column;
+}
+.export-card::before {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: var(--gold-500); transform: scaleX(0); transform-origin: left;
+    transition: transform .4s var(--ease);
+}
+.export-card:hover::before { transform: scaleX(1); }
+.export-card:hover { border-color: var(--gold-300); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.export-icon {
+    width: 38px; height: 38px; border-radius: 9px;
+    background: var(--gold-50); color: var(--gold-600);
+    display: grid; place-items: center;
+    border: 1px solid var(--gold-100); margin-bottom: 14px;
+}
+.export-title { font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+.export-desc { font-size: 12px; color: var(--ink-3); line-height: 1.5; flex: 1; margin-bottom: 14px; }
+.export-actions { display: flex; gap: 6px; }
+
+/* ── Stagger ── */
+@keyframes vg-rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.stagger > * { opacity: 0; animation: vg-rise .6s var(--ease-out) forwards; }
+.stagger > *:nth-child(1) { animation-delay: .05s; }
+.stagger > *:nth-child(2) { animation-delay: .12s; }
+.stagger > *:nth-child(3) { animation-delay: .20s; }
+.stagger > *:nth-child(4) { animation-delay: .28s; }
+.stagger > *:nth-child(5) { animation-delay: .36s; }
+.stagger > *:nth-child(6) { animation-delay: .44s; }
+.stagger > *:nth-child(n+7) { animation-delay: .50s; }
+
+/* ── Modal cumprir ── */
+.vg-modal-overlay {
+    position: fixed; inset: 0; background: rgba(14,31,51,0.55); backdrop-filter: blur(6px);
+    z-index: 9998; display: none; align-items: center; justify-content: center;
+}
+.vg-modal-overlay.open { display: flex; }
+.vg-modal-box {
+    background: var(--surface); border-radius: var(--r-lg);
+    width: 520px; max-width: 92vw; padding: 28px;
+    border: 1px solid var(--rule); box-shadow: var(--shadow-lg);
+}
+.vg-modal-eyebrow { font-size: 10px; letter-spacing: .2em; text-transform: uppercase; color: var(--gold-600); font-weight: 600; margin-bottom: 8px; }
+.vg-modal-title { font-weight: 300; font-size: 24px; letter-spacing: -.02em; color: var(--ink); margin-bottom: 14px; }
+.vg-modal-title em { font-style: normal; font-weight: 600; color: var(--navy-700); }
+.vg-modal-textarea {
+    width: 100%; padding: 14px; font-family: var(--sans); font-size: 13px;
+    border: 1px solid var(--rule); border-radius: var(--r-sm);
+    resize: vertical; min-height: 110px; color: var(--ink);
+    background: var(--paper);
+}
+.vg-modal-textarea:focus { outline: none; border-color: var(--gold-500); }
+.vg-modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+</style>
+@endpush
 
 @section('content')
-<div class="space-y-6" id="vigilia-app">
+<div class="editorial-page" id="vigilia-root">
 
-    {{-- HEADER com identidade visual --}}
-    <div class="rounded-xl p-5 shadow-sm" style="background: linear-gradient(135deg, #1B334A 0%, #385776 100%); border-bottom: 3px solid #E8B931;">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-lg flex items-center justify-center text-lg font-black" style="background:#E8B931;color:#1B334A;">V</div>
-                <div>
-                    <h1 class="text-xl font-bold text-white tracking-tight">VIGÍLIA</h1>
-                    <p class="text-xs" style="color:#8BA3BB;">Controle de Compromissos & Accountability</p>
+    {{-- ─────────── HERO ─────────── --}}
+    <section class="hero" style="margin-bottom: 56px;">
+        <div>
+            <div class="hero-eyebrow">Vigília · {{ ucfirst(now()->locale('pt_BR')->isoFormat('dddd, D [de] MMMM')) }}</div>
+            <h1 class="vg-hero-greeting">
+                <em>Hoje,</em> <span class="num" id="hero-total">—</span> <span id="hero-noun">processos</span><br>
+                <span class="name">exigem</span> sua atenção.
+            </h1>
+            <div class="hero-sub" id="hero-sub">Carregando panorama…</div>
+
+            <div class="hero-stats stagger">
+                <div class="hero-stat" onclick="setFilter('vencidas')">
+                    <div class="hero-stat-label">Vencidas</div>
+                    <div class="hero-stat-value val-bad" id="kpi-vencidas">—</div>
+                    <div class="hero-stat-delta down">requer ação imediata</div>
+                </div>
+                <div class="hero-stat" onclick="setFilter('cobrancas')">
+                    <div class="hero-stat-label">Sem providência 48h+</div>
+                    <div class="hero-stat-value val-warn" id="kpi-cobrancas">—</div>
+                    <div class="hero-stat-delta down">advogados parados</div>
+                </div>
+                <div class="hero-stat" onclick="setFilter('suspeitas')">
+                    <div class="hero-stat-label">Conclusões suspeitas</div>
+                    <div class="hero-stat-value" id="kpi-suspeitas">—</div>
+                    <div class="hero-stat-delta down">sem andamento posterior</div>
+                </div>
+                <div class="hero-stat" onclick="document.getElementById('auditoria').scrollIntoView({behavior:'smooth'})">
+                    <div class="hero-stat-label">Confiabilidade 30d</div>
+                    <div class="hero-stat-value val-ok" id="kpi-conf">—</div>
+                    <div class="hero-stat-delta" id="kpi-conf-delta">cruzamento automático</div>
                 </div>
             </div>
-            <div class="flex flex-wrap items-center gap-2">
-                <select id="vigilia-periodo" onchange="loadDashboard();loadCompromissos();updateRelLinks();"
-                    class="rounded-lg border px-3 py-1.5 text-sm shadow-sm" style="background:#162535;color:#E8EDF2;border-color:#4A7399;">
-                    <option value="mes-atual">Mês Atual</option>
-                    <option value="mes-anterior">Mês Anterior</option>
-                    <option value="trimestre">Último Trimestre</option>
-                    <option value="semestre">Último Semestre</option>
-                    <option value="ano">Ano 2026</option>
-                </select>
-                <button id="btn-cruzar" onclick="executarCruzamento()"
-                    class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-bold shadow-sm transition hover:opacity-90"
-                    style="background:#E8B931;color:#1B334A;">
-                    🔄 Cruzar Agora
-                </button>
-                <span id="sync-info" class="text-xs" style="color:#8BA3BB;">Carregando...</span>
-            </div>
         </div>
-    </div>
+        <div class="hero-time">
+            <div class="hero-clock" id="hero-clock">--<span class="colon">:</span>--</div>
+            Última sincronia DataJuri
+        </div>
+    </section>
 
-    {{-- TABS --}}
-    <div class="border-b border-gray-200">
-        <nav class="flex gap-0 -mb-px" id="vigilia-tabs">
-            <button onclick="switchTab('dashboard')" data-tab="dashboard" class="tab-btn px-4 py-2.5 text-sm font-semibold border-b-2 border-[#385776] text-[#1B334A]">📊 Dashboard</button>
-            <button onclick="switchTab('alertas')" data-tab="alertas" class="tab-btn px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-gray-400 hover:text-gray-600">🚨 Alertas <span id="alertas-badge" class="inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-xs font-bold bg-red-500 text-white ml-1">0</span></button>
-            <button onclick="switchTab('compromissos')" data-tab="compromissos" class="tab-btn px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-gray-400 hover:text-gray-600">📋 Compromissos</button>
-            <button onclick="switchTab('triggers')" data-tab="triggers" class="tab-btn px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-gray-400 hover:text-gray-600">⚡ Cobranças <span id="triggers-badge" class="inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-white ml-1">0</span></button>
-            <button onclick="switchTab('obrigacoes')" data-tab="obrigacoes" class="tab-btn px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-gray-400 hover:text-gray-600">⚖️ Obrigações <span id="obrigacoes-badge" class="inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-xs font-bold bg-purple-600 text-white ml-1 hidden">0</span></button>
-            <button onclick="switchTab('relatorios')" data-tab="relatorios" class="tab-btn px-4 py-2.5 text-sm font-semibold border-b-2 border-transparent text-gray-400 hover:text-gray-600">📑 Relatórios</button>
-        </nav>
-    </div>
-
-    {{-- ═══ TAB DASHBOARD ═══ --}}
-    <div id="panel-dashboard" class="tab-panel">
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-            <div class="bg-white rounded-xl shadow-sm border-l-4 border-[#385776] p-4">
-                <p class="text-xs text-gray-500 uppercase font-bold tracking-wide">Total</p>
-                <p class="text-3xl font-extrabold text-[#1B334A] mt-1" id="kpi-total">—</p>
+    {{-- ─────────── INBOX CRÍTICO ─────────── --}}
+    <section style="margin-bottom: 56px;">
+        <div class="section-head">
+            <div>
+                <div class="hero-eyebrow" style="margin-bottom: 6px;">Comando</div>
+                <h2>Inbox <em>crítico</em>.</h2>
             </div>
-            <div class="bg-white rounded-xl shadow-sm border-l-4 border-green-500 p-4">
-                <p class="text-xs text-gray-500 uppercase font-bold tracking-wide">Concluídos</p>
-                <p class="text-3xl font-extrabold text-green-600 mt-1" id="kpi-concluidos">—</p>
-                <p class="text-xs text-gray-400 mt-0.5" id="kpi-taxa">—</p>
-            </div>
-            <div class="bg-white rounded-xl shadow-sm border-l-4 border-amber-400 p-4">
-                <p class="text-xs text-gray-500 uppercase font-bold tracking-wide">Não Iniciados</p>
-                <p class="text-3xl font-extrabold text-amber-500 mt-1" id="kpi-nao-iniciados">—</p>
-            </div>
-            <div class="bg-white rounded-xl shadow-sm border-l-4 border-gray-300 p-4">
-                <p class="text-xs text-gray-500 uppercase font-bold tracking-wide">Cancelados</p>
-                <p class="text-3xl font-extrabold text-gray-400 mt-1" id="kpi-cancelados">—</p>
-            </div>
-            <div class="bg-white rounded-xl shadow-sm border-l-4 border-red-500 p-4">
-                <p class="text-xs text-gray-500 uppercase font-bold tracking-wide">Alertas</p>
-                <p class="text-3xl font-extrabold text-red-600 mt-1" id="kpi-alertas">—</p>
-                <p class="text-xs text-gray-400 mt-0.5">requerem atenção</p>
-            </div>
+            <div class="section-line"></div>
+            <a class="section-action" href="#" onclick="setFilter('cumpridas'); event.preventDefault();">
+                Cumpridas hoje
+                <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14m-6-6l6 6-6 6"/></svg>
+            </a>
         </div>
 
-        <div class="bg-white rounded-xl shadow-sm border">
-            <div class="px-5 py-3 border-b flex items-center justify-between">
-                <span class="font-bold text-[#1B334A]">Performance por Responsável</span>
-                <div class="flex gap-2">
-                    <a href="/vigilia/export/excel" class="px-3 py-1 rounded-lg text-xs font-medium border border-green-500 text-green-600 hover:bg-green-50 transition">📊 Excel</a>
-                    <a href="/vigilia/export/pdf?tipo=consolidado" class="px-3 py-1 rounded-lg text-xs font-medium border border-[#385776] text-[#385776] hover:bg-gray-50 transition">📄 PDF</a>
+        <div class="chip-row" id="chip-row">
+            <button class="chip chip--active" data-filter="tudo">Todos <span class="ct" id="ct-tudo">0</span></button>
+            <button class="chip chip--bad" data-filter="vencidas">Vencidas <span class="ct" id="ct-vencidas">0</span></button>
+            <button class="chip chip--warn" data-filter="cobrancas">Cobranças 48h+ <span class="ct" id="ct-cobrancas">0</span></button>
+            <button class="chip" data-filter="obrigacoes">Obrigações 72h <span class="ct" id="ct-obrigacoes">0</span></button>
+            <button class="chip" data-filter="suspeitas">Suspeitas <span class="ct" id="ct-suspeitas">0</span></button>
+            <button class="chip" data-filter="cumpridas">Cumpridas hoje <span class="ct" id="ct-cumpridas">0</span></button>
+        </div>
+
+        <div class="inbox stagger" id="inbox-list">
+            <div class="inbox-empty">Carregando…</div>
+        </div>
+    </section>
+
+    {{-- ─────────── PESSOAS ─────────── --}}
+    <section style="margin-bottom: 56px;">
+        <div class="section-head">
+            <div>
+                <div class="hero-eyebrow" style="margin-bottom: 6px;">Time</div>
+                <h2>Performance por <em>advogado</em>.</h2>
+            </div>
+            <div class="section-line"></div>
+            <a class="section-action" href="{{ url('/vigilia/relatorio/consolidado') }}">
+                Relatório consolidado
+                <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14m-6-6l6 6-6 6"/></svg>
+            </a>
+        </div>
+
+        <div class="people-grid stagger" id="people-grid">
+            <div class="inbox-empty" style="grid-column: 1/-1;">Carregando pessoas…</div>
+        </div>
+    </section>
+
+    {{-- ─────────── AUDITORIA ─────────── --}}
+    <section style="margin-bottom: 32px;" id="auditoria">
+        <div class="section-head">
+            <div>
+                <div class="hero-eyebrow" style="margin-bottom: 6px;">Auditoria</div>
+                <h2>Confiabilidade & <em>exports</em>.</h2>
+            </div>
+            <div class="section-line"></div>
+        </div>
+
+        <div class="audit-grid stagger">
+            <div class="audit-feature">
+                <div class="audit-eyebrow">Índice de Confiabilidade · 30d</div>
+                <div class="audit-value"><span id="conf-pct">—</span><span class="pct">%</span></div>
+                <div class="audit-breakdown">
+                    <div><b id="conf-verificadas">—</b>verificadas</div>
+                    <div><b id="conf-suspeitas">—</b>suspeitas</div>
+                    <div><b id="conf-semacao">—</b>sem ação</div>
+                </div>
+                <div class="audit-note" id="conf-note">Cruzamento automático: conclusões VIGÍLIA × andamentos DataJuri.</div>
+            </div>
+
+            <div class="export-card" onclick="window.location='/vigilia/export/excel'">
+                <div class="export-icon">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2a4 4 0 014-4h6m0 0l-3-3m3 3l-3 3M6 21h2a4 4 0 004-4v-2m-6 6V7a4 4 0 014-4h6"/></svg>
+                </div>
+                <div class="export-title">Consolidado mensal</div>
+                <div class="export-desc">Ranking, distribuição por tipo e resumo executivo.</div>
+                <div class="export-actions">
+                    <a class="vg-btn vg-btn--ghost" href="{{ url('/vigilia/export/excel') }}">Excel</a>
+                    <a class="vg-btn vg-btn--ghost" href="{{ url('/vigilia/export/pdf?tipo=consolidado') }}">PDF</a>
                 </div>
             </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="bg-gray-50 border-b">
-                            <th class="text-left px-5 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wider">Responsável</th>
-                            <th class="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase">Total</th>
-                            <th class="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase">Concl.</th>
-                            <th class="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase">Não In.</th>
-                            <th class="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase">Canc.</th>
-                            <th class="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase">Alertas</th>
-                            <th class="px-3 py-2.5 text-xs font-bold text-gray-500 uppercase">Taxa Cumpr.</th>
-                        </tr>
-                    </thead>
-                    <tbody id="ranking-body">
-                        <tr><td colspan="7" class="text-center py-6 text-gray-400">Carregando...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
 
-    {{-- ═══ TAB ALERTAS ═══ --}}
-    <div id="panel-alertas" class="tab-panel hidden">
-        <div id="alertas-container">
-            <p class="text-center text-gray-400 py-8">Carregando alertas...</p>
-        </div>
-    </div>
-
-    {{-- ═══ TAB COMPROMISSOS ═══ --}}
-    <div id="panel-compromissos" class="tab-panel hidden">
-        <div class="flex flex-wrap gap-2 mb-4 items-center">
-            <select id="filtro-responsavel" class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm shadow-sm focus:ring-2 focus:ring-[#385776]">
-                <option value="">Todos os responsáveis</option>
-                @foreach($responsaveis as $r)
-                    <option value="{{ $r }}">{{ $r }}</option>
-                @endforeach
-            </select>
-            <select id="filtro-status" class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm shadow-sm focus:ring-2 focus:ring-[#385776]">
-                <option value="">Todas as situações</option>
-                <option value="Concluído">Concluído</option>
-                <option value="Não iniciado">Não iniciado</option>
-                <option value="Cancelado">Cancelado</option>
-            </select>
-            <button onclick="loadCompromissos()" class="inline-flex items-center rounded-lg px-4 py-1.5 text-sm font-medium text-white shadow-sm transition hover:opacity-90" style="background:#385776;">Filtrar</button>
-            <span class="ml-auto text-xs text-gray-400" id="compromissos-count">—</span>
-        </div>
-        <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
-            <table class="w-full text-sm">
-                <thead>
-                    <tr class="bg-gray-50 border-b">
-                        <th class="text-left px-4 py-2.5 text-xs font-bold text-gray-500 uppercase">Situação</th>
-                        <th class="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase">Responsável</th>
-                        <th class="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase">Tipo</th>
-                        <th class="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase">Processo</th>
-                        <th class="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase">Data</th>
-                        <th class="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase">Prazo Fatal</th>
-                        <th class="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase">Cruzamento</th>
-                    </tr>
-                </thead>
-                <tbody id="compromissos-body">
-                    <tr><td colspan="7" class="text-center py-6 text-gray-400">Carregando...</td></tr>
-                </tbody>
-            </table>
-        </div>
-        <div id="compromissos-pagination" class="mt-3 flex justify-center"></div>
-    </div>
-
-    {{-- ═══ TAB COBRANÇAS (TRIGGERS) ═══ --}}
-    <div id="panel-triggers" class="tab-panel hidden">
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" id="trigger-kpis">
-            <div class="bg-white rounded-xl shadow-sm border-l-4 border-amber-400 p-4">
-                <p class="text-xs text-gray-500 uppercase font-bold tracking-wide">Total Tarefas Sensíveis</p>
-                <p class="text-3xl font-extrabold text-[#1B334A] mt-1" id="trig-total">—</p>
-            </div>
-            <div class="bg-white rounded-xl shadow-sm border-l-4 border-orange-500 p-4">
-                <p class="text-xs text-gray-500 uppercase font-bold tracking-wide">Pendentes</p>
-                <p class="text-3xl font-extrabold text-orange-500 mt-1" id="trig-pendentes">—</p>
-            </div>
-            <div class="bg-white rounded-xl shadow-sm border-l-4 border-red-500 p-4">
-                <p class="text-xs text-gray-500 uppercase font-bold tracking-wide">Vencidos (48h+)</p>
-                <p class="text-3xl font-extrabold text-red-600 mt-1" id="trig-vencidos">—</p>
-            </div>
-            <div class="bg-white rounded-xl shadow-sm border-l-4 border-green-500 p-4">
-                <p class="text-xs text-gray-500 uppercase font-bold tracking-wide">Concluídos</p>
-                <p class="text-3xl font-extrabold text-green-600 mt-1" id="trig-concluidos">—</p>
-            </div>
-        </div>
-
-        <div id="trigger-list">
-            <p class="text-center text-gray-400 py-8">Carregando...</p>
-        </div>
-    </div>
-
-    {{-- ═══ TAB OBRIGAÇÕES ═══ --}}
-    <div id="panel-obrigacoes" class="tab-panel hidden">
-        {{-- KPIs rápidos --}}
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5" id="obrig-kpis">
-            <div class="bg-white rounded-xl shadow-sm border-l-4 border-purple-500 p-4">
-                <p class="text-xs text-gray-500 uppercase font-bold tracking-wide">Pendentes</p>
-                <p class="text-3xl font-extrabold text-purple-600 mt-1" id="obrig-kpi-pendentes">—</p>
-            </div>
-            <div class="bg-white rounded-xl shadow-sm border-l-4 border-red-500 p-4">
-                <p class="text-xs text-gray-500 uppercase font-bold tracking-wide">Vencidas</p>
-                <p class="text-3xl font-extrabold text-red-600 mt-1" id="obrig-kpi-vencidas">—</p>
-            </div>
-            <div class="bg-white rounded-xl shadow-sm border-l-4 border-green-500 p-4">
-                <p class="text-xs text-gray-500 uppercase font-bold tracking-wide">Cumpridas</p>
-                <p class="text-3xl font-extrabold text-green-600 mt-1" id="obrig-kpi-cumpridas">—</p>
-            </div>
-            <div class="bg-white rounded-xl shadow-sm border-l-4 border-gray-300 p-4">
-                <p class="text-xs text-gray-500 uppercase font-bold tracking-wide">Total</p>
-                <p class="text-3xl font-extrabold text-gray-500 mt-1" id="obrig-kpi-total">—</p>
-            </div>
-        </div>
-
-        {{-- Filtros --}}
-        <div class="flex flex-wrap gap-2 mb-4 items-center">
-            <select id="obrig-filtro-status" class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm shadow-sm">
-                <option value="">Todas</option>
-                <option value="pendente" selected>Pendentes</option>
-                <option value="cumprida">Cumpridas</option>
-                <option value="justificada">Justificadas</option>
-                <option value="cancelada">Canceladas</option>
-            </select>
-            <select id="obrig-filtro-tipo" class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm shadow-sm">
-                <option value="">Todos os tipos</option>
-                <option value="SENTENÇA">Sentença</option>
-                <option value="ACÓRDÃO">Acórdão</option>
-                <option value="DECISÃO_SIGNIFICATIVA">Decisão Significativa</option>
-            </select>
-            <span id="obrig-filtro-processo-chip" class="hidden inline-flex items-center gap-2 rounded-lg bg-purple-50 border border-purple-200 px-3 py-1.5 text-xs font-semibold text-purple-700">
-                📁 Processo: <span id="obrig-filtro-processo-label" class="font-mono"></span>
-                <button onclick="clearProcessoFilter()" class="text-purple-500 hover:text-purple-800" title="Limpar filtro">✕</button>
-            </span>
-            <button onclick="loadObrigacoes()" class="inline-flex items-center rounded-lg px-4 py-1.5 text-sm font-medium text-white shadow-sm hover:opacity-90" style="background:#385776;">Filtrar</button>
-            <span class="ml-auto text-xs text-gray-400" id="obrig-count">—</span>
-        </div>
-
-        <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
-            <table class="w-full text-sm">
-                <thead>
-                    <tr class="bg-gray-50 border-b">
-                        <th class="text-left px-4 py-2.5 text-xs font-bold text-gray-500 uppercase">Tipo</th>
-                        <th class="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase">Processo</th>
-                        <th class="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase">Advogado</th>
-                        <th class="text-left px-3 py-2.5 text-xs font-bold text-gray-500 uppercase">Evento</th>
-                        <th class="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase">Data</th>
-                        <th class="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase">Limite (72h)</th>
-                        <th class="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase">Status</th>
-                        <th class="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase">Ação</th>
-                    </tr>
-                </thead>
-                <tbody id="obrigacoes-body">
-                    <tr><td colspan="8" class="text-center py-6 text-gray-400">Carregando...</td></tr>
-                </tbody>
-            </table>
-        </div>
-        <div id="obrigacoes-pagination" class="mt-3 flex justify-center"></div>
-    </div>
-
-    {{-- Modal cumprir obrigação --}}
-    <div id="modal-cumprir" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/40">
-        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 mx-4">
-            <h3 class="text-lg font-bold text-[#1B334A] mb-1">Marcar como Cumprida</h3>
-            <p class="text-xs text-gray-500 mb-4">Registre o que foi feito em resposta a este evento.</p>
-            <input type="hidden" id="modal-obrig-id">
-            <textarea id="modal-parecer" rows="4" placeholder="Descreva a providência tomada (petição protocolada, recurso apresentado, etc.)..."
-                class="w-full rounded-lg border border-gray-200 p-3 text-sm focus:ring-2 focus:ring-[#385776] resize-none"></textarea>
-            <div class="flex gap-2 mt-4 justify-end">
-                <button onclick="fecharModal()" class="px-4 py-2 rounded-lg text-sm border border-gray-200 text-gray-500 hover:bg-gray-50">Cancelar</button>
-                <button onclick="confirmarCumprir()" class="px-4 py-2 rounded-lg text-sm text-white font-bold hover:opacity-90" style="background:#385776;">Confirmar</button>
-            </div>
-        </div>
-    </div>
-
-    {{-- ═══ TAB RELATÓRIOS ═══ --}}
-    <div id="panel-relatorios" class="tab-panel hidden">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="bg-white rounded-xl shadow-sm border p-5 hover:shadow-md transition">
-                <div class="flex items-center gap-2 mb-2">
-                    <span class="w-8 h-8 rounded-lg flex items-center justify-center text-sm" style="background:#E8B93120;color:#E8B931;">👤</span>
-                    <h3 class="font-bold text-sm text-[#1B334A]">Relatório Individual</h3>
+            <div class="export-card">
+                <div class="export-icon">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </div>
-                <p class="text-xs text-gray-500 mb-3">Compromissos, taxa, alertas e confiabilidade por advogado.</p>
-                <select id="rel-adv" class="rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm shadow-sm w-full mb-3">
-                    @foreach($responsaveis as $r)
-                        <option value="{{ $r }}">{{ $r }}</option>
-                    @endforeach
-                </select>
-                <div class="flex gap-2">
-                    <a id="link-rel-individual" href="/vigilia/relatorio/individual" class="px-3 py-1.5 rounded-lg text-xs font-medium border border-[#385776] text-[#385776] hover:bg-gray-50 transition">🖥 Tela</a>
-                    <a id="link-rel-individual-pdf" href="/vigilia/export/pdf?tipo=individual" class="px-3 py-1.5 rounded-lg text-xs font-medium border border-blue-500 text-blue-600 hover:bg-blue-50 transition">📄 PDF</a>
+                <div class="export-title">Prazos críticos</div>
+                <div class="export-desc">Vencidos e vencendo nos próximos 7 dias. Gerado diariamente às 07:00.</div>
+                <div class="export-actions">
+                    <a class="vg-btn vg-btn--ghost" href="{{ url('/vigilia/relatorio/prazos') }}">Tela</a>
+                    <a class="vg-btn vg-btn--ghost" href="{{ url('/vigilia/export/pdf?tipo=prazos') }}">PDF</a>
                 </div>
             </div>
-            <div class="bg-white rounded-xl shadow-sm border p-5 hover:shadow-md transition">
-                <div class="flex items-center gap-2 mb-2">
-                    <span class="w-8 h-8 rounded-lg flex items-center justify-center text-sm" style="background:#DC354520;color:#DC3545;">⏰</span>
-                    <h3 class="font-bold text-sm text-[#1B334A]">Prazos Críticos</h3>
-                </div>
-                <p class="text-xs text-gray-500 mb-3">Prazos vencidos e vencendo. <strong>Gerado diariamente 07:00.</strong></p>
-                <div class="flex gap-2 mt-auto">
-                    <a href="/vigilia/relatorio/prazos" class="px-3 py-1.5 rounded-lg text-xs font-medium border border-[#385776] text-[#385776] hover:bg-gray-50 transition">🖥 Tela</a>
-                    <a href="/vigilia/export/pdf?tipo=prazos" class="px-3 py-1.5 rounded-lg text-xs font-medium border border-blue-500 text-blue-600 hover:bg-blue-50 transition">📄 PDF</a>
-                </div>
-            </div>
-            <div class="bg-white rounded-xl shadow-sm border p-5 hover:shadow-md transition">
-                <div class="flex items-center gap-2 mb-2">
-                    <span class="w-8 h-8 rounded-lg flex items-center justify-center text-sm" style="background:#38577620;color:#385776;">📑</span>
-                    <h3 class="font-bold text-sm text-[#1B334A]">Consolidado Mensal</h3>
-                </div>
-                <p class="text-xs text-gray-500 mb-3">Ranking, distribuição por tipo, resumo executivo para reunião.</p>
-                <div class="flex gap-2">
-                    <a href="/vigilia/relatorio/consolidado" class="px-3 py-1.5 rounded-lg text-xs font-medium border border-[#385776] text-[#385776] hover:bg-gray-50 transition">🖥 Tela</a>
-                    <a href="/vigilia/export/pdf?tipo=consolidado" class="px-3 py-1.5 rounded-lg text-xs font-medium border border-blue-500 text-blue-600 hover:bg-blue-50 transition">📄 PDF</a>
-                    <a href="/vigilia/export/excel" class="px-3 py-1.5 rounded-lg text-xs font-medium border border-green-500 text-green-600 hover:bg-green-50 transition">📊 Excel</a>
-                </div>
-            </div>
-            <div class="bg-white rounded-xl shadow-sm border p-5 hover:shadow-md transition">
-                <div class="flex items-center gap-2 mb-2">
-                    <span class="w-8 h-8 rounded-lg flex items-center justify-center text-sm" style="background:#4A739920;color:#4A7399;">🔍</span>
-                    <h3 class="font-bold text-sm text-[#1B334A]">Cruzamento</h3>
-                </div>
-                <p class="text-xs text-gray-500 mb-3">Auditoria conclusões vs. andamentos. Índice de confiabilidade.</p>
-                <div class="flex gap-2">
-                    <a href="/vigilia/relatorio/cruzamento" class="px-3 py-1.5 rounded-lg text-xs font-medium border border-[#385776] text-[#385776] hover:bg-gray-50 transition">🖥 Tela</a>
-                    <a href="/vigilia/export/pdf?tipo=cruzamento" class="px-3 py-1.5 rounded-lg text-xs font-medium border border-blue-500 text-blue-600 hover:bg-blue-50 transition">📄 PDF</a>
-                </div>
-            </div>
+        </div>
+    </section>
+
+</div>
+
+{{-- ─────────── Modal cumprir ─────────── --}}
+<div class="vg-modal-overlay" id="modal-cumprir">
+    <div class="vg-modal-box">
+        <div class="vg-modal-eyebrow">Obrigação VIGÍLIA</div>
+        <div class="vg-modal-title">Registrar <em>parecer</em>.</div>
+        <div style="font-size:12px;color:var(--ink-3);margin-bottom:12px;">
+            Descreva a providência tomada (petição protocolada, recurso apresentado, justificativa etc.).
+        </div>
+        <input type="hidden" id="modal-obrig-id">
+        <textarea id="modal-parecer" class="vg-modal-textarea" placeholder="Ex.: Recurso de apelação protocolado em 24/04/2026 às 15h42 — protocolo #..."></textarea>
+        <div class="vg-modal-actions">
+            <button class="vg-btn vg-btn--ghost" onclick="closeModal()">Cancelar</button>
+            <button class="vg-btn vg-btn--primary" id="modal-confirmar">Confirmar cumprimento</button>
         </div>
     </div>
 </div>
+@endsection
 
 @push('scripts')
 <script>
-function switchTab(tabId) {
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
-    document.querySelectorAll('.tab-btn').forEach(b => {
-        b.classList.remove('border-[#385776]', 'text-[#1B334A]');
-        b.classList.add('border-transparent', 'text-gray-400');
+const VIGILIA = {
+    filter: 'tudo',
+    counters: {},
+    items: [],
+};
+
+const CSRF = document.querySelector('meta[name="csrf-token"]').content;
+
+function el(id) { return document.getElementById(id); }
+
+function initials(name) {
+    if (!name) return '—';
+    return name.split(/\s+/).filter(Boolean).slice(0,2).map(s => s[0]).join('').toUpperCase();
+}
+
+function fmtRelative(dt) {
+    if (!dt) return '—';
+    const d = new Date(dt.replace(' ', 'T'));
+    const min = Math.round((Date.now() - d.getTime()) / 60000);
+    if (min < 1) return 'agora';
+    if (min < 60) return min + 'min';
+    if (min < 1440) return Math.round(min/60) + 'h';
+    return Math.round(min/1440) + 'd';
+}
+
+function severityClass(sev) {
+    return 'inbox-item--' + (sev || 'medium');
+}
+function statusClass(sev) {
+    return ({critical:'crit', high:'high', medium:'med', suspect:'susp', low:'low', ok:'ok'})[sev] || 'med';
+}
+
+function setFilter(f) {
+    VIGILIA.filter = f;
+    document.querySelectorAll('.chip').forEach(c => c.classList.toggle('chip--active', c.dataset.filter === f));
+    loadInbox();
+    // Rola suave pra inbox
+    document.querySelector('.chip-row')?.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => setFilter(c.dataset.filter)));
+
+async function loadInbox() {
+    try {
+        const r = await fetch('/vigilia/api/inbox?filter=' + VIGILIA.filter + '&limit=40');
+        const d = await r.json();
+        VIGILIA.counters = d.counters || {};
+        VIGILIA.items = d.items || [];
+
+        // Counters nos chips
+        Object.entries(d.counters || {}).forEach(([k, v]) => {
+            const ct = el('ct-' + k);
+            if (ct) ct.textContent = v;
+        });
+
+        // KPIs do hero
+        el('kpi-vencidas').textContent   = d.counters.vencidas ?? 0;
+        el('kpi-cobrancas').textContent  = d.counters.sem_providencia_48h ?? d.counters.cobrancas ?? 0;
+        el('kpi-suspeitas').textContent  = d.counters.suspeitas ?? 0;
+
+        // Hero principal
+        const total = d.counters.tudo ?? 0;
+        el('hero-total').textContent = total;
+        el('hero-noun').textContent = total === 1 ? 'processo' : 'processos';
+        el('hero-sub').textContent = total === 0
+            ? 'Nada pendente. Vigília está em dia ✓'
+            : `${d.counters.vencidas ?? 0} vencidas · ${d.counters.cobrancas ?? 0} cobranças 48h+ · ${d.counters.suspeitas ?? 0} suspeitas`;
+
+        renderInbox();
+    } catch (e) {
+        el('inbox-list').innerHTML = '<div class="inbox-empty">Erro ao carregar inbox.</div>';
+    }
+}
+
+function renderInbox() {
+    const list = el('inbox-list');
+    if (VIGILIA.items.length === 0) {
+        const emptyMsg = VIGILIA.filter === 'tudo'
+            ? '<strong>Tudo em ordem ✓</strong>Nenhuma pendência crítica no momento.'
+            : 'Nenhum item nesse filtro.';
+        list.innerHTML = `<div class="inbox-empty">${emptyMsg}</div>`;
+        return;
+    }
+
+    list.innerHTML = VIGILIA.items.map(it => {
+        const sev = it.severity || 'medium';
+        const stCls = statusClass(sev);
+        const meta = [
+            `<span class="who">${escape(it.advogado || '—')}</span>`,
+            it.cliente ? `<span class="sep">·</span><span>${escape(it.cliente)}</span>` : '',
+            it.area   ? `<span class="sep">·</span><span>${escape(it.area)}</span>` : '',
+        ].filter(Boolean).join('');
+
+        const actions = (it.actions || []).map((a, idx) => {
+            const cls = idx === 0 ? 'vg-btn vg-btn--primary' : 'vg-btn vg-btn--ghost';
+            return `<button class="${cls}" data-action="${a.kind}" data-id="${it.id}" data-obrigacao-id="${it.obrigacao_id ?? ''}">${escape(a.label)}</button>`;
+        }).join('');
+
+        return `<div class="inbox-item ${severityClass(sev)}">
+            <div class="inbox-tag">
+                <span class="inbox-tag-status ${stCls}">${escape(it.status_label || '—')}</span>
+                <span class="inbox-tag-time">${escape(it.time_label || '')}</span>
+            </div>
+            <div class="inbox-body">
+                <div class="inbox-process">${escape(it.processo || '—')} · ${escape(it.tribunal || '')}</div>
+                <div class="inbox-event">${escape(it.event_text || '')}</div>
+                <div class="inbox-meta">${meta}</div>
+            </div>
+            <div class="inbox-action">${actions}</div>
+        </div>`;
+    }).join('');
+
+    // Bind action buttons
+    list.querySelectorAll('[data-action]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const kind = btn.dataset.action;
+            const obrId = btn.dataset.obrigacaoId;
+            if (kind === 'parecer' && obrId) {
+                openModal(obrId);
+            } else if (kind === 'justificar' && obrId) {
+                const motivo = prompt('Justifique por que esta obrigação não pode ser cumprida no prazo:');
+                if (motivo && motivo.trim()) cumprirObrigacao(obrId, '[JUSTIFICATIVA] ' + motivo);
+            } else if (kind === 'auditar' || kind === 'aceitar') {
+                alert('Ação "' + btn.textContent + '" ainda será implementada no backend.');
+            } else if (kind === 'providencia') {
+                alert('Abra o DataJuri e registre parecer na atividade. A sincronia vai detectar automaticamente.');
+            } else if (kind === 'conversa') {
+                window.location = '/nexo';
+            }
+        });
     });
-    document.getElementById('panel-' + tabId).classList.remove('hidden');
-    const btn = document.querySelector(`[data-tab="${tabId}"]`);
-    btn.classList.add('border-[#385776]', 'text-[#1B334A]');
-    btn.classList.remove('border-transparent', 'text-gray-400');
-    if (tabId === 'alertas') loadAlertas();
-    if (tabId === 'compromissos') loadCompromissos();
-    if (tabId === 'triggers') loadTriggers();
-    if (tabId === 'obrigacoes') loadObrigacoes();
 }
 
-const periodo = () => document.getElementById('vigilia-periodo').value;
+function escape(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 
-function loadDashboard() {
-    fetch(`/vigilia/api/resumo?periodo=${periodo()}`)
-        .then(r => r.json())
-        .then(d => {
-            document.getElementById('kpi-total').textContent = d.resumo.total;
-            document.getElementById('kpi-concluidos').textContent = d.resumo.concluidos;
-            document.getElementById('kpi-taxa').textContent = d.resumo.taxa + '% taxa';
-            document.getElementById('kpi-nao-iniciados').textContent = d.resumo.naoIniciados;
-            document.getElementById('kpi-cancelados').textContent = d.resumo.cancelados;
-            document.getElementById('kpi-alertas').textContent = d.resumo.alertas;
-            document.getElementById('alertas-badge').textContent = d.resumo.alertas;
-            document.getElementById('sync-info').textContent = 'Atualizado agora';
+// ── Modal cumprir ──
+function openModal(obrigacaoId) {
+    el('modal-obrig-id').value = obrigacaoId;
+    el('modal-parecer').value = '';
+    el('modal-cumprir').classList.add('open');
+    setTimeout(() => el('modal-parecer').focus(), 60);
+}
+function closeModal() {
+    el('modal-cumprir').classList.remove('open');
+}
+el('modal-confirmar').addEventListener('click', () => {
+    const id = el('modal-obrig-id').value;
+    const parecer = el('modal-parecer').value.trim();
+    if (!parecer) { alert('Descreva a providência.'); return; }
+    cumprirObrigacao(id, parecer);
+});
 
-            let html = '';
-            d.ranking.sort((a, b) => b.taxa - a.taxa).forEach((r, i) => {
-                const cor = r.taxa >= 80 ? 'text-green-600' : (r.taxa >= 50 ? 'text-amber-500' : 'text-red-600');
-                const bg = r.taxa >= 80 ? 'bg-green-500' : (r.taxa >= 50 ? 'bg-amber-400' : 'bg-red-500');
-                const alertBadge = r.alertas > 0 ? `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-red-100 text-red-600">${r.alertas}</span>` : '<span class="text-gray-300">—</span>';
-                const rowBg = i % 2 === 0 ? '' : 'bg-gray-50/50';
-                html += `<tr class="border-b hover:bg-blue-50/30 transition ${rowBg}">
-                    <td class="px-5 py-3 font-semibold text-[#1B334A]">${r.responsavel_nome}</td>
-                    <td class="text-center px-3 py-3 font-bold text-[#1B334A]">${r.total}</td>
-                    <td class="text-center px-3 py-3 text-green-600 font-semibold">${r.concluidos}</td>
-                    <td class="text-center px-3 py-3 text-amber-500 font-semibold">${r.nao_iniciados}</td>
-                    <td class="text-center px-3 py-3 text-gray-400">${r.cancelados}</td>
-                    <td class="text-center px-3 py-3">${alertBadge}</td>
-                    <td class="px-3 py-3">
-                        <div class="flex items-center gap-2">
-                            <div class="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                <div class="h-full rounded-full ${bg}" style="width:${r.taxa}%"></div>
-                            </div>
-                            <span class="${cor} font-bold text-xs">${r.taxa}%</span>
-                        </div>
-                    </td>
-                </tr>`;
-            });
-            document.getElementById('ranking-body').innerHTML = html || '<tr><td colspan="7" class="text-center py-6 text-gray-400">Nenhum dado.</td></tr>';
+async function cumprirObrigacao(id, parecer) {
+    try {
+        const r = await fetch(`/vigilia/api/obrigacoes/${id}/cumprir`, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json','X-CSRF-TOKEN': CSRF},
+            body: JSON.stringify({parecer})
         });
+        const d = await r.json();
+        if (d.success) {
+            closeModal();
+            loadInbox();
+        } else {
+            alert('Falha ao registrar cumprimento.');
+        }
+    } catch (e) {
+        alert('Erro de rede.');
+    }
 }
 
-function loadAlertas() {
-    fetch('/vigilia/api/alertas')
-        .then(r => r.json())
-        .then(d => {
-            if (d.alertas.length === 0) {
-                document.getElementById('alertas-container').innerHTML = '<div class="text-center text-gray-400 py-12 bg-white rounded-xl border">✅ Nenhum alerta ativo. Todos os compromissos estão em dia.</div>';
-                return;
-            }
-            let html = '<div class="space-y-2">';
-            d.alertas.slice(0, 50).forEach(a => {
-                const sevBorder = a.severidade === 'critico' ? 'border-l-red-500 bg-red-50/50' : (a.severidade === 'alto' ? 'border-l-amber-400 bg-amber-50/30' : 'border-l-gray-300 bg-gray-50/30');
-                const sevBadge = a.severidade === 'critico' ? '<span class="text-xs font-bold text-white bg-red-500 px-2 py-0.5 rounded">CRÍTICO</span>' : (a.severidade === 'alto' ? '<span class="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded">ALTO</span>' : '<span class="text-xs font-bold text-gray-500 bg-gray-200 px-2 py-0.5 rounded">MÉDIO</span>');
-                const dias = a.dias_atraso > 0 ? `<span class="text-red-600 font-bold text-xs">${a.dias_atraso}d atraso</span>` : (a.dias_atraso !== null && a.dias_atraso < 0 ? `<span class="text-amber-500 font-bold text-xs">vence em ${Math.abs(a.dias_atraso)}d</span>` : '');
-                const and_ = a.tem_andamento ? '<span class="text-green-600 font-semibold text-xs">✓ Há andamento</span>' : '<span class="text-red-500 font-semibold text-xs">✕ Sem andamento</span>';
-
-                html += `<div class="rounded-xl border-l-4 ${sevBorder} bg-white shadow-sm p-4">
-                    <div class="flex justify-between items-start mb-1.5">
-                        <div class="flex items-center gap-2">${sevBadge} <strong class="text-sm text-[#1B334A]">${a.tipo_atividade}</strong></div>
-                        ${dias}
+// ── Pessoas ──
+async function loadPessoas() {
+    try {
+        const r = await fetch('/vigilia/api/resumo?periodo=mes-atual');
+        const d = await r.json();
+        const grid = el('people-grid');
+        const ranking = (d.ranking || []).sort((a,b) => b.total - a.total).slice(0, 9);
+        if (ranking.length === 0) {
+            grid.innerHTML = '<div class="inbox-empty" style="grid-column: 1/-1;">Sem dados no período.</div>';
+            return;
+        }
+        grid.innerHTML = ranking.map(r => {
+            const taxa = r.taxa || 0;
+            const alerta = (r.alertas || 0) > 0;
+            const cor = taxa >= 90 ? 'ok' : (taxa >= 75 ? 'warn' : 'alert');
+            const ultimo = r.ultimo_cumprimento ? fmtRelative(r.ultimo_cumprimento) : 'nunca';
+            return `<div class="person ${alerta ? 'person--alert' : ''}">
+                <div class="person-head">
+                    <div class="person-avatar">${escape(initials(r.responsavel_nome))}</div>
+                    <div>
+                        <div class="person-name">${escape(r.responsavel_nome)}</div>
+                        <div class="person-role">${r.total} atividades · mês atual</div>
                     </div>
-                    <div class="flex flex-wrap gap-4 text-xs text-gray-500">
-                        <span>👤 ${a.responsavel}</span>
-                        <span>📁 ${a.processo || '—'}</span>
-                        <span>📅 Prazo: ${a.prazo_fatal || '—'}</span>
-                        ${and_}
+                </div>
+                <div class="person-stats">
+                    <div>
+                        <div class="person-stat-val ${cor}">${taxa}%</div>
+                        <div class="person-stat-lbl">Taxa</div>
                     </div>
-                </div>`;
-            });
-            html += '</div>';
-            document.getElementById('alertas-container').innerHTML = html;
-        });
+                    <div>
+                        <div class="person-stat-val ${alerta ? 'alert' : ''}">${r.alertas || 0}</div>
+                        <div class="person-stat-lbl">Alertas</div>
+                    </div>
+                    <div>
+                        <div class="person-stat-val">${escape(ultimo)}</div>
+                        <div class="person-stat-lbl">Último</div>
+                    </div>
+                </div>
+                <div class="person-progress"><div class="person-progress-fill ${cor}" style="width:${taxa}%"></div></div>
+                <div class="person-foot">
+                    <span>${r.concluidos} concluídos · ${r.nao_iniciados} em curso</span>
+                    <span>${r.cancelados || 0} cancelados</span>
+                </div>
+            </div>`;
+        }).join('');
+    } catch (e) {
+        el('people-grid').innerHTML = '<div class="inbox-empty" style="grid-column: 1/-1;">Erro ao carregar.</div>';
+    }
 }
 
-function loadCompromissos(page) {
-    page = page || 1;
-    const resp = document.getElementById('filtro-responsavel').value;
-    const status = document.getElementById('filtro-status').value;
-    const params = new URLSearchParams({periodo: periodo(), page});
-    if (resp) params.set('responsavel', resp);
-    if (status) params.set('status', status);
-
-    fetch(`/vigilia/api/compromissos?${params}`)
-        .then(r => r.json())
-        .then(d => {
-            document.getElementById('compromissos-count').textContent = `${d.total} registros`;
-            let html = '';
-            d.data.forEach((c, i) => {
-                const isSusp = c.status === 'Concluído' && c.status_cruzamento === 'suspeito';
-                const sitBg = c.status === 'Concluído' ? (isSusp ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700') : (c.status === 'Não iniciado' ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-500');
-                const sitLabel = isSusp ? '⚠ Suspeito' : c.status;
-                const cruzBase = !c.status_cruzamento ? '—' : {verificado:'<span class="text-green-600 font-bold">✓</span>', suspeito:'<span class="text-amber-500 font-bold">⚠</span>', sem_acao:'<span class="text-red-500 font-bold">✕</span>', nao_aplicavel:'<span class="text-gray-300">N/A</span>', futuro:'<span class="text-blue-400">⏳</span>', pendente:'…'}[c.status_cruzamento] || c.status_cruzamento;
-                const aiTag = c.ai_verdict ? ({VERIFICADO:`<span class="ml-1 text-xs text-green-700 bg-green-100 px-1.5 py-0.5 rounded font-bold" title="${c.ai_justificativa||''}">AI✓</span>`, SUSPEITO:`<span class="ml-1 text-xs text-red-700 bg-red-100 px-1.5 py-0.5 rounded font-bold" title="${c.ai_justificativa||''}">AI⚠</span>`, INCONCLUSIVO:`<span class="ml-1 text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded font-bold" title="${c.ai_justificativa||''}">AI?</span>`}[c.ai_verdict]||'') : '';
-                const cruz = cruzBase + aiTag;
-                const rowBg = i % 2 === 0 ? '' : 'bg-gray-50/50';
-
-                html += `<tr class="border-b hover:bg-blue-50/30 transition ${rowBg}">
-                    <td class="px-4 py-2.5"><span class="text-xs font-semibold px-2 py-1 rounded-lg ${sitBg}">${sitLabel}</span></td>
-                    <td class="px-3 py-2.5 font-semibold text-[#1B334A] text-xs">${c.responsavel_nome}</td>
-                    <td class="px-3 py-2.5 text-xs text-gray-600">${c.tipo_atividade || '—'}</td>
-                    <td class="px-3 py-2.5 text-xs font-mono text-[#4A7399]">${c.processo_pasta || '—'}</td>
-                    <td class="px-3 py-2.5 text-xs text-gray-600">${c.data_hora ? new Date(c.data_hora).toLocaleDateString('pt-BR') : '—'}</td>
-                    <td class="px-3 py-2.5 text-xs text-gray-600">${c.data_prazo_fatal || '—'}</td>
-                    <td class="px-3 py-2.5 text-center">${cruz}</td>
-                </tr>`;
-            });
-            document.getElementById('compromissos-body').innerHTML = html || '<tr><td colspan="7" class="text-center py-6 text-gray-400">Nenhum registro.</td></tr>';
-
-            let pag = '';
-            if (d.last_page > 1) {
-                pag = '<div class="flex gap-1">';
-                for (let i = 1; i <= Math.min(d.last_page, 10); i++) {
-                    pag += `<button onclick="loadCompromissos(${i})" class="px-3 py-1.5 text-xs rounded-lg font-medium ${i === d.current_page ? 'text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200 transition'}" ${i === d.current_page ? 'style="background:#385776;"' : ''}>${i}</button>`;
-                }
-                pag += '</div>';
-            }
-            document.getElementById('compromissos-pagination').innerHTML = pag;
-        });
+// ── Auditoria ──
+async function loadConfiabilidade() {
+    try {
+        const r = await fetch('/vigilia/api/confiabilidade?dias=30');
+        const d = await r.json();
+        el('conf-pct').textContent = d.pct ?? 0;
+        el('conf-verificadas').textContent = d.verificadas ?? 0;
+        el('conf-suspeitas').textContent = d.suspeitas ?? 0;
+        el('conf-semacao').textContent = d.sem_acao ?? 0;
+        el('kpi-conf').textContent = (d.pct ?? 0) + '%';
+        if (d.ultima_exec) {
+            el('conf-note').textContent = `Cruzamento automático · última execução ${fmtRelative(d.ultima_exec)} atrás`;
+            el('kpi-conf-delta').textContent = 'última sincronia ' + fmtRelative(d.ultima_exec) + ' atrás';
+        }
+    } catch (e) {
+        // silent
+    }
 }
 
-function executarCruzamento() {
-    const btn = document.getElementById('btn-cruzar');
-    btn.disabled = true; btn.textContent = '⏳ Cruzando...';
-    fetch('/vigilia/api/cruzar', {method:'POST', headers:{'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content}})
-        .then(r => r.json())
-        .then(d => {
-            btn.disabled = false; btn.textContent = '🔄 Cruzar Agora';
-            alert('Cruzamento concluído!\nVerificados: ' + (d.stats.verificado||0) + '\nSuspeitos: ' + (d.stats.suspeito||0) + '\nSem ação: ' + (d.stats.sem_acao||0));
-            loadDashboard();
-        })
-        .catch(() => { btn.disabled = false; btn.textContent = '🔄 Cruzar Agora'; });
+// ── Relógio ──
+function tickClock() {
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2,'0');
+    const mm = String(now.getMinutes()).padStart(2,'0');
+    el('hero-clock').innerHTML = `${hh}<span class="colon">:</span>${mm}`;
 }
 
-function updateRelLinks() {
-    const adv = document.getElementById('rel-adv').value;
-    const p = periodo();
-    document.getElementById('link-rel-individual').href = `/vigilia/relatorio/individual?responsavel=${encodeURIComponent(adv)}&periodo=${p}`;
-    document.getElementById('link-rel-individual-pdf').href = `/vigilia/export/pdf?tipo=individual&responsavel=${encodeURIComponent(adv)}&periodo=${p}`;
-}
-
-document.getElementById('rel-adv').addEventListener('change', updateRelLinks);
-loadDashboard();
-updateRelLinks();
-loadTriggers();
-loadObrigacoesBadge();
-
-// Deep-link via querystring (?tab=obrigacoes&processo=XXXX) — usado pelo sininho/notificações
-(function applyDeepLink() {
+// ── Init + deep link ──
+(function init() {
+    tickClock();
+    setInterval(tickClock, 30000);
     const qs = new URLSearchParams(window.location.search);
     const tab = qs.get('tab');
-    const processo = qs.get('processo');
-    if (processo && (tab === 'obrigacoes' || !tab)) {
-        setProcessoFilter(processo);
+    const filter = qs.get('filter');
+    // Compat com links antigos (?tab=obrigacoes) → filtro obrigacoes
+    if (filter) {
+        VIGILIA.filter = filter;
+        document.querySelectorAll('.chip').forEach(c => c.classList.toggle('chip--active', c.dataset.filter === filter));
+    } else if (tab === 'obrigacoes') {
+        VIGILIA.filter = 'obrigacoes';
+        document.querySelectorAll('.chip').forEach(c => c.classList.toggle('chip--active', c.dataset.filter === 'obrigacoes'));
     }
-    if (tab && document.querySelector(`[data-tab="${tab}"]`)) {
-        switchTab(tab);
-    }
+    loadInbox();
+    loadPessoas();
+    loadConfiabilidade();
 })();
-
-function loadObrigacoesBadge() {
-    fetch('/vigilia/api/obrigacoes?status=pendente&per_page=1')
-        .then(r => r.json())
-        .then(d => {
-            const badge = document.getElementById('obrigacoes-badge');
-            if (d.total > 0) {
-                badge.textContent = d.total;
-                badge.classList.remove('hidden');
-            }
-        });
-}
-
-let __obrigProcessoFiltro = null;
-function setProcessoFilter(processo) {
-    __obrigProcessoFiltro = processo || null;
-    const chip = document.getElementById('obrig-filtro-processo-chip');
-    const lbl  = document.getElementById('obrig-filtro-processo-label');
-    if (__obrigProcessoFiltro) {
-        lbl.textContent = __obrigProcessoFiltro;
-        chip.classList.remove('hidden');
-        // Quando vier de notificação, mostrar todos os status (não só pendentes)
-        const stSel = document.getElementById('obrig-filtro-status');
-        if (stSel) stSel.value = '';
-    } else {
-        chip.classList.add('hidden');
-    }
-}
-function clearProcessoFilter() { setProcessoFilter(null); loadObrigacoes(); }
-
-function loadObrigacoes(page) {
-    page = page || 1;
-    const status = document.getElementById('obrig-filtro-status').value;
-    const tipo   = document.getElementById('obrig-filtro-tipo').value;
-    const params = new URLSearchParams({page, per_page: 25});
-    if (status) params.set('status', status);
-    if (tipo)   params.set('tipo_evento', tipo);
-    if (__obrigProcessoFiltro) params.set('processo', __obrigProcessoFiltro);
-
-    fetch(`/vigilia/api/obrigacoes?${params}`)
-        .then(r => r.json())
-        .then(d => {
-            document.getElementById('obrig-count').textContent = `${d.total} registros`;
-
-            // Calcular KPIs a partir dos dados (se filtrando pendentes, mostrar métricas)
-            let pendentes = 0, vencidas = 0, cumpridas = 0;
-            d.data.forEach(o => {
-                if (o.status === 'pendente') pendentes++;
-                if (o.vencida) vencidas++;
-                if (o.status === 'cumprida') cumpridas++;
-            });
-            document.getElementById('obrig-kpi-pendentes').textContent = d.total && !status ? '—' : (status === 'pendente' ? d.total : '');
-            document.getElementById('obrig-kpi-vencidas').textContent = vencidas;
-            document.getElementById('obrig-kpi-cumpridas').textContent = status === 'cumprida' ? d.total : cumpridas;
-            document.getElementById('obrig-kpi-total').textContent = d.total;
-
-            const tipoLabel = {SENTENÇA:'⚖️ Sentença', ACÓRDÃO:'🏛️ Acórdão', DECISÃO_SIGNIFICATIVA:'⚡ Decisão'};
-            const statusStyle = {pendente:'bg-purple-100 text-purple-700', cumprida:'bg-green-100 text-green-700', justificada:'bg-blue-100 text-blue-600', cancelada:'bg-gray-100 text-gray-500'};
-
-            let html = '';
-            d.data.forEach((o, i) => {
-                const rowBg = i % 2 === 0 ? '' : 'bg-gray-50/50';
-                const tipoChip = `<span class="text-xs font-bold px-2 py-0.5 rounded" style="background:#1B334A15;color:#1B334A;">${tipoLabel[o.tipo_evento]||o.tipo_evento}</span>`;
-                const stBg = statusStyle[o.status] || 'bg-gray-100 text-gray-500';
-                const stLabel = o.vencida ? '<span class="text-xs font-bold px-2 py-0.5 rounded bg-red-100 text-red-700">VENCIDA</span>' : `<span class="text-xs font-bold px-2 py-0.5 rounded ${stBg}">${o.status}</span>`;
-                const limite = o.data_limite ? new Date(o.data_limite).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
-                const dataEv = o.data_evento ? new Date(o.data_evento+'T12:00:00').toLocaleDateString('pt-BR') : '—';
-                const acaoBtn = o.status === 'pendente'
-                    ? `<button onclick="abrirModalCumprir(${o.id})" class="text-xs px-2 py-1 rounded-lg font-medium text-white hover:opacity-80" style="background:#385776;">Cumprir</button>`
-                    : `<span class="text-xs text-gray-400">${o.data_cumprimento ? new Date(o.data_cumprimento).toLocaleDateString('pt-BR') : '—'}</span>`;
-
-                html += `<tr class="border-b hover:bg-blue-50/30 transition ${rowBg}" title="${o.descricao_evento}">
-                    <td class="px-4 py-2.5">${tipoChip}</td>
-                    <td class="px-3 py-2.5 text-xs font-mono text-[#4A7399] font-semibold">${o.processo_pasta||'—'}</td>
-                    <td class="px-3 py-2.5 text-xs text-gray-600">${o.advogado_nome}</td>
-                    <td class="px-3 py-2.5 text-xs text-gray-500 max-w-xs truncate">${o.descricao_evento}</td>
-                    <td class="px-3 py-2.5 text-xs text-center text-gray-500">${dataEv}</td>
-                    <td class="px-3 py-2.5 text-xs text-center ${o.vencida?'text-red-600 font-bold':'text-gray-500'}">${limite}</td>
-                    <td class="px-3 py-2.5 text-center">${stLabel}</td>
-                    <td class="px-3 py-2.5 text-center">${acaoBtn}</td>
-                </tr>`;
-            });
-            document.getElementById('obrigacoes-body').innerHTML = html || '<tr><td colspan="8" class="text-center py-6 text-gray-400">Nenhuma obrigação encontrada.</td></tr>';
-
-            let pag = '';
-            if (d.last_page > 1) {
-                pag = '<div class="flex gap-1">';
-                for (let i = 1; i <= Math.min(d.last_page, 10); i++) {
-                    pag += `<button onclick="loadObrigacoes(${i})" class="px-3 py-1.5 text-xs rounded-lg font-medium ${i===d.current_page?'text-white shadow-sm':'bg-gray-100 text-gray-600 hover:bg-gray-200'}" ${i===d.current_page?'style="background:#385776;"':''}>${i}</button>`;
-                }
-                pag += '</div>';
-            }
-            document.getElementById('obrigacoes-pagination').innerHTML = pag;
-        });
-}
-
-function abrirModalCumprir(id) {
-    document.getElementById('modal-obrig-id').value = id;
-    document.getElementById('modal-parecer').value = '';
-    document.getElementById('modal-cumprir').classList.remove('hidden');
-}
-
-function fecharModal() {
-    document.getElementById('modal-cumprir').classList.add('hidden');
-}
-
-function confirmarCumprir() {
-    const id     = document.getElementById('modal-obrig-id').value;
-    const parecer = document.getElementById('modal-parecer').value.trim();
-    if (!parecer) { alert('Descreva a providência tomada antes de confirmar.'); return; }
-
-    fetch(`/vigilia/api/obrigacoes/${id}/cumprir`, {
-        method: 'POST',
-        headers: {'Content-Type':'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content},
-        body: JSON.stringify({parecer}),
-    })
-    .then(r => r.json())
-    .then(d => {
-        if (d.success) {
-            fecharModal();
-            loadObrigacoes();
-            loadObrigacoesBadge();
-        }
-    });
-}
-
-function loadTriggers() {
-    fetch('/vigilia/api/triggers')
-        .then(r => r.json())
-        .then(d => {
-            document.getElementById('trig-total').textContent = d.total;
-            document.getElementById('trig-pendentes').textContent = d.pendentes;
-            document.getElementById('trig-vencidos').textContent = d.vencidos;
-            document.getElementById('trig-concluidos').textContent = d.concluidos;
-            document.getElementById('triggers-badge').textContent = d.pendentes + d.vencidos;
-
-            let html = '';
-            const todos = [...(d.detalhes_pendentes || []), ...(d.detalhes_vencidos || [])];
-
-            if (todos.length === 0) {
-                html = '<div class="bg-white rounded-xl border p-8 text-center text-gray-400">✅ Nenhuma tarefa sensível pendente.</div>';
-            } else {
-                html = '<div class="space-y-3">';
-                todos.forEach(t => {
-                    const isVencido = t.vencido;
-                    const borderColor = isVencido ? 'border-l-red-500 bg-red-50/30' : 'border-l-amber-400 bg-amber-50/20';
-                    const statusBadge = isVencido
-                        ? '<span class="text-xs font-bold text-white bg-red-500 px-2 py-0.5 rounded">VENCIDO ' + Math.round(t.horas_desde_criacao) + 'h</span>'
-                        : '<span class="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded">PENDENTE ' + Math.round(t.horas_desde_criacao) + 'h/' + t.prazo_horas + 'h</span>';
-                    const parecerBadge = t.tem_parecer
-                        ? '<span class="text-green-600 font-semibold text-xs">✓ Parecer preenchido</span>'
-                        : '<span class="text-red-500 font-semibold text-xs">✕ Sem parecer no DataJuri</span>';
-
-                    html += '<div class="rounded-xl border-l-4 ' + borderColor + ' bg-white shadow-sm p-4">' +
-                        '<div class="flex justify-between items-start mb-2">' +
-                            '<div class="flex items-center gap-2">' + statusBadge + ' <strong class="text-sm text-[#1B334A]">' + t.assunto + '</strong></div>' +
-                        '</div>' +
-                        '<div class="flex flex-wrap gap-4 text-xs text-gray-500">' +
-                            '<span>👤 ' + t.responsavel + '</span>' +
-                            '<span>📁 ' + (t.processo_pasta || '—') + '</span>' +
-                            '<span>📅 ' + (t.data_hora ? new Date(t.data_hora).toLocaleDateString('pt-BR') : '—') + '</span>' +
-                            (t.assunto_alterado ? '<span class="text-purple-600 font-semibold text-xs">🔄 Assunto alterado de: ' + t.assunto_original + '</span>' : '') +
-                            parecerBadge +
-                        '</div>' +
-                    '</div>';
-                });
-                html += '</div>';
-            }
-            document.getElementById('trigger-list').innerHTML = html;
-        });
-}
 </script>
 @endpush
-@endsection

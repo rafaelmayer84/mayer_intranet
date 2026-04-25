@@ -115,6 +115,15 @@ class VigiliaService
             ->orderByDesc('total')
             ->get();
 
+        // Último cumprimento por advogado (via vigilia_obrigacoes → users.name)
+        $ultimos = DB::table('vigilia_obrigacoes as vo')
+            ->join('users as u', 'u.id', '=', 'vo.advogado_user_id')
+            ->whereNotNull('vo.data_cumprimento')
+            ->select('u.name', DB::raw('MAX(vo.data_cumprimento) as ultimo'))
+            ->groupBy('u.name')
+            ->pluck('ultimo', 'name')
+            ->toArray();
+
         // Enriquecer com contagem de alertas
         $result = [];
         foreach ($rows as $row) {
@@ -128,13 +137,14 @@ class VigiliaService
             $taxa = $row->total > 0 ? round(($row->concluidos / $row->total) * 100, 1) : 0;
 
             $result[] = [
-                'responsavel_nome' => $row->responsavel_nome,
-                'total' => (int) $row->total,
-                'concluidos' => (int) $row->concluidos,
-                'nao_iniciados' => (int) $row->nao_iniciados,
-                'cancelados' => (int) $row->cancelados,
-                'alertas' => $alertas,
-                'taxa' => $taxa,
+                'responsavel_nome'   => $row->responsavel_nome,
+                'total'              => (int) $row->total,
+                'concluidos'         => (int) $row->concluidos,
+                'nao_iniciados'      => (int) $row->nao_iniciados,
+                'cancelados'         => (int) $row->cancelados,
+                'alertas'            => $alertas,
+                'taxa'               => $taxa,
+                'ultimo_cumprimento' => $ultimos[$row->responsavel_nome] ?? null,
             ];
         }
 
@@ -968,6 +978,244 @@ class VigiliaService
         return DB::table('vigilia_obrigacoes')
             ->where('status', 'pendente')
             ->count();
+    }
+
+    // ─── INBOX UNIFICADO (editorial v2) ────────────────────────────
+
+    /**
+     * Une obrigações, cobranças (triggers) e suspeitas num feed priorizado.
+     * Filter: tudo | vencidas | cobrancas | obrigacoes | suspeitas | cumpridas
+     */
+    public function getInbox(string $filter = 'tudo', int $limit = 40): array
+    {
+        $items = [];
+        $now = Carbon::now();
+
+        // ─── Obrigações (72h parecer) ───
+        if (in_array($filter, ['tudo', 'vencidas', 'obrigacoes', 'cumpridas'], true)) {
+            $obrQ = DB::table('vigilia_obrigacoes as vo')
+                ->leftJoin('users as u', 'u.id', '=', 'vo.advogado_user_id')
+                ->leftJoin('processos as p', 'p.pasta', '=', 'vo.processo_pasta')
+                ->select(
+                    'vo.id', 'vo.processo_pasta', 'vo.tipo_evento',
+                    'vo.descricao_evento', 'vo.status', 'vo.data_limite',
+                    'vo.data_cumprimento', 'vo.created_at',
+                    'u.name as advogado_nome',
+                    'p.cliente_nome'
+                );
+
+            if ($filter === 'cumpridas') {
+                $obrQ->where('vo.status', 'cumprida')
+                    ->whereDate('vo.data_cumprimento', $now->toDateString());
+            } elseif ($filter === 'vencidas') {
+                $obrQ->where('vo.status', 'pendente')
+                    ->where('vo.data_limite', '<', $now);
+            } else {
+                $obrQ->where('vo.status', 'pendente');
+            }
+
+            foreach ($obrQ->orderBy('vo.data_limite')->limit($limit)->get() as $r) {
+                $limite = $r->data_limite ? Carbon::parse($r->data_limite) : null;
+                $vencida = $limite && $now->gt($limite) && $r->status === 'pendente';
+                $diasAtraso = $vencida ? (int) $limite->diffInDays($now) : null;
+                $horasAteLimite = $limite && !$vencida ? (int) $now->diffInHours($limite) : null;
+
+                if ($r->status === 'cumprida') {
+                    $sev = 'ok';
+                    $status_label = 'Cumprida';
+                } elseif ($vencida) {
+                    $sev = 'critical';
+                    $status_label = $diasAtraso > 0 ? "Vencida {$diasAtraso}d" : 'Vencida hoje';
+                } elseif ($horasAteLimite !== null && $horasAteLimite <= 24) {
+                    $sev = 'medium';
+                    $status_label = "Vence {$horasAteLimite}h";
+                } else {
+                    $sev = 'low';
+                    $status_label = 'Pendente';
+                }
+
+                $items[] = [
+                    'id'            => 'obr:' . $r->id,
+                    'obrigacao_id'  => $r->id,
+                    'source'        => 'obrigacao',
+                    'severity'      => $sev,
+                    'status_label'  => $status_label,
+                    'time_label'    => $limite ? 'limite ' . $limite->format('d/m · H\\h') : '—',
+                    'sort_key'      => $limite ? $limite->timestamp : PHP_INT_MAX,
+                    'processo'      => $r->processo_pasta,
+                    'tribunal'      => $this->tribunalFromPasta($r->processo_pasta),
+                    'event_text'    => mb_substr((string) $r->descricao_evento, 0, 180),
+                    'advogado'      => $r->advogado_nome ?? 'Não atribuído',
+                    'cliente'       => $r->cliente_nome,
+                    'area'          => $this->areaFromPasta($r->processo_pasta),
+                    'actions'       => $r->status === 'cumprida' ? [] : [
+                        ['kind' => 'parecer',     'label' => 'Registrar parecer'],
+                        ['kind' => 'justificar',  'label' => 'Justificar'],
+                    ],
+                ];
+            }
+        }
+
+        // ─── Cobranças (Triggers 48h+) ───
+        if (in_array($filter, ['tudo', 'cobrancas', 'vencidas'], true)) {
+            $triggers = $this->getTarefasTrigger();
+            foreach ($triggers as $t) {
+                $isVencido = $t['vencido'] === true && $t['status_trigger'] === 'vencido';
+                $isPendente = $t['status_trigger'] === 'pendente' || $isVencido;
+                if (!$isPendente) continue;
+                if ($filter === 'vencidas' && !$isVencido) continue;
+
+                $cliente = DB::table('processos')->where('pasta', $t['processo_pasta'])->value('cliente_nome');
+                $horas = (int) ($t['horas_desde_criacao'] ?? 0);
+                $prazo = (int) ($t['prazo_horas'] ?? 48);
+
+                $items[] = [
+                    'id'           => 'cob:' . $t['id'],
+                    'source'       => 'cobranca',
+                    'severity'     => $isVencido ? 'high' : 'medium',
+                    'status_label' => $isVencido ? 'Sem providência' : "Em curso {$horas}h",
+                    'time_label'   => "notificado {$horas}h atrás · prazo {$prazo}h",
+                    'sort_key'     => -$horas,
+                    'processo'     => $t['processo_pasta'],
+                    'tribunal'     => $this->tribunalFromPasta($t['processo_pasta']),
+                    'event_text'   => $t['assunto'] . ' — ' . ($t['tem_parecer'] ? 'parecer presente mas sem confirmação' : 'sem parecer registrado no DataJuri'),
+                    'advogado'     => $t['responsavel'],
+                    'cliente'      => $cliente,
+                    'area'         => $this->areaFromPasta($t['processo_pasta']),
+                    'actions'      => [
+                        ['kind' => 'providencia', 'label' => 'Marcar providência'],
+                        ['kind' => 'conversa',    'label' => 'Abrir NEXO'],
+                    ],
+                ];
+            }
+        }
+
+        // ─── Suspeitas (cruzamento) ───
+        if (in_array($filter, ['tudo', 'suspeitas'], true)) {
+            $susp = DB::table('vigilia_cruzamentos as vc')
+                ->join('atividades_datajuri as ad', 'ad.id', '=', 'vc.atividade_datajuri_id')
+                ->leftJoin('processos as p', 'p.pasta', '=', 'ad.processo_pasta')
+                ->where('vc.status_cruzamento', 'suspeito')
+                ->select(
+                    'vc.id', 'vc.dias_gap', 'vc.observacao', 'vc.ai_verdict',
+                    'ad.responsavel_nome', 'ad.processo_pasta', 'ad.tipo_atividade',
+                    'ad.data_hora', 'ad.data_conclusao',
+                    'p.cliente_nome'
+                )
+                ->orderByDesc('vc.dias_gap')
+                ->limit($limit)
+                ->get();
+
+            foreach ($susp as $r) {
+                $items[] = [
+                    'id'           => 'sus:' . $r->id,
+                    'source'       => 'suspeita',
+                    'severity'     => 'suspect',
+                    'status_label' => 'Suspeita',
+                    'time_label'   => $r->data_conclusao ? 'concluída ' . Carbon::parse($r->data_conclusao)->format('d/m') : 'conclusão sem data',
+                    'sort_key'     => (int) $r->dias_gap * -1,
+                    'processo'     => $r->processo_pasta,
+                    'tribunal'     => $this->tribunalFromPasta($r->processo_pasta),
+                    'event_text'   => ($r->tipo_atividade ?? 'Atividade') . ' marcada concluída sem andamento posterior no DataJuri' . ($r->ai_verdict ? " (AI: {$r->ai_verdict})" : '') . '.',
+                    'advogado'     => $r->responsavel_nome,
+                    'cliente'      => $r->cliente_nome,
+                    'area'         => $this->areaFromPasta($r->processo_pasta),
+                    'actions'      => [
+                        ['kind' => 'auditar', 'label' => 'Auditar'],
+                        ['kind' => 'aceitar', 'label' => 'Aceitar'],
+                    ],
+                ];
+            }
+        }
+
+        // Ordenação: crítico > alto > suspeita > médio > baixo > ok
+        $sevOrder = ['critical' => 0, 'high' => 1, 'suspect' => 2, 'medium' => 3, 'low' => 4, 'ok' => 5];
+        usort($items, function ($a, $b) use ($sevOrder) {
+            $sa = $sevOrder[$a['severity']] ?? 9;
+            $sb = $sevOrder[$b['severity']] ?? 9;
+            if ($sa !== $sb) return $sa <=> $sb;
+            return $a['sort_key'] <=> $b['sort_key'];
+        });
+
+        return array_slice($items, 0, $limit);
+    }
+
+    /**
+     * Contadores por categoria (pra badges dos chips).
+     */
+    public function getInboxCounters(): array
+    {
+        $now = Carbon::now();
+        $obrPendentes = DB::table('vigilia_obrigacoes')->where('status', 'pendente')->count();
+        $obrVencidas  = DB::table('vigilia_obrigacoes')->where('status', 'pendente')->where('data_limite', '<', $now)->count();
+        $triggers     = $this->getResumoTriggers();
+        $suspeitas    = DB::table('vigilia_cruzamentos')->where('status_cruzamento', 'suspeito')->count();
+        $cumpridasHoje = DB::table('vigilia_obrigacoes')->where('status', 'cumprida')->whereDate('data_cumprimento', $now->toDateString())->count();
+
+        $vencidasTotal = $obrVencidas + (int) ($triggers['vencidos'] ?? 0);
+
+        return [
+            'tudo'          => $obrPendentes + (int) ($triggers['pendentes'] ?? 0) + (int) ($triggers['vencidos'] ?? 0) + $suspeitas,
+            'vencidas'      => $vencidasTotal,
+            'cobrancas'     => (int) ($triggers['pendentes'] ?? 0) + (int) ($triggers['vencidos'] ?? 0),
+            'obrigacoes'    => $obrPendentes,
+            'suspeitas'     => $suspeitas,
+            'cumpridas'     => $cumpridasHoje,
+            'sem_providencia_48h' => (int) ($triggers['vencidos'] ?? 0),
+        ];
+    }
+
+    // ─── CONFIABILIDADE ───────────────────────────────────────────
+
+    public function getConfiabilidade(?int $dias = 30): array
+    {
+        // created_at pode estar NULL (rows legados) — usar updated_at como fallback
+        $desde = Carbon::now()->subDays($dias);
+        $base = DB::table('vigilia_cruzamentos')
+            ->whereIn('status_cruzamento', ['verificado', 'suspeito', 'sem_acao'])
+            ->where(function ($q) use ($desde) {
+                $q->where('updated_at', '>=', $desde)
+                  ->orWhereNull('updated_at');
+            });
+
+        $verificadas = (clone $base)->where('status_cruzamento', 'verificado')->count();
+        $suspeitas   = (clone $base)->where('status_cruzamento', 'suspeito')->count();
+        $semAcao     = (clone $base)->where('status_cruzamento', 'sem_acao')->count();
+        $total       = $verificadas + $suspeitas + $semAcao;
+        $pct         = $total > 0 ? round(($verificadas / $total) * 100) : 0;
+
+        $ultimaExec = DB::table('vigilia_cruzamentos')->max('updated_at');
+
+        return [
+            'total'        => $total,
+            'verificadas'  => $verificadas,
+            'suspeitas'    => $suspeitas,
+            'sem_acao'     => $semAcao,
+            'pct'          => $pct,
+            'dias'         => $dias,
+            'ultima_exec'  => $ultimaExec,
+        ];
+    }
+
+    // ─── Helpers ──────────────────────────────────────────────────
+
+    private function tribunalFromPasta(?string $pasta): string
+    {
+        if (!$pasta) return '—';
+        if (str_contains($pasta, '.8.24.')) return 'TJSC eproc';
+        if (str_contains($pasta, '.5.12.')) return 'TRT12';
+        if (str_contains($pasta, '.4.04.')) return 'TRF4';
+        if (str_starts_with($pasta, 'STJ')) return 'STJ';
+        return 'DataJuri';
+    }
+
+    private function areaFromPasta(?string $pasta): ?string
+    {
+        if (!$pasta) return null;
+        if (str_contains($pasta, '.5.12.')) return 'Trabalhista';
+        if (str_contains($pasta, '.8.24.')) return 'Cível';
+        if (str_contains($pasta, '.4.04.')) return 'Federal';
+        return null;
     }
 
 }

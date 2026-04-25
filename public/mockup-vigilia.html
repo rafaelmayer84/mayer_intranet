@@ -1,0 +1,839 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VIGÍLIA — Mockup Comando · Editorial Navy + Gold</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/editorial-design.css">
+<style>
+  /* ─────────────────────────────────────────────────────────────
+     VIGÍLIA — Componentes Editorial específicos do mockup
+     Empresta tokens de editorial-design.css (var(--navy-*) etc.)
+     ───────────────────────────────────────────────────────────── */
+  body { background: var(--paper); margin: 0; }
+  body::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none;
+    background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='1'/><feColorMatrix values='0 0 0 0 0.43 0 0 0 0 0.36 0 0 0 0 0.20 0 0 0 0.025 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    opacity: .9; z-index: 0;
+  }
+  .editorial-page { position: relative; z-index: 1; }
+
+  /* Hero override pra VIGÍLIA: número-comando gigante */
+  .vg-hero-greeting {
+    font-weight: 300;
+    font-size: clamp(48px, 6vw, 78px);
+    line-height: 1.0; letter-spacing: -.03em;
+    color: var(--ink); margin: 0 0 6px;
+  }
+  .vg-hero-greeting .num {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-style: italic; font-weight: 600;
+    color: var(--bad); font-size: 1.05em;
+    letter-spacing: -.04em;
+  }
+  .vg-hero-greeting em { font-style: normal; font-weight: 600; color: var(--navy-700); }
+  .vg-hero-greeting .name {
+    font-weight: 700; color: var(--navy-700);
+    display: inline-block; position: relative;
+  }
+  .vg-hero-greeting .name::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: .08em; height: .45em;
+    background: linear-gradient(to top, rgba(201,163,91,.22), transparent);
+    z-index: -1; border-radius: 2px;
+  }
+
+  /* Hero-stat com cor por severidade */
+  .hero-stat .val-bad  { color: var(--bad); }
+  .hero-stat .val-warn { color: var(--warn); }
+  .hero-stat .val-ok   { color: var(--ok); }
+
+  /* ── Filter chips ── */
+  .chip-row {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    margin-bottom: 22px;
+    padding-bottom: 18px;
+    border-bottom: 1px dashed var(--rule);
+  }
+  .chip {
+    font-family: var(--sans);
+    font-size: 12px; font-weight: 600;
+    letter-spacing: .04em;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--rule);
+    background: var(--surface);
+    color: var(--ink-2);
+    cursor: pointer;
+    transition: all .25s var(--ease);
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .chip .ct {
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-3); font-weight: 700;
+    background: var(--paper-2);
+    padding: 1px 8px; border-radius: 999px;
+    font-size: 11px;
+  }
+  .chip:hover { border-color: var(--gold-400); color: var(--gold-700); }
+  .chip--active {
+    background: var(--navy-700); color: var(--paper);
+    border-color: var(--navy-700);
+  }
+  .chip--active .ct { background: rgba(255,255,255,.12); color: var(--gold-300); }
+  .chip--bad   { border-color: rgba(179,66,47,.35); color: var(--bad); background: #FAEBE4; }
+  .chip--bad .ct { background: rgba(179,66,47,.12); color: var(--bad); }
+  .chip--warn  { border-color: rgba(195,122,42,.35); color: var(--warn); background: #FAF1E4; }
+  .chip--warn .ct { background: rgba(195,122,42,.12); color: var(--warn); }
+
+  /* ── Inbox items ── */
+  .inbox { display: flex; flex-direction: column; gap: 0; }
+  .inbox-item {
+    display: grid;
+    grid-template-columns: 130px 1fr auto;
+    gap: 24px; align-items: center;
+    padding: 22px 4px;
+    border-bottom: 1px solid var(--rule);
+    transition: all .25s var(--ease);
+    cursor: pointer; position: relative;
+  }
+  .inbox-item:first-child { border-top: 1px solid var(--rule); }
+  .inbox-item:hover { background: rgba(201,163,91,.04); padding-left: 12px; }
+  .inbox-item::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px; background: transparent;
+    transition: background .25s var(--ease);
+  }
+  .inbox-item--critical::before { background: var(--bad); }
+  .inbox-item--high::before     { background: var(--warn); }
+  .inbox-item--medium::before   { background: var(--gold-400); }
+  .inbox-item--suspect::before  { background: var(--navy-500); }
+
+  .inbox-tag {
+    display: flex; flex-direction: column; gap: 2px;
+    align-items: flex-start;
+  }
+  .inbox-tag-status {
+    font-size: 10px; font-weight: 700; letter-spacing: .14em;
+    text-transform: uppercase;
+    padding: 4px 10px; border-radius: 4px;
+    display: inline-block;
+  }
+  .inbox-tag-status.crit { background: var(--bad); color: var(--paper); }
+  .inbox-tag-status.high { background: var(--warn); color: var(--paper); }
+  .inbox-tag-status.med  { background: var(--gold-100); color: var(--gold-700); }
+  .inbox-tag-status.susp { background: var(--paper-2); color: var(--navy-700); border: 1px solid var(--navy-500); }
+
+  .inbox-tag-time {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-style: italic; font-weight: 400;
+    font-size: 13px; color: var(--ink-3);
+    margin-top: 4px;
+  }
+
+  .inbox-body { min-width: 0; }
+  .inbox-process {
+    font-family: var(--sans);
+    font-variant-numeric: tabular-nums;
+    font-size: 11px; letter-spacing: .08em;
+    color: var(--ink-3); font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .inbox-event {
+    font-size: 16px; line-height: 1.35;
+    color: var(--ink); font-weight: 500;
+    letter-spacing: -.005em;
+    margin-bottom: 8px;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .inbox-meta {
+    display: flex; gap: 14px; align-items: center;
+    font-size: 12px; color: var(--ink-3);
+  }
+  .inbox-meta .who {
+    font-weight: 600; color: var(--ink-2);
+  }
+  .inbox-meta .sep { color: var(--rule-2); }
+
+  .inbox-action { display: flex; gap: 6px; flex-shrink: 0; }
+  .btn {
+    font-family: var(--sans);
+    font-size: 12px; font-weight: 600;
+    letter-spacing: .02em;
+    padding: 9px 16px; border-radius: 8px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all .2s var(--ease);
+    white-space: nowrap;
+  }
+  .btn--primary {
+    background: var(--navy-700); color: var(--paper);
+    border-color: var(--navy-700);
+  }
+  .btn--primary:hover { background: var(--navy-600); }
+  .btn--ghost {
+    background: transparent; color: var(--ink-2);
+    border-color: var(--rule);
+  }
+  .btn--ghost:hover { border-color: var(--gold-500); color: var(--gold-700); }
+
+  /* ── Pessoas — cards ── */
+  .people-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  @media (max-width: 1100px) { .people-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 720px)  { .people-grid { grid-template-columns: 1fr; } }
+  .person {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--r-md);
+    padding: 22px 22px 20px;
+    cursor: pointer;
+    transition: all .3s var(--ease);
+    position: relative; overflow: hidden;
+  }
+  .person::before {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: var(--gold-500);
+    transform: scaleX(0); transform-origin: left;
+    transition: transform .5s var(--ease);
+  }
+  .person:hover::before { transform: scaleX(1); }
+  .person:hover {
+    border-color: var(--gold-300);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+  .person--alert::before { background: var(--bad); transform: scaleX(1); }
+  .person-head {
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 18px;
+  }
+  .person-avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--navy-700), var(--navy-500));
+    color: var(--paper);
+    display: grid; place-items: center;
+    font-weight: 600; font-size: 13px; letter-spacing: .05em;
+    flex-shrink: 0;
+  }
+  .person--alert .person-avatar {
+    background: linear-gradient(135deg, var(--bad), #8a3324);
+  }
+  .person-name {
+    font-size: 15px; font-weight: 600; color: var(--ink);
+    line-height: 1.2;
+  }
+  .person-role {
+    font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--ink-3); font-weight: 600; margin-top: 3px;
+  }
+  .person-stats {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 10px; margin-bottom: 14px;
+    padding: 14px 0;
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+  .person-stat-val {
+    font-weight: 300; font-size: 26px;
+    letter-spacing: -.02em; line-height: 1;
+    color: var(--ink); font-variant-numeric: tabular-nums;
+  }
+  .person-stat-val.alert { color: var(--bad); }
+  .person-stat-val.warn  { color: var(--warn); }
+  .person-stat-val.ok    { color: var(--ok); }
+  .person-stat-lbl {
+    font-size: 9px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--ink-3); font-weight: 600; margin-top: 6px;
+  }
+  .person-progress {
+    height: 4px; background: var(--rule);
+    border-radius: 999px; overflow: hidden;
+  }
+  .person-progress-fill {
+    height: 100%; border-radius: 999px;
+    background: var(--gold-500);
+    transition: width .8s var(--ease-out);
+  }
+  .person-progress-fill.alert { background: var(--bad); }
+  .person-progress-fill.warn  { background: var(--warn); }
+  .person-progress-fill.ok    { background: var(--ok); }
+  .person-foot {
+    margin-top: 12px;
+    font-size: 11px; color: var(--ink-3);
+    display: flex; justify-content: space-between;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Auditoria ── */
+  .audit-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 1100px) { .audit-grid { grid-template-columns: 1fr; } }
+
+  .audit-feature {
+    background: linear-gradient(135deg, var(--navy-900), var(--navy-700) 75%, var(--navy-600));
+    color: var(--paper);
+    border: 1px solid var(--navy-800);
+    border-radius: var(--r-md);
+    padding: 28px 30px;
+    position: relative; overflow: hidden;
+  }
+  .audit-feature::after {
+    content: ""; position: absolute; right: -50px; bottom: -80px;
+    width: 240px; height: 240px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(201,163,91,.25), transparent 60%);
+    pointer-events: none;
+  }
+  .audit-feature::before {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: var(--gold-500);
+  }
+  .audit-eyebrow {
+    font-size: 10px; letter-spacing: .2em; text-transform: uppercase;
+    color: var(--gold-400); font-weight: 600;
+    margin-bottom: 18px;
+  }
+  .audit-value {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-style: italic;
+    font-weight: 600; font-size: 88px; line-height: .9;
+    letter-spacing: -.04em;
+    color: var(--paper);
+  }
+  .audit-value .pct {
+    font-family: var(--sans);
+    font-style: normal; font-weight: 300;
+    font-size: .42em; color: var(--gold-400);
+    margin-left: 4px;
+  }
+  .audit-breakdown {
+    margin-top: 22px; display: flex; gap: 22px;
+    font-size: 12px; color: var(--gold-300);
+    border-top: 1px solid rgba(201,163,91,.18);
+    padding-top: 16px;
+  }
+  .audit-breakdown b { color: var(--paper); font-size: 18px; font-weight: 300; display: block; margin-bottom: 2px; }
+
+  .export-card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: var(--r-md);
+    padding: 22px;
+    transition: all .3s var(--ease);
+    position: relative; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  .export-card::before {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: var(--gold-500);
+    transform: scaleX(0); transform-origin: left;
+    transition: transform .4s var(--ease);
+  }
+  .export-card:hover::before { transform: scaleX(1); }
+  .export-card:hover { border-color: var(--gold-300); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  .export-icon {
+    width: 38px; height: 38px; border-radius: 9px;
+    background: var(--gold-50); color: var(--gold-600);
+    display: grid; place-items: center;
+    border: 1px solid var(--gold-100);
+    margin-bottom: 14px;
+  }
+  .export-title { font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+  .export-desc { font-size: 12px; color: var(--ink-3); line-height: 1.5; flex: 1; margin-bottom: 14px; }
+  .export-actions { display: flex; gap: 6px; }
+
+  /* ── Note no topo do mockup ── */
+  .mock-note {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--gold-50);
+    border-bottom: 1px solid var(--gold-300);
+    padding: 9px 24px;
+    font-size: 12px; color: var(--gold-700);
+    font-weight: 600; letter-spacing: .04em;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .mock-note .pill {
+    background: var(--navy-700); color: var(--gold-300);
+    padding: 2px 8px; border-radius: 4px;
+    font-size: 10px; letter-spacing: .12em;
+  }
+
+  /* Stagger reveal */
+  @keyframes vg-rise {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .stagger > * { opacity: 0; animation: vg-rise .7s var(--ease-out) forwards; }
+  .stagger > *:nth-child(1) { animation-delay: .05s; }
+  .stagger > *:nth-child(2) { animation-delay: .15s; }
+  .stagger > *:nth-child(3) { animation-delay: .25s; }
+  .stagger > *:nth-child(4) { animation-delay: .35s; }
+  .stagger > *:nth-child(5) { animation-delay: .45s; }
+  .stagger > *:nth-child(6) { animation-delay: .55s; }
+</style>
+</head>
+<body>
+
+<div class="mock-note">
+  <span class="pill">MOCKUP</span>
+  Proposta de refatoração — VIGÍLIA Comando · linguagem editorial Navy + Gold (mesma da home).
+  Dados ilustrativos. Aprove ou redirecione antes de eu trocar a tela real.
+</div>
+
+<div class="editorial-page">
+
+  <!-- ─────────── HERO ─────────── -->
+  <section class="hero" style="margin-bottom: 56px;">
+    <div>
+      <div class="hero-eyebrow">Vigília · Quinta, 24 de abril</div>
+      <h1 class="vg-hero-greeting">
+        <em>Hoje,</em> <span class="num">7</span> processos<br>
+        <span class="name">exigem</span> sua atenção.
+      </h1>
+      <div class="hero-sub">
+        5 vencidas há mais de 24h · 11 sem providência depois de 48h · 3 conclusões sem andamento
+      </div>
+
+      <div class="hero-stats stagger">
+        <div class="hero-stat">
+          <div class="hero-stat-label">Vencidas hoje</div>
+          <div class="hero-stat-value val-bad">5</div>
+          <div class="hero-stat-delta down">↓ requer ação imediata</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-label">Sem providência 48h+</div>
+          <div class="hero-stat-value val-warn">11</div>
+          <div class="hero-stat-delta down">↓ advogados parados</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-label">Conclusões suspeitas</div>
+          <div class="hero-stat-value">3</div>
+          <div class="hero-stat-delta down">↓ sem andamento posterior</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-label">Confiabilidade 30d</div>
+          <div class="hero-stat-value val-ok">94%</div>
+          <div class="hero-stat-delta">↑ +4pt vs período anterior</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero-time">
+      <div class="hero-clock">19<span class="colon">:</span>42</div>
+      Última sincronia DataJuri
+    </div>
+  </section>
+
+  <!-- ─────────── INBOX CRÍTICO ─────────── -->
+  <section style="margin-bottom: 56px;">
+    <div class="section-head">
+      <div>
+        <div class="hero-eyebrow" style="margin-bottom: 6px;">Comando</div>
+        <h2>Inbox <em>crítico</em>.</h2>
+      </div>
+      <div class="section-line"></div>
+      <a class="section-action">
+        Ver histórico completo
+        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14m-6-6l6 6-6 6"/></svg>
+      </a>
+    </div>
+
+    <div class="chip-row">
+      <button class="chip chip--active">Todos <span class="ct">19</span></button>
+      <button class="chip chip--bad">Vencidas <span class="ct">5</span></button>
+      <button class="chip chip--warn">Sem providência 48h+ <span class="ct">11</span></button>
+      <button class="chip">Suspeitas <span class="ct">3</span></button>
+      <button class="chip">Cumpridas hoje <span class="ct">8</span></button>
+    </div>
+
+    <div class="inbox stagger">
+
+      <div class="inbox-item inbox-item--critical">
+        <div class="inbox-tag">
+          <span class="inbox-tag-status crit">Vencida 2d</span>
+          <span class="inbox-tag-time">limite 22/04 · 14h</span>
+        </div>
+        <div class="inbox-body">
+          <div class="inbox-process">5007672-26.2023.8.24.0033 · TJSC eproc</div>
+          <div class="inbox-event">Sentença de mérito — procedente em parte. Fixa indenização e abre prazo recursal de 15 dias úteis.</div>
+          <div class="inbox-meta">
+            <span class="who">Pedro Soares</span>
+            <span class="sep">·</span>
+            <span>Cliente: Construtora Aliança Ltda.</span>
+            <span class="sep">·</span>
+            <span>Trabalhista</span>
+          </div>
+        </div>
+        <div class="inbox-action">
+          <button class="btn btn--primary">Registrar parecer</button>
+          <button class="btn btn--ghost">Justificar</button>
+        </div>
+      </div>
+
+      <div class="inbox-item inbox-item--critical">
+        <div class="inbox-tag">
+          <span class="inbox-tag-status crit">Vencida 1d</span>
+          <span class="inbox-tag-time">limite 23/04 · 10h</span>
+        </div>
+        <div class="inbox-body">
+          <div class="inbox-process">5015526-24.2024.8.24.0005 · TJSC eproc</div>
+          <div class="inbox-event">Acórdão de improcedência da apelação. Esgota instância ordinária. Avaliar cabimento de RE/REsp em 15 dias.</div>
+          <div class="inbox-meta">
+            <span class="who">Camila Pereira</span>
+            <span class="sep">·</span>
+            <span>Cliente: Mercado Verde S.A.</span>
+            <span class="sep">·</span>
+            <span>Cível</span>
+          </div>
+        </div>
+        <div class="inbox-action">
+          <button class="btn btn--primary">Registrar parecer</button>
+          <button class="btn btn--ghost">Justificar</button>
+        </div>
+      </div>
+
+      <div class="inbox-item inbox-item--high">
+        <div class="inbox-tag">
+          <span class="inbox-tag-status high">Sem providência</span>
+          <span class="inbox-tag-time">notificado 48h atrás</span>
+        </div>
+        <div class="inbox-body">
+          <div class="inbox-process">0001957-33.2025.5.12.0056 · TRT12</div>
+          <div class="inbox-event">Verificação de cumprimento solicitada pelo cliente — resposta pendente desde 22/04. Cliente já mandou cobrança no NEXO.</div>
+          <div class="inbox-meta">
+            <span class="who">Lucas Andrade</span>
+            <span class="sep">·</span>
+            <span>Cliente: Transporte Sul Express</span>
+            <span class="sep">·</span>
+            <span>Trabalhista</span>
+          </div>
+        </div>
+        <div class="inbox-action">
+          <button class="btn btn--primary">Marcar providência</button>
+          <button class="btn btn--ghost">Abrir conversa</button>
+        </div>
+      </div>
+
+      <div class="inbox-item inbox-item--suspect">
+        <div class="inbox-tag">
+          <span class="inbox-tag-status susp">Suspeita</span>
+          <span class="inbox-tag-time">concluída 21/04</span>
+        </div>
+        <div class="inbox-body">
+          <div class="inbox-process">0905055-95.2019.8.24.0033 · TJSC eproc</div>
+          <div class="inbox-event">Atividade marcada como concluída sem andamento posterior no DataJuri. Cruzamento da AI sinaliza como inconclusiva — pode ser registro indevido.</div>
+          <div class="inbox-meta">
+            <span class="who">Renata Lima</span>
+            <span class="sep">·</span>
+            <span>Cliente: Indústria Catarinense</span>
+            <span class="sep">·</span>
+            <span>Empresarial</span>
+          </div>
+        </div>
+        <div class="inbox-action">
+          <button class="btn btn--primary">Auditar</button>
+          <button class="btn btn--ghost">Aceitar</button>
+        </div>
+      </div>
+
+      <div class="inbox-item inbox-item--medium">
+        <div class="inbox-tag">
+          <span class="inbox-tag-status med">Vence 12h</span>
+          <span class="inbox-tag-time">limite 25/04 · 08h</span>
+        </div>
+        <div class="inbox-body">
+          <div class="inbox-process">5010278-18.2023.8.24.0036 · TJSC eproc</div>
+          <div class="inbox-event">Decisão saneadora — define pontos controvertidos e abre prazo de 5 dias para indicação de provas. Calendar audiência preliminar.</div>
+          <div class="inbox-meta">
+            <span class="who">Pedro Soares</span>
+            <span class="sep">·</span>
+            <span>Cliente: Cooperativa Agrosul</span>
+            <span class="sep">·</span>
+            <span>Cível</span>
+          </div>
+        </div>
+        <div class="inbox-action">
+          <button class="btn btn--primary">Registrar parecer</button>
+          <button class="btn btn--ghost">Adiar</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ─────────── PESSOAS ─────────── -->
+  <section style="margin-bottom: 56px;">
+    <div class="section-head">
+      <div>
+        <div class="hero-eyebrow" style="margin-bottom: 6px;">Time</div>
+        <h2>Performance por <em>advogado</em>.</h2>
+      </div>
+      <div class="section-line"></div>
+      <a class="section-action">
+        Relatório individual
+        <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14m-6-6l6 6-6 6"/></svg>
+      </a>
+    </div>
+
+    <div class="people-grid stagger">
+
+      <div class="person person--alert">
+        <div class="person-head">
+          <div class="person-avatar">PS</div>
+          <div>
+            <div class="person-name">Pedro Soares</div>
+            <div class="person-role">Trabalhista · Sênior</div>
+          </div>
+        </div>
+        <div class="person-stats">
+          <div>
+            <div class="person-stat-val alert">72%</div>
+            <div class="person-stat-lbl">Taxa</div>
+          </div>
+          <div>
+            <div class="person-stat-val alert">3</div>
+            <div class="person-stat-lbl">Alertas</div>
+          </div>
+          <div>
+            <div class="person-stat-val">2d</div>
+            <div class="person-stat-lbl">Último</div>
+          </div>
+        </div>
+        <div class="person-progress"><div class="person-progress-fill alert" style="width:72%"></div></div>
+        <div class="person-foot">
+          <span>11 ativos · 8 concluídos</span>
+          <span>↓ −9pt vs mês ant.</span>
+        </div>
+      </div>
+
+      <div class="person">
+        <div class="person-head">
+          <div class="person-avatar">CP</div>
+          <div>
+            <div class="person-name">Camila Pereira</div>
+            <div class="person-role">Cível · Sênior</div>
+          </div>
+        </div>
+        <div class="person-stats">
+          <div>
+            <div class="person-stat-val warn">86%</div>
+            <div class="person-stat-lbl">Taxa</div>
+          </div>
+          <div>
+            <div class="person-stat-val warn">1</div>
+            <div class="person-stat-lbl">Alertas</div>
+          </div>
+          <div>
+            <div class="person-stat-val">8h</div>
+            <div class="person-stat-lbl">Último</div>
+          </div>
+        </div>
+        <div class="person-progress"><div class="person-progress-fill warn" style="width:86%"></div></div>
+        <div class="person-foot">
+          <span>9 ativos · 14 concluídos</span>
+          <span>→ estável</span>
+        </div>
+      </div>
+
+      <div class="person">
+        <div class="person-head">
+          <div class="person-avatar">LA</div>
+          <div>
+            <div class="person-name">Lucas Andrade</div>
+            <div class="person-role">Trabalhista · Pleno</div>
+          </div>
+        </div>
+        <div class="person-stats">
+          <div>
+            <div class="person-stat-val warn">81%</div>
+            <div class="person-stat-lbl">Taxa</div>
+          </div>
+          <div>
+            <div class="person-stat-val warn">1</div>
+            <div class="person-stat-lbl">Alertas</div>
+          </div>
+          <div>
+            <div class="person-stat-val">3h</div>
+            <div class="person-stat-lbl">Último</div>
+          </div>
+        </div>
+        <div class="person-progress"><div class="person-progress-fill warn" style="width:81%"></div></div>
+        <div class="person-foot">
+          <span>7 ativos · 12 concluídos</span>
+          <span>↑ +2pt</span>
+        </div>
+      </div>
+
+      <div class="person">
+        <div class="person-head">
+          <div class="person-avatar">RL</div>
+          <div>
+            <div class="person-name">Renata Lima</div>
+            <div class="person-role">Empresarial · Sênior</div>
+          </div>
+        </div>
+        <div class="person-stats">
+          <div>
+            <div class="person-stat-val ok">95%</div>
+            <div class="person-stat-lbl">Taxa</div>
+          </div>
+          <div>
+            <div class="person-stat-val">0</div>
+            <div class="person-stat-lbl">Alertas</div>
+          </div>
+          <div>
+            <div class="person-stat-val">25min</div>
+            <div class="person-stat-lbl">Último</div>
+          </div>
+        </div>
+        <div class="person-progress"><div class="person-progress-fill ok" style="width:95%"></div></div>
+        <div class="person-foot">
+          <span>6 ativos · 19 concluídos</span>
+          <span>↑ +6pt</span>
+        </div>
+      </div>
+
+      <div class="person">
+        <div class="person-head">
+          <div class="person-avatar">FT</div>
+          <div>
+            <div class="person-name">Felipe Teixeira</div>
+            <div class="person-role">Cível · Pleno</div>
+          </div>
+        </div>
+        <div class="person-stats">
+          <div>
+            <div class="person-stat-val ok">92%</div>
+            <div class="person-stat-lbl">Taxa</div>
+          </div>
+          <div>
+            <div class="person-stat-val">0</div>
+            <div class="person-stat-lbl">Alertas</div>
+          </div>
+          <div>
+            <div class="person-stat-val">1h</div>
+            <div class="person-stat-lbl">Último</div>
+          </div>
+        </div>
+        <div class="person-progress"><div class="person-progress-fill ok" style="width:92%"></div></div>
+        <div class="person-foot">
+          <span>5 ativos · 11 concluídos</span>
+          <span>↑ +1pt</span>
+        </div>
+      </div>
+
+      <div class="person">
+        <div class="person-head">
+          <div class="person-avatar">MA</div>
+          <div>
+            <div class="person-name">Mariana Antunes</div>
+            <div class="person-role">Tributário · Júnior</div>
+          </div>
+        </div>
+        <div class="person-stats">
+          <div>
+            <div class="person-stat-val ok">100%</div>
+            <div class="person-stat-lbl">Taxa</div>
+          </div>
+          <div>
+            <div class="person-stat-val">0</div>
+            <div class="person-stat-lbl">Alertas</div>
+          </div>
+          <div>
+            <div class="person-stat-val">12min</div>
+            <div class="person-stat-lbl">Último</div>
+          </div>
+        </div>
+        <div class="person-progress"><div class="person-progress-fill ok" style="width:100%"></div></div>
+        <div class="person-foot">
+          <span>3 ativos · 5 concluídos</span>
+          <span>↑ novato</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ─────────── AUDITORIA ─────────── -->
+  <section style="margin-bottom: 32px;">
+    <div class="section-head">
+      <div>
+        <div class="hero-eyebrow" style="margin-bottom: 6px;">Auditoria</div>
+        <h2>Confiabilidade & <em>exports</em>.</h2>
+      </div>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="audit-grid stagger">
+      <div class="audit-feature">
+        <div class="audit-eyebrow">Índice de Confiabilidade · 30d</div>
+        <div class="audit-value">94<span class="pct">%</span></div>
+        <div class="audit-breakdown">
+          <div><b>312</b>verificadas</div>
+          <div><b>18</b>suspeitas</div>
+          <div><b>2</b>sem ação</div>
+        </div>
+        <div style="margin-top:18px;font-size:11px;color:var(--gold-300);letter-spacing:.06em;">
+          Cruzamento automático: conclusões VIGÍLIA × andamentos DataJuri. Última execução há 2h.
+        </div>
+      </div>
+
+      <div class="export-card">
+        <div class="export-icon">
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2a4 4 0 014-4h6m0 0l-3-3m3 3l-3 3M6 21h2a4 4 0 004-4v-2m-6 6V7a4 4 0 014-4h6"/></svg>
+        </div>
+        <div class="export-title">Consolidado mensal</div>
+        <div class="export-desc">Ranking, distribuição por tipo e resumo executivo. Pronto para reunião.</div>
+        <div class="export-actions">
+          <button class="btn btn--ghost">Excel</button>
+          <button class="btn btn--ghost">PDF</button>
+        </div>
+      </div>
+
+      <div class="export-card">
+        <div class="export-icon">
+          <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div class="export-title">Prazos críticos</div>
+        <div class="export-desc">Vencidos e vencendo nos próximos 7 dias. Gerado diariamente às 07:00.</div>
+        <div class="export-actions">
+          <button class="btn btn--ghost">PDF</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─────────── FOOTER MOCKUP ─────────── -->
+  <section style="margin-top: 72px; padding-top: 24px; border-top: 1px solid var(--rule);">
+    <div class="hero-eyebrow" style="margin-bottom: 14px;">Notas do mockup</div>
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; font-size: 13px; color: var(--ink-2); line-height: 1.55;">
+      <div>
+        <strong style="color:var(--ink); display:block; margin-bottom:6px;">O que muda</strong>
+        6 abas (Dashboard, Alertas, Compromissos, Cobranças, Obrigações, Relatórios) viram <em style="color:var(--navy-700);font-style:normal;font-weight:600;">um inbox priorizado com filter chips</em>. Tudo que pede ação fica num lugar só.
+      </div>
+      <div>
+        <strong style="color:var(--ink); display:block; margin-bottom:6px;">O que somete</strong>
+        Botão "Cruzar Agora" (vai pro cron, status no header). Ranking telemétrico (vira Pessoas com drill-down). Relatórios isolados (viram export do que está em tela).
+      </div>
+      <div>
+        <strong style="color:var(--ink); display:block; margin-bottom:6px;">A pergunta aberta</strong>
+        Cobranças 48h e Obrigações 72h — fluxos distintos ou nomes pra mesma coisa? Sua resposta vira filter chip ou desaparece. Decida antes de eu mexer.
+      </div>
+    </div>
+  </section>
+
+</div>
+
+</body>
+</html>
