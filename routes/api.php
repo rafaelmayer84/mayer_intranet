@@ -83,6 +83,11 @@ Route::prefix('evidentia-mcp')->middleware(['evidentia.mcp', 'throttle:30,1'])->
 Route::post('/mcp/evidentia', [EvidentiaMcpHttpController::class, 'handle'])
     ->middleware(['evidentia.mcp', 'throttle:30,1']);
 
+// LEXUS V3 — triagem de leads via WhatsApp com IA
+Route::post('lexus/processar', [\App\Http\Controllers\Api\LexusController::class, 'processar'])
+    ->middleware('throttle:120,1')
+    ->name('lexus.processar');
+
 // NEXO: servir media para SendPulse (sem auth - URL publica)
 Route::get('/nexo/media/{filename}', function (string $filename) {
     $path = storage_path('app/public/nexo/media/' . $filename);
