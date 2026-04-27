@@ -5,7 +5,6 @@ namespace App\Services\Nexo;
 use App\Exceptions\LexusAnthropicException;
 use App\Models\NexoLexusSessao;
 use App\Models\WaConversation;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
 class LexusOrchestratorService
@@ -15,6 +14,9 @@ class LexusOrchestratorService
     private const MENSAGEM_ERRO_FALLBACK = 'Tive um problema técnico. Vou pedir para um atendente da equipe falar com você em instantes. 🙏';
 
     private LexusAnthropicClient $client;
+    private LexusClienteLookupService $clienteLookup;
+    private LexusLeadCreationService $leadCreation;
+    private LexusWaConversationLinker $waLinker;
 
     public function __construct()
     {
@@ -23,14 +25,17 @@ class LexusOrchestratorService
 
         $model = env('LEXUS_CLAUDE_MODEL', 'claude-sonnet-4-5-20250929');
 
-        $this->client = new LexusAnthropicClient($apiKey, $model);
+        $this->client        = new LexusAnthropicClient($apiKey, $model);
+        $this->clienteLookup = new LexusClienteLookupService();
+        $this->leadCreation  = new LexusLeadCreationService();
+        $this->waLinker      = new LexusWaConversationLinker();
     }
 
     public function processar(array $input): array
     {
-        $phone  = WaConversation::normalizePhone($input['phone']);
-        $convId = $input['conversation_id'];
-        $nome   = $input['nome_whatsapp'] ?? null;
+        $phone    = WaConversation::normalizePhone($input['phone']);
+        $convId   = $input['conversation_id'];
+        $nome     = $input['nome_whatsapp'] ?? null;
         $mensagem = $this->limparMensagem($input['mensagem'] ?? '');
 
         if (trim($mensagem) === '') {
@@ -47,21 +52,36 @@ class LexusOrchestratorService
             $sessao->contato = $nome;
         }
 
-        // 2. Montar histórico para Anthropic (sem campo 'ts')
+        // 2. Lookup de cliente existente (se ainda não descoberto)
+        $ehCliente   = false;
+        $clienteNome = null;
+        if (!$sessao->cliente_id) {
+            $lookup = $this->clienteLookup->buscarPorPhone($phone);
+            if ($lookup) {
+                $sessao->cliente_id = $lookup['cliente_id'];
+                $sessao->saveQuietly();
+                $ehCliente   = $lookup['is_cliente'];
+                $clienteNome = $lookup['nome'];
+            }
+        } else {
+            $ehCliente = true;
+        }
+
+        // 3. Montar histórico para Anthropic (sem campo 'ts')
         $contextoAtual = $sessao->contexto_json ?? [];
         $historico = array_map(
             fn($turno) => ['role' => $turno['role'], 'content' => $turno['content']],
             $contextoAtual
         );
 
-        // 3. Adicionar mensagem atual como último turno user
+        // 4. Adicionar mensagem atual como último turno user
         $historico[] = ['role' => 'user', 'content' => $mensagem];
 
-        // 4. Montar system prompt
+        // 5. Montar system prompt com contexto atualizado
         $systemPrompt = LexusPromptService::montarSystemPrompt([
             'nome_whatsapp'       => $nome ?? $sessao->contato,
-            'eh_cliente_existente'=> false,
-            'cliente_nome'        => null,
+            'eh_cliente_existente'=> $ehCliente,
+            'cliente_nome'        => $clienteNome,
             'area_provavel_atual' => $sessao->area_provavel,
             'cidade_atual'        => $sessao->cidade,
             'total_interacoes'    => $sessao->total_interacoes,
@@ -71,7 +91,7 @@ class LexusOrchestratorService
 
         $tInicio = microtime(true);
 
-        // 5. Chamar Anthropic
+        // 6. Chamar Anthropic
         try {
             $resultado = $this->client->messages($historico, $systemPrompt);
         } catch (LexusAnthropicException $e) {
@@ -85,7 +105,7 @@ class LexusOrchestratorService
 
         $tempoMs = round((microtime(true) - $tInicio) * 1000);
 
-        // 6. Parsear JSON
+        // 7. Parsear JSON
         $ia = $this->parsearRespostaIA($resultado['content_text']);
 
         if ($ia === null) {
@@ -97,7 +117,7 @@ class LexusOrchestratorService
             return $this->respostaErro($sessao->id);
         }
 
-        // 7. Validar e truncar mensagem_para_cliente
+        // 8. Validar e truncar mensagem_para_cliente
         $mensagemCliente = $ia['mensagem_para_cliente'] ?? '';
         if (mb_strlen($mensagemCliente) > self::MAX_MENSAGEM_CHARS) {
             Log::warning('LEXUS-V3 mensagem truncada', [
@@ -107,25 +127,25 @@ class LexusOrchestratorService
             $mensagemCliente = mb_substr($mensagemCliente, 0, 997) . '...';
         }
 
-        // 8. Mapear ação para etapa
+        // 9. Mapear ação para etapa
         $etapa = $this->acaoParaEtapa($ia['acao'] ?? 'perguntar');
 
-        // 9. Append contexto (turno user + turno assistant)
-        $contextoAtual[] = ['role' => 'user',      'content' => $mensagem,       'ts' => now()->format('Y-m-d H:i:s')];
-        $contextoAtual[] = ['role' => 'assistant', 'content' => $mensagemCliente, 'ts' => now()->format('Y-m-d H:i:s')];
+        // 10. Append contexto (turno user + turno assistant)
+        $contextoAtual[] = ['role' => 'user',      'content' => $mensagem,        'ts' => now()->format('Y-m-d H:i:s')];
+        $contextoAtual[] = ['role' => 'assistant',  'content' => $mensagemCliente, 'ts' => now()->format('Y-m-d H:i:s')];
         if (count($contextoAtual) > self::MAX_CONTEXTO_TURNOS) {
             $contextoAtual = array_slice($contextoAtual, -self::MAX_CONTEXTO_TURNOS);
         }
 
-        // 10. Persistir na sessão
+        // 11. Persistir campos da IA na sessão
         $sessao->etapa               = $etapa;
-        $sessao->area_provavel       = $ia['area_detectada']        ?? $sessao->area_provavel;
-        $sessao->intencao_contratar  = $ia['intencao_contratar']    ?? $sessao->intencao_contratar;
-        $sessao->urgencia            = $ia['urgencia']              ?? $sessao->urgencia;
+        $sessao->area_provavel       = $ia['area_detectada']         ?? $sessao->area_provavel;
+        $sessao->intencao_contratar  = $ia['intencao_contratar']     ?? $sessao->intencao_contratar;
+        $sessao->urgencia            = $ia['urgencia']               ?? $sessao->urgencia;
         $sessao->nome_cliente        = $ia['nome_cliente_capturado'] ?? $sessao->nome_cliente;
-        $sessao->cidade              = $ia['cidade_capturada']      ?? $sessao->cidade;
-        $sessao->resumo_caso         = $ia['resumo_caso']           ?? $sessao->resumo_caso;
-        $sessao->briefing_operador   = $ia['briefing_operador']     ?? $sessao->briefing_operador;
+        $sessao->cidade              = $ia['cidade_capturada']       ?? $sessao->cidade;
+        $sessao->resumo_caso         = $ia['resumo_caso']            ?? $sessao->resumo_caso;
+        $sessao->briefing_operador   = $ia['briefing_operador']      ?? $sessao->briefing_operador;
         $sessao->contexto_json       = $contextoAtual;
         $sessao->ultima_atividade    = now();
         $sessao->total_interacoes    = ($sessao->total_interacoes ?? 0) + 1;
@@ -143,20 +163,30 @@ class LexusOrchestratorService
             'raciocinio'   => $ia['raciocinio_interno'] ?? null,
         ]);
 
+        // 12. Criar lead se qualificado
+        if ($etapa === 'qualificado') {
+            $leadId = $this->leadCreation->criarOuAtualizar($sessao);
+            if ($leadId) {
+                $sessao->lead_id = $leadId;
+                $sessao->saveQuietly();
+            }
+        }
+
+        // 13. Linkar wa_conversation (decide internamente o que fazer por etapa)
+        $this->waLinker->linkar($sessao);
+
         return [
-            'acao'        => $ia['acao'] ?? 'perguntar',
+            'acao'           => $ia['acao'] ?? 'perguntar',
             'mensagem_lexus' => $mensagemCliente,
-            'etapa_atual' => $etapa,
-            'lead_id'     => null,
-            'sessao_id'   => $sessao->id,
+            'etapa_atual'    => $etapa,
+            'lead_id'        => $sessao->lead_id,
+            'sessao_id'      => $sessao->id,
         ];
     }
 
     private function parsearRespostaIA(string $texto): ?array
     {
         $texto = trim($texto);
-
-        // Remove fences caso o modelo as inclua mesmo após instrução
         $texto = preg_replace('/^```json\s*/i', '', $texto);
         $texto = preg_replace('/\s*```$/i', '', $texto);
 
@@ -217,8 +247,8 @@ class LexusOrchestratorService
 
     private function emHorarioComercial(): bool
     {
-        $hora = (int) now('America/Sao_Paulo')->format('H');
-        $diaSemana = (int) now('America/Sao_Paulo')->format('N'); // 1=seg, 7=dom
+        $hora      = (int) now('America/Sao_Paulo')->format('H');
+        $diaSemana = (int) now('America/Sao_Paulo')->format('N');
         return $diaSemana <= 5 && $hora >= 8 && $hora < 18;
     }
 }
