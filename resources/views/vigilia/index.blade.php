@@ -506,6 +506,12 @@
 
 </div>
 
+@endsection
+
+{{-- Drawer e modal vão pra @push('modals') que o layout renderiza FORA do
+     <main overflow-auto> — caso contrário position:fixed se ancora no main
+     e o painel aparece "no topo do documento" exigindo rolar a tela. --}}
+@push('modals')
 {{-- ─────────── Drawer de detalhe (inteiro teor) ─────────── --}}
 <div class="vg-drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
 <aside class="vg-drawer" id="drawer-detail" aria-hidden="true">
@@ -536,7 +542,7 @@
         </div>
     </div>
 </div>
-@endsection
+@endpush
 
 @push('scripts')
 <script>
