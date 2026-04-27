@@ -556,7 +556,7 @@ const NexoApp = {
         try{
             const j=await this.api(`/nexo/atendimento/conversas/${cid}/contexto`);
             let html='';
-            const tc={lead:{bg:'bg-blue-100',tx:'text-blue-700',lb:'Lead'},cliente:{bg:'bg-purple-100',tx:'text-purple-700',lb:'Cliente'},indefinido:{bg:'bg-gray-100',tx:'text-gray-600',lb:'Não vinculado'}};const catLabels={ADV:'Adv.Adverso',PERITO:'Perito',CORRESP:'Corresp.',FORN:'Fornecedor',OUTRO:'Outro'};
+            const tc={lead:{bg:'bg-blue-100',tx:'text-blue-700',lb:'Lead'},cliente:{bg:'bg-purple-100',tx:'text-purple-700',lb:'Cliente'},indefinido:{bg:'bg-gray-100',tx:'text-gray-600',lb:'Não vinculado'}};const catLabels={ADV:'Adv.Adverso',PERITO:'Perito',CORRESP:'Corresp.',FORN:'Fornecedor',OUTRO:'Outro',lead_qualificado:'Lead Qualificado',lead_desqualificado:'Lead Desqualificado',cliente_ativo:'Cliente Ativo'};
             const t=tc[j.link_type]||tc.indefinido;
             html+=`<div><span class="text-xs px-2.5 py-1 rounded-full ${t.bg} ${t.tx} font-medium">${t.lb}</span></div>`;
 
@@ -570,6 +570,9 @@ const NexoApp = {
                 {v:'CORRESP',l:'Correspondente',c:'bg-teal-100 text-teal-700'},
                 {v:'FORN',l:'Fornecedor',c:'bg-indigo-100 text-indigo-700'},
                 {v:'OUTRO',l:'Outro',c:'bg-gray-100 text-gray-600'},
+                {v:'lead_qualificado',l:'Lead Qualificado',c:'bg-[#16a34a] text-white'},
+                {v:'lead_desqualificado',l:'Lead Desqualificado',c:'bg-[#6b7280] text-white'},
+                {v:'cliente_ativo',l:'Cliente Ativo',c:'bg-[#385776] text-white'},
             ];
             const curCat = this.conversaAtual?.category || j.category || '';
             html+=`<div class="mt-2"><label class="text-[10px] text-gray-500 font-medium">Categoria</label><select id="nexo-category-select" onchange="NexoApp.updateCategory(this.value)" class="mt-0.5 w-full text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-[#1e3a5f]">`;

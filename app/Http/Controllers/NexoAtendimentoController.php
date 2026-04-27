@@ -950,7 +950,8 @@ class NexoAtendimentoController extends Controller
     public function updateCategory(Request $request, int $id)
     {
         $conv = WaConversation::findOrFail($id);
-        $valid = ['ADV', 'PERITO', 'CORRESP', 'FORN', 'OUTRO', null];
+        $valid = ['ADV', 'PERITO', 'CORRESP', 'FORN', 'OUTRO',
+                  'lead_qualificado', 'lead_desqualificado', 'cliente_ativo', null];
         $category = $request->input('category');
         if (!in_array($category, $valid, true)) {
             return response()->json(['error' => 'Categoria invalida'], 422);
