@@ -126,7 +126,13 @@ class CrmGatesProcessar extends Command
                 return !$ainda;
 
             case CrmAccountDataGate::TIPO_SEM_STATUS_PESSOA:
-                return !empty($statusDj);
+                // Resolvido se DJ preencheu statusPessoa, OU se conta foi arquivada/eh adversa pura
+                if (!empty($statusDj)) return true;
+                if (($account->lifecycle ?? '') === 'arquivado') return true;
+                $isCliente = $cliente->is_cliente ?? false;
+                $temContrato = $djId && DB::table('contratos')->where('contratante_id_datajuri', $djId)->exists();
+                $temProcessoCliente = $djId && DB::table('processos')->where('cliente_datajuri_id', $djId)->exists();
+                return !$isCliente && !$temContrato && !$temProcessoCliente;
         }
 
         return false;

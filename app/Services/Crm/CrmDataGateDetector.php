@@ -37,7 +37,7 @@ class CrmDataGateDetector
         $q = DB::table('crm_accounts as a')
             ->leftJoin('clientes as c', 'c.datajuri_id', '=', 'a.datajuri_pessoa_id')
             ->select([
-                'a.id', 'a.name', 'a.datajuri_pessoa_id', 'a.owner_user_id',
+                'a.id', 'a.name', 'a.datajuri_pessoa_id', 'a.owner_user_id', 'a.lifecycle',
                 'c.status_pessoa', 'c.is_cliente',
             ]);
         if ($limit) $q->limit($limit);
@@ -179,9 +179,13 @@ class CrmDataGateDetector
         }
 
         // Regra 5: DJ nao veio com status_pessoa
-        if ($djId && empty($statusDj)) {
+        // Excecoes: conta arquivada ja esta encerrada; parte adversa pura (sem vinculo como cliente)
+        // nunca tera statusPessoa de cliente preenchido no DJ.
+        $ehArquivado = ($acc->lifecycle ?? '') === 'arquivado';
+        $ehAdversaPura = !($acc->is_cliente ?? false) && $contratos->count() === 0 && $processosCliente === 0;
+        if ($djId && empty($statusDj) && !$ehArquivado && !$ehAdversaPura) {
             $tipos[] = [CrmAccountDataGate::TIPO_SEM_STATUS_PESSOA, [
-                'dica' => 'Cadastro DJ sem status_pessoa preenchido — classificar no DJ.',
+                'dica' => 'Cadastro DJ sem "Status da Pessoa" preenchido. No DJ: abra a ficha da pessoa → aba "Cliente" → campo "Status". Valores válidos: Cliente Ativo, Cliente Inativo, Cliente Estratégico, Parte Adversa, etc.',
             ]];
         }
 
