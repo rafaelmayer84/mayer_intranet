@@ -716,6 +716,13 @@ async function cumprirObrigacao(id, parecer) {
         const d = await r.json();
         if (d.success) {
             closeModal();
+            closeDrawer();
+            const cascata = d.cascata || 0;
+            if (cascata > 0) {
+                showToast(`Registrada · ${cascata} obrigação${cascata>1?'ões irmãs':' irmã'} do mesmo processo/dia também ${cascata>1?'foram':'foi'} marcada${cascata>1?'s':''}.`);
+            } else {
+                showToast('Registrada.');
+            }
             loadInbox();
         } else {
             alert('Falha ao registrar cumprimento.');
@@ -723,6 +730,20 @@ async function cumprirObrigacao(id, parecer) {
     } catch (e) {
         alert('Erro de rede.');
     }
+}
+
+function showToast(msg) {
+    let t = document.getElementById('vg-toast');
+    if (!t) {
+        t = document.createElement('div');
+        t.id = 'vg-toast';
+        t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--navy-700);color:#fff;padding:12px 20px;border-radius:8px;font-size:13px;z-index:10000;box-shadow:var(--shadow-lg);max-width:90vw;text-align:center;opacity:0;transition:opacity .2s';
+        document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.style.opacity = '1';
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => { t.style.opacity = '0'; }, 3500);
 }
 
 // ── Drawer de detalhe (inteiro teor + links) ──

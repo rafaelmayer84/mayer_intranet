@@ -197,8 +197,11 @@ class VigiliaController extends Controller
     {
         $this->checkAdmin();
         $parecer = $request->input('parecer', '');
-        $ok = $this->service->cumpriObrigacao($id, $parecer);
-        return response()->json(['success' => $ok]);
+        $r = $this->service->cumpriObrigacao($id, $parecer);
+        return response()->json([
+            'success' => $r['ok'],
+            'cascata' => $r['cascata'],
+        ]);
     }
 
     // ─── INBOX UNIFICADO (editorial v2) ─────────────────────────────

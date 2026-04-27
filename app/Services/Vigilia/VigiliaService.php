@@ -970,14 +970,47 @@ class VigiliaService
         ];
     }
 
-    public function cumpriObrigacao(int $id, string $parecer): bool
+    /**
+     * Cumpre uma obrigação e cascateia para "irmãs" do mesmo processo+data_evento.
+     *
+     * Retorna ['ok' => bool, 'cascata' => int] — cascata é o nº de obrigações irmãs
+     * também marcadas como cumpridas (não conta a alvo).
+     *
+     * Por que cascata: o DataJuri frequentemente registra múltiplos andamentos pra
+     * "mesma" decisão lógica (ex.: "Remetido ao DJE" + "Proferidas Outras Decisões").
+     * O gerador de obrigações cria 1 linha por andamento, então o usuário vê N
+     * pendências pra resolver com o mesmo parecer. Ao cumprir uma, propagamos para
+     * as outras pendentes do mesmo processo+dia.
+     */
+    public function cumpriObrigacao(int $id, string $parecer): array
     {
-        return (bool) DB::table('vigilia_obrigacoes')->where('id', $id)->update([
+        $alvo = DB::table('vigilia_obrigacoes')->where('id', $id)->first();
+        if (!$alvo) return ['ok' => false, 'cascata' => 0];
+
+        $parecerTrunc = mb_substr($parecer, 0, 1000);
+        $now = now();
+
+        $okAlvo = (bool) DB::table('vigilia_obrigacoes')->where('id', $id)->update([
             'status'           => 'cumprida',
-            'data_cumprimento' => now(),
-            'parecer'          => mb_substr($parecer, 0, 1000),
-            'updated_at'       => now(),
+            'data_cumprimento' => $now,
+            'parecer'          => $parecerTrunc,
+            'updated_at'       => $now,
         ]);
+
+        $parecerCascata = '[CASCATA · cumprida via #' . $id . '] ' . $parecerTrunc;
+        $cascata = DB::table('vigilia_obrigacoes')
+            ->where('id', '!=', $id)
+            ->where('processo_pasta', $alvo->processo_pasta)
+            ->where('data_evento', $alvo->data_evento)
+            ->where('status', 'pendente')
+            ->update([
+                'status'           => 'cumprida',
+                'data_cumprimento' => $now,
+                'parecer'          => mb_substr($parecerCascata, 0, 1000),
+                'updated_at'       => $now,
+            ]);
+
+        return ['ok' => $okAlvo, 'cascata' => (int) $cascata];
     }
 
     public function getContadorObrigacoesPendentes(): int
