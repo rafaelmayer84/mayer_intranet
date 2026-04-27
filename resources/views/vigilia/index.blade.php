@@ -376,6 +376,9 @@
                 <span class="name">exigem</span> sua atenção.
             </h1>
             <div class="hero-sub" id="hero-sub">Carregando panorama…</div>
+            <div class="hero-fineprint" style="font-size:11px;color:var(--ink-3);margin-top:6px;line-height:1.5;">
+                Prazos VIGÍLIA = data do andamento <strong>+ 72h corridas</strong>. Métrica interna do escritório, não o prazo processual do tribunal.
+            </div>
 
             <div class="hero-stats stagger">
                 <div class="hero-stat" onclick="setFilter('vencidas')">
@@ -579,7 +582,8 @@ function setFilter(f) {
 
 document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => setFilter(c.dataset.filter)));
 
-async function loadInbox() {
+async function loadInbox(preserveScroll = false) {
+    const savedY = preserveScroll ? window.scrollY : null;
     try {
         const r = await fetch('/vigilia/api/inbox?filter=' + VIGILIA.filter + '&limit=40');
         const d = await r.json();
@@ -606,6 +610,9 @@ async function loadInbox() {
             : `${d.counters.vencidas ?? 0} vencidas · ${d.counters.cobrancas ?? 0} cobranças 48h+ · ${d.counters.suspeitas ?? 0} suspeitas`;
 
         renderInbox();
+        if (savedY !== null) {
+            requestAnimationFrame(() => window.scrollTo(0, savedY));
+        }
     } catch (e) {
         el('inbox-list').innerHTML = '<div class="inbox-empty">Erro ao carregar inbox.</div>';
     }
@@ -723,7 +730,7 @@ async function cumprirObrigacao(id, parecer) {
             } else {
                 showToast('Registrada.');
             }
-            loadInbox();
+            loadInbox(true);
         } else {
             alert('Falha ao registrar cumprimento.');
         }
@@ -749,6 +756,12 @@ function showToast(msg) {
 // ── Drawer de detalhe (inteiro teor + links) ──
 async function openDrawer(itemId) {
     if (!itemId) return;
+    // Trava scroll do body sem perder posição (overflow:hidden no desktop preserva scrollY)
+    if (!document.body.dataset.scrollLocked) {
+        document.body.dataset.scrollLocked = '1';
+        document.body.dataset.scrollY = String(window.scrollY);
+        document.body.style.overflow = 'hidden';
+    }
     el('drawer-overlay').classList.add('open');
     el('drawer-detail').classList.add('open');
     el('drawer-detail').setAttribute('aria-hidden', 'false');
@@ -771,6 +784,14 @@ function closeDrawer() {
     el('drawer-overlay').classList.remove('open');
     el('drawer-detail').classList.remove('open');
     el('drawer-detail').setAttribute('aria-hidden', 'true');
+    if (document.body.dataset.scrollLocked) {
+        document.body.style.overflow = '';
+        const y = parseInt(document.body.dataset.scrollY || '0', 10);
+        delete document.body.dataset.scrollLocked;
+        delete document.body.dataset.scrollY;
+        // Restaura posição (nem sempre é necessário no desktop, mas garante)
+        window.scrollTo(0, y);
+    }
 }
 
 document.addEventListener('keydown', (e) => {
@@ -801,7 +822,7 @@ function renderDrawer(d) {
         d.cliente ? `<span>Cliente: <strong>${escape(d.cliente)}</strong></span>` : '',
         d.advogado ? `<span>Advogado(a): <strong>${escape(d.advogado)}</strong></span>` : '',
         d.data_evento ? `<span>Evento: <strong>${escape(fmtDate(d.data_evento))}</strong></span>` : '',
-        d.data_limite ? `<span>Prazo: <strong>${escape(fmtDate(d.data_limite))}</strong></span>` : '',
+        d.data_limite ? `<span title="Calculado: data do andamento + 72h corridas. É prazo INTERNO da VIGÍLIA, não prazo processual.">Prazo VIGÍLIA: <strong>${escape(fmtDate(d.data_limite))}</strong> <em style="color:var(--ink-3);font-style:normal;">(+72h corridas do andamento)</em></span>` : '',
     ].filter(Boolean).join('');
     el('drw-meta').innerHTML = meta;
 
