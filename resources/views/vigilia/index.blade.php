@@ -284,6 +284,83 @@
 }
 .vg-modal-textarea:focus { outline: none; border-color: var(--gold-500); }
 .vg-modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+
+/* ── Inbox item: clicável + dica ── */
+.inbox-item { cursor: pointer; }
+.inbox-action button { cursor: pointer; }
+
+/* ── Drawer de detalhe (inteiro teor) ── */
+.vg-drawer-overlay {
+    position: fixed; inset: 0; background: rgba(14,31,51,0.55); backdrop-filter: blur(4px);
+    z-index: 9997; display: none; opacity: 0; transition: opacity .2s var(--ease-out);
+}
+.vg-drawer-overlay.open { display: block; opacity: 1; }
+.vg-drawer {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: 640px; max-width: 96vw;
+    background: var(--surface); z-index: 9998;
+    transform: translateX(100%); transition: transform .26s var(--ease-out);
+    overflow-y: auto; box-shadow: -8px 0 28px rgba(14,31,51,.12);
+    border-left: 1px solid var(--rule);
+}
+.vg-drawer.open { transform: translateX(0); }
+.vg-drawer-head {
+    padding: 24px 32px 18px;
+    border-bottom: 1px solid var(--rule);
+    background: var(--paper);
+    position: sticky; top: 0; z-index: 1;
+}
+.vg-drawer-eyebrow { font-size: 10px; letter-spacing: .22em; text-transform: uppercase; color: var(--gold-600); font-weight: 600; margin-bottom: 8px; }
+.vg-drawer-title { font-weight: 300; font-size: 22px; letter-spacing: -.015em; color: var(--ink); margin-bottom: 10px; line-height: 1.25; }
+.vg-drawer-title em { font-style: normal; font-weight: 600; color: var(--navy-700); }
+.vg-drawer-meta { display: flex; flex-wrap: wrap; gap: 14px; font-size: 11px; color: var(--ink-3); }
+.vg-drawer-meta span strong { color: var(--ink); font-weight: 500; }
+.vg-drawer-close {
+    position: absolute; top: 18px; right: 18px;
+    width: 32px; height: 32px; border-radius: 8px;
+    border: 1px solid var(--rule); background: var(--surface);
+    display: grid; place-items: center; cursor: pointer;
+    color: var(--ink-3); font-size: 18px; line-height: 1;
+}
+.vg-drawer-close:hover { color: var(--ink); border-color: var(--gold-300); }
+
+.vg-drawer-body { padding: 24px 32px 32px; }
+.vg-drawer-section { margin-bottom: 26px; }
+.vg-drawer-section:last-child { margin-bottom: 0; }
+.vg-drawer-label {
+    font-size: 10px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--ink-3); font-weight: 600; margin-bottom: 10px;
+    padding-bottom: 6px; border-bottom: 1px solid var(--rule-2);
+}
+.vg-drawer-text {
+    font-size: 13.5px; line-height: 1.65; color: var(--ink);
+    white-space: pre-line; word-break: break-word;
+}
+.vg-drawer-text--muted { color: var(--ink-3); font-style: italic; }
+.vg-drawer-quote {
+    background: var(--paper); border-left: 3px solid var(--gold-400);
+    padding: 14px 16px; border-radius: 0 6px 6px 0;
+    font-size: 13px; color: var(--ink); line-height: 1.6;
+    white-space: pre-line;
+}
+.vg-drawer-note {
+    background: rgba(201,163,91,0.06); border: 1px solid var(--gold-100);
+    padding: 12px 14px; border-radius: 6px;
+    font-size: 12px; color: var(--ink-2); line-height: 1.55;
+}
+.vg-drawer-cta-row {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    padding-top: 6px;
+}
+.vg-drawer-cta-row a, .vg-drawer-cta-row button {
+    text-decoration: none;
+}
+.vg-copy-btn {
+    font-size: 11px; padding: 6px 10px;
+    border: 1px solid var(--rule); border-radius: 6px;
+    background: var(--surface); color: var(--ink-2); cursor: pointer;
+}
+.vg-copy-btn:hover { border-color: var(--gold-300); color: var(--ink); }
 </style>
 @endpush
 
@@ -426,6 +503,20 @@
 
 </div>
 
+{{-- ─────────── Drawer de detalhe (inteiro teor) ─────────── --}}
+<div class="vg-drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+<aside class="vg-drawer" id="drawer-detail" aria-hidden="true">
+    <button class="vg-drawer-close" onclick="closeDrawer()" aria-label="Fechar">×</button>
+    <div class="vg-drawer-head">
+        <div class="vg-drawer-eyebrow" id="drw-eyebrow">Detalhe</div>
+        <h2 class="vg-drawer-title" id="drw-title">Carregando…</h2>
+        <div class="vg-drawer-meta" id="drw-meta"></div>
+    </div>
+    <div class="vg-drawer-body" id="drw-body">
+        <div class="vg-drawer-text vg-drawer-text--muted">Carregando…</div>
+    </div>
+</aside>
+
 {{-- ─────────── Modal cumprir ─────────── --}}
 <div class="vg-modal-overlay" id="modal-cumprir">
     <div class="vg-modal-box">
@@ -544,7 +635,7 @@ function renderInbox() {
             return `<button class="${cls}" data-action="${a.kind}" data-id="${it.id}" data-obrigacao-id="${it.obrigacao_id ?? ''}">${escape(a.label)}</button>`;
         }).join('');
 
-        return `<div class="inbox-item ${severityClass(sev)}">
+        return `<div class="inbox-item ${severityClass(sev)}" data-item-id="${it.id}" role="button" tabindex="0">
             <div class="inbox-tag">
                 <span class="inbox-tag-status ${stCls}">${escape(it.status_label || '—')}</span>
                 <span class="inbox-tag-time">${escape(it.time_label || '')}</span>
@@ -557,6 +648,20 @@ function renderInbox() {
             <div class="inbox-action">${actions}</div>
         </div>`;
     }).join('');
+
+    // Bind: click no card abre drawer (exceto se for botão de ação)
+    list.querySelectorAll('.inbox-item').forEach(card => {
+        card.addEventListener('click', (e) => {
+            if (e.target.closest('[data-action]')) return;
+            openDrawer(card.dataset.itemId);
+        });
+        card.addEventListener('keydown', (e) => {
+            if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('[data-action]')) {
+                e.preventDefault();
+                openDrawer(card.dataset.itemId);
+            }
+        });
+    });
 
     // Bind action buttons
     list.querySelectorAll('[data-action]').forEach(btn => {
@@ -618,6 +723,137 @@ async function cumprirObrigacao(id, parecer) {
     } catch (e) {
         alert('Erro de rede.');
     }
+}
+
+// ── Drawer de detalhe (inteiro teor + links) ──
+async function openDrawer(itemId) {
+    if (!itemId) return;
+    el('drawer-overlay').classList.add('open');
+    el('drawer-detail').classList.add('open');
+    el('drawer-detail').setAttribute('aria-hidden', 'false');
+    el('drw-title').textContent = 'Carregando…';
+    el('drw-eyebrow').textContent = 'Detalhe';
+    el('drw-meta').innerHTML = '';
+    el('drw-body').innerHTML = '<div class="vg-drawer-text vg-drawer-text--muted">Carregando…</div>';
+
+    try {
+        const r = await fetch('/vigilia/api/inbox/' + encodeURIComponent(itemId));
+        if (!r.ok) throw new Error('http ' + r.status);
+        const d = await r.json();
+        renderDrawer(d);
+    } catch (e) {
+        el('drw-body').innerHTML = '<div class="vg-drawer-text vg-drawer-text--muted">Não foi possível carregar o detalhe.</div>';
+    }
+}
+
+function closeDrawer() {
+    el('drawer-overlay').classList.remove('open');
+    el('drawer-detail').classList.remove('open');
+    el('drawer-detail').setAttribute('aria-hidden', 'true');
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeDrawer();
+});
+
+function fmtDate(s) {
+    if (!s) return '—';
+    const d = new Date(String(s).replace(' ', 'T'));
+    if (isNaN(d.getTime())) return s;
+    return d.toLocaleDateString('pt-BR') + (s.length > 10 ? ' ' + d.toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'}) : '');
+}
+
+function renderDrawer(d) {
+    el('drw-eyebrow').textContent = ({
+        obrigacao: 'Obrigação · 72h parecer',
+        cobranca:  'Cobrança · 48h providência',
+        suspeita:  'Conclusão suspeita',
+    }[d.kind] || 'Detalhe');
+
+    const titleParts = (d.title || '').split('·');
+    el('drw-title').innerHTML = titleParts.length > 1
+        ? `<em>${escape(titleParts[0].trim())}</em> · ${escape(titleParts.slice(1).join('·').trim())}`
+        : `<em>${escape(d.title || 'Detalhe')}</em>`;
+
+    const meta = [
+        d.processo ? `<span><strong>${escape(d.processo)}</strong> · ${escape(d.tribunal || '')}</span>` : '',
+        d.cliente ? `<span>Cliente: <strong>${escape(d.cliente)}</strong></span>` : '',
+        d.advogado ? `<span>Advogado(a): <strong>${escape(d.advogado)}</strong></span>` : '',
+        d.data_evento ? `<span>Evento: <strong>${escape(fmtDate(d.data_evento))}</strong></span>` : '',
+        d.data_limite ? `<span>Prazo: <strong>${escape(fmtDate(d.data_limite))}</strong></span>` : '',
+    ].filter(Boolean).join('');
+    el('drw-meta').innerHTML = meta;
+
+    const sections = [];
+
+    // Andamento (descricao + observacao)
+    if (d.andamento) {
+        const desc = (d.andamento.descricao || '').trim();
+        const obs  = (d.andamento.observacao || '').trim();
+        sections.push(`<div class="vg-drawer-section">
+            <div class="vg-drawer-label">Andamento registrado no DataJuri</div>
+            ${desc ? `<div class="vg-drawer-quote">${escape(desc)}</div>` : '<div class="vg-drawer-text vg-drawer-text--muted">Sem descrição registrada.</div>'}
+            ${obs ? `<div class="vg-drawer-text" style="margin-top:12px"><strong style="color:var(--ink-2);font-size:11px;text-transform:uppercase;letter-spacing:.1em;">Observação:</strong><br>${escape(obs)}</div>` : ''}
+        </div>`);
+    }
+
+    // Parecer existente
+    const parecer = (d.parecer || (d.andamento && d.andamento.parecer) || '').trim();
+    if (parecer) {
+        sections.push(`<div class="vg-drawer-section">
+            <div class="vg-drawer-label">Parecer registrado</div>
+            <div class="vg-drawer-quote">${escape(parecer)}</div>
+        </div>`);
+    }
+
+    // Suspeita meta
+    if (d.suspeita_meta) {
+        const sm = d.suspeita_meta;
+        sections.push(`<div class="vg-drawer-section">
+            <div class="vg-drawer-label">Análise do cruzamento</div>
+            <div class="vg-drawer-text">
+                Gap: <strong>${sm.dias_gap}d</strong> sem andamento posterior à conclusão.
+                ${sm.observacao ? `<br><br>${escape(sm.observacao)}` : ''}
+                ${sm.ai_verdict ? `<br><br><strong>IA:</strong> ${escape(sm.ai_verdict)}` : ''}
+            </div>
+        </div>`);
+    }
+
+    // Nota explicativa
+    if (d.note) {
+        sections.push(`<div class="vg-drawer-section">
+            <div class="vg-drawer-note">${escape(d.note)}</div>
+        </div>`);
+    }
+
+    // CTAs
+    const links = d.links || {};
+    const ctas = [];
+    if (links.datajuri) {
+        ctas.push(`<a class="vg-btn vg-btn--primary" href="${links.datajuri}" target="_blank" rel="noopener">Abrir no DataJuri ↗</a>`);
+    }
+    if (links.tribunal_url) {
+        ctas.push(`<a class="vg-btn vg-btn--ghost" href="${links.tribunal_url}" target="_blank" rel="noopener">Consultar no ${escape(links.tribunal_label || 'tribunal')} ↗</a>`);
+    }
+    if (links.pasta) {
+        ctas.push(`<button class="vg-copy-btn" onclick="copyToClipboard('${escape(links.pasta)}', this)">Copiar nº CNJ</button>`);
+    }
+    if (ctas.length) {
+        sections.push(`<div class="vg-drawer-section">
+            <div class="vg-drawer-label">Ações</div>
+            <div class="vg-drawer-cta-row">${ctas.join('')}</div>
+        </div>`);
+    }
+
+    el('drw-body').innerHTML = sections.join('') || '<div class="vg-drawer-text vg-drawer-text--muted">Sem dados adicionais.</div>';
+}
+
+function copyToClipboard(text, btn) {
+    navigator.clipboard.writeText(text).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = 'Copiado ✓';
+        setTimeout(() => { btn.textContent = orig; }, 1500);
+    });
 }
 
 // ── Pessoas ──

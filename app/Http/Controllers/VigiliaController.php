@@ -220,6 +220,16 @@ class VigiliaController extends Controller
         return response()->json($this->service->getConfiabilidade($dias));
     }
 
+    public function apiInboxItem(Request $request, string $id)
+    {
+        $this->checkAdmin();
+        $detail = $this->service->getInboxItemDetail($id);
+        if (!$detail) {
+            return response()->json(['error' => 'Item não encontrado.'], 404);
+        }
+        return response()->json($detail);
+    }
+
     private function parsePeriodo(Request $request): array
     {
         $periodo = $request->input('periodo', 'mes-atual');

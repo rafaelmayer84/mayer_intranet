@@ -1219,6 +1219,186 @@ class VigiliaService
         ];
     }
 
+    // ─── DETALHE DO ITEM (modal "ver mais") ───────────────────────
+
+    /**
+     * Retorna detalhe completo de um item do inbox (obr:N | cob:N | sus:N).
+     * Inclui: andamento integral, parecer, observação, metadata, links.
+     */
+    public function getInboxItemDetail(string $compositeId): ?array
+    {
+        if (!preg_match('/^(obr|cob|sus):(\d+)$/', $compositeId, $m)) return null;
+        [$_, $kind, $id] = $m;
+        $id = (int) $id;
+
+        return match ($kind) {
+            'obr' => $this->detailObrigacao($id),
+            'cob' => $this->detailCobranca($id),
+            'sus' => $this->detailSuspeita($id),
+            default => null,
+        };
+    }
+
+    private function detailObrigacao(int $id): ?array
+    {
+        $obr = DB::table('vigilia_obrigacoes as vo')
+            ->leftJoin('users as u', 'u.id', '=', 'vo.advogado_user_id')
+            ->where('vo.id', $id)
+            ->select('vo.*', 'u.name as advogado_nome')
+            ->first();
+        if (!$obr) return null;
+
+        $and = $obr->andamento_fase_id
+            ? DB::table('andamentos_fase')->where('id', $obr->andamento_fase_id)->first()
+            : null;
+        $proc = DB::table('processos')->where('pasta', $obr->processo_pasta)->first();
+
+        return [
+            'kind'        => 'obrigacao',
+            'title'       => 'Obrigação · ' . str_replace('_', ' ', mb_strtolower($obr->tipo_evento ?? '')),
+            'processo'    => $obr->processo_pasta,
+            'tribunal'    => $this->tribunalFromPasta($obr->processo_pasta),
+            'cliente'     => $proc->cliente_nome ?? null,
+            'advogado'    => $obr->advogado_nome ?? 'Não atribuído',
+            'data_evento' => $obr->data_evento,
+            'data_limite' => $obr->data_limite,
+            'status'      => $obr->status,
+            'parecer'     => $obr->parecer ?: null,
+            'andamento'   => $and ? [
+                'tipo'       => $and->tipo,
+                'data'       => $and->data_andamento,
+                'descricao'  => $and->descricao,
+                'observacao' => $this->extractFromPayload($and->payload_raw, 'observacao'),
+                'parecer'    => $and->parecer ?: $this->extractFromPayload($and->payload_raw, 'parecer'),
+            ] : null,
+            'links'       => $this->buildLinks($proc, $obr->processo_pasta),
+            'note'        => 'O DataJuri não armazena o inteiro teor da decisão — apenas um título do andamento. Para ler o documento completo, abra no DataJuri ou consulte o processo no tribunal.',
+        ];
+    }
+
+    private function detailCobranca(int $id): ?array
+    {
+        $ad = DB::table('atividades_datajuri')->where('id', $id)->first();
+        if (!$ad) return null;
+        $proc = DB::table('processos')->where('pasta', $ad->processo_pasta)->first();
+
+        $ultimoAnd = DB::table('andamentos_fase')
+            ->where('processo_pasta', $ad->processo_pasta)
+            ->orderByDesc('data_andamento')
+            ->first();
+
+        $temParecer = $ultimoAnd && trim((string) ($ultimoAnd->parecer ?? '')) !== '';
+
+        return [
+            'kind'        => 'cobranca',
+            'title'       => 'Cobrança · ' . ($ad->assunto ?: $ad->tipo_atividade ?: 'Trigger'),
+            'processo'    => $ad->processo_pasta,
+            'tribunal'    => $this->tribunalFromPasta($ad->processo_pasta),
+            'cliente'     => $proc->cliente_nome ?? null,
+            'advogado'    => $ad->responsavel_nome,
+            'data_evento' => $ad->data_hora,
+            'data_limite' => null,
+            'status'      => $ad->status,
+            'parecer'     => $temParecer ? $ultimoAnd->parecer : null,
+            'andamento'   => $ultimoAnd ? [
+                'tipo'       => $ultimoAnd->tipo,
+                'data'       => $ultimoAnd->data_andamento,
+                'descricao'  => $ultimoAnd->descricao,
+                'observacao' => $this->extractFromPayload($ultimoAnd->payload_raw, 'observacao'),
+                'parecer'    => $ultimoAnd->parecer ?: $this->extractFromPayload($ultimoAnd->payload_raw, 'parecer'),
+            ] : null,
+            'links'       => $this->buildLinks($proc, $ad->processo_pasta),
+            'note'        => $temParecer
+                ? 'Parecer já registrado. Falta confirmação no fluxo VIGÍLIA — registre providência no DataJuri ou marque manualmente.'
+                : 'Sem parecer registrado no DataJuri. O advogado precisa preencher o parecer da atividade.',
+        ];
+    }
+
+    private function detailSuspeita(int $id): ?array
+    {
+        $row = DB::table('vigilia_cruzamentos as vc')
+            ->join('atividades_datajuri as ad', 'ad.id', '=', 'vc.atividade_datajuri_id')
+            ->where('vc.id', $id)
+            ->select(
+                'vc.id', 'vc.dias_gap', 'vc.observacao as vc_obs', 'vc.ai_verdict', 'vc.status_cruzamento',
+                'ad.id as atividade_id', 'ad.assunto', 'ad.tipo_atividade', 'ad.processo_pasta',
+                'ad.data_hora', 'ad.data_conclusao', 'ad.responsavel_nome'
+            )
+            ->first();
+        if (!$row) return null;
+
+        $proc = DB::table('processos')->where('pasta', $row->processo_pasta)->first();
+        $ultimoAnd = DB::table('andamentos_fase')
+            ->where('processo_pasta', $row->processo_pasta)
+            ->orderByDesc('data_andamento')
+            ->first();
+
+        return [
+            'kind'        => 'suspeita',
+            'title'       => 'Suspeita · ' . ($row->tipo_atividade ?: 'Atividade'),
+            'processo'    => $row->processo_pasta,
+            'tribunal'    => $this->tribunalFromPasta($row->processo_pasta),
+            'cliente'     => $proc->cliente_nome ?? null,
+            'advogado'    => $row->responsavel_nome,
+            'data_evento' => $row->data_conclusao ?: $row->data_hora,
+            'data_limite' => null,
+            'status'      => $row->status_cruzamento,
+            'parecer'     => null,
+            'andamento'   => $ultimoAnd ? [
+                'tipo'       => $ultimoAnd->tipo,
+                'data'       => $ultimoAnd->data_andamento,
+                'descricao'  => $ultimoAnd->descricao,
+                'observacao' => $this->extractFromPayload($ultimoAnd->payload_raw, 'observacao'),
+                'parecer'    => $ultimoAnd->parecer ?: $this->extractFromPayload($ultimoAnd->payload_raw, 'parecer'),
+            ] : null,
+            'suspeita_meta' => [
+                'dias_gap'   => (int) $row->dias_gap,
+                'observacao' => $row->vc_obs,
+                'ai_verdict' => $row->ai_verdict,
+            ],
+            'links'       => $this->buildLinks($proc, $row->processo_pasta),
+            'note'        => 'Atividade marcada como concluída no DataJuri sem andamento posterior compatível. Audite ou aceite a conclusão.',
+        ];
+    }
+
+    private function extractFromPayload(?string $rawJson, string $key): ?string
+    {
+        if (!$rawJson) return null;
+        $p = json_decode($rawJson, true);
+        if (!is_array($p)) return null;
+        $v = $p[$key] ?? null;
+        return is_string($v) && trim($v) !== '' ? $v : null;
+    }
+
+    private function buildLinks($processo, ?string $pasta): array
+    {
+        $djUrl = ($processo && !empty($processo->datajuri_id))
+            ? "https://dj21.datajuri.com.br/app/#/lista/Processo/{$processo->datajuri_id}"
+            : null;
+
+        $tribunalUrl = null;
+        $tribunalLabel = null;
+        if ($pasta) {
+            if (str_contains($pasta, '.8.24.')) {
+                $tribunalUrl = 'https://eproc1g.tjsc.jus.br/eproc/externo_controlador.php?acao=processo_consulta_publica';
+                $tribunalLabel = 'eproc TJSC';
+            } elseif (str_contains($pasta, '.4.04.')) {
+                $tribunalUrl = 'https://eproc.trf4.jus.br/eproc2trf4/externo_controlador.php?acao=processo_consulta_publica';
+                $tribunalLabel = 'eproc TRF4';
+            } elseif (str_contains($pasta, '.5.12.')) {
+                $tribunalUrl = 'https://pje.trt12.jus.br/consultaprocessual';
+                $tribunalLabel = 'PJe TRT12';
+            }
+        }
+
+        return [
+            'datajuri'        => $djUrl,
+            'tribunal_url'    => $tribunalUrl,
+            'tribunal_label'  => $tribunalLabel,
+            'pasta'           => $pasta,
+        ];
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────
 
     private function tribunalFromPasta(?string $pasta): string

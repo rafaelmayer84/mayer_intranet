@@ -29,6 +29,9 @@ Route::middleware(['auth'])->prefix('vigilia')->name('vigilia.')->group(function
         Route::get('/obrigacoes', [VigiliaController::class, 'apiObrigacoes'])->name('api.obrigacoes');
         Route::post('/obrigacoes/{id}/cumprir', [VigiliaController::class, 'apiObrigacaoCumprir'])->name('api.obrigacoes.cumprir');
         Route::get('/inbox', [VigiliaController::class, 'apiInbox'])->name('api.inbox');
+        Route::get('/inbox/{id}', [VigiliaController::class, 'apiInboxItem'])
+            ->where('id', '[a-z]+:[0-9]+')
+            ->name('api.inbox.item');
         Route::get('/confiabilidade', [VigiliaController::class, 'apiConfiabilidade'])->name('api.confiabilidade');
     });
 
