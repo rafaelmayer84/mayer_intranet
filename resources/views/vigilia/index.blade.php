@@ -756,15 +756,11 @@ function showToast(msg) {
 // ── Drawer de detalhe (inteiro teor + links) ──
 async function openDrawer(itemId) {
     if (!itemId) return;
-    // Trava scroll do body sem perder posição (overflow:hidden no desktop preserva scrollY)
-    if (!document.body.dataset.scrollLocked) {
-        document.body.dataset.scrollLocked = '1';
-        document.body.dataset.scrollY = String(window.scrollY);
-        document.body.style.overflow = 'hidden';
-    }
     el('drawer-overlay').classList.add('open');
     el('drawer-detail').classList.add('open');
     el('drawer-detail').setAttribute('aria-hidden', 'false');
+    // Foca o drawer pra leitor de tela e pra rolagem por teclado
+    setTimeout(() => el('drawer-detail').focus?.(), 0);
     el('drw-title').textContent = 'Carregando…';
     el('drw-eyebrow').textContent = 'Detalhe';
     el('drw-meta').innerHTML = '';
@@ -784,14 +780,6 @@ function closeDrawer() {
     el('drawer-overlay').classList.remove('open');
     el('drawer-detail').classList.remove('open');
     el('drawer-detail').setAttribute('aria-hidden', 'true');
-    if (document.body.dataset.scrollLocked) {
-        document.body.style.overflow = '';
-        const y = parseInt(document.body.dataset.scrollY || '0', 10);
-        delete document.body.dataset.scrollLocked;
-        delete document.body.dataset.scrollY;
-        // Restaura posição (nem sempre é necessário no desktop, mas garante)
-        window.scrollTo(0, y);
-    }
 }
 
 document.addEventListener('keydown', (e) => {
