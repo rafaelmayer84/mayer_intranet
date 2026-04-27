@@ -4,6 +4,7 @@ use App\Http\Controllers\NexoAtendimentoController;
 use App\Http\Controllers\NexoGerencialController;
 use App\Http\Controllers\NexoDataJuriController;
 use App\Http\Controllers\NexoTicketController;
+use App\Http\Controllers\NexoLeadsAguardandoController;
 Route::middleware(['auth', 'user.active'])->group(function () {
     Route::prefix('nexo/atendimento')->middleware('modulo:operacional.nexo,visualizar')->group(function () {
         // -- Rotas existentes (INTOCADAS) ------------------------------
@@ -75,5 +76,11 @@ Route::middleware(['auth', 'user.active'])->group(function () {
     Route::post('/escala', [NexoGerencialController::class, 'escalaStore'])->name('nexo.gerencial.escala.store');
     Route::delete('/escala/{id}', [NexoGerencialController::class, 'escalaDestroy'])->name('nexo.gerencial.escala.destroy');
     // === FIM NEXO GERENCIAL ===
+    });
+
+    // === NEXO: Leads Aguardando (Lexus V3) ===
+    Route::prefix('nexo')->middleware('modulo:operacional.nexo,visualizar')->group(function () {
+        Route::get('/leads-aguardando', [NexoLeadsAguardandoController::class, 'index'])->name('nexo.leads-aguardando');
+        Route::post('/leads-aguardando/{convId}/atendido', [NexoLeadsAguardandoController::class, 'markAtendido'])->name('nexo.leads-aguardando.atendido')->whereNumber('convId');
     });
 });

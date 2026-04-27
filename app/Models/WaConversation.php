@@ -33,6 +33,7 @@ class WaConversation extends Model
     public function cliente(): BelongsTo { return $this->belongsTo(Cliente::class, 'linked_cliente_id'); }
     public function processo(): BelongsTo { return $this->belongsTo(Processo::class, 'linked_processo_id'); }
     public function crmAccount(): BelongsTo { return $this->belongsTo(\App\Models\Crm\CrmAccount::class, 'linked_crm_account_id'); }
+    public function lexusSessao(): \Illuminate\Database\Eloquent\Relations\HasOne { return $this->hasOne(NexoLexusSessao::class, 'phone', 'phone')->latestOfMany('id'); }
 
     public function scopeOpen($query) { return $query->where('status', 'open'); }
     public function scopeClosed($query) { return $query->where('status', 'closed'); }
